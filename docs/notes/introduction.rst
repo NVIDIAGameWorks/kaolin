@@ -1,0 +1,8 @@
+Kaolin: An introduction
+=================================
+
+Kaolin accelerates 3D deep learning research by providing efficient implementations of functionality that one needs at every stage to build a 3D deep learning application. Right from loading/preprocessing data, to converting it across popular 3D representations (meshes, voxels, signed distance functions, pointclouds, etc.), to performing deep learning tasks on those representations, to computing task-specific metrics and visualizing 3D data, Kaolin makes the entire lifecycle of a 3D deep learning application easier to implement. In addition, Kaolin also supports a set of standardized metrics that can act upon each representation, for an easy comparison across methods.
+
+A lot of recent 3D deep learning applications extensively use differentiable renderers, to explicitly model geometric structure and other physical processes (lighting, shading, projection, etc.) to learn better representations. Seeing the potential impact differentiable renderers could have on the 3D vision research landscape, we implement a generic, modular differentiable renderer that can be easily accessed, and extended to build newer ones. We also present concrete extensions of this generic renderer, and demonstrate how most of the existing differentiable renderers fall within this framework.
+
+Finally, a large set of popular pretrained models for 3D tasks are provided in our model zoo, to demonstrate the ease through which new methods can be implemented in Kaolin, and to turn Kaolin into a starting point for newer research applications in 3D vision, graphics, and robotics.
