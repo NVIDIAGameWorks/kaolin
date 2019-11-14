@@ -295,7 +295,8 @@ class Mesh():
         self.ef_count = self._to_helper(self.ef_count, device)
         self.ee = self._to_helper(self.ee, device)
         self.ee_count = self._to_helper(self.ee_count, device)
-        self.device = device
+
+        self.device = self.vertices.device
 
 
     @staticmethod
