@@ -27,7 +27,7 @@ class Voxel3DIWGenerator(nn.Module):
     """
 
     def __init__(self):
-        super(Generator, self).__init__()
+        super(Voxel3DIWGenerator, self).__init__()
 
         self.linear = nn.Linear(200, 256 * 2 * 2 * 2)
         self.post_linear = torch.nn.Sequential(
@@ -81,7 +81,7 @@ class Voxel3DIWDiscriminator(nn.Module):
     """
 
     def __init__(self):
-        super(Discriminator, self).__init__()
+        super(Voxel3DIWDiscriminator, self).__init__()
 
         self.layer1 = torch.nn.Sequential(
             torch.nn.Conv3d(1, 32, kernel_size=4, stride=2),
