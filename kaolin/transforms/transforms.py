@@ -30,9 +30,9 @@ import kaolin.conversions as cvt
 # from kaolin.conversion import mesh as cvt_mesh
 # from kaolin.conversion import SDF as cvt_SDF
 # from kaolin.conversion import voxel as cvt_voxel
-# from kaolin.transforms import pointcloudfunc as pcfunc
-# from kaolin.transforms import meshfunc
-# from kaolin.transforms import voxelfunc
+from kaolin.transforms import pointcloudfunc as pcfunc
+from kaolin.transforms import meshfunc
+from kaolin.transforms import voxelfunc
 
 
 class Compose(object):
