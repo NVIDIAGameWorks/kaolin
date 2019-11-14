@@ -101,6 +101,8 @@ def check_sign(mesh, points, hash_resolution=512):
 
 
     """
+    assert mesh.device == points.device
+
     if mesh.device.type == 'cuda':
         return check_sign_fast(mesh, points)
     else:
