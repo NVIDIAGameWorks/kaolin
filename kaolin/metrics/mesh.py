@@ -43,7 +43,7 @@ import numpy as np
 
 
 
-class TringleDistanceFunction(torch.autograd.Function):
+class TriangleDistanceFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, points, verts_1, verts_2, verts_3):
         batchsize, n, _ = points.size()
@@ -71,7 +71,7 @@ class TriangleDistance(torch.nn.Module):
         verts_1 = verts_1.view(1, -1, 3)
         verts_2 = verts_2.view(1, -1, 3)
         verts_3 = verts_3.view(1, -1, 3)
-        return TringleDistanceFunction.apply(points, verts_1, verts_2, verts_3)
+        return TriangleDistanceFunction.apply(points, verts_1, verts_2, verts_3)
 
 
 def chamfer_distance(mesh1: Mesh, mesh2: Mesh,
@@ -306,33 +306,33 @@ def _point_to_surface_cpu(v1, v2, v3, points):
     sign2 = _compute_sign(v32, nor, p2)
     sign3 = _compute_sign(v13, nor, p3)
 
-    outside_tringle = torch.le(torch.abs(sign1 + sign2 + sign3), 2)
-    inside_tringle = torch.gt(torch.abs(sign1 + sign2 + sign3), 2)
+    outside_triangle = torch.le(torch.abs(sign1 + sign2 + sign3), 2)
+    inside_triangle = torch.gt(torch.abs(sign1 + sign2 + sign3), 2)
     distances = torch.FloatTensor(np.zeros(sign1.shape))
 
     del (sign1)
     del (sign2)
     del (sign3)
 
-    outside_tringle = np.where(outside_tringle)
-    inside_tringle = np.where(inside_tringle)
+    outside_triangle = np.where(outside_triangle)
+    inside_triangle = np.where(inside_triangle)
 
     try:
-        dotter1 = _compute_dotter(v21[outside_tringle], p1[outside_tringle])
-        dotter2 = _compute_dotter(v32[outside_tringle], p2[outside_tringle])
-        dotter3 = _compute_dotter(v13[outside_tringle], p3[outside_tringle])
+        dotter1 = _compute_dotter(v21[outside_triangle], p1[outside_triangle])
+        dotter2 = _compute_dotter(v32[outside_triangle], p2[outside_triangle])
+        dotter3 = _compute_dotter(v13[outside_triangle], p3[outside_triangle])
         dots = torch.cat((dotter1, dotter2, dotter3), dim=1)
         edge_distance = torch.min(dots, dim=1)[0]
     except BaseException:
         edge_distance = 0
 
-    distances[outside_tringle] = edge_distance
+    distances[outside_triangle] = edge_distance
     try:
         face_distance = _compute_planar_dist(
-            nor[inside_tringle], p1[inside_tringle])
+            nor[inside_triangle], p1[inside_triangle])
     except BaseException:
         face_distance = 0
-    distances[inside_tringle] = face_distance
+    distances[inside_triangle] = face_distance
 
     distances = distances.view(points.shape[0], faces_len)
 
