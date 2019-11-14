@@ -19,7 +19,7 @@ import logging
 import numpy as np
 from pathlib import Path
 import os
-from typing import Iterable, Union, Tuple, Dict
+from typing import Iterable, Union, Tuple, Dict, List
 
 from pxr import Usd, UsdGeom, UsdLux, Sdf, Gf, Vt
 
@@ -58,6 +58,7 @@ class VisUsd:
         self.stage = Usd.Stage.CreateNew(str(filepath))
 
         self.up_axis = up_axis.upper()
+        self.up_axis_index = {'Y': 1, 'Z': 2}[self.up_axis]
         assert (self.up_axis in ['Y', 'Z'])
         UsdGeom.SetStageUpAxis(self.stage, self.up_axis)
 
@@ -126,9 +127,8 @@ class VisUsd:
         """
 
         points = torch.nonzero(voxels.voxels.detach()).float()
-        points, scale, _ = self._fit_to_stage(points)
-        points, _ = self._set_points_center(points, [1.0, 1.0, 1.0])
-        points, _ = self._set_points_bottom(points, 1, 1.0)
+        points, scale, _ = self._fit_to_stage(points, **kwargs)
+        points, _ = self._set_points_bottom(points, scale)
 
         points[:, 0] += translation[0]
         points[:, 1] += translation[1]
@@ -204,7 +204,7 @@ class VisUsd:
         self.save()
 
     def _fit_to_stage(self, points: torch.Tensor, center_on_stage: bool = True,
-                      meet_ground: bool = True, fit_to_stage: bool = True):
+                      meet_ground: bool = True, fit_to_stage: bool = True, **kwargs):
         r""" Scale and translate (in the Y axis) to fit to
         the specified stage size and keep the object above the floor.
 
@@ -219,7 +219,7 @@ class VisUsd:
         translation = [0., 0., 0.]
         if center_on_stage:
             # center at 0, 0, 0
-            points, translation = self._set_points_center(points, [0., 0., 0.])
+            points, translation = self._set_points_center(points)
 
         if fit_to_stage:
             # scale points to fit within STAGE_SIZE
@@ -227,9 +227,8 @@ class VisUsd:
 
         if meet_ground:
             # set bottom as 0.0 on up_axis
-            axis = {'Y': 1, 'Z': 2}[self.up_axis]
-            points, up_translation = self._set_points_bottom(points, axis=axis, bottom=0.0)
-            translation[axis] += up_translation
+            points, up_translation = self._set_points_bottom(points, **kwargs)
+            translation[self.up_axis_index] += up_translation
         return points, scale, translation
 
     def _fit_points(self, points, fit_size):
@@ -239,13 +238,13 @@ class VisUsd:
         points *= scale
         return points, scale
 
-    def _set_points_bottom(self, points: np.ndarray, axis: int, bottom: float):
+    def _set_points_bottom(self, points: np.ndarray, bottom: float = 0.0, **kwargs):
         r"""Move points to be above bottom value on axis"""
-        y_translation = torch.min(points[:, axis])
-        points[:, axis] -= y_translation
+        y_translation = torch.min(points[:, self.up_axis_index])
+        points[:, self.up_axis_index] -= y_translation - bottom
         return points, y_translation
 
-    def _set_points_center(self, points, center_point):
+    def _set_points_center(self, points, center_point: List[float] = [0., 0., 0.]):
         r"""Set center of points to match center_point."""
         center_point = torch.tensor(center_point, device=points.device)
         extents = torch.max(points, 0)[0] - torch.min(points, 0)[0]
