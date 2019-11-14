@@ -126,7 +126,6 @@ class VisUsd:
         """
 
         points = torch.nonzero(voxels.voxels).float()
-        import pdb; pdb.set_trace()
         points, scale, _ = self._fit_to_stage(points)
         points, _ = self._set_points_center(points, torch.tensor([1.0, 1.0, 1.0]))
         points, _ = self._set_points_bottom(points, 1, 1.0)
@@ -177,6 +176,7 @@ class VisUsd:
                         translation: Tuple[float, float, float] = (0., 0., 0.), **kwargs):
         r""" Visualize mesh in USD.
         """
+
         if isinstance(mesh, Mesh):
             vertices, faces = mesh.vertices, mesh.faces
         else:
@@ -189,8 +189,9 @@ class VisUsd:
         face_vertex_counts = [faces.size(1)] * num_faces
 
         vertices, _, _ = self._fit_to_stage(vertices, **kwargs)
+
         vertices = vertices.detach().cpu().numpy().astype(float)
-        points = [Gf.Vec3f(*v) for v in vertices]
+        points = vertices.tolist()
         faces = faces.detach().cpu().view(-1).numpy().astype(int)
 
         usd_mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts)
@@ -199,6 +200,7 @@ class VisUsd:
         if is_tri:
             usd_mesh.GetPrim().GetAttribute('subdivisionScheme').Set('none')
         UsdGeom.XformCommonAPI(usd_mesh.GetPrim()).SetTranslate(translation)
+
         self.save()
 
     def _fit_to_stage(self, points: torch.Tensor, center_on_stage: bool = True,
@@ -228,7 +230,7 @@ class VisUsd:
             # scale points to fit within STAGE_SIZE
             points, scale = self._fit_points(points, self.STAGE_SIZE)
 
-        translation[axis] += up_translation
+            translation[axis] += up_translation
         return points, scale, translation
 
     def _fit_points(self, points, fit_size):
