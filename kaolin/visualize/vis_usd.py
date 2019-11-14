@@ -125,9 +125,9 @@ class VisUsd:
 
         """
 
-        points = torch.nonzero(voxels.voxels).float()
+        points = torch.nonzero(voxels.voxels.detach()).float()
         points, scale, _ = self._fit_to_stage(points)
-        points, _ = self._set_points_center(points, torch.tensor([1.0, 1.0, 1.0]))
+        points, _ = self._set_points_center(points, [1.0, 1.0, 1.0])
         points, _ = self._set_points_bottom(points, 1, 1.0)
 
         points[:, 0] += translation[0]
@@ -135,8 +135,8 @@ class VisUsd:
         points[:, 2] += translation[2]
 
         indices = [1] * points.shape[0]
-        points = points.numpy().astype(float)
-        positions = [Gf.Vec3f(*p) for p in points]
+        points = points.cpu().numpy().astype(float)
+        positions = points.tolist()
         orientations = [Gf.Quath(1.0, 0.0, 0.0, 0.0)] * points.shape[0]
         scales = [Gf.Vec3f(float(scale))] * points.shape[0]
 
@@ -152,17 +152,17 @@ class VisUsd:
         r""" Visualize points in USD.
         """
 
-        points, _, _ = self._fit_to_stage(pointcloud.points)
+        points, _, _ = self._fit_to_stage(pointcloud.points.detach())
 
         points[:, 0] += translation[0]
         points[:, 1] += translation[1]
         points[:, 2] += translation[2]
 
         indices = [0] * points.shape[0]
-        points = points.numpy().astype(float)
-        positions = [Gf.Vec3f(*p) for p in points]
+        points = points.cpu().numpy().astype(float)
+        positions = points.tolist()
         orientations = [Gf.Quath(1.0, 0.0, 0.0, 0.0)] * points.shape[0]
-        scales = [Gf.Vec3f(0.1)] * points.shape[0]
+        scales = [Gf.Vec3f(1)] * points.shape[0]
 
         self.instancer.GetProtoIndicesAttr().Set(indices)
         self.instancer.GetPositionsAttr().Set(positions)
@@ -178,7 +178,7 @@ class VisUsd:
         """
 
         if isinstance(mesh, Mesh):
-            vertices, faces = mesh.vertices, mesh.faces
+            vertices, faces = mesh.vertices.detach(), mesh.faces.detach()
         else:
             vertices, faces = mesh['vertices'], mesh['faces']
 
@@ -219,17 +219,16 @@ class VisUsd:
         translation = [0., 0., 0.]
         if center_on_stage:
             # center at 0, 0, 0
-            points, translation = self._set_points_center(points, torch.tensor([0., 0., 0.]))
-
-        if meet_ground:
-            # set bottom as 0.0 on up_axis
-            axis = {'Y': 1, 'Z': 2}[self.up_axis]
-            points, up_translation = self._set_points_bottom(points, axis=axis, bottom=0.0)
+            points, translation = self._set_points_center(points, [0., 0., 0.])
 
         if fit_to_stage:
             # scale points to fit within STAGE_SIZE
             points, scale = self._fit_points(points, self.STAGE_SIZE)
 
+        if meet_ground:
+            # set bottom as 0.0 on up_axis
+            axis = {'Y': 1, 'Z': 2}[self.up_axis]
+            points, up_translation = self._set_points_bottom(points, axis=axis, bottom=0.0)
             translation[axis] += up_translation
         return points, scale, translation
 
@@ -248,6 +247,7 @@ class VisUsd:
 
     def _set_points_center(self, points, center_point):
         r"""Set center of points to match center_point."""
+        center_point = torch.tensor(center_point, device=points.device)
         extents = torch.max(points, 0)[0] - torch.min(points, 0)[0]
         curr_center = torch.max(points, 0)[0] - extents / 2.0
         translation = center_point - curr_center
