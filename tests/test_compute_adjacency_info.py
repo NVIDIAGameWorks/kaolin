@@ -20,7 +20,7 @@ from kaolin.rep import TriangleMesh
 from kaolin.rep import QuadMesh
 from kaolin.rep import Mesh
 
-mesh = TriangleMesh.from_obj(('model.obj') )
+mesh = TriangleMesh.from_obj(('tests/model.obj') )
 vertices = mesh.vertices
 faces = mesh.faces
 device = vertices.device
