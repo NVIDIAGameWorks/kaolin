@@ -20,35 +20,36 @@ import sys
 import kaolin as kal
 from kaolin.rep import TriangleMesh
 
-def test_check_sign(device = 'cpu'): 
-	mesh = TriangleMesh.from_obj(('tests/model.obj') )
-	if device == 'cuda': 
-		mesh.cuda()
-	points = torch.rand((1000,3)) -.5
-	signs = kal.rep.SDF.check_sign(mesh, points)
-	assert (signs == True).sum() > 0 
-	assert (signs == False).sum() > 0 
+@pytest.mark.parametrize('device', ['cpu', 'cuda'])
+def test_check_sign(device): 
+    mesh = TriangleMesh.from_obj(('tests/model.obj') )
+    if device == 'cuda': 
+        mesh.cuda()
+    points = torch.rand((1000,3), device=device) -.5
+    signs = kal.rep.SDF.check_sign(mesh, points)
+    assert (signs == True).sum() > 0 
+    assert (signs == False).sum() > 0 
 
-	points = (torch.rand((1000,3)) -.5) * .001
-	signs = kal.rep.SDF.check_sign(mesh, points)
-	assert (signs == False).sum() == 0 
-
-
-	points = torch.rand((1000,3)) +10
-	signs = kal.rep.SDF.check_sign(mesh, points)
-	assert (signs == True).sum() == 0 
-
-def test_check_sign_gpu(): 
-	test_check_sign("cuda")
+    points = (torch.rand((1000,3), device=device) -.5) * .001
+    signs = kal.rep.SDF.check_sign(mesh, points)
+    assert (signs == False).sum() == 0 
 
 
-def test_check_sign_fast(device='cuda'):
-	mesh = TriangleMesh.from_obj('tests/model.obj')
-	mesh.to(device)
-	points = torch.rand(1000, 3).to(device) - .5
-	signs = kal.rep.SDF.check_sign_fast(mesh, points)
-	assert (signs == True).float().sum() > 0
-	assert (signs == False).sum() > 0
+    points = torch.rand((1000,3), device=device) +10
+    signs = kal.rep.SDF.check_sign(mesh, points)
+    assert (signs == True).sum() == 0 
+
+# def test_check_sign_gpu(): 
+#     test_check_sign("cuda")
+
+
+# def test_check_sign_fast(device='cuda'):
+#     mesh = TriangleMesh.from_obj('tests/model.obj')
+#     mesh.to(device)
+#     points = torch.rand(1000, 3).to(device) - .5
+#     signs = kal.rep.SDF.check_sign_fast(mesh, points)
+#     assert (signs == True).float().sum() > 0
+#     assert (signs == False).sum() > 0
 
 
 # if __name__ == '__main__':
@@ -63,5 +64,5 @@ def test_check_sign_fast(device='cuda'):
 # 	sign = kal.rep.SDF.check_sign(mesh, points)
 # 	import numpy as np
 # 	sign = torch.from_numpy(np.asarray(sign)).cuda()
-	
+    
 # 	print((sign == sign_fast).float().sum())
