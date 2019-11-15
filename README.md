@@ -85,7 +85,7 @@ To verify that `kaolin` has been installed, fire up your python interpreter, and
 
 ```python
 >>> import kaolin as kal
->>> print(kal.__version)
+>>> print(kal.__version__)
 ```
 
 ### Building the Documentation
@@ -178,3 +178,4 @@ If you find this library useful, consider citing the following paper:
 }
 
 ```
+
