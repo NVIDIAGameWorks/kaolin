@@ -24,6 +24,23 @@ class Generator(nn.Module):
 
     Input shape: B x 200 (B -> batchsize, 200 -> latent code size)
     Output shape: B x 1 x 32 x 32 x 32
+
+
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @inproceedings{3dgan,
+              title={Learning a probabilistic latent space of object shapes via 3d generative-adversarial modeling},
+              author={Wu, Jiajun and Zhang, Chengkai and Xue, Tianfan and Freeman, William T and Tenenbaum, Joshua B},
+              booktitle={Advances in Neural Information Processing Systems},
+              pages={82--90},
+              year={2016}
+            }
+
+            
     """
 
     def __init__(self):

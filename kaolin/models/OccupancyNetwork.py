@@ -274,6 +274,19 @@ class OccupancyNetwork(nn.Module):
         encoder (nn.Module): encoder network
         p0_z (dist): prior distribution for latent code z
         device (device): torch device
+
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @inproceedings{Occupancy Networks,
+                title = {Occupancy Networks: Learning 3D Reconstruction in Function Space},
+                author = {Mescheder, Lars and Oechsle, Michael and Niemeyer, Michael and Nowozin, Sebastian and Geiger, Andreas},
+                booktitle = {Proceedings IEEE Conf. on Computer Vision and Pattern Recognition (CVPR)},
+                year = {2019}
+            }
     '''
 
     def __init__(self, device):

@@ -24,9 +24,31 @@ class Voxel3DIWGenerator(nn.Module):
 
     Input shape: B x 200
     Output shape: B x 32 x 32 x 32
+
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{DBLP:journals/corr/SmithM17,
+              author    = {Edward J. Smith and
+                           David Meger},
+              title     = {Improved Adversarial Systems for 3D Object Generation and Reconstruction},
+              journal   = {CoRR},
+              volume    = {abs/1707.09557},
+              year      = {2017},
+              url       = {http://arxiv.org/abs/1707.09557},
+              archivePrefix = {arXiv},
+              eprint    = {1707.09557},
+              timestamp = {Mon, 13 Aug 2018 16:46:50 +0200},
+              biburl    = {https://dblp.org/rec/bib/journals/corr/SmithM17},
+              bibsource = {dblp computer science bibliography, https://dblp.org}
+            }
     """
 
     def __init__(self):
+
         super(Voxel3DIWGenerator, self).__init__()
 
         self.linear = nn.Linear(200, 256 * 2 * 2 * 2)
@@ -81,6 +103,7 @@ class Voxel3DIWDiscriminator(nn.Module):
     """
 
     def __init__(self):
+
         super(Voxel3DIWDiscriminator, self).__init__()
 
         self.layer1 = torch.nn.Sequential(
