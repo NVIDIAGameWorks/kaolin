@@ -21,6 +21,22 @@ class ImageToMeshReconstructionBaseline(nn.Module):
     r"""A simple mesh reconstruction architecture from images. This serves
     as a baseline for mesh reconstruction systems.
     
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @InProceedings{smith19a,
+                title = {{GEOM}etrics: Exploiting Geometric Structure for Graph-Encoded Objects},
+                author = {Smith, Edward and Fujimoto, Scott and Romero, Adriana and Meger, David},
+                booktitle = {Proceedings of the 36th International Conference on Machine Learning},
+                pages = {5866--5876},
+                year = {2019},
+                volume = {97},
+                series = {Proceedings of Machine Learning Research},
+                publisher = {PMLR},
+            }
     """
 
     def __init__(self, N_CHANNELS, N_KERNELS, \

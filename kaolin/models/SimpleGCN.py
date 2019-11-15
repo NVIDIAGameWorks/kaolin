@@ -27,6 +27,19 @@ class SimpleGCN(nn.Module):
     r"""A simple graph convolution layer, similar to the one defined in
     Kipf et al. https://arxiv.org/abs/1609.02907
 
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{kipf2016semi,
+              title={Semi-Supervised Classification with Graph Convolutional Networks},
+              author={Kipf, Thomas N and Welling, Max},
+              journal={arXiv preprint arXiv:1609.02907},
+              year={2016}
+            }
+
     """
 
     def __init__(self, in_features, out_features, bias=True):

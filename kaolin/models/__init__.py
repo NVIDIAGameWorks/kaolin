@@ -25,3 +25,27 @@ import kaolin.models.VoxelSuperresODM
 
 # DGCNN
 import kaolin.models.dgcnn
+
+# DIBREncoder
+import kaolin.models.DIBREncoder
+
+# GEOMetrics
+import kaolin.models.GEOMetrics
+
+# Image2MeshReconstructionBaseline
+import kaolin.models.Image2MeshReconstructionBaseline
+
+# MeshEncoder
+import kaolin.models.MeshEncoder
+
+# OccupancyNetwork
+import kaolin.models.OccupancyNetwork
+
+# Pixel2Mesh
+import kaolin.models.Pixel2Mesh
+
+# SimpleGCN
+import kaolin.models.SimpleGCN
+
+# VGG18
+import kaolin.models.VGG18

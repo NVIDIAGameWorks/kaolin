@@ -44,6 +44,7 @@ import numpy as np
 
 
 class TriangleDistanceFunction(torch.autograd.Function):
+
     @staticmethod
     def forward(ctx, points, verts_1, verts_2, verts_3):
         batchsize, n, _ = points.size()
@@ -71,6 +72,7 @@ class TriangleDistance(torch.nn.Module):
         verts_1 = verts_1.view(1, -1, 3)
         verts_2 = verts_2.view(1, -1, 3)
         verts_3 = verts_3.view(1, -1, 3)
+
         return TriangleDistanceFunction.apply(points, verts_1, verts_2, verts_3)
 
 

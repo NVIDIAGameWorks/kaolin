@@ -22,6 +22,19 @@ class DIBREncoder(nn.Module):
     the Neurips 2019 paper "Learning to Predict 3D Objects with an
     Interpolation-based Differentiable Renderer"
     
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @inproceedings{chen2019dibrender,
+                title={Learning to Predict 3D Objects with an Interpolation-based Differentiable Renderer},
+                author={Wenzheng Chen and Jun Gao and Huan Ling and Edward Smith and Jaakko Lehtinen and Alec Jacobson and Sanja Fidler},
+                booktitle={Advances In Neural Information Processing Systems},
+                year={2019}
+            }
+            
     """
 
     def __init__(self, N_CHANNELS, N_KERNELS, \

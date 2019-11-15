@@ -24,6 +24,20 @@ from torch.nn import Parameter
 
 
 class VGG(nn.Module):
+    r"""
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @InProceedings{Simonyan15,
+              author       = "Karen Simonyan and Andrew Zisserman",
+              title        = "Very Deep Convolutional Networks for Large-Scale Image Recognition",
+              booktitle    = "International Conference on Learning Representations",
+              year         = "2015",
+            }
+    """
     
     def __init__(self, channels = 4):
         
@@ -87,6 +101,21 @@ class VGG(nn.Module):
 
 
 class G_Res_Net(nn.Module):
+    r"""Pixel2Mesh architecture.
+
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @inProceedings{wang2018pixel2mesh,
+              title={Pixel2Mesh: Generating 3D Mesh Models from Single RGB Images},
+              author={Nanyang Wang and Yinda Zhang and Zhuwen Li and Yanwei Fu and Wei Liu and Yu-Gang Jiang},
+              booktitle={ECCV},
+              year={2018}
+            }
+    """
 
     def __init__(self, input_features, hidden = 128, output_features = 3):
         super(G_Res_Net, self).__init__()
@@ -155,6 +184,19 @@ class G_Res_Net(nn.Module):
 class GCN(nn.Module):
     """
     Simple GCN layer, similar to https://arxiv.org/abs/1609.02907
+
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{kipf2016semi,
+              title={Semi-Supervised Classification with Graph Convolutional Networks},
+              author={Kipf, Thomas N and Welling, Max},
+              journal={arXiv preprint arXiv:1609.02907},
+              year={2016}
+            }
     """
     def __init__(self, in_features, out_features):
         super(GCN, self).__init__()

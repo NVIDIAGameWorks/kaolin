@@ -23,16 +23,20 @@ class PointNetFeatureExtractor(nn.Module):
     r"""PointNet feature extractor (extracts either global or local, i.e.,
     per-point features).
 
-    Based on the original PointNet paper:
+    Based on the original PointNet paper:.
 
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
         .. code-block::
 
-        @article{qi2016pointnet,
-          title={PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation},
-          author={Qi, Charles R and Su, Hao and Mo, Kaichun and Guibas, Leonidas J},
-          journal={arXiv preprint arXiv:1612.00593},
-          year={2016}
-        }
+            @article{qi2016pointnet,
+              title={PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation},
+              author={Qi, Charles R and Su, Hao and Mo, Kaichun and Guibas, Leonidas J},
+              journal={arXiv preprint arXiv:1612.00593},
+              year={2016}
+            }
 
     Args:
         in_channels (int): Number of channels in the input pointcloud
@@ -196,14 +200,18 @@ class PointNetClassifier(nn.Module):
     r"""PointNet classifier. Uses the PointNet feature extractor, and
     adds classification layers on top.
 
-    Based on the original PointNet paper:
+    .. note::
 
-        @article{qi2016pointnet,
-          title={PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation},
-          author={Qi, Charles R and Su, Hao and Mo, Kaichun and Guibas, Leonidas J},
-          journal={arXiv preprint arXiv:1612.00593},
-          year={2016}
-        }
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2016pointnet,
+              title={PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation},
+              author={Qi, Charles R and Su, Hao and Mo, Kaichun and Guibas, Leonidas J},
+              journal={arXiv preprint arXiv:1612.00593},
+              year={2016}
+            }
 
     Args:
         in_channels (int): Number of channels in the input pointcloud
@@ -357,14 +365,18 @@ class PointNetSegmenter(nn.Module):
     r"""PointNet segmenter. Uses the PointNet feature extractor, and
     adds per-point segmentation layers on top.
 
-    Based on the original PointNet paper:
+    .. note::
 
-        @article{qi2016pointnet,
-          title={PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation},
-          author={Qi, Charles R and Su, Hao and Mo, Kaichun and Guibas, Leonidas J},
-          journal={arXiv preprint arXiv:1612.00593},
-          year={2016}
-        }
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2016pointnet,
+              title={PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation},
+              author={Qi, Charles R and Su, Hao and Mo, Kaichun and Guibas, Leonidas J},
+              journal={arXiv preprint arXiv:1612.00593},
+              year={2016}
+            }
 
     Args:
         in_channels (int): Number of channels in the input pointcloud

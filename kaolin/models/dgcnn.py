@@ -67,16 +67,18 @@ class DGCNN(nn.Module):
         k (int): number of nearest neighbors.
         use_cuda (bool): if ``True`` will move the model to GPU
 
-    Citation: 
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
         
         .. code-block::
 
-        @article{dgcnn,
-            title={Dynamic Graph CNN for Learning on Point Clouds},
-            author={Wang, Yue and Sun, Yongbin and Liu, Ziwei and Sarma, Sanjay E. and Bronstein, Michael M. and Solomon, Justin M.},
-            journal={ACM Transactions on Graphics (TOG)},
-            year={2019}
-        }
+            @article{dgcnn,
+                title={Dynamic Graph CNN for Learning on Point Clouds},
+                author={Wang, Yue and Sun, Yongbin and Liu, Ziwei and Sarma, Sanjay E. and Bronstein, Michael M. and Solomon, Justin M.},
+                journal={ACM Transactions on Graphics (TOG)},
+                year={2019}
+            }
 
     """
     def __init__(

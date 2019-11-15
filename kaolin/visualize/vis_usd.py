@@ -19,7 +19,7 @@ import logging
 import numpy as np
 from pathlib import Path
 import os
-from typing import Iterable, Union, Tuple, Dict, List
+from typing import Dict, Iterable, List, Tuple, Union
 
 from pxr import Usd, UsdGeom, UsdLux, Sdf, Gf, Vt
 

@@ -26,6 +26,23 @@ class SuperresNetwork(nn.Module):
 
     Input shape: B x 128 x 128 x 128
     Output shape: B x (high//low * 128) x (high//low * 128) x (high//low * 128)
+
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @incollection{ODM,
+                title = {Multi-View Silhouette and Depth Decomposition for High Resolution 3D Object Representation},
+                author = {Smith, Edward and Fujimoto, Scott and Meger, David},
+                booktitle = {Advances in Neural Information Processing Systems 31},
+                editor = {S. Bengio and H. Wallach and H. Larochelle and K. Grauman and N. Cesa-Bianchi and R. Garnett},
+                pages = {6479--6489},
+                year = {2018},
+                publisher = {Curran Associates, Inc.},
+                url = {http://papers.nips.cc/paper/7883-multi-view-silhouette-and-depth-decomposition-for-high-resolution-3d-object-representation.pdf}
+            }
     """
 
     def __init__(self, high, low):

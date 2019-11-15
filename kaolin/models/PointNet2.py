@@ -52,6 +52,20 @@ import kaolin.cuda.three_nn
 
 
 class FurthestPointSampling(torch.autograd.Function):
+    r"""
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
+    """
 
     @staticmethod
     def forward(ctx, xyz, num_points_out):
@@ -75,6 +89,20 @@ furthest_point_sampling = FurthestPointSampling.apply
 
 
 class FPSGatherByIndex(torch.autograd.Function):
+    r"""
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
+    """
     @staticmethod
     def forward(ctx, features, idx):
         """TODO: documentation (and the ones below)
@@ -106,6 +134,20 @@ fps_gather_by_index = FPSGatherByIndex.apply
 
 
 class ThreeNN(torch.autograd.Function):
+    r"""
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
+    """
     @staticmethod
     def forward(ctx, unknown, known):
         # type: (Any, torch.Tensor, torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]
@@ -138,6 +180,20 @@ three_nn = ThreeNN.apply
 
 
 class ThreeInterpolate(torch.autograd.Function):
+    r"""
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
+    """
     @staticmethod
     def forward(ctx, features, idx, weight):
         # type(Any, torch.Tensor, torch.Tensor, torch.Tensor) -> Torch.Tensor
@@ -195,6 +251,20 @@ three_interpolate = ThreeInterpolate.apply
 
 
 class GroupGatherByIndex(torch.autograd.Function):
+    r"""
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
+    """
     @staticmethod
     def forward(ctx, features, idx):
         # type: (Any, torch.Tensor, torch.Tensor) -> torch.Tensor
@@ -247,6 +317,21 @@ group_gather_by_index = GroupGatherByIndex.apply
 
 
 class BallQuery(torch.autograd.Function):
+    r"""
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
+    """
+
     @staticmethod
     def forward(ctx, radius, nsample, xyz, new_xyz, use_random=False):
         # type: (Any, float, int, torch.Tensor, torch.Tensor) -> torch.Tensor
@@ -289,6 +374,19 @@ ball_query = BallQuery.apply
 def separate_xyz_and_features(points):
     """Break up a point cloud into position vectors (first 3 dimensions) and feature vectors.
 
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
+
     Args:
         points (torch.Tensor): shape = (batch_size, num_points, 3 + num_features)
             The point cloud to separate.
@@ -314,6 +412,19 @@ def separate_xyz_and_features(points):
 class PointNet2GroupingLayer(nn.Module):
     """
     TODO: documentation: if radius is None, then group everything
+
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
     """
 
     def __init__(self, radius, num_samples, use_xyz_feature=True, use_random_ball_query=False):
@@ -381,6 +492,19 @@ class PointNet2GroupingLayer(nn.Module):
 class PointNet2SetAbstraction(nn.Module):
     """A single set-abstraction layer for the PointNet++ architecture.
     Supports multi-scale grouping (MSG).
+
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
 
     Args:
         num_points_out (int|None): The number of output points.
@@ -540,6 +664,19 @@ class PointNet2FeaturePropagator(nn.Module):
 
     Used for segmentation.
 
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
+
     Args:
         num_features (int): The number of features in the current layer.
             Note: this is the number of output features of the corresponding
@@ -630,16 +767,20 @@ class PointNet2FeaturePropagator(nn.Module):
 class PointNet2Classifier(nn.Module):
     r"""PointNet++ classification network.
 
-    Based on the original PointNet++ paper:
+    Based on the original PointNet++ paper.
 
-    .. code-block::
-    
-    @article{qi2017pointnet2,
-        title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
-        author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
-        year = {2017},
-        journal={arXiv preprint arXiv:1706.02413},
-    }
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
 
     Args:
         in_features (int): Number of features (not including xyz coordinates) in
@@ -757,14 +898,18 @@ class PointNet2Classifier(nn.Module):
 class PointNet2Segmenter(nn.Module):
     """PointNet++ classification network.
 
-    Based on the original PointNet++ paper:
+    .. note::
 
-    @article{qi2017pointnet2,
-        title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
-        author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
-        year = {2017},
-        journal={arXiv preprint arXiv:1706.02413},
-    }
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{qi2017pointnet2,
+                title = {PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space},
+                author = {Qi, Charles R. and Yi, Li and Su, Hao and Guibas, Leonidas J.},
+                year = {2017},
+                journal={arXiv preprint arXiv:1706.02413},
+            }
 
     Args:
         in_features (int): Number of features (not including xyz coordinates) in

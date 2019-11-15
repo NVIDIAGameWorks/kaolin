@@ -18,3 +18,21 @@ kaolin.models
 .. autofunction:: models.Voxel3DIWGAN.Voxel3DIWDiscriminator
 .. autofunction:: models.VoxelSuperresODM.SuperresNetwork
 .. autofunction:: models.VoxelSuperresSimple.EncoderDecoder
+.. automodule:: kaolin.models.DIBREncoder
+    :members:
+.. automodule:: kaolin.models.GEOMetrics
+    :members:
+.. automodule:: kaolin.models.GraphResNet
+    :members:
+.. automodule:: kaolin.models.Image2MeshReconstructionBaseline
+    :members:
+.. automodule:: kaolin.models.MeshEncoder
+    :members:
+.. automodule:: kaolin.models.OccupancyNetwork
+    :members:
+.. automodule:: kaolin.models.Pixel2Mesh
+    :members:
+.. automodule:: kaolin.models.SimpleGCN
+    :members:
+.. automodule:: kaolin.models.VGG18
+    :members:

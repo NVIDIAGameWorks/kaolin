@@ -20,6 +20,21 @@ import torch.nn.functional as F
 
 
 class VGG18(nn.Module):
+    r"""
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @InProceedings{Simonyan15,
+              author       = "Karen Simonyan and Andrew Zisserman",
+              title        = "Very Deep Convolutional Networks for Large-Scale Image Recognition",
+              booktitle    = "International Conference on Learning Representations",
+              year         = "2015",
+            }
+    """
+    
     def __init__(self):
         super(VGG, self).__init__()
 
