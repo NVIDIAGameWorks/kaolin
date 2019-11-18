@@ -26,4 +26,5 @@ from kaolin import metrics
 from kaolin import models
 from kaolin import transforms
 
+from kaolin.engine import *
 from kaolin.mathutils import *

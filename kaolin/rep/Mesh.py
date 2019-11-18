@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional
+
 from abc import abstractmethod
 import os
 from PIL import Image
@@ -205,6 +207,83 @@ class Mesh():
                 None
 
         return self(vertices, faces, uvs, face_textures, textures, edges,
+                    edge2key, vv, vv_count, vf, vf_count, ve, ve_count, ff, ff_count,
+                    ef, ef_count, ee, ee_count)
+
+    @classmethod
+    def from_off(self, filename: str,
+                 enable_adjacency: Optional[bool] = False):
+        r"""Loads a mesh from a .off file.
+
+        Args:
+            filename (str): Path to the .off file.
+            enable_adjacency (str): Whether or not to compute adjacency info.
+
+        Returns:
+            (kaolin.rep.Mesh): Mesh object.
+
+        """
+        vertices = []
+        faces = []
+        num_vertices = 0
+        num_faces = 0
+        num_edges = 0
+        # Flag to store the number of vertices, faces, and edges that have
+        # been read.
+        read_vertices = 0
+        read_faces = 0
+        read_edgs = 0
+        # Flag to indicate whether or not metadata (number of vertices,
+        # number of faces, (optionally) number of edges) has been read.
+        # For .off files, metadata is the first valid line of each file
+        # (neglecting the "OFF" header).
+        metadata_read = False
+        with open(filename, 'r') as infile:
+            for line in infile.readlines():
+                # Ignore comments
+                if line.startswith('#'):
+                    continue
+                if line.startswith('OFF'):
+                    continue
+                data = line.strip().split()
+                data = [da for da in data if len(da) > 0]
+                # Ignore blank lines
+                if len(data) == 0:
+                    continue
+                if metadata_read is False:
+                    num_vertices = int(data[0])
+                    num_faces = int(data[1])
+                    if len(data) == 3:
+                        num_edges = int(data[2])
+                    metadata_read = True
+                    continue
+                if read_vertices < num_vertices:
+                    vertices.append([float(d) for d in data])
+                    read_vertices += 1
+                    continue
+                if read_faces < num_faces:
+                    numedges = int(data[0])
+                    faces.append([int(d) for d in data[1:1+numedges]])
+                    read_faces += 1
+                    continue
+                if read_edges < num_edges:
+                    edges.append([int(d) for d in data[1:]])
+                    read_edges += 1
+                    continue
+        vertices = torch.FloatTensor(np.array(vertices, dtype=np.float32))
+        faces = torch.LongTensor(np.array(faces, dtype=np.int64))
+
+        if enable_adjacency:
+            edge2key, edges, vv, vv_count, ve, ve_count, vf, vf_count, ff, ff_count, \
+                ee, ee_count, ef, ef_count = self.compute_adjacency_info(
+                    vertices, faces)
+        else:
+            edge2key, edges, vv, vv_count, ve, ve_count, vf, vf_count, ff, \
+                ff_count, ee, ee_count, ef, ef_count = None, None, None, \
+                None, None, None, None, None, None, None, None, None, None, \
+                None
+
+        return self(vertices, faces, None, None, None, edges,
                     edge2key, vv, vv_count, vf, vf_count, ve, ve_count, ff, ff_count,
                     ef, ef_count, ee, ee_count)
 
