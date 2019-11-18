@@ -12,27 +12,108 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Callable, Iterable, Optional, Union
+
 import torch
 import os
 import sys
-import urllib.request
-import zipfile
 from glob import glob
 import scipy.io as sio
 
+import kaolin as kal
 
-def download_modelnet_category(modelnet_location):
-    r"""Downloads a modelnet category to a specified direcotry
 
-    You may complete this function to automate downloading from a
-    central source.
+_MODELNET10_CLASSES = ['bathtub', 'bed', 'chair', 'desk', 'dresser', 'monitor',
+                       'night_stand', 'sofa', 'table', 'toilet']
+
+
+class ModelNet10(torch.utils.data.Dataset):
+    r"""Dataset class for the ModelNet10 dataset.
+
+    Args:
+        basedir (str): Path to the base directory of the ModelNet10 dataset.
+        rep (str, optional): Type of representation to convert the dataset into
+            (default: 'mesh').
+        split (str, optional): Split to load ('train' vs 'test',
+            default: 'train').
+        categories (iterable, optional): List of categories to load
+            (default: ['chair']).
+        device (str or torch.device, optional): Device to use (cpu,
+            cuda-capable device, etc.).
+        transform (callable, optional): A function/transform to apply on each
+            loaded example.
+
+    **kwargs
+        num_points (int, optional): Number of points in the returned pointcloud
+            (if using pointcloud representation, default: 1024).
+
     """
-    NotImplemented
+
+    def __init__(self, basedir: str, rep: Optional[str] = 'mesh',
+                 split: Optional[str] = 'train',
+                 categories: Optional[Iterable] = ['bed'],
+                 device: Optional[Union[torch.device, str]] = 'cpu',
+                 transform: Optional[Callable] = None,
+                 **kwargs):
+
+        super(ModelNet10, self).__init__()
+
+        if rep.lower() not in ['mesh', 'pointcloud']:
+            raise ValueError('Argument \'rep\' must be one of \'mesh\' '
+                ' or \'pointcloud\'. Got {0} instead.'.format(rep))
+        if split.lower() not in ['train', 'test']:
+            raise ValueError('Argument \'split\' must be one of \'train\' '
+                ' or \'test\'. Got {0} instead.'.format(split))
+
+        self.categories = categories
+        self.paths = []
+        self.labels = []
+        for idx, cat in enumerate(self.categories):
+
+            if cat not in _MODELNET10_CLASSES:
+                raise ValueError('Invalid ModelNet10 class {0}. Valid classes '
+                    ' are {1}'.format(cat, _MODELNET10_CLASSES))
+            
+            catdir = os.path.join(basedir, cat, split)
+            for path in glob(os.path.join(catdir, '*.off')):
+                self.paths.append(path)
+                self.labels.append(idx)
+
+        self.rep = rep
+        self.device = device
+        self.transform = transform
+
+        # Set defaults for kwargs
+        if 'num_points' in kwargs:
+            self.num_points = kwargs['num_points']
+        else:
+            self.num_points = 1024
+
+    def __len__(self):
+        r"""Returns the length of the dataset. """
+        return len(self.paths)
+
+    def __getitem__(self, idx):
+        r"""Returns the item at index `idx`. """
+        
+        mesh = kal.rep.TriangleMesh.from_off(self.paths[idx])
+        mesh.to(self.device)
+        label = torch.LongTensor([self.labels[idx]]).to(self.device)
+        if self.rep == 'mesh':
+            if self.transform is not None:
+                mesh = self.transform(mesh)
+            return mesh, label
+        elif self.rep == 'pointcloud':
+            pts, _ = mesh.sample(self.num_points)
+            if self.transform is not None:
+                pts = self.transform(pts)
+            return pts, label
+        else:
+            raise NotImplementedError
 
 
-class ModelNet(object):
-    r"""
-    Dataloader for downloading and reading from ModelNet
+class ModelNetVoxels(object):
+    r""" Dataloader for downloading and reading from ModelNet.
 
 
     Args:
@@ -64,8 +145,6 @@ class ModelNet(object):
         if not os.path.exists(root + '/ModelNet/'):
             assert download, "ModelNet is not found, and download is set to False"
             assert (train or test), 'either train or test must be set to True'
-
-            download_modelnet_category(root)
 
         if not single_view:
             side = ''
