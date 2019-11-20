@@ -40,13 +40,13 @@ args = parser.parse_args()
 
 
 # Data
-points_set_valid = nvl.dataloader.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
+points_set_valid = kal.datasets.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
 	download = True, train = False, split = .7, num_points=5000 )
-images_set_valid = nvl.dataloader.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
+images_set_valid = kal.datasets.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
 	download = True, train = False,  split = .7, views=1, transform= preprocess )
-meshes_set_valid = nvl.dataloader.ShapeNet.Meshes(root ='../../datasets/', categories =args.categories , \
+meshes_set_valid = kal.datasets.ShapeNet.Meshes(root ='../../datasets/', categories =args.categories , \
 	download = True, train = False,  split = .7)
-valid_set = nvl.dataloader.ShapeNet.Combination([points_set_valid, images_set_valid, meshes_set_valid], root='../../datasets/')
+valid_set = kal.datasets.ShapeNet.Combination([points_set_valid, images_set_valid, meshes_set_valid], root='../../datasets/')
 
 dataloader_val = DataLoader(valid_set, batch_size=args.batchsize, collate_fn=collate_fn, shuffle=False, 
 	num_workers=8)
@@ -140,7 +140,7 @@ with torch.no_grad():
 		if args.f_score: 
 			#### compute f score #### 
 <<<<<<< HEAD
-			f_score = nvl.metrics.point.f_score(tgt_points[:2466]*.57, pred_points[:2466]*.57, extend = False)
+			f_score = kal.metrics.point.f_score(tgt_points[:2466]*.57, pred_points[:2466]*.57, extend = False)
 =======
 			f_score = kal.metrics.point.f_score(tgt_points, pred_points, extend = False)
 >>>>>>> 62d38f16ac8958ccf6e237dfd2074cebebff291d

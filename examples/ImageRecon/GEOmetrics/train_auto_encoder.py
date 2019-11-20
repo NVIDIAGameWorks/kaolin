@@ -50,21 +50,21 @@ args = parser.parse_args()
 """
 Dataset
 """
-mesh_set = kal.dataloader.ShapeNet.Surface_Meshes(root ='../../datasets/',categories =args.categories , \
+mesh_set = kal.datasets.ShapeNet.Surface_Meshes(root ='../../datasets/',categories =args.categories , \
 	resolution = 32, download = True, train = True, split = .7, mode = 'Tri' )
-voxel_set = kal.dataloader.ShapeNet.Voxels(root ='../../datasets/',categories =args.categories , \
+voxel_set = kal.datasets.ShapeNet.Voxels(root ='../../datasets/',categories =args.categories , \
 	download = True, train = True, resolutions=[32], split = .7 )
 
-train_set = kal.dataloader.ShapeNet.Combination([mesh_set, voxel_set], root='../../datasets/')
+train_set = kal.datasets.ShapeNet.Combination([mesh_set, voxel_set], root='../../datasets/')
 
 
 
 
-mesh_set = kal.dataloader.ShapeNet.Surface_Meshes(root ='../../datasets/',categories =args.categories , \
+mesh_set = kal.datasets.ShapeNet.Surface_Meshes(root ='../../datasets/',categories =args.categories , \
 	resolution = 32, download = True, train = False, split = .7, mode = 'Tri' )
-voxel_set = kal.dataloader.ShapeNet.Voxels(root ='../../datasets/',categories =args.categories , \
+voxel_set = kal.datasets.ShapeNet.Voxels(root ='../../datasets/',categories =args.categories , \
 	download = True, train = False, resolutions=[32], split = .7 )
-valid_set = kal.dataloader.ShapeNet.Combination([mesh_set, voxel_set], root='../../datasets/')
+valid_set = kal.datasets.ShapeNet.Combination([mesh_set, voxel_set], root='../../datasets/')
 
 
 

@@ -52,25 +52,25 @@ args = parser.parse_args()
 """
 Dataset
 """
-points_set = nvl.dataloader.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
+points_set = kal.datasets.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
 	download = True, train = True, split = .7, num_points=3000 )
-images_set = nvl.dataloader.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
+images_set = kal.datasets.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
 	download = True, train = True,  split = .7, views=23, transform= preprocess )
 if args.latent_loss:
-	mesh_set = nvl.dataloader.ShapeNet.Surface_Meshes(root ='../../datasets/',categories =args.categories , \
+	mesh_set = kal.datasets.ShapeNet.Surface_Meshes(root ='../../datasets/',categories =args.categories , \
 		resolution = 32, download = True, train = True, split = .7, mode = 'Tri' )
-	train_set = nvl.dataloader.ShapeNet.Combination([points_set, images_set, mesh_set], root='../../datasets/')
+	train_set = kal.datasets.ShapeNet.Combination([points_set, images_set, mesh_set], root='../../datasets/')
 	dataloader_train = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn,
 	num_workers=8)
 else: 
-	train_set = nvl.dataloader.ShapeNet.Combination([points_set, images_set], root='../../datasets/')
+	train_set = kal.datasets.ShapeNet.Combination([points_set, images_set], root='../../datasets/')
 
 
-points_set_valid = nvl.dataloader.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
+points_set_valid = kal.datasets.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
 	download = True, train = False, split = .7, num_points=10000 )
-images_set_valid = nvl.dataloader.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
+images_set_valid = kal.datasets.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
 	download = True, train = False,  split = .7, views=1, transform= preprocess )
-valid_set = nvl.dataloader.ShapeNet.Combination([points_set_valid, images_set_valid], root='../../datasets/')
+valid_set = kal.datasets.ShapeNet.Combination([points_set_valid, images_set_valid], root='../../datasets/')
 
 dataloader_val = DataLoader(valid_set, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
@@ -205,7 +205,7 @@ class Engine(object):
 				surf_loss += (6000 * loss_surf(meshes, tgt_points[bn]) / float(args.batch_size))
 				edge_loss += (300 *.6 * loss_edge(meshes) / float(args.batch_size))
 				lap_loss  += (1500 * loss_lap(meshes) / float(args.batch_size))
-				f_loss += nvl.metrics.point.f_score(.57*meshes['update'][2].sample(2466)[0],.57*tgt_points[bn],  extend=False) / float(args.batch_size)
+				f_loss += kal.metrics.point.f_score(.57*meshes['update'][2].sample(2466)[0],.57*tgt_points[bn],  extend=False) / float(args.batch_size)
 
 
 				loss = surf_loss + edge_loss + lap_loss
@@ -292,8 +292,8 @@ class Engine(object):
 					########## losses #############
 					###############################
 
-					surf_loss = 3000 * nvl.metrics.point.chamfer_distance(pred_points, tgt_points[bn])
-					loss_f += (nvl.metrics.point.f_score(.57*meshes['update'][2].sample(2466)[0],.57*tgt_points[bn], extend=False).item() / float(args.batch_size))
+					surf_loss = 3000 * kal.metrics.point.chamfer_distance(pred_points, tgt_points[bn])
+					loss_f += (kal.metrics.point.f_score(.57*meshes['update'][2].sample(2466)[0],.57*tgt_points[bn], extend=False).item() / float(args.batch_size))
 
 					loss_epoch += (surf_loss.item()  / float(args.batch_size))
 

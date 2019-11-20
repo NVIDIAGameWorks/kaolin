@@ -49,22 +49,22 @@ args = parser.parse_args()
 """
 Dataset
 """
-points_set = kal.dataloader.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
+points_set = kal.datasets.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
 	download = True, train = True, split = .7, num_points=3000 )
-images_set = kal.dataloader.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
+images_set = kal.datasets.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
 	download = True, train = True,  split = .7, views=23, transform= preprocess )
-train_set = kal.dataloader.ShapeNet.Combination([points_set, images_set], root='../../datasets/')
+train_set = kal.datasets.ShapeNet.Combination([points_set, images_set], root='../../datasets/')
 
 dataloader_train = DataLoader(train_set, batch_size=args.batchsize, shuffle=True, 
 	num_workers=8)
 
 
 
-points_set_valid = kal.dataloader.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
+points_set_valid = kal.datasets.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
 	download = True, train = False, split = .7, num_points=5000 )
-images_set_valid = kal.dataloader.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
+images_set_valid = kal.datasets.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
 	download = True, train = False,  split = .7, views=1, transform= preprocess )
-valid_set = kal.dataloader.ShapeNet.Combination([points_set_valid, images_set_valid], root='../../datasets/')
+valid_set = kal.datasets.ShapeNet.Combination([points_set_valid, images_set_valid], root='../../datasets/')
 
 dataloader_val = DataLoader(valid_set, batch_size=args.batchsize, shuffle=False, 
 	num_workers=8)

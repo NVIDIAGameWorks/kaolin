@@ -52,7 +52,7 @@ class ModelNet_ODMS(object):
 	"""
 
 	def __init__(self, root='../datasets/', train=True, download=True, compute=True, categories=['chair'], single_view=True, voxels = True):
-		voxel_set = kal.dataloader.ModelNet( root, train=train, download=download, categories=categories, single_view=single_view)
+		voxel_set = kal.datasets.ModelNet( root, train=train, download=download, categories=categories, single_view=single_view)
 		odm_location = root + '/ModelNet/ODMs/'
 		if voxels: 
 			self.load_voxels = True 
