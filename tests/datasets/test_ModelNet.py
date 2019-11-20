@@ -27,7 +27,7 @@ from torch.utils.data import DataLoader
 
 # def test_ModelNet(device = 'cpu'): 
 	
-# 	models = kal.dataloader.ModelNet(root = 'datasets', categories = ['chair'], train = True)
+# 	models = kal.datasets.ModelNet(root = 'datasets', categories = ['chair'], train = True)
 	
 # 	assert len(models) == 889
 # 	for obj in models: 

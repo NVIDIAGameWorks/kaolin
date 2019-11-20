@@ -27,7 +27,7 @@ from torch.utils.data import DataLoader
 
 # def test_SHREC16(): 
 	
-# 	shreck = kal.dataloader.SHREC16(root = 'tests/datasets_eval/shrec_16/', categories = ['alien', 'ants'], mode = 'train')
+# 	shreck = kal.datasets.SHREC16(root = 'tests/datasets_eval/shrec_16/', categories = ['alien', 'ants'], mode = 'train')
 # 	for obj in shreck: 
 # 		assert obj['verts'].shape[0] > 0  
 # 		assert obj['faces'].shape[0] > 0 
