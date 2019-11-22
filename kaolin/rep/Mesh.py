@@ -15,7 +15,7 @@
 from abc import abstractmethod
 import os
 from PIL import Image
-
+from typing import Iterable
 import torch
 import numpy as np
 
@@ -113,7 +113,136 @@ class Mesh():
 
     @_composedecorator(classmethod, abstractmethod)
     def from_obj(self, filename: str, with_vt: bool = False,
-                 enable_adjacency: bool = False, texture_res=4):
+                 enable_adjacency: bool = False, texture_res=4,
+                 device: str = 'cpu'):
+        r"""Loads object in .obj wavefront format.
+
+        Args:
+            filename (str) : location of file.
+            with_vt (bool): objects loaded with textures specified by vertex
+                textures.
+            enable_adjacency (bool): adjacency information is computed.
+            texture_res (int): resolution of loaded face colors.
+            device (str, optional): specify the device on which to create the tensors.
+                by default, tensors will be created on 'cpu'.
+
+        Note: the with_vt parameter requires cuda.
+
+        Example:
+            >>> mesh = Mesh.from_obj('model.obj')
+            >>> mesh.vertices.shape
+            torch.Size([482, 3])
+            >>> mesh.faces.shape
+            torch.Size([960, 3])
+
+        """
+        device = torch.device(device)
+
+        # run through obj file and extract obj info
+        vertices = []
+        faces = []
+        face_textures = []
+        uvs = []
+        with open(filename, 'r') as mesh:
+            for line in mesh.readlines():
+                data = line.strip().split(' ')
+
+                data = [da for da in data if len(da) > 0]
+                if len(data) == 0:
+                    continue
+                if data[0] == 'v':
+                    vertices.append([float(d) for d in data[1:]])
+
+                if data[0] == 'vt':
+                    uvs.append([float(d) for d in data[1:3]])
+
+                if data[0] == 'f':
+                    if '//' in data[1]:
+                        data = [da.split('//') for da in data]
+                        faces.append([int(d[0]) for d in data[1:]])
+                    elif '/' in data[1]:
+                        data = [da.split('/') for da in data]
+                        faces.append([int(d[0]) for d in data[1:]])
+                    else:
+                        faces.append([int(d) for d in data[1:]])
+
+                    try:
+                        face_textures.append([int(d[1]) for d in data[1:]])
+                    except BaseException:
+                        continue
+
+        vertices = torch.tensor(vertices, device=device, dtype=torch.float)
+        faces = self.homogenize_faces(faces)
+        faces = torch.tensor(faces, device=device, dtype=torch.long) - 1
+
+        # compute texture info
+        textures = None
+        if with_vt:
+            with open(filename, 'r') as f:
+                textures = None
+                for line in f:
+                    if line.startswith('mtllib'):
+                        filename_mtl = os.path.join(
+                            os.path.dirname(filename), line.split()[1])
+                        textures = self.load_textures(
+                            filename, filename_mtl, texture_res)
+
+                f.close()
+
+        if len(uvs) > 0:
+            uvs = torch.tensor(uvs, device=device, dtype=torch.float)
+        else:
+            uvs = None
+        if len(face_textures) > 0:
+            face_textures = self.homogenize_faces(face_textures)
+            face_textures = torch.tensor(face_textures, device=device, dtype=torch.long) - 1
+        else:
+            face_textures = None
+
+        if enable_adjacency:
+            edge2key, edges, vv, vv_count, ve, ve_count, vf, vf_count, ff, ff_count, \
+                ee, ee_count, ef, ef_count = self.compute_adjacency_info(
+                    vertices, faces)
+        else:
+            edge2key, edges, vv, vv_count, ve, ve_count, vf, vf_count, ff, \
+                ff_count, ee, ee_count, ef, ef_count = None, None, None, \
+                None, None, None, None, None, None, None, None, None, None, \
+                None
+
+        return self(vertices, faces, uvs, face_textures, textures, edges,
+                    edge2key, vv, vv_count, vf, vf_count, ve, ve_count, ff, ff_count,
+                    ef, ef_count, ee, ee_count)
+
+    @staticmethod
+    def homogenize_faces(faces: Iterable):
+        r"""Homogenize list of faces if they contain n-polys
+        to only contain triangle polygons. If all faces are quads, no changes are made.
+
+        Args:
+            faces(list of list): List of faces, which are themselves composed of
+                a list of vertex indices.
+
+        Returns:
+            (list of list): Homogeneous list of faces.
+        """
+        is_homogeneous = all(len(f) == len(faces[0]) for f in faces)
+        if is_homogeneous:
+            return faces
+        else:
+            new_faces = []
+            # homogenize by converting all polygons to triangles
+            for face in faces:
+                while len(face) > 3:
+                    new_faces.append(face[:3])
+                    face.pop(1)
+                new_faces.append(face)
+
+            return new_faces
+
+    @_composedecorator(classmethod, abstractmethod)
+    def from_obj_old(self, filename: str, with_vt: bool = False,
+                     enable_adjacency: bool = False, texture_res=4):
+
         r"""Loads object in .obj wavefront format.
 
         Args:
@@ -297,7 +426,6 @@ class Mesh():
         self.ee_count = self._to_helper(self.ee_count, device)
 
         self.device = self.vertices.device
-
 
     @staticmethod
     def load_mtl(filename_mtl: str):
@@ -530,13 +658,13 @@ class Mesh():
         facesize = faces.shape[1]
         nb_vertices = vertices.shape[0]
         nb_faces = faces.shape[0]
-        edges = torch.cat([faces[:,i:i+2] for i in range(facesize - 1)] +
-                          [faces[:,[-1,0]]], dim=0)
+        edges = torch.cat([faces[:, i:(i + 2)] for i in range(facesize - 1)]
+                          + [faces[:, [-1, 0]]], dim=0)
         # Sort the vertex of edges in increasing order
         edges = torch.sort(edges, dim=1)[0]
         # id of corresponding face in edges
         face_ids = torch.arange(nb_faces, device=device, dtype=torch.long).repeat(facesize)
-        # remove multiple occurences and sort by the first vertex
+        # remove multiple occurrences and sort by the first vertex
         # the edge key / id is fixed from now as the first axis position
         # edges_ids will give the key of the edges on the original vector
         edges, edges_ids = torch.unique(edges, sorted=True, return_inverse=True, dim=0)
@@ -545,10 +673,10 @@ class Mesh():
         # EDGE2FACE
         sorted_edges_ids, order_edges_ids = torch.sort(edges_ids)
         sorted_faces_ids = face_ids[order_edges_ids]
-        # indices of first occurences of each key
+        # indices of first occurrences of each key
         idx_first = torch.where(
             torch.nn.functional.pad(sorted_edges_ids[1:] != sorted_edges_ids[:-1],
-                                    (1,0), value=1))[0]
+                                    (1, 0), value=1))[0]
         nb_faces_per_edge = idx_first[1:] - idx_first[:-1]
         # compute sub_idx (2nd axis indices to store the faces)
         offsets = torch.zeros(sorted_edges_ids.shape[0], device=device, dtype=torch.long)
@@ -557,10 +685,10 @@ class Mesh():
                    torch.cumsum(offsets, dim=0))
         # TODO(cfujitsang): potential way to compute sub_idx differently
         #                   to test with bigger model
-        #sub_idx = torch.ones(sorted_edges_ids.shape[0], device=device, dtype=torch.long)
-        #sub_idx[0] = 0
-        #sub_idx[idx_first[1:]] = 1 - nb_faces_per_edge
-        #sub_idx = torch.cumsum(sub_idx, dim=0)
+        # sub_idx = torch.ones(sorted_edges_ids.shape[0], device=device, dtype=torch.long)
+        # sub_idx[0] = 0
+        # sub_idx[idx_first[1:]] = 1 - nb_faces_per_edge
+        # sub_idx = torch.cumsum(sub_idx, dim=0)
         nb_faces_per_edge = torch.cat([nb_faces_per_edge,
                                        sorted_edges_ids.shape[0] - idx_first[-1:]],
                                       dim=0)
@@ -568,66 +696,66 @@ class Mesh():
         ef = torch.zeros((nb_edges, max_sub_idx), device=device, dtype=torch.long) - 1
         ef[sorted_edges_ids, sub_idx] = sorted_faces_ids
         # FACE2FACES
-        nb_faces_per_face = torch.stack([nb_faces_per_edge[edges_ids[i*nb_faces:(i+1)*nb_faces]]
+        nb_faces_per_face = torch.stack([nb_faces_per_edge[edges_ids[(i * nb_faces):((i + 1) * nb_faces)]]
                                          for i in range(facesize)], dim=1).sum(dim=1) - facesize
-        ff = torch.cat([ef[edges_ids[i*nb_faces:(i+1)*nb_faces]] for i in range(facesize)], dim=1)
-        # remove self occurences
-        ff[ff == torch.arange(nb_faces, device=device, dtype=torch.long).view(-1,1)] = -1
+        ff = torch.cat([ef[edges_ids[(i * nb_faces):(i + 1) * nb_faces]] for i in range(facesize)], dim=1)
+        # remove self occurrences
+        ff[ff == torch.arange(nb_faces, device=device, dtype=torch.long).view(-1, 1)] = -1
         ff = torch.sort(ff, dim=-1, descending=True)[0]
-        to_del = (ff[:,1:] == ff[:,:-1]) & (ff[:,1:] != -1)
-        ff[:,1:][to_del] = -1
+        to_del = (ff[:, 1:] == ff[:, :-1]) & (ff[:, 1:] != -1)
+        ff[:, 1:][to_del] = -1
         nb_faces_per_face = nb_faces_per_face - torch.sum(to_del, dim=1)
         max_sub_idx = torch.max(nb_faces_per_face)
-        ff = torch.sort(ff, dim=-1, descending=True)[0][:,:max_sub_idx]
+        ff = torch.sort(ff, dim=-1, descending=True)[0][:, :max_sub_idx]
 
         # VERTEX2VERTICES and VERTEX2EDGES
         npy_edges = edges.cpu().numpy()
         edge2key = {tuple(npy_edges[i]): i for i in range(nb_edges)}
-        #_edges and double_edges 2nd axis correspond to the triplet:
+        # _edges and double_edges 2nd axis correspond to the triplet:
         # [left vertex, right vertex, edge key]
         _edges = torch.cat([edges, torch.arange(nb_edges, device=device).view(-1, 1)],
                            dim=1)
-        double_edges = torch.cat([_edges, _edges[:,[1,0,2]]], dim=0)
+        double_edges = torch.cat([_edges, _edges[:, [1, 0, 2]]], dim=0)
         double_edges = torch.unique(double_edges, sorted=True, dim=0)
-        # TODO(cfujitsang): potential improvment, to test with bigger model:
-        #double_edges0, order_double_edges = torch.sort(double_edges[0])
+        # TODO(cfujitsang): potential improvement, to test with bigger model:
+        # double_edges0, order_double_edges = torch.sort(double_edges[0])
         nb_double_edges = double_edges.shape[0]
-        # indices of first occurences of each key
+        # indices of first occurrences of each key
         idx_first = torch.where(
-            torch.nn.functional.pad(double_edges[1:,0] != double_edges[:-1,0],
-                                    (1,0), value=1))[0]
+            torch.nn.functional.pad(double_edges[1:, 0] != double_edges[:-1, 0],
+                                    (1, 0), value=1))[0]
         nb_edges_per_vertex = idx_first[1:] - idx_first[:-1]
         # compute sub_idx (2nd axis indices to store the edges)
         offsets = torch.zeros(nb_double_edges, device=device, dtype=torch.long)
         offsets[idx_first[1:]] = nb_edges_per_vertex
-        sub_idx = (torch.arange(nb_double_edges, device=device, dtype=torch.long) -
-                   torch.cumsum(offsets, dim=0))
+        sub_idx = (torch.arange(nb_double_edges, device=device, dtype=torch.long)
+                   - torch.cumsum(offsets, dim=0))
         nb_edges_per_vertex = torch.cat([nb_edges_per_vertex,
                                          nb_double_edges - idx_first[-1:]], dim=0)
         max_sub_idx = torch.max(nb_edges_per_vertex)
         vv = torch.zeros((nb_vertices, max_sub_idx), device=device, dtype=torch.long) - 1
-        vv[double_edges[:,0], sub_idx] = double_edges[:,1]
+        vv[double_edges[:, 0], sub_idx] = double_edges[:, 1]
         ve = torch.zeros((nb_vertices, max_sub_idx), device=device, dtype=torch.long) - 1
-        ve[double_edges[:,0], sub_idx] = double_edges[:,2]
+        ve[double_edges[:, 0], sub_idx] = double_edges[:, 2]
         # EDGE2EDGES
-        ee = torch.cat([ve[edges[:,0],:], ve[edges[:,1],:]], dim=1)
-        nb_edges_per_edge = nb_edges_per_vertex[edges[:,0]] + nb_edges_per_vertex[edges[:,1]] - 2
+        ee = torch.cat([ve[edges[:, 0], :], ve[edges[:, 1], :]], dim=1)
+        nb_edges_per_edge = nb_edges_per_vertex[edges[:, 0]] + nb_edges_per_vertex[edges[:, 1]] - 2
         max_sub_idx = torch.max(nb_edges_per_edge)
-        # remove self occurences
-        ee[ee == torch.arange(nb_edges, device=device, dtype=torch.long).view(-1,1)] = -1
-        ee = torch.sort(ee, dim=-1, descending=True)[0][:,:max_sub_idx]
+        # remove self occurrences
+        ee[ee == torch.arange(nb_edges, device=device, dtype=torch.long).view(-1, 1)] = -1
+        ee = torch.sort(ee, dim=-1, descending=True)[0][:, :max_sub_idx]
         # VERTEX2FACES
         vertex_ordered, order_vertex = torch.sort(faces.view(-1))
         face_ids_in_vertex_order = order_vertex / facesize
-        # indices of first occurences of each id
+        # indices of first occurrences of each id
         idx_first = torch.where(
-            torch.nn.functional.pad(vertex_ordered[1:] != vertex_ordered[:-1], (1,0), value=1))[0]
+            torch.nn.functional.pad(vertex_ordered[1:] != vertex_ordered[:-1], (1, 0), value=1))[0]
         nb_faces_per_vertex = idx_first[1:] - idx_first[:-1]
         # compute sub_idx (2nd axis indices to store the faces)
         offsets = torch.zeros(vertex_ordered.shape[0], device=device, dtype=torch.long)
         offsets[idx_first[1:]] = nb_faces_per_vertex
-        sub_idx = (torch.arange(vertex_ordered.shape[0], device=device, dtype=torch.long) -
-                   torch.cumsum(offsets, dim=0))
+        sub_idx = (torch.arange(vertex_ordered.shape[0], device=device, dtype=torch.long)
+                   - torch.cumsum(offsets, dim=0))
         # TODO(cfujitsang): it seems that nb_faces_per_vertex == nb_edges_per_vertex ?
         nb_faces_per_vertex = torch.cat([nb_faces_per_vertex,
                                          vertex_ordered.shape[0] - idx_first[-1:]], dim=0)
@@ -638,14 +766,13 @@ class Mesh():
         return edge2key, edges, vv, nb_edges_per_vertex, ve, nb_edges_per_vertex, vf, \
             nb_faces_per_vertex, ff, nb_faces_per_face, ee, nb_edges_per_edge, ef, nb_faces_per_edge
 
-
     @staticmethod
     def old_compute_adjacency_info(vertices: torch.Tensor, faces: torch.Tensor):
         """Build data structures to help speed up connectivity queries. Assumes
         a homogeneous mesh, i.e., each face has the same number of vertices.
 
         """
-        
+
         device = vertices.device
 
         facesize = faces.shape[1]
@@ -812,7 +939,7 @@ class Mesh():
             self.vertices = neighbor_sum / neighbor_num
 
     def compute_laplacian(self):
-        r"""Calcualtes the laplcaian of the graph, meaning the average
+        r"""Calculates the Laplacian of the graph, meaning the average
                 difference between a vertex and its neighbors.
 
             Returns:
@@ -838,7 +965,7 @@ class Mesh():
         return lap
 
     def show(self):
-        r""" Visuailizes the mesh.
+        r""" Visualizes the mesh.
 
             Example:
                 >>> mesh = Mesh.from_obj('model.obj')

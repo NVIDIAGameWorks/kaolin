@@ -19,13 +19,26 @@ from pathlib import Path
 from pxr import Usd, UsdGeom, UsdLux, Sdf, Gf, Vt
 
 from kaolin import helpers
+from kaolin.rep.TriangleMesh import Mesh
 
 
 def get_mesh_attributes(usd_mesh):
-    face_count = torch.tensor(usd_mesh.GetFaceVertexCountsAttr().Get())[0]
     vertices = torch.tensor(usd_mesh.GetPointsAttr().Get())
-    faces = torch.tensor(usd_mesh.GetFaceVertexIndicesAttr().Get())
-    faces = faces.view(-1, face_count)
+
+    face_counts = usd_mesh.GetFaceVertexCountsAttr().Get()
+    faces_raw = usd_mesh.GetFaceVertexIndicesAttr().Get()
+    if all(fc == face_counts[0] for fc in face_counts):
+        faces = torch.tensor(faces_raw)
+        faces = faces.view(-1, face_counts[0])
+    else:
+        idx = 0
+        faces = []
+        for face_count in face_counts:
+            faces.append(faces_raw[idx:(idx + face_count)])
+            idx += face_count
+        faces = [list(f) for f in faces]
+        faces = Mesh.homogenize_faces(faces)
+        faces = torch.tensor(faces)
     return {'vertices': vertices, 'faces': faces}
 
 
@@ -65,12 +78,7 @@ class USDMeshes(data.Dataset):
         for mesh_prim in uncached_mesh_prims:
             name = mesh_prim.GetName()
             mesh = UsdGeom.Mesh(mesh_prim)
-            face_counts = torch.tensor(mesh.GetFaceVertexCountsAttr().Get())
-            if not torch.allclose(face_counts, face_counts[0]):
-                log.warn(f'Skipping mesh {name}, not all faces have the same '
-                             'number of vertices.')
-            else:
-                self.cache(name, usd_mesh=mesh)
+            self.cache(name, usd_mesh=mesh)
 
     def __len__(self):
         return len(self.names)

@@ -20,7 +20,7 @@ from kaolin.datasets.usdfile import USDMeshes
 
 
 def test_usd_meshes():
-    fpath = './tests/model.usd'
+    fpath = './tests/model.usda'
     cache_dir = './tests/datasets_eval/USDMeshes/'
     usd_dataset = USDMeshes(usd_filepath=fpath, cache_dir=cache_dir)
     assert len(usd_dataset) == 1
@@ -29,13 +29,14 @@ def test_usd_meshes():
     assert len(list(Path(cache_dir).glob('**/*.npz'))) == 1
     shutil.rmtree('tests/datasets_eval/USDMeshes')
 
-# Tests below must be run with KitchenSet dataset
 
-# def test_usd_meshes():
-#     fpath = 'data/Kitchen_set/Kitchen_set.usd'
+# Tests below must be run with KitchenSet dataset
+# def test_kitchen_set():
+#     fpath = 'data/Kitchen_set/Kitchen_set/Kitchen_set.usd'
 #     cache_dir = './tests/datasets_eval/USDMeshes/'
 #     usd_dataset = USDMeshes(usd_filepath=fpath, cache_dir=cache_dir)
-#     assert len(usd_dataset) == 740
+#     assert len(usd_dataset) == 1169
 
 #     # test caching
-#     assert len(list(Path(cache_dir).glob('**/*.npz'))) == 740
+#     assert len(list(Path(cache_dir).glob('**/*.npz'))) == 1169
+#     shutil.rmtree('tests/datasets_eval/USDMeshes')
