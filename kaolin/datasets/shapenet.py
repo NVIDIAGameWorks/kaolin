@@ -105,7 +105,7 @@ def tqdm_hook(t, timeout=1):
 
 
 def download_shapenet_class(syn: str, shapenet_location: str, download: bool):
-    r"""Downloads a shapenet class to a specified directory.
+    r"""Downloads a shapenet to a specified directory.
 
     You may complete this function to automate downloading from a
     central source.
@@ -120,7 +120,6 @@ def download_images(shapenet_root: str):
     central source.
     """
     NotImplemented
-
 
 
 def _convert_categories(categories):
@@ -149,14 +148,14 @@ class ShapeNet_Meshes(data.Dataset):
 
     Returns:
         .. code-block::
-        
+
         dict: {
             attributes: {name: str, path: str, synset: str, label: str},
             data: {vertices: torch.Tensor, faces: torch.Tensor}
         }
 
     Example:
-        >>> meshes = ShapeNet_Meshes(root='./datasets/', download=True)
+        >>> meshes = ShapeNet_Meshes(root='./datasets/ShapeNet/', cache_dir='cache', download=True)
         >>> obj = next(iter(meshes))
         >>> obj['data']['vertices'].shape
         torch.Size([2133, 3])
@@ -164,25 +163,20 @@ class ShapeNet_Meshes(data.Dataset):
         torch.Size([1910, 3])
     """
 
-    def __init__(self, root: str = '../data/', categories: list = ['chair'], train: bool = True,
-                 download: bool = True, split: float = .7, no_progress: bool = False):
+    def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
+                 download: bool = False, split: float = .7, no_progress: bool = False):
         self.root = Path(root)
         self.paths = []
         self.synset_idxs = []
         self.synsets = _convert_categories(categories)
         self.labels = [synset_to_label[s] for s in self.synsets]
 
-        # make the shapenet folder
-        self.shapenet_root = self.root / 'ShapeNet'
-        shapenet_object_root = self.shapenet_root / 'meshes'
-        shapenet_object_root.mkdir(parents=True, exist_ok=True)
-
-        # loops through desired classes and download those not found
-        desc = 'downloading desired classes as meshes'
-        for i in tqdm(range(len(self.synsets)), desc=desc, disable=no_progress):
+        # loops through desired classes
+        for i in range(len(self.synsets)):
             syn = self.synsets[i]
-            class_target = shapenet_object_root / syn
-            download_shapenet_class(syn, str(shapenet_object_root), download)
+            class_target = self.root / syn
+            if not class_target.exists():
+                download_shapenet(syn, str(self.root), download)
 
             # find all objects in the class
             models = sorted(class_target.glob('*'))
@@ -257,7 +251,7 @@ class ShapeNet_Images(data.Dataset):
         torch.Size([10, 4, 137, 137])
     """
 
-    def __init__(self, root: str = '../data/', categories: list = ['chair'], train: bool = True,
+    def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
                  split: float = .7, download: bool = True, views: int = 23, transform=None,
                  no_progress: bool = False):
         self.root = root
@@ -361,17 +355,17 @@ class ShapeNet_Voxels(data.Dataset):
         torch.Size([10, 128, 128, 128])
 
     """
-    def __init__(self, root: str = '../data/', categories: list = ['chair'], train: bool = True,
+    def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
                  download: bool = True, split: float = .7, resolutions=[128, 32],
                  no_progress: bool = False):
         self.root = Path(root)
-        self.shapenet_root = self.root / 'ShapeNet'
-        self.cache_dir = self.shapenet_root / 'voxels'
+        self.cache_dir = Path(cache_dir) / 'voxels'
         self.cache_transforms = {}
         self.params = {
             'resolutions': resolutions,
         }
         mesh_dataset = ShapeNet_Meshes(root=root,
+                                       cache_dir=cache_dir,
                                        categories=categories,
                                        train=train,
                                        download=download,
@@ -418,7 +412,7 @@ class ShapeNet_Voxels(data.Dataset):
 
 
 class ShapeNet_Surface_Meshes(data.Dataset):
-    r"""ShapeNet Dataset class for watertight meshes with only the surface presevred.
+    r"""ShapeNet Dataset class for watertight meshes with only the surface preserved.
 
     Arguments:
         root (str): Path to the root directory of the ShapeNet dataset.
@@ -450,16 +444,16 @@ class ShapeNet_Surface_Meshes(data.Dataset):
 
     """
 
-    def __init__(self, root: str = '../data/', categories: list = ['chair'], train: bool = True,
-                 download: bool = True, split: float = .7, resolution: int = 100, 
+    def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
+                 download: bool = True, split: float = .7, resolution: int = 100,
                  smoothing_iterations: int = 3, mode='Tri', no_progress: bool = False):
         assert mode in ['Tri', 'Quad']
 
         self.root = Path(root)
-        self.shapenet_root = self.root / 'ShapeNet'
-        self.cache_dir = self.shapenet_root / 'surface_meshes'
+        self.cache_dir = Path(cache_dir) / 'surface_meshes'
         dataset_params = {
             'root': root,
+            'cache_dir': cache_dir,
             'categories': categories,
             'train': train,
             'download': download,
@@ -484,16 +478,14 @@ class ShapeNet_Surface_Meshes(data.Dataset):
         if mode == 'Tri':
             mesh_conversion = tfs.VoxelGridToTriangleMesh(threshold=0.5,
                                                           mode='marching_cubes',
-                                                          normalize=False,
-                                                          no_progress=no_progress)
+                                                          normalize=False)
         else:
             mesh_conversion = tfs.VoxelGridToQuadMesh(threshold=0.5,
-                                                      normalize=False,
-                                                      no_progress=no_progress)
+                                                      normalize=False)
 
         def convert(og_mesh, voxel):
             transforms = tfs.Compose([mesh_conversion,
-                    tfs.MeshLaplacianSmoothing(smoothing_iterations)])
+                                     tfs.MeshLaplacianSmoothing(smoothing_iterations)])
 
             new_mesh = transforms(voxel)
             new_mesh.vertices = pcfunc.realign(new_mesh.vertices, og_mesh.vertices)
@@ -545,7 +537,7 @@ class ShapeNet_Points(data.Dataset):
         download (bool): download the shapenet class if not found
         num_points (int): number of point sampled on mesh
         smoothing_iteration (int): number of application of laplacian smoothing
-        surface (bool): if only the surface of the origional mesh should be used
+        surface (bool): if only the surface of the original mesh should be used
         resolution (int): resolution of voxel object to use when converting
         normals (bool): should the normals of the points be saved
         no_progress (bool): if True, disables progress bar
@@ -568,15 +560,15 @@ class ShapeNet_Points(data.Dataset):
 
     """
 
-    def __init__(self, root: str = '../data/', categories: list = ['chair'], train: bool = True,
+    def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
                  download: bool = True, split: float = .7, num_points: int = 5000, smoothing_iterations=3,
                  surface=True, resolution=100, normals=True, no_progress: bool = False):
         self.root = Path(root)
-        self.shapenet_root = self.root / 'ShapeNet'
-        self.cache_dir = self.shapenet_root / 'points'
+        self.cache_dir = Path(cache_dir) / 'points'
 
         dataset_params = {
             'root': root,
+            'cache_dir': cache_dir,
             'categories': categories,
             'train': train,
             'download': download,
@@ -653,7 +645,7 @@ class ShapeNet_SDF_Points(data.Dataset):
         download (bool): download the shapenet class if not found
         resolution (int): resolution of voxel object to use when converting
         num_points (int): number of sdf points sampled on mesh
-        occ (bool): should only occuapncy values be returned instead of distances
+        occ (bool): should only occupancy values be returned instead of distances
         smoothing_iteration (int): number of application of laplacian smoothing
         sample_box (bool): whether to sample only from within mesh extents
         no_progress (bool): if True, disables progress bar
@@ -678,12 +670,11 @@ class ShapeNet_SDF_Points(data.Dataset):
 
     """
 
-    def __init__(self, root: str = '../data/', categories: list = ['chair'], train: bool = True,
+    def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
                  download: bool = True, split: float = .7, resolution: int = 100, num_points: int = 5000,
-                 occ: bool = False, smoothing_iterations: int = 3, sample_box=True,  no_progress: bool = False):
+                 occ: bool = False, smoothing_iterations: int = 3, sample_box=True, no_progress: bool = False):
         self.root = Path(root)
-        self.shapenet_root = self.root / 'ShapeNet'
-        self.cache_dir = self.shapenet_root / 'sdf_points'
+        self.cache_dir = Path(cache_dir) / 'sdf_points'
 
         self.params = {
             'resolution': resolution,
@@ -694,6 +685,7 @@ class ShapeNet_SDF_Points(data.Dataset):
         }
 
         surface_mesh_dataset = ShapeNet_Surface_Meshes(root=root,
+                                                       cache_dir=cache_dir,
                                                        categories=categories,
                                                        train=train,
                                                        download=download,
@@ -771,12 +763,12 @@ class ShapeNet_Tags(data.Dataset):
     r"""ShapeNet Dataset class for tags.
 
     Args:
-        dataset (kal.dataloader.shapenet.ShapeNet): One of the ShapeNet datasets 
+        dataset (kal.dataloader.shapenet.ShapeNet): One of the ShapeNet datasets
         download (bool): If True will load taxonomy of objects if it is not loaded yet
         transform (...) : transformation to apply to tags
 
     Returns:
-        dict: Dictionary with key for the input tags encod and : 'tag_enc': 
+        dict: Dictionary with key for the input tags encod and : 'tag_enc':
 
     Example:
         >>> from torch.utils.data import DataLoader
@@ -789,7 +781,7 @@ class ShapeNet_Tags(data.Dataset):
 
     """
     def __init__(self, dataset, download=True, tag_aug=True):
-        self.shapenet_root = dataset.shapenet_root
+        self.root = dataset.root
         self.paths = dataset.paths
         self.synset_idxs = dataset.synset_idxs
         self.synsets = dataset.synsets
@@ -834,7 +826,7 @@ class ShapeNet_Tags(data.Dataset):
 
     def get_taxonomy(self):
         r"""Download the taxonomy from the web."""
-        taxonomy_location = os.path.join(self.shapenet_root, 'taxonomy.json')
+        taxonomy_location = os.path.join(self.root, 'taxonomy.json')
         if not os.path.exists(taxonomy_location):
             with print_wrapper("Downloading taxonomy ..."):
                 taxonomy_web_location = 'http://shapenet.cs.stanford.edu/shapenet/obj-zip/ShapeNetCore.v1/taxonomy.json'
@@ -880,13 +872,13 @@ class ShapeNet_Tags(data.Dataset):
         r"""Get the list of SynSet IDs and the respective tags based on the taxonomy.
 
         Args:
-            category (str): category of the object that needs to be rtrieved.
+            category (str): category of the object that needs to be retrieved.
 
         Returns:
             synsetIds (list): list of synsets
             tags (list): list of tags for each synset
         """
-        with open(os.path.join(self.shapenet_root, 'taxonomy.json'), 'r') as json_f:
+        with open(os.path.join(self.root, 'taxonomy.json'), 'r') as json_f:
             taxonomy = json.load(json_f)
 
         synsetIds, children = [], []
@@ -903,11 +895,11 @@ class ShapeNet_Tags(data.Dataset):
 
             if matchObj:
                 sid = c['synsetId']
-                if not sid in synsetIds:
+                if sid not in synsetIds:
                     synsetIds.append(sid)
                     tags.append(tag)
                 for childId in c['children']:
-                    if not childId in children:
+                    if childId not in children:
                         children.append(childId)
                         parent_tags.append(tag)
 
@@ -916,13 +908,13 @@ class ShapeNet_Tags(data.Dataset):
             new_parent_tags = []
             for c in taxonomy:
                 sid = c['synsetId']
-                if sid in children and not sid in synsetIds:
+                if sid in children and sid not in synsetIds:
                     synsetIds.append(sid)
                     i = children.index(sid)
                     tag = c['name'] + ',' + parent_tags[i]
                     tags.append(tag)
                     for childId in c['children']:
-                        if not childId in new_children:
+                        if childId not in new_children:
                             new_children.append(childId)
                             new_parent_tags.append(tag)
 
@@ -955,15 +947,15 @@ class ShapeNet_Tags(data.Dataset):
             return tag_list, 0
         else:
             tags_to_keep = np.random.randint(1, len(tag_list) + 1)
-            res_tag_ind  = np.random.choice(range(len(tag_list)),
-                                            tags_to_keep,
-                                            replace=False)
+            res_tag_ind = np.random.choice(range(len(tag_list)),
+                                           tags_to_keep,
+                                           replace=False)
             max_ind = max(res_tag_ind)
             res_tag_list = [tag_list[el] for el in res_tag_ind]
             return res_tag_list, max_ind
 
     def tag_proc(self, tag_list):
-        """Get the embedding from the list of tags. By default this functions does 
+        """Get the embedding from the list of tags. By default this function does
         one-hot encoding of the tags, but can be replaced by more complex encodings.
 
         Args:
@@ -993,7 +985,7 @@ class ShapeNet_Tags(data.Dataset):
             input_tags, last_tag_id = self.rand_drop_tag(full_tag)
         else:
             input_tags = full_tag
-            last_tag_id = len(full_tag)-1
+            last_tag_id = len(full_tag) - 1
 
         # tag encodings
         data['tag_inp'] = self.tag_proc(input_tags)
@@ -1049,12 +1041,11 @@ class ShapeNet_Combination(data.Dataset):
         distance
         points
         normals
-        
     """
 
     def __init__(self, datasets):
         self.names = datasets[0].names
-        self.shapenet_root = datasets[0].shapenet_root
+        self.root = datasets[0].root
         self.synset_idxs = datasets[0].synset_idxs
         self.synsets = datasets[0].synsets
         self.labels = datasets[0].labels
