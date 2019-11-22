@@ -3,7 +3,10 @@ Unittests for projective geometry utility functions
 """
 
 # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
-# Kornia components Copyright (c) 2019 Kornia project authors
+# Kornia components:
+# Copyright (C) 2017-2019, Arraiy, Inc., all rights reserved.
+# Copyright (C) 2019-    , Open Source Vision Foundation, all rights reserved.
+# Copyright (C) 2019-    , Kornia authors, all rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
