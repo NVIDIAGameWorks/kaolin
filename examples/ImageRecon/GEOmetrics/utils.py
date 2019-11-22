@@ -335,12 +335,12 @@ def loss_surf(meshes, tgt_points):
 	return loss
 
 def loss_surf2(meshes, tgt_points):	
-	loss = nvl.metrics.mesh.point_to_surface(tgt_points, meshes['update'][0])
-	loss += nvl.metrics.point.directed_distance((meshes['update'][0].sample(3000)[0]), tgt_points)
-	loss += nvl.metrics.mesh.point_to_surface(tgt_points, meshes['update'][1])
-	loss += nvl.metrics.point.directed_distance((meshes['update'][1].sample(3000)[0]), tgt_points)
-	loss += nvl.metrics.mesh.point_to_surface(tgt_points, meshes['update'][2])
-	loss += nvl.metrics.point.directed_distance((meshes['update'][2].sample(3000)[0]), tgt_points)
+	loss = kal.metrics.mesh.point_to_surface(tgt_points, meshes['update'][0])
+	loss += kal.metrics.point.directed_distance((meshes['update'][0].sample(3000)[0]), tgt_points)
+	loss += kal.metrics.mesh.point_to_surface(tgt_points, meshes['update'][1])
+	loss += kal.metrics.point.directed_distance((meshes['update'][1].sample(3000)[0]), tgt_points)
+	loss += kal.metrics.mesh.point_to_surface(tgt_points, meshes['update'][2])
+	loss += kal.metrics.point.directed_distance((meshes['update'][2].sample(3000)[0]), tgt_points)
 	return loss
 
 

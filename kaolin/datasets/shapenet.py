@@ -771,12 +771,12 @@ class ShapeNet_Tags(data.Dataset):
     r"""ShapeNet Dataset class for tags.
 
     Args:
-        dataset (kal.dataloader.shapenet.ShapeNet): One of the ShapeNet datasets 
+        dataset (kal.datasets.shapenet.ShapeNet): One of the ShapeNet datasets
         download (bool): If True will load taxonomy of objects if it is not loaded yet
         transform (...) : transformation to apply to tags
 
     Returns:
-        dict: Dictionary with key for the input tags encod and : 'tag_enc': 
+        dict: Dictionary with key for the input tags encod and : 'tag_enc':
 
     Example:
         >>> from torch.utils.data import DataLoader

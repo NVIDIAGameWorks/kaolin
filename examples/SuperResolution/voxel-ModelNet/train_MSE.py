@@ -13,7 +13,7 @@ from tqdm import tqdm
 from utils import down_sample, up_sample
 from architectures import EncoderDecoder
 
-import kaolin as kal 
+import kaolin as kal
 """
 Commandline arguments
 """
@@ -37,16 +37,14 @@ args = parser.parse_args()
 """
 Dataset
 """
-train_set = kal.dataloader.ModelNet(root ='../../datasets/',categories = args.categories, download = True)
-dataloader_train = DataLoader(train_set, batch_size=args.batchsize, shuffle=True, 
-	num_workers=8)
+train_set = kal.datasets.ModelNet(root ='../../datasets/',categories = args.categories, download = True)
+dataloader_train = DataLoader(train_set, batch_size=args.batchsize, shuffle=True, num_workers=8)
 
-valid_set = kal.dataloader.ModelNet(root ='../../datasets/',categories = args.categories, download = True, train = False)
-dataloader_val = DataLoader(valid_set, batch_size=args.batchsize, shuffle=False, \
-	num_workers=8)
+valid_set = kal.datasets.ModelNet(root ='../../datasets/',categories = args.categories, download = True, train = False)
+dataloader_val = DataLoader(valid_set, batch_size=args.batchsize, shuffle=False, num_workers=8)
 
 """
-Model settings 
+Model settings
 """
 model = EncoderDecoder().to(args.device)
 
@@ -64,7 +62,7 @@ if not os.path.isdir(args.logdir):
 # Log all commandline args
 with open(os.path.join(args.logdir, 'args.txt'), 'w') as f:
 	json.dump(args.__dict__, f, indent=2)
- 
+
 
 class Engine(object):
 	"""Engine that runs training and inference.
@@ -72,7 +70,6 @@ class Engine(object):
 		- cur_epoch (int): Current epoch.
 		- print_every (int): How frequently (# batches) to print loss.
 		- validate_every (int): How frequently (# epochs) to run validation.
-		
 	"""
 
 	def __init__(self,  cur_epoch=0, print_every=1, validate_every=1):
@@ -88,16 +85,14 @@ class Engine(object):
 		# Train loop
 		for i, data in enumerate(tqdm(dataloader_train), 0):
 			optimizer.zero_grad()
-			
 			# data creation
 			tgt = data['data'].to(args.device)
-			
 			inp = down_sample(tgt)
 
-			# inference 
+			# inference
 			pred = model(inp)
 
-			# losses 
+			# losses
 			loss = loss_fn(pred, tgt)
 			loss.backward()
 			loss_epoch += float(loss.item())
@@ -109,17 +104,15 @@ class Engine(object):
 				tqdm.write(f'[TRAIN] Epoch {self.cur_epoch:03d}, Batch {i:03d}: Loss: {float(loss.item())}')
 				tqdm.write('Metric iou: {0}'.format(iou))
 			optimizer.step()
-		
-		
+
 		loss_epoch = loss_epoch / num_batches
 		self.train_loss.append(loss_epoch)
 		self.cur_epoch += 1
 
-		
-		
+
 	def validate(self):
 		model.eval()
-		with torch.no_grad():	
+		with torch.no_grad():
 			iou_epoch = 0.
 			iou_NN_epoch = 0.
 			num_batches = 0
@@ -132,16 +125,16 @@ class Engine(object):
 				tgt = data['data'].to(args.device)
 				inp = down_sample(tgt)
 
-				# inference 
+				# inference
 				pred = model(inp)
-		
+
 				# losses
 				loss = loss_fn(pred, tgt)
 				loss_epoch += float(loss.item())
 
 				iou = kal.metrics.voxel.iou(pred.contiguous(), tgt)
 				iou_epoch += iou
-				
+
 				NN_pred = up_sample(inp)
 				iou_NN = kal.metrics.voxel.iou(NN_pred.contiguous(), tgt)
 				iou_NN_epoch += iou_NN
@@ -152,7 +145,7 @@ class Engine(object):
 						out_iou = iou_epoch.item() / float(num_batches)
 						out_iou_NN = iou_NN_epoch.item() / float(num_batches)
 						tqdm.write(f'[VAL] Epoch {self.cur_epoch:03d}, Batch {i:03d}: IoU: {out_iou}, Iou Base: {out_iou_NN}')
-						
+
 			out_iou = iou_epoch.item() / float(num_batches)
 			out_iou_NN = iou_NN_epoch.item() / float(num_batches)
 			tqdm.write(f'[VAL Total] Epoch {self.cur_epoch:03d}, Batch {i:03d}: IoU: {out_iou}, Iou Base: {out_iou_NN}')
@@ -161,12 +154,11 @@ class Engine(object):
 			self.val_loss.append(out_iou)
 
 	def save(self):
-
 		save_best = False
 		if self.val_loss[-1] >= self.bestval:
 			self.bestval = self.val_loss[-1]
 			save_best = True
-		
+
 		# Create a dictionary of all data to save
 		log_table = {
 			'epoch': self.cur_epoch,
@@ -185,7 +177,7 @@ class Engine(object):
 			f.write(json.dumps(log_table))
 
 		tqdm.write('====== Saved recent model ======>')
-		
+
 		if save_best:
 			torch.save(model.state_dict(), os.path.join(args.logdir, 'best.pth'))
 			torch.save(optimizer.state_dict(), os.path.join(args.logdir, 'best_optim.pth'))
@@ -193,11 +185,11 @@ class Engine(object):
 			with open(os.path.join(args.logdir, 'best.log'), 'w') as f:
 				f.write(json.dumps(log_table))
 			tqdm.write('====== Overwrote best model ======>')
-			
-	
+
+
 trainer = Engine()
 
-for epoch in range(args.epochs): 
+for epoch in range(args.epochs):
 	trainer.train()
 	trainer.validate()
 	trainer.save()
