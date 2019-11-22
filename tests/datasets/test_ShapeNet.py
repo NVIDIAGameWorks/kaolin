@@ -33,14 +33,14 @@ CACHE_DIR = 'tests/datasets/cache'
 
 
 def test_Meshes():
-    meshes1 = shapenet.ShapeNet_Meshes(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
+    meshes1 = shapenet.ShapeNet_Meshes(root=SHAPENET_ROOT,
                                        categories=['can'], train=True, split=.7)
     assert len(meshes1) > 0
     for mesh in meshes1:
         assert Path(mesh['attributes']['path']).is_file()
         assert mesh['data']['vertices'].shape[0] > 0
 
-    meshes2 = shapenet.ShapeNet_Meshes(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
+    meshes2 = shapenet.ShapeNet_Meshes(root=SHAPENET_ROOT,
                                        categories=['can', 'bowl'], train=True, split=.7)
     assert len(meshes2) > len(meshes1)
 
@@ -63,7 +63,8 @@ def test_Voxels():
 
 
 # def test_Images():
-#     images = shapenet.ShapeNet_Images(root=SHAPENET_ROOT, cache_dir=CACHE_DIR, categories=['phone'], views=1, train=True, split=.7)
+#     images = shapenet.ShapeNet_Images(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
+#                                       categories=['phone'], views=1, train=True, split=.7)
 #     assert len(images) == 736
 #     for obj in images:
 #         assert set(obj['data']['images'].shape) == set([137, 137, 4])
@@ -74,8 +75,9 @@ def test_Voxels():
 
 def test_Surface_Meshes():
     surface_meshes = shapenet.ShapeNet_Surface_Meshes(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
-                                                      categories=['can'], train=True, split=.1, resolution=100,
-                                                      smoothing_iterations=3, mode='Tri')
+                                                      categories=['can'], train=True, split=.1,
+                                                      resolution=100, smoothing_iterations=3,
+                                                      mode='Tri')
     assert len(surface_meshes) == 10
     assert surface_meshes.cache_dir.exists()
     assert len(list(surface_meshes.cache_dir.rglob('*.npz'))) == 10
@@ -86,8 +88,9 @@ def test_Surface_Meshes():
     shutil.rmtree('tests/datasets/cache/surface_meshes')
 
     surface_meshes = shapenet.ShapeNet_Surface_Meshes(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
-                                                      categories=['can'], train=True, split=.1, resolution=100,
-                                                      smoothing_iterations=3, mode='Quad')
+                                                      categories=['can'], train=True, split=.1,
+                                                      resolution=100, smoothing_iterations=3,
+                                                      mode='Quad')
     assert len(surface_meshes) == 10
     assert surface_meshes.cache_dir.exists()
     assert len(list(surface_meshes.cache_dir.rglob('*.npz'))) == 10
@@ -165,18 +168,20 @@ def test_SDF_Points():
 def test_Combination():
     dataset_params = {
         'root': SHAPENET_ROOT,
-        'cache_dir': CACHE_DIR,
         'categories': ['can'],
         'train': True,
         'split': .8,
     }
-    # images = shapenet.ShapeNet_Images(root=SHAPENET_ROOT, cache_dir=CACHE_DIR, categories=['bowl'], views=1, train=True, split=.8)
+    # images = shapenet.ShapeNet_Images(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
+    #                                   categories=['bowl'], views=1, train=True, split=.8)
     meshes = shapenet.ShapeNet_Meshes(**dataset_params)
-    voxels = shapenet.ShapeNet_Voxels(**dataset_params, resolutions=[32])
-    sdf_points = shapenet.ShapeNet_SDF_Points(**dataset_params, smoothing_iterations=3, num_points=500, occ=False,
+    voxels = shapenet.ShapeNet_Voxels(**dataset_params, cache_dir=CACHE_DIR, resolutions=[32])
+    sdf_points = shapenet.ShapeNet_SDF_Points(**dataset_params, cache_dir=CACHE_DIR,
+                                              smoothing_iterations=3, num_points=500, occ=False,
                                               sample_box=True)
 
-    points = shapenet.ShapeNet_Points(**dataset_params, resolution=100, smoothing_iterations=3, num_points=500,
+    points = shapenet.ShapeNet_Points(**dataset_params, cache_dir=CACHE_DIR, resolution=100,
+                                      smoothing_iterations=3, num_points=500,
                                       surface=False, normals=True)
 
     dataset = shapenet.ShapeNet_Combination([voxels, sdf_points, points])

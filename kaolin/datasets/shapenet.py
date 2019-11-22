@@ -155,7 +155,7 @@ class ShapeNet_Meshes(data.Dataset):
         }
 
     Example:
-        >>> meshes = ShapeNet_Meshes(root='./datasets/ShapeNet/', cache_dir='cache', download=True)
+        >>> meshes = ShapeNet_Meshes(root='./datasets/ShapeNet/', download=True)
         >>> obj = next(iter(meshes))
         >>> obj['data']['vertices'].shape
         torch.Size([2133, 3])
@@ -163,7 +163,7 @@ class ShapeNet_Meshes(data.Dataset):
         torch.Size([1910, 3])
     """
 
-    def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
+    def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
                  download: bool = False, split: float = .7, no_progress: bool = False):
         self.root = Path(root)
         self.paths = []
@@ -176,7 +176,7 @@ class ShapeNet_Meshes(data.Dataset):
             syn = self.synsets[i]
             class_target = self.root / syn
             if not class_target.exists():
-                download_shapenet(syn, str(self.root), download)
+                download_shapenet_class(syn, str(self.root), download)
 
             # find all objects in the class
             models = sorted(class_target.glob('*'))
@@ -251,7 +251,7 @@ class ShapeNet_Images(data.Dataset):
         torch.Size([10, 4, 137, 137])
     """
 
-    def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
+    def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
                  split: float = .7, download: bool = True, views: int = 23, transform=None,
                  no_progress: bool = False):
         self.root = root
@@ -329,6 +329,7 @@ class ShapeNet_Voxels(data.Dataset):
 
     Args:
         root (str): Path to the root directory of the ShapeNet dataset.
+        cache_dir (str): Path to save cached converted representations.
         categories (str): List of categories to load from ShapeNet. This list may
                 contain synset ids, class label names (for ShapeNetCore classes),
                 or a combination of both.
@@ -365,7 +366,6 @@ class ShapeNet_Voxels(data.Dataset):
             'resolutions': resolutions,
         }
         mesh_dataset = ShapeNet_Meshes(root=root,
-                                       cache_dir=cache_dir,
                                        categories=categories,
                                        train=train,
                                        download=download,
@@ -416,6 +416,7 @@ class ShapeNet_Surface_Meshes(data.Dataset):
 
     Arguments:
         root (str): Path to the root directory of the ShapeNet dataset.
+        cache_dir (str): Path to save cached converted representations.
         categories (str): List of categories to load from ShapeNet. This list may
                 contain synset ids, class label names (for ShapeNetCore classes),
                 or a combination of both.
@@ -453,7 +454,6 @@ class ShapeNet_Surface_Meshes(data.Dataset):
         self.cache_dir = Path(cache_dir) / 'surface_meshes'
         dataset_params = {
             'root': root,
-            'cache_dir': cache_dir,
             'categories': categories,
             'train': train,
             'download': download,
@@ -467,7 +467,7 @@ class ShapeNet_Surface_Meshes(data.Dataset):
         }
 
         mesh_dataset = ShapeNet_Meshes(**dataset_params)
-        voxel_dataset = ShapeNet_Voxels(**dataset_params, resolutions=[resolution])
+        voxel_dataset = ShapeNet_Voxels(**dataset_params, cache_dir=cache_dir, resolutions=[resolution])
         combined_dataset = ShapeNet_Combination([mesh_dataset, voxel_dataset])
 
         self.names = combined_dataset.names
@@ -529,6 +529,7 @@ class ShapeNet_Points(data.Dataset):
 
     Args:
         root (str): Path to the root directory of the ShapeNet dataset.
+        cache_dir (str): Path to save cached converted representations.
         categories (str): List of categories to load from ShapeNet. This list may
                 contain synset ids, class label names (for ShapeNetCore classes),
                 or a combination of both.
@@ -568,7 +569,6 @@ class ShapeNet_Points(data.Dataset):
 
         dataset_params = {
             'root': root,
-            'cache_dir': cache_dir,
             'categories': categories,
             'train': train,
             'download': download,
@@ -585,6 +585,7 @@ class ShapeNet_Points(data.Dataset):
 
         if surface:
             dataset = ShapeNet_Surface_Meshes(**dataset_params,
+                                              cache_dir=cache_dir,
                                               resolution=resolution,
                                               smoothing_iterations=smoothing_iterations)
         else:
@@ -637,6 +638,7 @@ class ShapeNet_SDF_Points(data.Dataset):
 
     Args:
         root (str): Path to the root directory of the ShapeNet dataset.
+        cache_dir (str): Path to save cached converted representations.
         categories (str): List of categories to load from ShapeNet. This list may
                 contain synset ids, class label names (for ShapeNetCore classes),
                 or a combination of both.
