@@ -29,7 +29,7 @@ CACHE_DIR = 'tests/datasets/cache'
 
 
 # Tests below can only be run is a ShapeNet dataset is available
-REASON = 'ShapeNet not found at {}'.format(SHAPENET_ROOT)
+REASON = 'ShapeNet not found at default location: {}'.format(SHAPENET_ROOT)
 
 
 @pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=REASON)
