@@ -104,24 +104,6 @@ def tqdm_hook(t, timeout=1):
     return update_to
 
 
-def download_shapenet_class(syn: str, shapenet_location: str, download: bool):
-    r"""Downloads a shapenet class to a specified directory.
-
-    You may complete this function to automate downloading from a
-    central source.
-    """
-    NotImplemented
-
-
-def download_images(shapenet_location: str):
-    r"""Downloads shapenet core class images to a specified directory
-
-    You may complete this function to automate downloading from a
-    central source.
-    """
-    NotImplemented
-
-
 def _convert_categories(categories):
     assert categories is not None, 'List of categories cannot be empty!'
     if not (c in synset_to_label.keys() + label_to_synset.keys()
@@ -143,7 +125,6 @@ class ShapeNet_Meshes(data.Dataset):
                 or a combination of both.
         train (bool): return the training set else the test set
         split (float): amount of dataset that is training out of 1
-        download (bool): download the shapenet class if not found
         no_progress (bool): if True, disables progress bar
 
     Returns:
@@ -155,7 +136,7 @@ class ShapeNet_Meshes(data.Dataset):
         }
 
     Example:
-        >>> meshes = ShapeNet_Meshes(root='../data/ShapeNet/', download=True)
+        >>> meshes = ShapeNet_Meshes(root='../data/ShapeNet/')
         >>> obj = next(iter(meshes))
         >>> obj['data']['vertices'].shape
         torch.Size([2133, 3])
@@ -164,7 +145,7 @@ class ShapeNet_Meshes(data.Dataset):
     """
 
     def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
-                 download: bool = False, split: float = .7, no_progress: bool = False):
+                 split: float = .7, no_progress: bool = False):
         self.root = Path(root)
         self.paths = []
         self.synset_idxs = []
@@ -176,7 +157,8 @@ class ShapeNet_Meshes(data.Dataset):
             syn = self.synsets[i]
             class_target = self.root / syn
             if not class_target.exists():
-                download_shapenet_class(syn, str(self.root), download)
+                raise ValueError('Class {0} ({1}) was not found at location {2}.'.format(
+                    syn, self.labels[i], str(class_target)))
 
             # find all objects in the class
             models = sorted(class_target.glob('*'))
@@ -221,7 +203,6 @@ class ShapeNet_Images(data.Dataset):
                 or a combination of both.
         train (bool): if true use the training set, else use the test set
         split (float): amount of dataset that is training out of
-        download (bool): if true download dataset set not found
         views (int): number of viewpoints per object to load
         transform (torchvision.transforms) : transformation to apply to images
         no_progress (bool): if True, disables progress bar
@@ -243,7 +224,7 @@ class ShapeNet_Images(data.Dataset):
 
     Example:
         >>> from torch.utils.data import DataLoader
-        >>> images = ShapeNet_Images(root='../data/ShapeNetImages', download = True)
+        >>> images = ShapeNet_Images(root='../data/ShapeNetImages')
         >>> train_loader = DataLoader(images, batch_size=10, shuffle=True, num_workers=8)
         >>> obj = next(iter(train_loader))
         >>> image = obj['data']['imgs']
@@ -252,7 +233,7 @@ class ShapeNet_Images(data.Dataset):
     """
 
     def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
-                 split: float = .7, download: bool = True, views: int = 23, transform=None,
+                 split: float = .7, views: int = 23, transform=None,
                  no_progress: bool = False):
         self.root = Path(root)
         self.synsets = _convert_categories(categories)
@@ -263,11 +244,10 @@ class ShapeNet_Images(data.Dataset):
         self.synset_idx = []
 
         shapenet_img_root = self.root / 'images'
-        # check if images already exists and if not download them
+        # check if images exist
         if not shapenet_img_root.exists():
-            shapenet_img_root.mkdir()
-            assert download, f'ShapeNet Images are not found, and download is set to False'
-            download_images(str(self.root))
+            raise ValueError('ShapeNet images were not found at location {0}.'.format(
+                str(shapenet_img_root)))
 
         # find all needed images
         for i in tqdm(range(len(self.synsets)), disable=no_progress):
@@ -335,7 +315,6 @@ class ShapeNet_Voxels(data.Dataset):
                 or a combination of both.
         train (bool): return the training set else the test set
         split (float): amount of dataset that is training out of 1
-        download (bool): download the shapenet class if not found
         resolutions (list): list of resolutions to be returned
         no_progress (bool): if True, disables progress bar
 
@@ -349,7 +328,7 @@ class ShapeNet_Voxels(data.Dataset):
 
     Example:
         >>> from torch.utils.data import DataLoader
-        >>> voxels = ShapeNet_Voxels(root='../data/', download=True)
+        >>> voxels = ShapeNet_Voxels(root='../data/ShapeNet/', cache_dir='cache/')
         >>> train_loader = DataLoader(voxels, batch_size=10, shuffle=True, num_workers=8 )
         >>> obj = next(iter(train_loader))
         >>> obj['data']['128'].shape
@@ -357,8 +336,7 @@ class ShapeNet_Voxels(data.Dataset):
 
     """
     def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
-                 download: bool = True, split: float = .7, resolutions=[128, 32],
-                 no_progress: bool = False):
+                 split: float = .7, resolutions=[128, 32], no_progress: bool = False):
         self.root = Path(root)
         self.cache_dir = Path(cache_dir) / 'voxels'
         self.cache_transforms = {}
@@ -368,7 +346,6 @@ class ShapeNet_Voxels(data.Dataset):
         mesh_dataset = ShapeNet_Meshes(root=root,
                                        categories=categories,
                                        train=train,
-                                       download=download,
                                        split=split,
                                        no_progress=no_progress)
         self.names = mesh_dataset.names
@@ -422,7 +399,6 @@ class ShapeNet_Surface_Meshes(data.Dataset):
                 or a combination of both.
         train (bool): return the training set else the test set
         split (float): amount of dataset that is training out of 1
-        download (bool): download the shapenet class if not found
         resolution (int): resolution of voxel object to use when converting
         smoothing_iteration (int): number of applications of laplacian smoothing
         no_progress (bool): if True, disables progress bar
@@ -436,7 +412,7 @@ class ShapeNet_Surface_Meshes(data.Dataset):
         }
 
     Example:
-        >>> surface_meshes = ShapeNet_Surface_Meshes(root ='../data/', download = True)
+        >>> surface_meshes = ShapeNet_Surface_Meshes(root='../data/ShapeNet', cache_dir='cache/')
         >>> obj = next(iter(surface_meshes))
         >>> obj['data']['vertices'].shape
         torch.Size([11617, 3])
@@ -446,8 +422,8 @@ class ShapeNet_Surface_Meshes(data.Dataset):
     """
 
     def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
-                 download: bool = True, split: float = .7, resolution: int = 100,
-                 smoothing_iterations: int = 3, mode='Tri', no_progress: bool = False):
+                 split: float = .7, resolution: int = 100, smoothing_iterations: int = 3, mode='Tri',
+                 no_progress: bool = False):
         assert mode in ['Tri', 'Quad']
 
         self.root = Path(root)
@@ -456,7 +432,6 @@ class ShapeNet_Surface_Meshes(data.Dataset):
             'root': root,
             'categories': categories,
             'train': train,
-            'download': download,
             'split': split,
             'no_progress': no_progress,
         }
@@ -535,7 +510,6 @@ class ShapeNet_Points(data.Dataset):
                 or a combination of both.
         train (bool): return the training set else the test set
         split (float): amount of dataset that is training out of 1
-        download (bool): download the shapenet class if not found
         num_points (int): number of point sampled on mesh
         smoothing_iteration (int): number of application of laplacian smoothing
         surface (bool): if only the surface of the original mesh should be used
@@ -553,7 +527,7 @@ class ShapeNet_Points(data.Dataset):
 
     Example:
         >>> from torch.utils.data import DataLoader
-        >>> points = ShapeNet_Points(root ='../data/', download = True)
+        >>> points = ShapeNet_Points(root='../data/ShapeNet', cache_dir='cache/')
         >>> train_loader = DataLoader(points, batch_size=10, shuffle=True, num_workers=8)
         >>> obj = next(iter(train_loader))
         >>> obj['data']['points'].shape
@@ -562,7 +536,7 @@ class ShapeNet_Points(data.Dataset):
     """
 
     def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
-                 download: bool = True, split: float = .7, num_points: int = 5000, smoothing_iterations=3,
+                 split: float = .7, num_points: int = 5000, smoothing_iterations=3,
                  surface=True, resolution=100, normals=True, no_progress: bool = False):
         self.root = Path(root)
         self.cache_dir = Path(cache_dir) / 'points'
@@ -571,7 +545,6 @@ class ShapeNet_Points(data.Dataset):
             'root': root,
             'categories': categories,
             'train': train,
-            'download': download,
             'split': split,
             'no_progress': no_progress,
         }
@@ -644,7 +617,6 @@ class ShapeNet_SDF_Points(data.Dataset):
                 or a combination of both.
         train (bool): return the training set else the test set
         split (float): amount of dataset that is training out of 1
-        download (bool): download the shapenet class if not found
         resolution (int): resolution of voxel object to use when converting
         num_points (int): number of sdf points sampled on mesh
         occ (bool): should only occupancy values be returned instead of distances
@@ -664,7 +636,7 @@ class ShapeNet_SDF_Points(data.Dataset):
 
     Example:
         >>> from torch.utils.data import DataLoader
-        >>> sdf_points = ShapeNet_SDF_Points(root ='../data/', download = True)
+        >>> sdf_points = ShapeNet_SDF_Points(root='../data/ShapeNet', cache_dir='cache/')
         >>> train_loader = DataLoader(sdf_points, batch_size=10, shuffle=True, num_workers=8)
         >>> obj = next(iter(train_loader))
         >>> obj['data']['sdf_points'].shape
@@ -673,8 +645,8 @@ class ShapeNet_SDF_Points(data.Dataset):
     """
 
     def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
-                 download: bool = True, split: float = .7, resolution: int = 100, num_points: int = 5000,
-                 occ: bool = False, smoothing_iterations: int = 3, sample_box=True, no_progress: bool = False):
+                 split: float = .7, resolution: int = 100, num_points: int = 5000, occ: bool = False,
+                 smoothing_iterations: int = 3, sample_box=True, no_progress: bool = False):
         self.root = Path(root)
         self.cache_dir = Path(cache_dir) / 'sdf_points'
 
@@ -690,7 +662,6 @@ class ShapeNet_SDF_Points(data.Dataset):
                                                        cache_dir=cache_dir,
                                                        categories=categories,
                                                        train=train,
-                                                       download=download,
                                                        split=split,
                                                        resolution=resolution,
                                                        smoothing_iterations=smoothing_iterations,
@@ -774,7 +745,7 @@ class ShapeNet_Tags(data.Dataset):
 
     Example:
         >>> from torch.utils.data import DataLoader
-        >>> meshes = ShapeNet_Meshes(root='../data/', download=True)
+        >>> meshes = ShapeNet_Meshes(root='../data/ShapeNet/', cache_dir='cache/')
         >>> tags = ShapeNet_Tags(meshes)
         >>> train_loader = DataLoader(tags, batch_size=10, shuffle=True, num_workers=8 )
         >>> obj = next(iter(train_loader))
@@ -782,7 +753,7 @@ class ShapeNet_Tags(data.Dataset):
         torch.Size([10, N])
 
     """
-    def __init__(self, dataset, download=True, tag_aug=True):
+    def __init__(self, dataset, tag_aug=True):
         self.root = dataset.root
         self.paths = dataset.paths
         self.synset_idxs = dataset.synset_idxs
@@ -1014,7 +985,6 @@ class ShapeNet_Combination(data.Dataset):
                 or a combination of both.
         root (str): Path to the root directory of the ShapeNet dataset.
         train (bool): if true use the training set, else use the test set
-        download (bool): if true download dataset set not found
 
     Returns:
         dict: Dictionary with keys indicated by passed datasets
@@ -1022,10 +992,10 @@ class ShapeNet_Combination(data.Dataset):
     Example:
 
         >>> from torch.utils.data import DataLoader
-        >>> shapenet = ShapeNet_Meshes(root ='../data/', download = True)
-        >>> voxels = ShapeNet_Voxels(shapenet)
-        >>> images = ShapeNet_Images(shapenet)
-        >>> points = ShapeNet_Points(shapenet)
+        >>> shapenet = ShapeNet_Meshes(root='../data/ShapeNet', cache_dir='cache/')
+        >>> voxels = ShapeNet_Voxels(root='../data/ShapeNet', cache_dir='cache/')
+        >>> images = ShapeNet_Images(root='../data/ShapeNet', cache_dir='cache/')
+        >>> points = ShapeNet_Points(root='../data/ShapeNet', cache_dir='cache/')
         >>> dataset = ShapeNet_Combination([voxels, images, points])
         >>> train_loader = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=8)
         >>> obj = next(iter(train_loader))
