@@ -17,7 +17,7 @@ parser.add_argument('--loss-type', type=str, choices=['MSE', 'NLLL'], default='M
 parser.add_argument('--device', type=str, default='cuda', help='Device to use')
 parser.add_argument('--categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
 parser.add_argument('--vis', action='store_true', help='Visualize each model while evaluating')
-parser.add_argument('-batchsize', type=int, default=16, help='Batch size.')
+parser.add_argument('--batchsize', type=int, default=16, help='Batch size.')
 args = parser.parse_args()
 
 
