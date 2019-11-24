@@ -105,7 +105,7 @@ def tqdm_hook(t, timeout=1):
 
 
 def download_shapenet_class(syn: str, shapenet_location: str, download: bool):
-    r"""Downloads a shapenet to a specified directory.
+    r"""Downloads a shapenet class to a specified directory.
 
     You may complete this function to automate downloading from a
     central source.
@@ -113,7 +113,7 @@ def download_shapenet_class(syn: str, shapenet_location: str, download: bool):
     NotImplemented
 
 
-def download_images(shapenet_root: str):
+def download_images(shapenet_location: str):
     r"""Downloads shapenet core class images to a specified directory
 
     You may complete this function to automate downloading from a
@@ -155,7 +155,7 @@ class ShapeNet_Meshes(data.Dataset):
         }
 
     Example:
-        >>> meshes = ShapeNet_Meshes(root='./datasets/ShapeNet/', download=True)
+        >>> meshes = ShapeNet_Meshes(root='../data/ShapeNet/', download=True)
         >>> obj = next(iter(meshes))
         >>> obj['data']['vertices'].shape
         torch.Size([2133, 3])
@@ -243,7 +243,7 @@ class ShapeNet_Images(data.Dataset):
 
     Example:
         >>> from torch.utils.data import DataLoader
-        >>> images = ShapeNet_Images(root ='./datasets/', download = True)
+        >>> images = ShapeNet_Images(root='../data/ShapeNetImages', download = True)
         >>> train_loader = DataLoader(images, batch_size=10, shuffle=True, num_workers=8)
         >>> obj = next(iter(train_loader))
         >>> image = obj['data']['imgs']
@@ -254,20 +254,20 @@ class ShapeNet_Images(data.Dataset):
     def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
                  split: float = .7, download: bool = True, views: int = 23, transform=None,
                  no_progress: bool = False):
-        self.root = root
+        self.root = Path(root)
         self.synsets = _convert_categories(categories)
+        self.labels = [synset_to_label[s] for s in self.synsets]
         self.transform = transform
         self.views = views
         self.names = []
         self.synset_idx = []
 
-        self.shapenet_root = Path(root) / 'ShapeNet'
-        shapenet_img_root = Path(self.shapenet_root) / 'images'
+        shapenet_img_root = self.root / 'images'
         # check if images already exists and if not download them
         if not shapenet_img_root.exists():
             shapenet_img_root.mkdir()
             assert download, f'ShapeNet Images are not found, and download is set to False'
-            download_images(str(self.shapenet_root))
+            download_images(str(self.root))
 
         # find all needed images
         for i in tqdm(range(len(self.synsets)), disable=no_progress):
@@ -320,7 +320,7 @@ class ShapeNet_Images(data.Dataset):
         data['params']['distance'] = distance
         attributes['name'] = name
         attributes['synset'] = self.synsets[synset_idx]
-        attributes['label'] = self.synsets[self.synset_idx[index]]
+        attributes['label'] = self.labels[self.synset_idx[index]]
         return {'data': data, 'attributes': attributes}
 
 
