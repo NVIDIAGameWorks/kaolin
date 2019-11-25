@@ -190,7 +190,7 @@ If you find this library useful, consider citing the following paper:
 
 Here is a list of all authors on relevant research papers that Kaolin borrows code from. Without the efforts of these folks (and their willingness to release their implementations under permissable copyleft licenses), Kaolin would not have been possible.
 
-* Kornia: Edgar Riba, Dmytro Mishkin, Daniel Ponsa. [[Paper](https://arxiv.org/pdf/1910.02190.pdf)] [[Code](https://github.com/kornia/kornia)]
+* Kornia: Edgar Riba, Dmytro Mishkin, Daniel Ponsa, Ethan Rublee and Gary Bradski. [[Paper](https://arxiv.org/pdf/1910.02190.pdf)] [[Code](https://github.com/kornia/kornia)]
 * Occupancy Networks: Lars Mescheder, Michael Oechsle, Michael Niemeyer, Sebastian Nowozin, Andreas Geiger. [[Paper](https://avg.is.tuebingen.mpg.de/publications/occupancy-networks)] [[Code](https://github.com/autonomousvision/occupancy_networks)]
 * Multi-View Silhouette and Depth Decomposition for High Resolution 3D Object Representation: Edward Smith, Scott Fujimoto, David Meger. [[Paper](https://papers.nips.cc/paper/7883-multi-view-silhouette-and-depth-decomposition-for-high-resolution-3d-object-representation.pdf)] [[Code](https://github.com/EdwardSmith1884/Multi-View-Silhouette-and-Depth-Decomposition-for-High-Resolution-3D-Object-Representation)]
 * Pytorch Chamfer Distance: Christian Diller. [[Code](https://github.com/chrdiller/pyTorchChamferDistance)]
