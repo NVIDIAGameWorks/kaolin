@@ -27,7 +27,7 @@ class ModelNet(object):
     r""" Dataset class for the ModelNet dataset.
 
     Args:
-        basedir (str): Path to the base directory of the ModelNet10 dataset.
+        basedir (str): Path to the base directory of the ModelNet dataset.
         split (str, optional): Split to load ('train' vs 'test',
             default: 'train').
         categories (iterable, optional): List of categories to load
