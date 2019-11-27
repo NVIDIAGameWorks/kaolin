@@ -24,7 +24,8 @@ from torch.utils.data import DataLoader
 from kaolin.datasets import shapenet
 
 
-SHAPENET_ROOT = 'data/ShapeNet/'
+SHAPENET_ROOT = '/data/ShapeNet/'
+SHAPENET_RENDERING_ROOT = '/data/ShapeNetRendering'
 CACHE_DIR = 'tests/datasets/cache'
 
 
@@ -63,17 +64,22 @@ def test_Voxels():
 
     shutil.rmtree('tests/datasets/cache/voxels')
 
-
-# def test_Images():
-#     images = shapenet.ShapeNet_Images(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
-#                                       categories=['phone'], views=1, train=True, split=.7)
-#     assert len(images) == 736
-#     for obj in images:
-#         assert set(obj['data']['images'].shape) == set([137, 137, 4])
-#         assert os.path.isfile(obj['attributes']['name'] + '/rendering/00.png')
-#         assert set(obj['data']['params']['cam_mat'].shape) == set([3, 3])
-#         assert set(obj['data']['params']['cam_pos'].shape) == set([3])
-
+@pytest.mark.parametrize('categories', [['chair'], ['plane', 'bench', 'cabinet', 'car', 'chair',
+                                                    'monitor', 'lamp', 'speaker', 'rifle',
+                                                    'sofa', 'table', 'phone', 'watercraft']])
+@pytest.mark.skipif(not Path(SHAPENET_RENDERING_ROOT).exists(), reason=REASON)
+def test_Images(categories):
+    images = shapenet.ShapeNet_Images(root=SHAPENET_RENDERING_ROOT,
+                                      categories=categories, views=24, train=True, split=.7)
+    if categories == ['chair']:
+        assert len(images) == 4744
+    else:
+        assert len(images) == 30644
+    for obj in images:
+        assert list(obj['data']['images'].shape) == [4, 137, 137]
+        assert os.path.isfile(obj['attributes']['name'] / 'rendering/00.png')
+        assert list(obj['data']['params']['cam_mat'].shape) == [3, 3]
+        assert list(obj['data']['params']['cam_pos'].shape) == [3]
 
 @pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=REASON)
 def test_Surface_Meshes():
