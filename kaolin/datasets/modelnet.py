@@ -66,7 +66,7 @@ class ModelNet(object):
         self.cat_idxs = []
 
         if not os.path.exists(basedir):
-            ValueError('ModelNet was not found at {0}.'.format(basedir))
+            raise ValueError('ModelNet was not found at "{0}".'.format(basedir))
 
         available_categories = [p for p in os.listdir(basedir) if os.path.isdir(os.path.join(basedir, p))]
 
@@ -94,13 +94,14 @@ class ModelNet(object):
         return data, category
 
 
-class ModelNet_Voxels(object):
+class ModelNetVoxels(object):
     r""" Dataloader for downloading and reading from ModelNet.
 
 
     Args:
         basedir (str): location the dataset should be downloaded to /loaded from
-        train (bool): if True loads training set, else loads test
+        split (str, optional): Split to load ('train' vs 'test',
+            default: 'train').
         download (bool): downloads the dataset if not found in basedir
         categories (str): list of object classes to be loaded
 
@@ -121,7 +122,8 @@ class ModelNet_Voxels(object):
         torch.Size([10, 30, 30, 30])
     """
 
-    def __init__(self, basedir: str = 'data/ModelNet/', cache_dir: str = 'cache', train: bool = True, categories: list = ['bed'],
+    def __init__(self, basedir: str, cache_dir: str, 
+                 split: Optional[str] = 'train', categories: list = ['bed'],
                  resolutions: List[int] = [32], device: str = 'cpu'):
 
         self.basedir = basedir
@@ -130,7 +132,7 @@ class ModelNet_Voxels(object):
         self.params = {'resolutions': resolutions}
         self.cache_transforms = {}
 
-        mesh_dataset = ModelNet(basedir, train, categories, device)
+        mesh_dataset = ModelNet(basedir, split, categories, device)
 
         self.names = mesh_dataset.names
         self.categories = mesh_dataset.categories
@@ -147,9 +149,7 @@ class ModelNet_Voxels(object):
             for idx in tqdm(range(len(mesh_dataset)), desc=desc, disable=False):
                 name = mesh_dataset.names[idx]
                 if name not in self.cache_transforms[res].cached_ids:
-                    sample = mesh_dataset[idx]
-                    mesh = TriangleMesh.from_tensors(sample['data']['vertices'],
-                                                     sample['data']['faces'])
+                    mesh, _ = mesh_dataset[idx]
                     mesh.to(device=device)
                     self.cache_transforms[res](name, mesh)
 
