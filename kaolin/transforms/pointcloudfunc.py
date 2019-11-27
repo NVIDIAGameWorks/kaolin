@@ -168,19 +168,14 @@ def realign(src: Union[torch.Tensor, PointCloud],
         src = src.clone()
 
     # Compute the relative scaling factor and scale the src cloud.
-    src_min, _ = src.min(-2)
-    src_max, _ = src.max(-2)
-    tgt_min, _ = tgt.min(-2)
-    tgt_max, _ = tgt.max(-2)
-    src_min = src_min.unsqueeze(-2)
-    src_max = src_max.unsqueeze(-2)
-    tgt_min = tgt_min.unsqueeze(-2)
-    tgt_max = tgt_max.unsqueeze(-2)
-    # Center the pointclouds.
-    src = src - src.mean(-2).unsqueeze(-2)
-    src = ( (tgt_max - tgt_min) / (src_max - src_min + EPS) ) * src
-    # Undo the centering translation, and return the result.
-    return src + tgt.mean(-2).unsqueeze(-2)
+    src_min, _ = src.min(-2, keepdim=True)
+    src_max, _ = src.max(-2, keepdim=True)
+    tgt_min, _ = tgt.min(-2, keepdim=True)
+    tgt_max, _ = tgt.max(-2, keepdim=True)
+
+    src = ((tgt_max - tgt_min) / (src_max - src_min + EPS)) * src
+    src = src + (tgt_max - src.max(-2, keepdim=True)[0])
+    return src
 
 
 def normalize(cloud: Union[torch.Tensor, PointCloud],

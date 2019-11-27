@@ -12,15 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-
-import torch 
 from torch import nn 
-from torch.nn.parameter import Parameter
 import torch.nn.functional as F
-
-import torch
-from torch.nn import Parameter
 
 from .SimpleGCN import SimpleGCN
 
@@ -31,8 +24,8 @@ class GraphResNet(nn.Module):
 
     """
 
-    def __init__(self, input_features, hidden = 192, output_features = 3):
-        super(G_Res_Net, self).__init__()
+    def __init__(self, input_features, hidden=192, output_features=3):
+        super(GraphResNet, self).__init__()
         self.gc1 = SimpleGCN(input_features, hidden)
         self.gc2 = SimpleGCN(hidden, hidden)
         self.gc3 = SimpleGCN(hidden , hidden)
@@ -46,7 +39,7 @@ class GraphResNet(nn.Module):
         self.gc11 = SimpleGCN(hidden , hidden)
         self.gc12 = SimpleGCN(hidden, hidden)
         self.gc13 = SimpleGCN(hidden , hidden)
-        self.gc14 = SimpleGCN(hidden,  output_features)
+        self.gc14 = SimpleGCN(hidden, output_features)
         self.hidden = hidden
 
     def forward(self, features, adj):
@@ -91,4 +84,4 @@ class GraphResNet(nn.Module):
         features /= 2.
 
         coords = (self.gc14(features, adj))
-        return coords,features
+        return coords, features

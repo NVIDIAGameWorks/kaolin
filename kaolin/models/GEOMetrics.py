@@ -12,15 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
-
 import torch 
 from torch import nn 
-from torch.nn.parameter import Parameter
-import torch.nn.functional as F
-
-import torch
-from torch.nn import Parameter
 
 
 class VoxelDecoder(nn.Module):
@@ -28,7 +21,7 @@ class VoxelDecoder(nn.Module):
     .. note::
 
         If you use this code, please cite the original paper in addition to Kaolin.
-        
+
         .. code-block::
 
             @InProceedings{smith19a,
@@ -41,28 +34,28 @@ class VoxelDecoder(nn.Module):
                 series = {Proceedings of Machine Learning Research},
                 publisher = {PMLR},
             }
-            
+
     """
     def __init__(self, latent_length): 
         super(VoxelDecoder, self).__init__()
         self.fully = torch.nn.Sequential(
-              torch.nn.Linear(latent_length, 512)
-            )
+            torch.nn.Linear(latent_length, 512)
+        )
 
         self.model = torch.nn.Sequential(
-            torch.nn.ConvTranspose3d( 64, 64, 4, stride=2, padding=(1, 1, 1), ), 
+            torch.nn.ConvTranspose3d(64, 64, 4, stride=2, padding=(1, 1, 1)), 
             nn.BatchNorm3d(64),
             nn.ELU(inplace=True),
 
-            torch.nn.ConvTranspose3d( 64, 64, 4, stride=2, padding=(1, 1, 1)), 
+            torch.nn.ConvTranspose3d(64, 64, 4, stride=2, padding=(1, 1, 1)), 
             nn.BatchNorm3d(64),
             nn.ELU(inplace=True),
 
-            torch.nn.ConvTranspose3d( 64, 32, 4, stride=2, padding=(1, 1, 1)), 
+            torch.nn.ConvTranspose3d(64, 32, 4, stride=2, padding=(1, 1, 1)), 
             nn.BatchNorm3d(32),
             nn.ELU(inplace=True),
 
-            torch.nn.ConvTranspose3d( 32, 8, 4, stride=2, padding=(1, 1, 1)), 
+            torch.nn.ConvTranspose3d(32, 8, 4, stride=2, padding=(1, 1, 1)), 
             nn.BatchNorm3d(8),
             nn.ELU(inplace=True),
 
@@ -70,7 +63,7 @@ class VoxelDecoder(nn.Module):
         )
 
     def forward(self, latent):
-        decode = self.fully(latent).view(-1,64, 2, 2,2)
-        decode = self.model(decode).reshape(-1,32,32,32)
-        voxels = F.sigmoid(decode)
+        decode = self.fully(latent).view(-1, 64, 2, 2, 2)
+        decode = self.model(decode).reshape(-1, 32, 32, 32)
+        voxels = torch.sigmoid(decode)
         return voxels

@@ -194,3 +194,7 @@ public/
 
 # Results directory for examples
 examples/renderers/DIB-R/results/
+
+# example outputs
+cache/
+log/
