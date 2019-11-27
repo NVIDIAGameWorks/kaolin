@@ -53,15 +53,15 @@ To start, we will define a few important parameters:
 ```python
 modelnet_path = 'path/to/ModelNet/'
 categories = ['chair', 'sofa']
-sample_points = 1024
+num_points = 1024
 device = 'cuda'
 ```
 
-The `model_path` variable will hold the path to the ModelNet10 dataset. We will use the `categories` variable to specify which classes we want to learn to classify. `sample_points` is the number of points we will sample from the mesh when transforming it to a pointcloud. Finally, we will use `device = 'cuda'` to tell pytorch to run everything on the GPU.
+The `model_path` variable will hold the path to the ModelNet10 dataset. We will use the `categories` variable to specify which classes we want to learn to classify. `num_points` is the number of points we will sample from the mesh when transforming it to a pointcloud. Finally, we will use `device = 'cuda'` to tell pytorch to run everything on the GPU.
 
 ```python
 transform = tfs.Compose([
-    tfs.TriangleMeshToPointCloud(num_samples=sample_points),
+    tfs.TriangleMeshToPointCloud(num_samples=num_points),
     tfs.NormalizePointCloud()
 ])
 ```
@@ -133,7 +133,7 @@ For a more explicit example without the `ClassificationEngine` class, please see
 The `ClassificationEngine` can be customized to suit your needs.
 
 You can train on other categories by simply changing the `categories` argument passed to the `ModelNet10` dataset object. For example, you can add a `bed` class by running
-```
+```python
 dataset = ModelNet('/path/to/ModelNet10', categories=['chair', 'sofa', 'bed'],
                    split='train', rep='pointcloud', transform=norm, device='cuda:0')
 ```
