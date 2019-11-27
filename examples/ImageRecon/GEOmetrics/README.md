@@ -14,7 +14,7 @@ To train the system with the latent encoding loss call first:
 ```
 python train_auto_encoder.py
 ```
-This will train the mesh encoder. Then call the follwoing to train the image reconstruction algorithm: 
+This will train the mesh encoder. Then call the following to train the image reconstruction algorithm: 
 ```
 python train.py -latent_loss
 ```
