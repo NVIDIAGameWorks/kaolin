@@ -32,7 +32,7 @@ REASON = 'ShapeNet not found at default location: {}'.format(MODELNET_ROOT)
 @pytest.mark.parametrize('device', ['cpu', 'cuda'])
 @pytest.mark.skipif(not os.path.exists(MODELNET_ROOT), reason=REASON)
 def test_ModelNet(device): 
-    models = kal.datasets.ModelNet(basedir=MODELNET_ROOT, cache_dir=CACHE_DIR, categories=['bathtub'], split='test')
+    models = kal.datasets.ModelNet(basedir=MODELNET_ROOT, categories=['bathtub'], split='test')
 
     assert len(models) == 50
     for obj, category in models: 
@@ -47,7 +47,7 @@ def test_ModelNetPointCloud(device):
         tfs.TriangleMeshToPointCloud(num_samples=32),
         tfs.NormalizePointCloud()
     ])
-    models = kal.datasets.ModelNet(basedir=MODELNET_ROOT, cache_dir=CACHE_DIR, categories=['bathtub'], split='test', transform=transform)
+    models = kal.datasets.ModelNet(basedir=MODELNET_ROOT, categories=['bathtub'], split='test', transform=transform)
 
     assert len(models) == 50
     for obj, category in models: 

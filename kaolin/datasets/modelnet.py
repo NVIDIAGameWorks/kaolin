@@ -32,29 +32,23 @@ class ModelNet(object):
             default: 'train').
         categories (iterable, optional): List of categories to load
             (default: ['chair']).
-        device (str or torch.device, optional): Device to use (cpu,
-            cuda-capable device, etc.).
         transform (callable, optional): A function/transform to apply on each
             loaded example.
-
-    **kwargs
-        num_points (int, optional): Number of points in the returned pointcloud
-            (if using pointcloud representation, default: 1024).
+        device (str or torch.device, optional): Device to use (cpu,
+            cuda, cuda:1, etc.).  Default: 'cpu'
 
     Examples:
         >>> dataset = ModelNet(basedir='data/ModelNet')
         >>> train_loader = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=8)
-        >>> obj = next(iter(train_loader))
-        >>> obj['data']['data']
-        torch.Size([10, 30, 30, 30])
+        >>> obj, label = next(iter(train_loader))
     """
 
     def __init__(self, basedir: str,
                  split: Optional[str] = 'train',
                  categories: Optional[Iterable] = ['bed'],
-                 device: Optional[Union[torch.device, str]] = 'cpu',
                  transform: Optional[Callable] = None,
-                 **kwargs):
+                 device: Optional[Union[torch.device, str]] = 'cpu'):
+
         assert split.lower() in ['train', 'test']
 
         self.basedir = basedir
@@ -100,10 +94,14 @@ class ModelNetVoxels(object):
 
     Args:
         basedir (str): location the dataset should be downloaded to /loaded from
+        cache_dir (str, optional)
         split (str, optional): Split to load ('train' vs 'test',
             default: 'train').
-        download (bool): downloads the dataset if not found in basedir
-        categories (str): list of object classes to be loaded
+        categories (str, optional): list of object classes to be loaded
+        resolutions (list of int, optional): list of voxel grid resolutions to create,
+            default: [32]
+        device (str or torch.device, optional): Device to use (cpu,
+            cuda, cuda:1, etc.).  Default: 'cpu'
 
     Returns:
         .. code-block::
@@ -115,24 +113,25 @@ class ModelNetVoxels(object):
 
 
     Examples:
-        >>> dataset = ModelNet(basedir='../data/')
+        >>> dataset = ModelNet(basedir='data/ModelNet', resolutions=[32])
         >>> train_loader = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=8)
         >>> obj = next(iter(train_loader))
-        >>> obj['data']['data']
-        torch.Size([10, 30, 30, 30])
+        >>> obj['data']['32'].size()
+        torch.Size(32, 32, 32)
     """
 
-    def __init__(self, basedir: str, cache_dir: str, 
+    def __init__(self, basedir: str, cache_dir: Optional[str] = None, 
                  split: Optional[str] = 'train', categories: list = ['bed'],
-                 resolutions: List[int] = [32], device: str = 'cpu'):
+                 resolutions: List[int] = [32],
+                 device: Optional[Union[torch.device, str]] = 'cpu'):
 
         self.basedir = basedir
         self.device = torch.device(device)
-        self.cache_dir = cache_dir
+        self.cache_dir = cache_dir if cache_dir is not None else os.path.join(basedir, 'cache')
         self.params = {'resolutions': resolutions}
         self.cache_transforms = {}
 
-        mesh_dataset = ModelNet(basedir, split, categories, device)
+        mesh_dataset = ModelNet(basedir=basedir, split=split, categories=categories, device=device)
 
         self.names = mesh_dataset.names
         self.categories = mesh_dataset.categories
