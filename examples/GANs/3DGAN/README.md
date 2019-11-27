@@ -7,7 +7,7 @@ This example lets you train the 3D GAN method. See: https://arxiv.org/abs/1610.0
 
 To train run (adding a valid path to modelnet-root)
 ```
-python train.py --modelnet-root <path/to/modelnet/> --cache-dir cache/
+python train.py --modelnet-root <path/to/modelnet/>
 ```
 The argument `cache-dir` specifies where to store voxelized representations of 
 the ModelNet meshes used during training.
@@ -19,4 +19,3 @@ To evaluate run
 ```
 python eval.py
 ```
-

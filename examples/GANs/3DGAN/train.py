@@ -28,7 +28,7 @@ from architectures import Generator, Discriminator
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--modelnet-root', type=str, help='Root directory of the ModelNet dataset.')
-parser.add_argument('--cache-dir', type=str, help='Path to write intermediate representation to.')
+parser.add_argument('--cache-dir', type=str, default=None, help='Path to write intermediate representation to.')
 parser.add_argument('--expid', type=str, default='GAN', help='Unique experiment identifier.')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use')
 parser.add_argument('--categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
@@ -42,8 +42,8 @@ args = parser.parse_args()
 
 
 # Setup Dataloader
-train_set = kal.datasets.ModelNet_Voxels(root=args.modelnet_root, cache_dir=args.cache_dir,
-                                         categories=args.categories, resolutions=[30])
+train_set = kal.datasets.ModelNetVoxels(basedir=args.modelnet_root, cache_dir=args.cache_dir,
+                                        categories=args.categories, resolutions=[30])
 dataloader_train = DataLoader(train_set, batch_size=args.batchsize, shuffle=True, num_workers=8)
 
 
