@@ -12,104 +12,80 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Iterable, Optional, Union
+from typing import Callable, Iterable, Optional, Union, List
 
 import torch
 import os
-import sys
 from glob import glob
-import scipy.io as sio
+from tqdm import tqdm
 
-import kaolin as kal
-
-
-_MODELNET10_CLASSES = ['bathtub', 'bed', 'chair', 'desk', 'dresser', 'monitor',
-                       'night_stand', 'sofa', 'table', 'toilet']
+from kaolin.rep.TriangleMesh import TriangleMesh
+from kaolin.transforms import transforms as tfs
 
 
-class ModelNet10(torch.utils.data.Dataset):
-    r"""Dataset class for the ModelNet10 dataset.
+class ModelNet(object):
+    r""" Dataset class for the ModelNet dataset.
 
     Args:
-        basedir (str): Path to the base directory of the ModelNet10 dataset.
-        rep (str, optional): Type of representation to convert the dataset into
-            (default: 'mesh').
+        basedir (str): Path to the base directory of the ModelNet dataset.
         split (str, optional): Split to load ('train' vs 'test',
             default: 'train').
         categories (iterable, optional): List of categories to load
             (default: ['chair']).
-        device (str or torch.device, optional): Device to use (cpu,
-            cuda-capable device, etc.).
         transform (callable, optional): A function/transform to apply on each
             loaded example.
+        device (str or torch.device, optional): Device to use (cpu,
+            cuda, cuda:1, etc.).  Default: 'cpu'
 
-    **kwargs
-        num_points (int, optional): Number of points in the returned pointcloud
-            (if using pointcloud representation, default: 1024).
-
+    Examples:
+        >>> dataset = ModelNet(basedir='data/ModelNet')
+        >>> train_loader = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=8)
+        >>> obj, label = next(iter(train_loader))
     """
 
-    def __init__(self, basedir: str, rep: Optional[str] = 'mesh',
+    def __init__(self, basedir: str,
                  split: Optional[str] = 'train',
                  categories: Optional[Iterable] = ['bed'],
-                 device: Optional[Union[torch.device, str]] = 'cpu',
                  transform: Optional[Callable] = None,
-                 **kwargs):
+                 device: Optional[Union[torch.device, str]] = 'cpu'):
 
-        super(ModelNet10, self).__init__()
+        assert split.lower() in ['train', 'test']
 
-        if rep.lower() not in ['mesh', 'pointcloud']:
-            raise ValueError('Argument \'rep\' must be one of \'mesh\' '
-                ' or \'pointcloud\'. Got {0} instead.'.format(rep))
-        if split.lower() not in ['train', 'test']:
-            raise ValueError('Argument \'split\' must be one of \'train\' '
-                ' or \'test\'. Got {0} instead.'.format(split))
-
-        self.categories = categories
-        self.paths = []
-        self.labels = []
-        for idx, cat in enumerate(self.categories):
-
-            if cat not in _MODELNET10_CLASSES:
-                raise ValueError('Invalid ModelNet10 class {0}. Valid classes '
-                    ' are {1}'.format(cat, _MODELNET10_CLASSES))
-            
-            catdir = os.path.join(basedir, cat, split)
-            for path in glob(os.path.join(catdir, '*.off')):
-                self.paths.append(path)
-                self.labels.append(idx)
-
-        self.rep = rep
-        self.device = device
+        self.basedir = basedir
         self.transform = transform
+        self.device = device
+        self.categories = categories
+        self.names = []
+        self.filepaths = []
+        self.cat_idxs = []
 
-        # Set defaults for kwargs
-        if 'num_points' in kwargs:
-            self.num_points = kwargs['num_points']
-        else:
-            self.num_points = 1024
+        if not os.path.exists(basedir):
+            raise ValueError('ModelNet was not found at "{0}".'.format(basedir))
+
+        available_categories = [p for p in os.listdir(basedir) if os.path.isdir(os.path.join(basedir, p))]
+
+        for cat_idx, category in enumerate(categories):
+            assert category in available_categories, 'object class {0} not in list of available classes: {1}'.format(
+                category, available_categories)
+
+            cat_paths = glob(os.path.join(basedir, category, split.lower(), '*.off'))
+
+            self.cat_idxs += [cat_idx] * len(cat_paths)
+            self.names += [os.path.splitext(os.path.basename(cp))[0] for cp in cat_paths]
+            self.filepaths += cat_paths
 
     def __len__(self):
-        r"""Returns the length of the dataset. """
-        return len(self.paths)
+        return len(self.names)
 
-    def __getitem__(self, idx):
-        r"""Returns the item at index `idx`. """
-        
-        mesh = kal.rep.TriangleMesh.from_off(self.paths[idx])
-        mesh.to(self.device)
-        label = torch.LongTensor([self.labels[idx]]).to(self.device)
-        if self.rep == 'mesh':
-            if self.transform is not None:
-                mesh = self.transform(mesh)
-            return mesh, label
-        elif self.rep == 'pointcloud':
-            pts, _ = mesh.sample(self.num_points)
-            if self.transform is not None:
-                pts = self.transform(pts)
-            return pts, label
-        else:
-            raise NotImplementedError
+    def __getitem__(self, index):
+        """Returns the item at index idx. """
+        category = torch.tensor(self.cat_idxs[index], dtype=torch.long, device=self.device)
+        data = TriangleMesh.from_off(self.filepaths[index])
+        data.to(self.device)
+        if self.transform:
+            data = self.transform(data)
+
+        return data, category
 
 
 class ModelNetVoxels(object):
@@ -117,15 +93,19 @@ class ModelNetVoxels(object):
 
 
     Args:
-        root (str): location the dataset should be downloaded to /loaded from
-        train (bool): if True loads training set, else loads test
-        download (bool): downloads the dataset if not found in root
-        categories (str): list of object classes to be loaded
-        single_view (bool): if true only one roation is used, if not all 12 views are loaded
+        basedir (str): location the dataset should be downloaded to /loaded from
+        cache_dir (str, optional)
+        split (str, optional): Split to load ('train' vs 'test',
+            default: 'train').
+        categories (str, optional): list of object classes to be loaded
+        resolutions (list of int, optional): list of voxel grid resolutions to create,
+            default: [32]
+        device (str or torch.device, optional): Device to use (cpu,
+            cuda, cuda:1, etc.).  Default: 'cpu'
 
     Returns:
         .. code-block::
-        
+
         dict: {
             'attributes': {'name': str, 'class': str},
             'data': {'voxels': torch.Tensor}
@@ -133,57 +113,56 @@ class ModelNetVoxels(object):
 
 
     Examples:
-        >>> dataset = ModelNet(root='../data/')
+        >>> dataset = ModelNet(basedir='data/ModelNet', resolutions=[32])
         >>> train_loader = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=8)
         >>> obj = next(iter(train_loader))
-        >>> obj['data']['data']
-        torch.Size([10, 30, 30, 30])
+        >>> obj['data']['32'].size()
+        torch.Size(32, 32, 32)
     """
 
-    def __init__(self, root: str = '../data/', train: bool = True, test: bool = True,
-                 download: bool = True, categories: list = ['chair'], single_view: bool = True):
-        if not os.path.exists(root + '/ModelNet/'):
-            assert download, "ModelNet is not found, and download is set to False"
-            assert (train or test), 'either train or test must be set to True'
+    def __init__(self, basedir: str, cache_dir: Optional[str] = None, 
+                 split: Optional[str] = 'train', categories: list = ['bed'],
+                 resolutions: List[int] = [32],
+                 device: Optional[Union[torch.device, str]] = 'cpu'):
 
-        if not single_view:
-            side = ''
-        else:
-            side = '_1'
+        self.basedir = basedir
+        self.device = torch.device(device)
+        self.cache_dir = cache_dir if cache_dir is not None else os.path.join(basedir, 'cache')
+        self.params = {'resolutions': resolutions}
+        self.cache_transforms = {}
 
-        all_classes = [os.path.basename(os.path.dirname(c))
-                       for c in glob(root + '/ModelNet/volumetric_data/*/')]
-        self.names = []
-        for category in categories:
-            assert category in all_classes, 'object class {0} not in list of availible classes: {1}'.format(
-                category, all_classes)
-            if train:
-                self.names += glob(
-                    root + '/ModelNet/volumetric_data/{0}/*/{1}/*{2}.mat'.format(category, 'train', side))
-            if test:
-                self.names += glob(
-                    root + '/ModelNet/volumetric_data/{0}/*/{1}/*{2}.mat'.format(category, 'test', side))
+        mesh_dataset = ModelNet(basedir=basedir, split=split, categories=categories, device=device)
+
+        self.names = mesh_dataset.names
+        self.categories = mesh_dataset.categories
+        self.cat_idxs = mesh_dataset.cat_idxs
+
+        for res in self.params['resolutions']:
+            self.cache_transforms[res] = tfs.CacheCompose([
+                tfs.TriangleMeshToVoxelGrid(res, normalize=True, vertex_offset=0.5),
+                tfs.FillVoxelGrid(thresh=0.5),
+                tfs.ExtractProjectOdmsFromVoxelGrid()
+            ], self.cache_dir)
+
+            desc = 'converting to voxels to resolution {0}'.format(res)
+            for idx in tqdm(range(len(mesh_dataset)), desc=desc, disable=False):
+                name = mesh_dataset.names[idx]
+                if name not in self.cache_transforms[res].cached_ids:
+                    mesh, _ = mesh_dataset[idx]
+                    mesh.to(device=device)
+                    self.cache_transforms[res](name, mesh)
 
     def __len__(self):
         return len(self.names)
 
-    def __getitem__(self, item):
-        object_path = self.names[item]
-
-        # convert the path to the linux like path in o
-        if sys.platform.startswith('win'):
-            object_path = object_path.replace('\\', '/')
-
-        
-        object_class = object_path.split('/')[-4]
-        object_name = object_path.split('/')[-1]
-        object_data = sio.loadmat(object_path)['instance']
-        # object_shape = object_data.shape
-
+    def __getitem__(self, index):
+        """Returns the item at index idx. """
         data = dict()
         attributes = dict()
-        attributes['name'] = object_name
-        attributes['class'] = object_class
-        data['voxels'] = torch.FloatTensor(object_data.astype(float))
+        name = self.names[index]
 
-        return {'attributes': attributes, 'data': data}
+        for res in self.params['resolutions']:
+            data[str(res)] = self.cache_transforms[res](name)
+        attributes['name'] = name
+        attributes['category'] = self.categories[self.cat_idxs[index]]
+        return {'data': data, 'attributes': attributes}
