@@ -12,28 +12,57 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
-import torch
-import sys
 import os
+import pytest
 import shutil
+import torch
 
 import kaolin as kal
-from torch.utils.data import DataLoader
+import kaolin.transforms.transforms as tfs
+
+
+MODELNET_ROOT = 'data/ModelNet10/'
+CACHE_DIR = 'tests/datasets/cache'
 
 
 # Tests below can only be run is a ShapeNet dataset is available
-
-# def test_ModelNet(device = 'cpu'): 
-	
-# 	models = kal.dataloader.ModelNet(root = 'datasets', categories = ['chair'], train = True)
-	
-# 	assert len(models) == 889
-# 	for obj in models: 
-# 		assert obj['class'] == 'chair'
-# 		assert set(obj['data'].shape) == set([30,30,30]) 
-# 	shutil.rmtree('datasets/')
+REASON = 'ShapeNet not found at default location: {}'.format(MODELNET_ROOT)
 
 
+@pytest.mark.parametrize('device', ['cpu', 'cuda'])
+@pytest.mark.skipif(not os.path.exists(MODELNET_ROOT), reason=REASON)
+def test_ModelNet(device): 
+    models = kal.datasets.ModelNet(basedir=MODELNET_ROOT, cache_dir=CACHE_DIR, categories=['bathtub'], split='test')
 
+    assert len(models) == 50
+    for obj, category in models: 
+        assert category.item() == 0
+        assert isinstance(obj, kal.rep.Mesh)
+
+
+@pytest.mark.parametrize('device', ['cpu', 'cuda'])
+@pytest.mark.skipif(not os.path.exists(MODELNET_ROOT), reason=REASON)
+def test_ModelNetPointCloud(device): 
+    transform = tfs.Compose([
+        tfs.TriangleMeshToPointCloud(num_samples=32),
+        tfs.NormalizePointCloud()
+    ])
+    models = kal.datasets.ModelNet(basedir=MODELNET_ROOT, cache_dir=CACHE_DIR, categories=['bathtub'], split='test', transform=transform)
+
+    assert len(models) == 50
+    for obj, category in models: 
+        assert category.item() == 0
+        assert isinstance(obj, torch.Tensor)
+        assert obj.size(0) == 32
+
+
+@pytest.mark.parametrize('device', ['cpu', 'cuda'])
+@pytest.mark.skipif(not os.path.exists(MODELNET_ROOT), reason=REASON)
+def test_ModelNetVoxels(device): 
+    models = kal.datasets.ModelNetVoxels(basedir=MODELNET_ROOT, cache_dir=CACHE_DIR, categories=['bathtub'], split='test', resolutions=[30])
+
+    assert len(models) == 50
+    for obj in models: 
+        assert obj['attributes']['category'] == 'bathtub'
+        assert set(obj['data']['30'].shape) == set([30, 30, 30]) 
+    shutil.rmtree(CACHE_DIR)
