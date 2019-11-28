@@ -27,7 +27,7 @@ torch.cuda.manual_seed(0)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--logdir', type=str, default='log', help='Directory to log data to.')
-parser.add_argument('--expid', type=str, default='GAN', help='Unique experiment identifier.')
+parser.add_argument('--expid', type=str, default='3D_IWGAN', help='Unique experiment identifier.')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use.')
 parser.add_argument('--batchsize', type=int, default=50, help='Batch size.')
 args = parser.parse_args()

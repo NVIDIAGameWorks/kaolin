@@ -30,7 +30,7 @@ import kaolin as kal
 parser = argparse.ArgumentParser()
 parser.add_argument('--modelnet-root', type=str, help='Root directory of the ModelNet dataset.')
 parser.add_argument('--cache-dir', type=str, default=None, help='Path to write intermediate representation to.')
-parser.add_argument('--expid', type=str, default='GAN', help='Unique experiment identifier.')
+parser.add_argument('--expid', type=str, default='3D_IWGAN', help='Unique experiment identifier.')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use')
 parser.add_argument('--categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
 parser.add_argument('--epochs', type=int, default=50000, help='Number of train epochs.')
