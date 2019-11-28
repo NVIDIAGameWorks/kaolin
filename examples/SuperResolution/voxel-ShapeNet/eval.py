@@ -12,7 +12,7 @@ import kaolin as kal
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--shapenet-root', type=str, required=True, help='Root directory of the ShapeNet dataset.')
-parser.add_argument('--cache-dir', type=str, default=None, help='Directory where intermediate representations will be stored.')
+parser.add_argument('--cache-dir', type=str, default='cache', help='Directory where intermediate representations will be stored.')
 parser.add_argument('--loss-type', type=str, choices=['MSE', 'NLLL'], default='MSE', help='Specify the loss type to use.')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use')
 parser.add_argument('--categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
