@@ -27,7 +27,7 @@ def calculate_gradient_penalty(D, real_samples, fake_samples):
     # calculate probability of interpolated examples
     d_interpolates = D(interpolates)
     # Get gradient w.r.t. interpolates
-    fake = torch.ones_like(d_interpolates).requires_grad_(False).to(real_samples.device)
+    fake = torch.ones_like(d_interpolates, device=real_samples.device, requires_grad=False)
     gradients = torch.autograd.grad(outputs=d_interpolates,
                                     inputs=interpolates,
                                     grad_outputs=fake,
