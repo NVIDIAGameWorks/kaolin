@@ -89,7 +89,8 @@ val_loader = DataLoader(ModelNet(modelnet_path, categories=categories,
 Now that all of the data is ready, we can train our classifier using the `ClassificationEngine` class provided by Kaolin. The following line of code will train and validate a _PointNet_ classifier, which is probably the simplest of pointcloud neural architectures.
 
 ```python
-engine = ClassificationEngine(PointNet(num_classes=len(categories)), train_loader, val_loader, device='cuda:0')
+engine = ClassificationEngine(PointNet(num_classes=len(categories)),
+                              train_loader, val_loader, device=device)
 engine.fit()
 ```
 
