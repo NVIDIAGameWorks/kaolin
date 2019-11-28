@@ -89,7 +89,8 @@ val_loader = DataLoader(ModelNet(modelnet_path, categories=categories,
 Now that all of the data is ready, we can train our classifier using the `ClassificationEngine` class provided by Kaolin. The following line of code will train and validate a _PointNet_ classifier, which is probably the simplest of pointcloud neural architectures.
 
 ```python
-engine = ClassificationEngine(PointNet(num_classes=len(categories)), train_loader, val_loader, device='cuda:0')
+engine = ClassificationEngine(PointNet(num_classes=len(categories)),
+                              train_loader, val_loader, device=device)
 engine.fit()
 ```
 
@@ -127,6 +128,31 @@ The code is available in `pointcloud_classification_engine.py`.
 
 For a more explicit example without the `ClassificationEngine` class, please see the code in `pointcloud_classification.py`
 
+
+## Visualizing the results
+We will create a new dataloder which will load the same data as our previous val_loader but with shuffling, and take a sample batch.
+
+```python
+test_loader = DataLoader(ModelNet(modelnet_path, categories=categories,
+                                 split='test',transform=transform, device=device),
+                        shuffle=True, batch_size=15)
+
+test_batch, labels = next(iter(test_loader))
+preds = engine.model(test_batch)
+pred_labels = torch.max(preds, axis=1)[1]
+```
+
+Next, we setup a plot to visualize the pointcloud, groundtruth label and our prediction using a small utility function. Here we've also colour-coded the results - green for correct and red for incorrect.
+
+```python
+from utils import visualize_batch
+visualize_batch(test_batch, pred_labels, labels, categories)
+```
+
+<p align="center">
+    <img src="../../assets/classification_vis.png">
+</p>
+Looks like everything is green!
 
 ## Bells and whistles
 
