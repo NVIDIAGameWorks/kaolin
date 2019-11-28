@@ -39,25 +39,38 @@ Before all the fun-stuff begins, let us import all necessary functions from `kao
 import torch
 from torch.utils.data import DataLoader
 import kaolin as kal
-from kaolin import ClassificationEngine as Engine
-from kaolin.datasets import ModelNet10 as ModelNet
+from kaolin import ClassificationEngine
+from kaolin.datasets import ModelNet
 from kaolin.models.PointNet import PointNetClassifier as PointNet
-from kaolin.transforms import NormalizePointCloud as normpc
+import kaolin.transforms as tfs
 ```
 
 ## Dataloading
 
 Kaolin provides convenience functions to load popular 3D datasets (of course, ModelNet10). Assuming you have [installed Kaolin](../../README.md#installation-and-usage), fire up your favourite python interpreter, and execute the following commands.
 
-```
-norm = NormalizePointCloud()
+To start, we will define a few important parameters:
+```python
+modelnet_path = 'path/to/ModelNet/'
+categories = ['chair', 'sofa']
+num_points = 1024
+device = 'cuda'
 ```
 
-This command defines a `transform` that takes in any pointcloud object and _normalizes_ it to be centered at the origin, and have a standard deviation of 1. Much like images, 3D data such as pointclouds need to be normalized for better classification performance.
+The `model_path` variable will hold the path to the ModelNet10 dataset. We will use the `categories` variable to specify which classes we want to learn to classify. `num_points` is the number of points we will sample from the mesh when transforming it to a pointcloud. Finally, we will use `device = 'cuda'` to tell pytorch to run everything on the GPU.
 
+```python
+transform = tfs.Compose([
+    tfs.TriangleMeshToPointCloud(num_samples=num_points),
+    tfs.NormalizePointCloud()
+])
 ```
-train_loader = DataLoader(ModelNet('/path/to/ModelNet10', categories=['chair', 'sofa'],
-                                   split='train', rep='pointcloud', transform=norm, device='cuda:0'),
+
+This command defines a `transform` that first converts a mesh representation to a pointcloud and then _normalizes_ it to be centered at the origin, and have a standard deviation of 1. Much like images, 3D data such as pointclouds need to be normalized for better classification performance.
+
+```python
+train_loader = DataLoader(ModelNet(modelnet_path, categories=categories,
+                                   split='train', transform=transform, device=device),
                           batch_size=12, shuffle=True)
 ```
 
@@ -65,9 +78,9 @@ Phew, that was slightly long! But here's what it does. It creates a `DataLoader`
 
 Similarly, the test dataset can be loaded up as follows.
 
-```
-val_loader = DataLoader(ModelNet('/path/to/ModelNet10', categories=['chair', 'sofa'],
-                                 split='test', rep='pointcloud', transform=norm, device='cuda:0'),
+```python
+val_loader = DataLoader(ModelNet(modelnet_path, categories=categories,
+                                 split='test',transform=transform, device=device),
                         batch_size=12)
 ```
 
@@ -75,8 +88,8 @@ val_loader = DataLoader(ModelNet('/path/to/ModelNet10', categories=['chair', 'so
 
 Now that all of the data is ready, we can train our classifier using the `ClassificationEngine` class provided by Kaolin. The following line of code will train and validate a _PointNet_ classifier, which is probably the simplest of pointcloud neural architectures.
 
-```
-engine = ClassificationEngine(PointNet(num_classes=2), train_loader, val_loader, device='cuda:0')
+```python
+engine = ClassificationEngine(PointNet(num_classes=len(categories)), train_loader, val_loader, device='cuda:0')
 engine.fit()
 ```
 
@@ -120,7 +133,7 @@ For a more explicit example without the `ClassificationEngine` class, please see
 The `ClassificationEngine` can be customized to suit your needs.
 
 You can train on other categories by simply changing the `categories` argument passed to the `ModelNet10` dataset object. For example, you can add a `bed` class by running
-```
+```python
 dataset = ModelNet('/path/to/ModelNet10', categories=['chair', 'sofa', 'bed'],
                    split='train', rep='pointcloud', transform=norm, device='cuda:0')
 ```
