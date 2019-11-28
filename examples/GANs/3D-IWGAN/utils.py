@@ -13,68 +13,26 @@
 # limitations under the License.
 
 import torch 
-import numpy as np
-from torchvision import transforms
-from torchvision.transforms import Normalize as norm 
 
-
-np.random.seed(1)
 torch.manual_seed(1)
 torch.cuda.manual_seed(1)
 
-def gradient_penalty(netD, real_data, fake_data):
-	batch_size = real_data.shape[0]
-	dim = real_data.shape[2]
-	alpha = torch.rand(batch_size, 1)
-	alpha = alpha.expand(batch_size, int(real_data.nelement()/batch_size)).contiguous()
-	alpha = alpha.view(batch_size, 32, 32, 32)
-	alpha = alpha.cuda()
 
-	
-	fake_data = fake_data.view(batch_size, 32, 32, 32)
-	interpolates = alpha * real_data.detach() + ((1 - alpha) * fake_data.detach())
-	
-	
-	interpolates.requires_grad_(True)
-
-	disc_interpolates = netD(interpolates)
-	
-
-	gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolates,
-							  grad_outputs=torch.ones(disc_interpolates.size()).cuda(),
-							  create_graph=True, retain_graph=True)[0]
-	
-
-                            
-	gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-	return gradient_penalty
-
-
-def calculate_gradient_penalty(netD, real_images, fake_images):
-		batch_size = real_images.shape[0]
-		eta = torch.rand(batch_size, 1)
-		eta = eta.expand(batch_size, int(real_images.nelement()/batch_size)).contiguous()
-		eta = eta.view(batch_size, 32, 32, 32)
-		eta = eta.cuda()
-		
-	  
-
-		interpolated = eta * real_images + ((1 - eta) * fake_images)
-		
-		
-
-		# define it to calculate gradient
-		interpolated.requires_grad_(True)
-
-		# calculate probability of interpolated examples
-		prob_interpolated = netD(interpolated)
-		
-
-		# calculate gradients of probabilities with respect to examples
-		gradients = torch.autograd.grad(outputs=prob_interpolated, inputs=interpolated,
-							   grad_outputs=torch.ones(
-								   prob_interpolated.size()).cuda(),
-							   create_graph=True, retain_graph=True)[0]
-	
-		grad_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
-		return grad_penalty
+def calculate_gradient_penalty(D, real_samples, fake_samples):
+    """Calculates the gradient penalty loss"""
+    # Random weight for interpolation between real and fake samples
+    eta = torch.rand((real_samples.size(0), 1, 1, 1), device=real_samples.device)
+    # Get random interpolation between real and fake samples
+    interpolates = (eta * real_samples + ((1 - eta) * fake_samples)).requires_grad_(True)
+    # calculate probability of interpolated examples
+    d_interpolates = D(interpolates)
+    # Get gradient w.r.t. interpolates
+    fake = torch.ones_like(d_interpolates).requires_grad_(False).to(real_samples.device)
+    gradients = torch.autograd.grad(outputs=d_interpolates,
+                                    inputs=interpolates,
+                                    grad_outputs=fake,
+                                    create_graph=True,
+                                    retain_graph=True)[0]
+    gradients = gradients.view(gradients.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    return gradient_penalty
