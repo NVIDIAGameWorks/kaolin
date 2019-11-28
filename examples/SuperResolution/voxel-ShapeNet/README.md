@@ -7,7 +7,7 @@ These example scripts let you train a voxel superresolution network on the Shape
 
 To train using MSE run
 ```
-python train.py --shapenet-root <ShapeNet dir> --loss-type MSE
+python train.py --shapenet-root <ShapeNet dir> --cache-dir 'cache/' --loss-type MSE
 ```
 
 
@@ -15,14 +15,14 @@ python train.py --shapenet-root <ShapeNet dir> --loss-type MSE
 
 To evaluate a trained MSE model run 
 ```
-python eval.py --shapenet-root <ShapeNet dir> --loss-type MSE
+python eval.py --shapenet-root <ShapeNet dir> --cache-dir 'cache/' --loss-type MSE
 ```
 
 ### Training the network: NLLL
 
 To train using NLLL run
 ```
-python train.py --shapenet-root <ShapeNet dir> --loss-type NLLL
+python train.py --shapenet-root <ShapeNet dir> --cache-dir 'cache/' --loss-type NLLL
 ```
 
 
@@ -30,5 +30,5 @@ python train.py --shapenet-root <ShapeNet dir> --loss-type NLLL
 
 To evaluate a trained NLLL model run 
 ```
-python eval.py --shapenet-root <ShapeNet dir> --loss-type NLLL
+python eval.py --shapenet-root <ShapeNet dir> --cache-dir 'cache/' --loss-type NLLL
 ```
