@@ -43,8 +43,8 @@ args = parser.parse_args()
 
 
 # Setup Dataloader
-train_set = kal.datasets.ModelNetVoxels(basedir=args.modelnet_root, cache_dir=args.cache_dir,
-                                        categories=args.categories, resolutions=[30])
+train_set = kal.datasets.modelnet.ModelNetVoxels(basedir=args.modelnet_root, cache_dir=args.cache_dir,
+                                                 categories=args.categories, resolutions=[30])
 dataloader_train = DataLoader(train_set, batch_size=args.batchsize, shuffle=True, num_workers=8)
 
 
