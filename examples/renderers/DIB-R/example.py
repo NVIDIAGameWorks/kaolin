@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, NEVADA CORPORATION. All rights reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,37 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import graphics
-from graphics.utils.utils_perspective import lookatnp, perspectiveprojectionnp
-from graphics.utils.utils_sphericalcoord import get_spherical_coords_x
-from graphics.render.base import Render as Dib_Renderer
-import os
-import sys
-import math
-
-import torch
-import numpy as np
-import tqdm
-import imageio
-# from PIL import Image
-
-import kaolin as kal
+from kaolin.graphics.dib_renderer.renderer import Renderer
 from kaolin.rep import TriangleMesh
+import argparse
+import imageio
+import numpy as np
+import os
+import torch
+import tqdm
 
-sys.path.append(str(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../DIB-R')))
+ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 
-current_dir = os.path.dirname(os.path.realpath(__file__))
-data_dir = os.path.join(current_dir, 'data')
-output_directory = os.path.join(data_dir, 'results')
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Kaolin DIB-R Example')
 
-output_directory_dib = os.path.join(output_directory, 'dib')
-os.makedirs(output_directory_dib, exist_ok=True)
+    parser.add_argument('--mesh', type=str, default=os.path.join(ROOT_DIR, 'banana.obj'),
+                        help='Path to the mesh OBJ file')
+    parser.add_argument('--output_path', type=str, default=os.path.join(ROOT_DIR, 'results'),
+                        help='Path to the output directory')
+
+    return parser.parse_args()
 
 
 def main():
-    filename_input = os.path.join(data_dir, 'banana.obj')
-    filename_output = os.path.join(output_directory, 'example1.gif')
+    args = parse_arguments()
 
     ###########################
     # camera settings
@@ -53,7 +47,7 @@ def main():
     ###########################
     # load object
     ###########################
-    mesh = TriangleMesh.from_obj(filename_input)
+    mesh = TriangleMesh.from_obj(args.mesh)
     vertices = mesh.vertices
     faces = mesh.faces.int()
     face_textures = (faces).clone()
@@ -76,16 +70,19 @@ def main():
     ###########################
     # DIB-Renderer
     ###########################
-    renderer = Dib_Renderer(256, 256, mode='VertexColor')
-    textures = torch.ones(1, vertices.shape[1], 3).cuda()
+    renderer = Renderer(256, 256, mode='VertexColor')
+    textures = torch.rand(1, vertices.shape[1], 3).cuda()
     loop = tqdm.tqdm(list(range(0, 360, 4)))
-    loop.set_description('Drawing Dib_Renderer VertexColor')
-    writer = imageio.get_writer(os.path.join(output_directory_dib, 'rotation_VertexColor.gif'), mode='I')
+    loop.set_description('Drawing VertexColor')
+
+    os.makedirs(args.output_path, exist_ok=True)
+    writer = imageio.get_writer(os.path.join(args.output_path, 'vertex_color.gif'), mode='I')
     for azimuth in loop:
         renderer.set_look_at_parameters([90 - azimuth], [elevation], [camera_distance])
-        predictions, _, _ = renderer.forward(points=[vertices, faces[0].long()], colors=[textures])
+        predictions, _, _ = renderer(points=[vertices, faces[0].long()], colors=[textures])
         image = predictions.detach().cpu().numpy()[0]
         writer.append_data((image * 255).astype(np.uint8))
+
     writer.close()
 
 

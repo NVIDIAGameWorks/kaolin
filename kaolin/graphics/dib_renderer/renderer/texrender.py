@@ -24,10 +24,10 @@ from __future__ import division
 import torch
 import torch.nn as nn
 
-from graphics.vshader.perpsective import PersepctiveProjection
-from graphics.rasterize.rasterize import TriRender2D
-from graphics.fshader.frag_tex import fragmentshader
-from graphics.utils.utils import datanormalize
+from .vertex_shaders.perpsective import perspective_projection
+from kaolin.graphics.dib_renderer.rasterizer import linear_rasterizer
+from .fragment_shaders.frag_tex import fragmentshader
+from kaolin.graphics.dib_renderer.utils import datanormalize
 
 
 ##################################################################
@@ -48,7 +48,7 @@ class TexRender(nn.Module):
         # camera_rot_bx3x3, camera_pos_bx3, camera_proj_3x1 = cameras
 
         points3d_bxfx9, points2d_bxfx6, normal_bxfx3 = \
-            PersepctiveProjection(points_bxpx3, faces_fx3, cameras)
+            perspective_projection(points_bxpx3, faces_fx3, cameras)
 
         ################################################################
         # normal
@@ -69,8 +69,14 @@ class TexRender(nn.Module):
         mask = torch.ones_like(c0[:, :, :1])
         uv_bxfx9 = torch.cat((c0, mask, c1, mask, c2, mask), dim=2)
 
-        imfeat, improb_bxhxwx1 = TriRender2D(self.height, self.width)(
-            points3d_bxfx9, points2d_bxfx6, normalz_bxfx1, uv_bxfx9)
+        imfeat, improb_bxhxwx1 = linear_rasterizer(
+            self.height,
+            self.width,
+            points3d_bxfx9,
+            points2d_bxfx6,
+            normalz_bxfx1,
+            uv_bxfx9
+        )
 
         imtexcoords = imfeat[:, :, :, :2]
         hardmask = imfeat[:, :, :, 2:3]

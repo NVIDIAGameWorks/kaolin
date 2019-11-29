@@ -26,7 +26,7 @@ import torch.nn
 
 
 ##################################################
-def persepctive_projection(points_bxpx3, faces_fx3, cameras):
+def perspective_projection(points_bxpx3, faces_fx3, cameras):
 
     # perspective, use just one camera intrinc parameter
     camera_rot_bx3x3, camera_pos_bx3, camera_proj_3x1 = cameras

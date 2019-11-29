@@ -24,7 +24,7 @@ from __future__ import division
 import torch
 import torch.nn
 
-from graphics.fshader.interpolation import texinterpolation
+from .interpolation import texinterpolation
 
 
 ################################################

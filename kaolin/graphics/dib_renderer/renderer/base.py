@@ -24,10 +24,8 @@ from __future__ import division
 import torch
 import numpy as np
 import torch.nn as nn
-import graphics
-from graphics.utils.utils_perspective import lookatnp, perspectiveprojectionnp
+from kaolin.graphics.dib_renderer.utils import perspectiveprojectionnp
 
-import kaolin as kal
 from kaolin.mathutils.geometry.transformations import compute_camera_params
 
 from .vcrender import VCRender
@@ -39,11 +37,11 @@ from .phongrender import PhongRender
 renderers = {'VertexColor': VCRender, 'Lambertian': Lambertian, 'SphericalHarmonics': SHRender, 'Phong': PhongRender}
 
 
-class Render():
+class Renderer(nn.Module):
 
     def __init__(self, height, width, mode='VertexColor', camera_center=None,
                  camera_up=None, camera_fov_y=None):
-        super(Render, self).__init__()
+        super(Renderer, self).__init__()
         assert mode in renderers, "Passed mode {0} must in in list of accepted modes: {1}".format(mode, renderers)
         self.mode = mode
         self.renderer = renderers[mode](height, width)
