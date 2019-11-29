@@ -1,16 +1,18 @@
-# DIB-Renderer
+# DIB-Renderer Example
 
+This example uses the DIB-R renderer in kaolin to render a simple mesh (using random vertex colors), and output an animated GIF image of the rendered object.
 
-### Build the renderer
+Usage:
 
+```bash
+python example.py
 ```
-cd cuda
-python build.py install
-```
 
-### Citation
+By default, the example will render the `banana.obj` mesh in this directory, and output the result into a `results` folder in this directory.
 
-If you use this code, please cite:
+Use the `--help` option to display available arguments.
+
+The DIB-R renderer is based on its original implementation by Wenzheng et al.
 
 ```
 @inproceedings{chen2019dibrender,
