@@ -168,6 +168,11 @@ if __name__ == '__main__':
             'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
             'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
         ]),
+        CUDAExtension('kaolin.graphics.dib_renderer.cuda.rasterizer', [
+            'kaolin/graphics/dib_renderer/cuda/rasterizer.cpp',
+            'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda.cu',
+            'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda_back.cu',
+        ]),
         triangle_hash_module,
         mise_module,
         mcubes_module,
