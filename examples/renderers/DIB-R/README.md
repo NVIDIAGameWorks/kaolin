@@ -1,5 +1,7 @@
 # DIB-Renderer Example
 
+![example image](example.gif)
+
 This example uses the DIB-R renderer in kaolin to render a simple mesh (using random vertex colors), and output an animated GIF image of the rendered object.
 
 Usage:
