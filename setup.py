@@ -3,6 +3,8 @@ import io
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CppExtension
 from setuptools import setup, find_packages
 import numpy as np
+
+
 cwd = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -24,6 +26,11 @@ a comprehensive model zoo comprising many state-of-the-art 3D deep learning arch
 for future research endeavours.
 """
 
+
+# Get version number from version.py
+version = {}
+with open("kaolin/version.py") as fp:
+    exec(fp.read(), version)
 
 def build_deps():
     print('Building nv-usd...')
@@ -144,7 +151,7 @@ if __name__ == '__main__':
     setup(
         # Metadata
         name=PACKAGE_NAME,
-        version=VERSION,
+        version=version['__version__'],
         author=AUTHOR,
         description=DESCRIPTION,
         url=URL,
