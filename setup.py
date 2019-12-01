@@ -13,7 +13,7 @@ VERSION = '0.1.0'
 DESCRIPTION = 'Kaolin: A PyTorch library for accelerating 3D deep learning research'
 URL = 'https://github.com/NVIDIAGameWorks/kaolin'
 AUTHOR = 'NVIDIA'
-LICENSE = ''
+LICENSE = 'Apache License 2.0'
 DOWNLOAD_URL = ''
 LONG_DESCRIPTION = """
 Kaolin is a PyTorch library aiming to accelerate 3D deep learning research. Kaolin provides efficient implementations
