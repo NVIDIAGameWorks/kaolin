@@ -29,41 +29,45 @@ from kaolin.datasets import shapenet
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-expid', type=str, default='Direct', help='Unique experiment identifier.')
-parser.add_argument('-device', type=str, default='cuda', help='Device to use')
-parser.add_argument('-categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
-parser.add_argument('-epochs', type=int, default=50, help='Number of train epochs.')
-parser.add_argument('-lr', type=float, default=1e-4, help='Learning rate.')
-parser.add_argument('-val-every', type=int, default=5, help='Validation frequency (epochs).')
-parser.add_argument('-batch_size', type=int, default=5, help='batch size')
-parser.add_argument('-print-every', type=int, default=20, help='Print frequency (batches).')
-parser.add_argument('-latent_loss', action='store_true', help='indicates latent loss should be used')
-parser.add_argument('-logdir', type=str, default='log', help='Directory to log data to.')
-parser.add_argument('-save-model', action='store_true', help='Saves the model and a snapshot \
+parser.add_argument('--shapenet-root', type=str, help='Root directory of the ShapeNet dataset.')
+parser.add_argument('--shapenet-rendering-root', type=str, help='Root directory of the ShapeNet Rendering dataset.')
+parser.add_argument('--cache-dir', type=str, default=None, help='Path to write intermediate representation to.')
+parser.add_argument('--expid', type=str, default='Direct', help='Unique experiment identifier.')
+parser.add_argument('--device', type=str, default='cuda', help='Device to use')
+parser.add_argument('--categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
+parser.add_argument('--epochs', type=int, default=50, help='Number of train epochs.')
+parser.add_argument('-lr', '--learning-rate', type=float, default=1e-4, help='Learning rate.')
+parser.add_argument('--val-every', type=int, default=5, help='Validation frequency (epochs).')
+parser.add_argument('--batch-size', type=int, default=5, help='batch size')
+parser.add_argument('--print-every', type=int, default=20, help='Print frequency (batches).')
+parser.add_argument('--latent-loss', action='store_true', help='indicates latent loss should be used')
+parser.add_argument('--logdir', type=str, default='log', help='Directory to log data to.')
+parser.add_argument('--save-model', action='store_true', help='Saves the model and a snapshot \
     of the optimizer state.')
 args = parser.parse_args()
 
 
 # Setup Dataset
-points_set = shapenet.ShapeNet_Points(root='../../datasets/', categories=args.categories,
+points_set = shapenet.ShapeNet_Points(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
                                       train=True, split=.7, num_points=3000)
-images_set = shapenet.ShapeNet_Images(root='../../datasets/', categories=args.categories,
+images_set = shapenet.ShapeNet_Images(root=args.shapenet_rendering_root, categories=args.categories,
                                       train=True, split=.7, views=23, transform=preprocess)
 if args.latent_loss:
-    mesh_set = shapenet.ShapeNet_Surface_Meshes(root='../../datasets/', categories=args.categories,
+    mesh_set = shapenet.ShapeNet_Surface_Meshes(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
                                                 resolution=32, train=True, split=.7, mode='Tri')
-    train_set = shapenet.ShapeNet.Combination([points_set, images_set, mesh_set], root='../../datasets/')
-    dataloader_train = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn,
-                                  num_workers=8)
+    train_set = shapenet.ShapeNet_Combination([points_set, images_set, mesh_set])
 else: 
-    train_set = shapenet.ShapeNet_Combination([points_set, images_set], root='../../datasets/')
+    train_set = shapenet.ShapeNet_Combination([points_set, images_set])
+
+dataloader_train = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn,
+                                  num_workers=8)
 
 
-points_set_valid = shapenet.ShapeNet_Points(root='../../datasets/', categories=args.categories,
+points_set_valid = shapenet.ShapeNet_Points(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
                                             train=False, split=.7, num_points=10000)
-images_set_valid = shapenet.ShapeNet_Images(root='../../datasets/', categories=args.categories,
+images_set_valid = shapenet.ShapeNet_Images(root=args.shapenet_rendering_root, categories=args.categories,
                                             train=False, split=.7, views=1, transform=preprocess)
-valid_set = shapenet.ShapeNet_Combination([points_set_valid, images_set_valid], root='../../datasets/')
+valid_set = shapenet.ShapeNet_Combination([points_set_valid, images_set_valid])
 
 dataloader_val = DataLoader(valid_set, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
@@ -84,15 +88,9 @@ parameters = []
 for i in range(3): 
     parameters += list(encoders[i].parameters()) 
     parameters += list(mesh_updates[i].parameters())
-optimizer = optim.Adam(parameters, lr=args.lr)
+optimizer = optim.Adam(parameters, lr=args.learning_rate)
 
 encoding_dims = [56, 28, 14, 7]
-
-
-"""
-Initial settings
-"""
-
 
 
 # Create log directory, if it doesn't already exist
