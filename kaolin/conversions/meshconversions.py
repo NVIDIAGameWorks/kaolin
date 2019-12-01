@@ -55,13 +55,14 @@ def trianglemesh_to_pointcloud(mesh: kaolin.rep.Mesh, num_points: int):
 
 
 def trianglemesh_to_voxelgrid(mesh: kaolin.rep.Mesh, resolution: int,
-             normalize: bool = True, vertex_offset: float = 0.):
+                              normalize: bool = True, vertex_offset: float = 0.):
     r""" Converts mesh to a voxel model of a given resolution
 
     Args:
         mesh (kaolin.rep.Mesh): mesh to convert
         resolution (int): desired dresolution of generated voxel array
-        normalize (bool): Determines whether to normalize vertices
+        normalize (bool): Determines whether to normalize vertices to a
+            unit cube centered at the origin.
         vertex_offset (float): Offset applied to all vertices after
                                normalizing.
 
@@ -78,7 +79,7 @@ def trianglemesh_to_voxelgrid(mesh: kaolin.rep.Mesh, resolution: int,
     if normalize:
         verts_max = mesh.vertices.max()
         verts_min = mesh.vertices.min()
-        mesh.vertices = (mesh.vertices - verts_min) / (verts_max - verts_min)
+        mesh.vertices = (mesh.vertices - verts_min) / (verts_max - verts_min) - 0.5
 
     mesh.vertices = mesh.vertices + vertex_offset
 
