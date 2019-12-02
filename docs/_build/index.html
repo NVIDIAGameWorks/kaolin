@@ -1,0 +1,337 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Kaolin &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script type="text/javascript" src="_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="notes/installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="#" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Kaolin</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="kaolin">
+<h1>Kaolin<a class="headerlink" href="#kaolin" title="Permalink to this headline">¶</a></h1>
+<p>Kaolin is a PyTorch library aimed at accelerating 3D deep learning research. Kaolin provides efficient implementations of several differentiable modules for use in neural networks. With several native functions to manipulate meshes, pointclouds, signed distance functions, and voxel grids, researchers/practitioners need not dabble with writing boilerplate code anymore. Kaolin packages several differentiable graphics, vision, and robotics modules (eg. rendering, lighting, shading, view warping, etc.). It also provides easy access to loading and pre-processing several 3D datasets. Additionally, we curate a model zoo comprising several state-of-the-art 3D deep learning architectures, to serve as a starting point for future research endeavours.</p>
+<img alt="_images/kaolin.png" src="_images/kaolin.png" />
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="notes/installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notes/installation.html#build-documentation">Build documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/installation.html#run-unittests-optional">Run unittests (optional)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/hello3d.html">Hello, 3D world!</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notes/hello3d.html#triangle-meshes">Triangle meshes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/hello3d.html#voxel-grids">Voxel grids</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/hello3d.html#pointclouds">Pointclouds</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/hello3d.html#signed-distance-functions">Signed distance functions</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="notes/usd_tutorial.html">USD Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notes/usd_tutorial.html#creating-a-mesh-dataset-from-a-usd-scene">Creating a Mesh Dataset from a USD Scene</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/usd_tutorial.html#viewing-usd-files">Viewing USD Files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/usd_tutorial.html#some-notes">Some Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="notes/datasets_tutorial.html">Datasets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notes/datasets_tutorial.html#shapenet">ShapeNet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/datasets_tutorial.html#modelnet">ModelNet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/datasets_tutorial.html#shrec16">SHREC16</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/datasets_tutorial.html#more-to-come">More to come</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="notes/conversions_tutorial.html">Conversions across various representations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#trianglemesh-to-voxelgrid">TriangleMesh to VoxelGrid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#trianglemesh-to-pointcloud">TriangleMesh to PointCloud</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#trianglemesh-to-signed-distance-function-sdf">TriangleMesh to Signed Distance Function (SDF)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#voxelgrid-to-pointcloud">VoxelGrid to PointCloud</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#voxelgrid-to-trianglemesh">VoxelGrid to TriangleMesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#voxelgrid-to-quadmesh">VoxelGrid to QuadMesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#voxelgrid-to-sdf">VoxelGrid to SDF</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#sdf-to-pointcloud">SDF to PointCloud</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#sdf-to-trianglemesh">SDF to TriangleMesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#sdf-to-voxelgrid">SDF to VoxelGrid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#pointcloud-to-voxelgrid">PointCloud to VoxelGrid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#pointcloud-to-trianglemesh">PointCloud to TriangleMesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="notes/conversions_tutorial.html#pointcloud-to-sdf">PointCloud to SDF</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/conversions.html">kaolin.conversions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules/conversions.meshconversions.html">kaolin.conversions.meshconversions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/conversions.voxelgridconversions.html">kaolin.conversions.voxelgridconversions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/conversions.pointcloudconversions.html">kaolin.conversions.pointcloudconversions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/conversions.sdfconversions.html">kaolin.conversions.sdfconversions</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules/datasets.html">kaolin.datasets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules/datasets.shapenet.html">kaolin.datasets.shapenet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/datasets.modelnet.html">kaolin.datasets.modelnet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/datasets.shrec.html">kaolin.datasets.shrec</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/datasets.scannet.html">kaolin.datasets.scannet</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/metrics.html">kaolin.metrics</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules/metrics.mesh.html">kaolin.metrics.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/metrics.point.html">kaolin.metrics.point</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/metrics.voxel.html">kaolin.metrics.voxel</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules/models.html">kaolin.models</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules/rep.html">kaolin.rep</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules/rep.Mesh.html">kaolin.rep.Mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/rep.TriangleMesh.html">kaolin.rep.TriangleMesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/rep.QuadMesh.html">kaolin.rep.QuadMesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/rep.PointCloud.html">kaolin.rep.PointCloud</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/rep.VoxelGrid.html">kaolin.rep.VoxelGrid</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules/rep.SDF.html">kaolin.rep.SDF</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="notes/installation.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

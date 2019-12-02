@@ -1,0 +1,409 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.graphics &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+        <script type="text/javascript" src="../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="kaolin.mathutils" href="mathutils.html" />
+    <link rel="prev" title="kaolin.datasets.scannet" href="datasets.scannet.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>kaolin.graphics</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/modules/graphics.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="kaolin-graphics">
+<h1>kaolin.graphics<a class="headerlink" href="#kaolin-graphics" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="graphics.DifferentiableRenderer">
+<em class="property">class </em><code class="sig-name descname">DifferentiableRenderer</code><a class="reference internal" href="../_modules/graphics/DifferentiableRenderer.html#DifferentiableRenderer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#graphics.DifferentiableRenderer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base class for differentiable renderers. All major components
+of the graphics processing pipeline have been instantiated as
+abstract methods.</p>
+<p>A differentiable renderer takes in vertex geometry, faces (usually
+triangles), and optionally texture (and any other information
+deemed relevant), and implements the following main steps.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Lighting (ambient and optionally, directional lighting, i.e.,
+diffuse/Lambertian reflection, and optionally specular reflection)</p></li>
+<li><p>(Vertex) Shading (Gouraud/Phong/etc.)</p></li>
+<li><p>Geometric transformation (usually, this is needed to view the
+object to be rendered from a specific viewing angle, etc.)
+(the geometric transformations are usually applied AFTER lighting,
+as it is easier to perform lighting in the object frame, rather
+than at the scene level)</p></li>
+<li><p>Projection (perspective/orthographic/weak-orthographic(affine))
+from 3D (camera) coordinates to 2D (image) coordinates.</p></li>
+<li><p>Rasterization to convert the primitives (usually triangles) to
+pixels, and determine texture (when available).</p></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="class">
+<dt id="graphics.NeuralMeshRenderer">
+<em class="property">class </em><code class="sig-name descname">NeuralMeshRenderer</code><span class="sig-paren">(</span><em class="sig-param">image_size: int = 256</em>, <em class="sig-param">anti_aliasing: bool = True</em>, <em class="sig-param">bg_color: torch.Tensor = tensor([0.</em>, <em class="sig-param">0.</em>, <em class="sig-param">0.])</em>, <em class="sig-param">fill_back: bool = True</em>, <em class="sig-param">camera_mode: str = 'projection'</em>, <em class="sig-param">K=None</em>, <em class="sig-param">rmat=None</em>, <em class="sig-param">tvec=None</em>, <em class="sig-param">perspective_distort: bool = True</em>, <em class="sig-param">viewing_angle: float = 30.0</em>, <em class="sig-param">camera_direction: torch.Tensor = tensor([0.</em>, <em class="sig-param">0.</em>, <em class="sig-param">1.])</em>, <em class="sig-param">near: float = 0.1</em>, <em class="sig-param">far: float = 100</em>, <em class="sig-param">light_intensity_ambient: float = 0.5</em>, <em class="sig-param">light_intensity_directional: float = 0.5</em>, <em class="sig-param">light_color_ambient: torch.Tensor = tensor([1.</em>, <em class="sig-param">1.</em>, <em class="sig-param">1.])</em>, <em class="sig-param">light_color_directional: torch.Tensor = tensor([1.</em>, <em class="sig-param">1.</em>, <em class="sig-param">1.])</em>, <em class="sig-param">light_direction: torch.Tensor = tensor([0.</em>, <em class="sig-param">1.</em>, <em class="sig-param">0.])</em>, <em class="sig-param">device: str = 'cpu'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/graphics/NeuralMeshRenderer.html#NeuralMeshRenderer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#graphics.NeuralMeshRenderer" title="Permalink to this definition">¶</a></dt>
+<dd><p>A class implementing the emph{Neural Mesh Renderer}
+from the following CVPR 2018 paper:</p>
+<blockquote>
+<div><p>Neural 3D Mesh Renderer
+Hiroharu Kato, Yoshitaka Ushiku, and Tatsuya Harada
+Link: <a class="reference external" href="https://arxiv.org/abs/1711.07566">https://arxiv.org/abs/1711.07566</a></p>
+</div></blockquote>
+</dd></dl>
+
+<dl class="class">
+<dt id="graphics.SoftRenderer">
+<em class="property">class </em><code class="sig-name descname">SoftRenderer</code><span class="sig-paren">(</span><em class="sig-param">image_size: int = 256</em>, <em class="sig-param">anti_aliasing: bool = True</em>, <em class="sig-param">bg_color: torch.Tensor = tensor([0.</em>, <em class="sig-param">0.</em>, <em class="sig-param">0.])</em>, <em class="sig-param">fill_back: bool = True</em>, <em class="sig-param">camera_mode: str = 'projection'</em>, <em class="sig-param">K=None</em>, <em class="sig-param">rmat=None</em>, <em class="sig-param">tvec=None</em>, <em class="sig-param">perspective_distort: bool = True</em>, <em class="sig-param">sigma_val: float = 1e-05</em>, <em class="sig-param">dist_func: str = 'euclidean'</em>, <em class="sig-param">dist_eps: float = 0.0001</em>, <em class="sig-param">gamma_val: float = 0.0001</em>, <em class="sig-param">aggr_func_rgb: str = 'softmax'</em>, <em class="sig-param">aggr_func_alpha: str = 'prod'</em>, <em class="sig-param">texture_type: str = 'surface'</em>, <em class="sig-param">viewing_angle: float = 30.0</em>, <em class="sig-param">viewing_scale: float = 1.0</em>, <em class="sig-param">eye: torch.Tensor = None</em>, <em class="sig-param">camera_direction: torch.Tensor = tensor([0.</em>, <em class="sig-param">0.</em>, <em class="sig-param">1.])</em>, <em class="sig-param">near: float = 0.1</em>, <em class="sig-param">far: float = 100</em>, <em class="sig-param">light_mode: str = 'surface'</em>, <em class="sig-param">light_intensity_ambient: float = 0.5</em>, <em class="sig-param">light_intensity_directional: float = 0.5</em>, <em class="sig-param">light_color_ambient: torch.Tensor = tensor([1.</em>, <em class="sig-param">1.</em>, <em class="sig-param">1.])</em>, <em class="sig-param">light_color_directional: torch.Tensor = tensor([1.</em>, <em class="sig-param">1.</em>, <em class="sig-param">1.])</em>, <em class="sig-param">light_direction: torch.Tensor = tensor([0.</em>, <em class="sig-param">1.</em>, <em class="sig-param">0.])</em>, <em class="sig-param">device: str = 'cpu'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/graphics/SoftRenderer.html#SoftRenderer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#graphics.SoftRenderer" title="Permalink to this definition">¶</a></dt>
+<dd><p>A class implementing the emph{Soft Renderer}
+from the following ICCV 2019 paper:</p>
+<blockquote>
+<div><p>Soft Rasterizer: A differentiable renderer for image-based 3D reasoning
+Shichen Liu, Tianye Li, Weikai Chen, and Hao Li
+Link: <a class="reference external" href="https://arxiv.org/abs/1904.01786">https://arxiv.org/abs/1904.01786</a></p>
+</div></blockquote>
+</dd></dl>
+
+<dl class="class">
+<dt id="graphics.DIBRenderer">
+<em class="property">class </em><code class="sig-name descname">DIBRenderer</code><a class="reference internal" href="../_modules/graphics/DIBRenderer.html#DIBRenderer"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#graphics.DIBRenderer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Placeholder class for DIB-Renderer implementation.</p>
+<p>A differentiable renderer takes in vertex geometry, faces (usually
+triangles), and optionally texture (and any other information
+deemed relevant), and implements the following main steps.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Lighting (ambient and optionally, directional lighting, i.e.,
+diffuse/Lambertian reflection, and optionally specular reflection)</p></li>
+<li><p>(Vertex) Shading (Gouraud/Phong/etc.)</p></li>
+<li><p>Geometric transformation (usually, this is needed to view the
+object to be rendered from a specific viewing angle, etc.)
+(the geometric transformations are usually applied AFTER lighting,
+as it is easier to perform lighting in the object frame, rather
+than at the scene level)</p></li>
+<li><p>Projection (perspective/orthographic/weak-orthographic(affine))
+from 3D (camera) coordinates to 2D (image) coordinates.</p></li>
+<li><p>Rasterization to convert the primitives (usually triangles) to
+pixels, and determine texture (when available).</p></li>
+</ul>
+</div></blockquote>
+</dd></dl>
+
+<dl class="function">
+<dt id="graphics.Lighting.apply_ambient_light">
+<code class="sig-name descname">apply_ambient_light</code><span class="sig-paren">(</span><em class="sig-param">face_vertices: torch.Tensor</em>, <em class="sig-param">textures: torch.Tensor</em>, <em class="sig-param">ambient_intensity: float = 1.0</em>, <em class="sig-param">ambient_color: torch.Tensor = tensor([1.</em>, <em class="sig-param">1.</em>, <em class="sig-param">1.])</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/graphics/Lighting.html#apply_ambient_light"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#graphics.Lighting.apply_ambient_light" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes and applies ambient lighting to a mesh, given faces and
+face textures.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>face_vertices</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – A tensor containing a list of (per-face)
+vertices of the mesh (shape: <cite>B</cite> <span class="math notranslate nohighlight">\(\times\)</span> <cite>num_faces</cite>
+<span class="math notranslate nohighlight">\(\times 9\)</span>). Here, <span class="math notranslate nohighlight">\(B\)</span> is the batchsize, <cite>num_faces</cite>
+is the number of faces in the mesh, and since each face is assumed
+to be a triangle, it has 3 vertices, and hence 9 coordinates in
+total.</p></li>
+<li><p><strong>textures</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – TODO: Add docstring</p></li>
+<li><p><strong>ambient_intensity</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.8)"><em>float</em></a>) – Intensity of ambient light (in the range
+<span class="math notranslate nohighlight">\(\left[0, 1\right]\)</span>). If the values provided are outside
+this range, we clip them so that they fall in range.</p></li>
+<li><p><strong>ambient_color</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – Color of the ambient light (R, G, B)
+(shape: <span class="math notranslate nohighlight">\(3\)</span>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Updated textures, with ambient lighting</dt><dd><p>applied (shape: same as input <cite>textures</cite>) #TODO: Update docstring</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>textures (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))">torch.Tensor</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="graphics.Lighting.apply_directional_light">
+<code class="sig-name descname">apply_directional_light</code><span class="sig-paren">(</span><em class="sig-param">face_vertices: torch.Tensor</em>, <em class="sig-param">textures: torch.Tensor</em>, <em class="sig-param">directional_intensity: float = 1.0</em>, <em class="sig-param">directional_color: torch.Tensor = tensor([1.</em>, <em class="sig-param">1.</em>, <em class="sig-param">1.])</em>, <em class="sig-param">direction: torch.Tensor = tensor([0.</em>, <em class="sig-param">1.</em>, <em class="sig-param">0.])</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/graphics/Lighting.html#apply_directional_light"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#graphics.Lighting.apply_directional_light" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes and applies directional lighting to a mesh, given faces
+and face textures.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>face_vertices</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – A tensor containing a list of (per-face)
+vertices of the mesh (shape: <cite>B</cite> <span class="math notranslate nohighlight">\(\times\)</span> <cite>num_faces</cite>
+<span class="math notranslate nohighlight">\(\times 9\)</span>). Here, <span class="math notranslate nohighlight">\(B\)</span> is the batchsize, <cite>num_faces</cite>
+is the number of faces in the mesh, and since each face is assumed
+to be a triangle, it has 3 vertices, and hence 9 coordinates in
+total.</p></li>
+<li><p><strong>textures</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – TODO: Add docstring</p></li>
+<li><p><strong>directional_intensity</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.8)"><em>float</em></a>) – Intensity of directional light (in the
+range <span class="math notranslate nohighlight">\(\left[0, 1\right]\)</span>). If the values provided are
+outside this range, we clip them so that they fall in range.</p></li>
+<li><p><strong>directional_color</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – Color of the directional light
+(R, G, B) (shape: <span class="math notranslate nohighlight">\(3\)</span>).</p></li>
+<li><p><strong>direction</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – Direction of light from the light source.
+(default: <span class="math notranslate nohighlight">\(\left( 0, 1, 0 \right)^T\)</span>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>A light tensor, which can be elementwise</dt><dd><p>multiplied with the textures, to obtain the mesh with lighting
+applied (shape: <cite>B</cite> <span class="math notranslate nohighlight">\(\times\)</span> <cite>num_faces</cite> <span class="math notranslate nohighlight">\(\times
+1 \times 1 \times 1 \times 3\)</span>)</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>light (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))">torch.Tensor</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="graphics.Transformations.get_eye_from_spherical_coords">
+<code class="sig-name descname">get_eye_from_spherical_coords</code><span class="sig-paren">(</span><em class="sig-param">distance: torch.Tensor</em>, <em class="sig-param">elevation: torch.Tensor</em>, <em class="sig-param">azimuth: torch.Tensor</em>, <em class="sig-param">degrees: Optional[bool] = True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/graphics/Transformations.html#get_eye_from_spherical_coords"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#graphics.Transformations.get_eye_from_spherical_coords" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the Cartesian position of the eye of the camera, given
+spherical coordinates (distance, azimuth, and elevation).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>distance</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – Distance of the eye from the object.</p></li>
+<li><p><strong>elevation</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – Elevation angle.</p></li>
+<li><p><strong>azimuth</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))"><em>torch.Tensor</em></a>) – Azimuth angle.</p></li>
+<li><p><strong>degrees</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a><em>, </em><em>optional</em>) – Bool to indicate that <cite>azimuth</cite> and
+<cite>elevation</cite> are specified in degrees (default: True).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Position of the “eye” of the camera.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch vmaster (1.4.0a0+6deb41c ))">torch.Tensor</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="mathutils.html" class="btn btn-neutral float-right" title="kaolin.mathutils" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="datasets.scannet.html" class="btn btn-neutral float-left" title="kaolin.datasets.scannet" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

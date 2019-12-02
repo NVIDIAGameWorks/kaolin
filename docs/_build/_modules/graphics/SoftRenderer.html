@@ -1,0 +1,744 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>graphics.SoftRenderer &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>graphics.SoftRenderer</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for graphics.SoftRenderer</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1"># </span>
+<span class="c1"># </span>
+<span class="c1"># Soft Rasterizer (SoftRas)</span>
+<span class="c1"># </span>
+<span class="c1"># Copyright (c) 2017 Hiroharu Kato</span>
+<span class="c1"># Copyright (c) 2018 Nikos Kolotouros</span>
+<span class="c1"># Copyright (c) 2019 Shichen Liu</span>
+<span class="c1"># </span>
+<span class="c1"># Permission is hereby granted, free of charge, to any person obtaining a copy</span>
+<span class="c1"># of this software and associated documentation files (the &quot;Software&quot;), to deal</span>
+<span class="c1"># in the Software without restriction, including without limitation the rights</span>
+<span class="c1"># to use, copy, modify, merge, publish, distribute, sublicense, and/or sell</span>
+<span class="c1"># copies of the Software, and to permit persons to whom the Software is</span>
+<span class="c1"># furnished to do so, subject to the following conditions:</span>
+<span class="c1">#</span>
+<span class="c1"># The above copyright notice and this permission notice shall be included in all</span>
+<span class="c1"># copies or substantial portions of the Software.</span>
+<span class="c1">#</span>
+<span class="c1"># THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR</span>
+<span class="c1"># IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,</span>
+<span class="c1"># FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE</span>
+<span class="c1"># AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER</span>
+<span class="c1"># LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,</span>
+<span class="c1"># OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE</span>
+<span class="c1"># SOFTWARE.</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">import</span> <span class="nn">kaolin</span> <span class="k">as</span> <span class="nn">kal</span>
+<span class="kn">from</span> <span class="nn">.DifferentiableRenderer</span> <span class="k">import</span> <span class="n">DifferentiableRenderer</span>
+<span class="kn">from</span> <span class="nn">.Lighting</span> <span class="k">import</span> <span class="n">compute_ambient_light</span>
+<span class="kn">from</span> <span class="nn">.Lighting</span> <span class="k">import</span> <span class="n">compute_directional_light</span>
+
+
+<div class="viewcode-block" id="SoftRenderer"><a class="viewcode-back" href="../../modules/graphics.html#graphics.SoftRenderer">[docs]</a><span class="k">class</span> <span class="nc">SoftRenderer</span><span class="p">(</span><span class="n">DifferentiableRenderer</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;A class implementing the \emph{Soft Renderer}</span>
+<span class="sd">    from the following ICCV 2019 paper:</span>
+<span class="sd">        Soft Rasterizer: A differentiable renderer for image-based 3D reasoning</span>
+<span class="sd">        Shichen Liu, Tianye Li, Weikai Chen, and Hao Li</span>
+<span class="sd">        Link: https://arxiv.org/abs/1904.01786</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">image_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">256</span><span class="p">,</span>
+            <span class="n">anti_aliasing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="n">bg_color</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+            <span class="n">fill_back</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="n">camera_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;projection&#39;</span><span class="p">,</span>
+            <span class="n">K</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rmat</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tvec</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="n">perspective_distort</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="n">sigma_val</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-5</span><span class="p">,</span>
+            <span class="n">dist_func</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;euclidean&#39;</span><span class="p">,</span>
+            <span class="n">dist_eps</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span>
+            <span class="n">gamma_val</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span>
+            <span class="n">aggr_func_rgb</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;softmax&#39;</span><span class="p">,</span>
+            <span class="n">aggr_func_alpha</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;prod&#39;</span><span class="p">,</span>
+            <span class="n">texture_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;surface&#39;</span><span class="p">,</span>
+            <span class="n">viewing_angle</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">30.</span><span class="p">,</span>
+            <span class="n">viewing_scale</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> 
+            <span class="n">eye</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">camera_direction</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]),</span>
+            <span class="n">near</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span> <span class="n">far</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+            <span class="n">light_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;surface&#39;</span><span class="p">,</span>
+            <span class="n">light_intensity_ambient</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+            <span class="n">light_intensity_directional</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
+            <span class="n">light_color_ambient</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+            <span class="n">light_color_directional</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+            <span class="n">light_direction</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span>
+            <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;cpu&#39;</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initalize the SoftRenderer object.</span>
+
+<span class="sd">        NOTE: SoftRenderer works only in GPU mode!</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            image_size (int): Size of the (square) image to be rendered.</span>
+<span class="sd">            anti_aliasing (bool): Whether or not to perform anti-aliasing</span>
+<span class="sd">                (default: True)</span>
+<span class="sd">            bg_color (torch.Tensor): Background color of rendered image</span>
+<span class="sd">                (size: math:`3`, default: :math:`\left[0, 0, 0\right]`)</span>
+<span class="sd">            fill_back (bool): Whether or not to fill color to the back</span>
+<span class="sd">                side of each triangle as well (sometimes helps, when</span>
+<span class="sd">                the triangles in the mesh are not properly oriented.)</span>
+<span class="sd">                (default: True)</span>
+<span class="sd">            camera_mode (str): Choose from among `projection`, `look`, and</span>
+<span class="sd">                `look_at`. In the `projection` mode, the camera is at the</span>
+<span class="sd">                origin, and its optical axis is aligned with the positive</span>
+<span class="sd">                Z-axis. In the `look_at` mode, the object (not the camera)</span>
+<span class="sd">                is placed at the origin. The camera &quot;looks at&quot; the object</span>
+<span class="sd">                from a predefined &quot;eye&quot; location, which is computed from</span>
+<span class="sd">                the `viewing_angle` (another input to this function). In</span>
+<span class="sd">                the `look` mode, only the direction in which the camera</span>
+<span class="sd">                needs to look is specified. It does not necessarily look</span>
+<span class="sd">                towards the origin, as it allows the specification of a</span>
+<span class="sd">                custom &quot;upwards&quot; direction (default: &#39;projection&#39;).</span>
+<span class="sd">            K (torch.Tensor): Camera intrinsics matrix. Note that, unlike</span>
+<span class="sd">                standard notation, K here is a 4 x 4 matrix (with the last</span>
+<span class="sd">                row and last column drawn from the 4 x 4 identity matrix)</span>
+<span class="sd">                (default: None)</span>
+<span class="sd">            rmat (torch.Tensor): Rotation matrix (again, 4 x 4, as opposed</span>
+<span class="sd">                to the usual 3 x 3 convention).</span>
+<span class="sd">            tvec (torch.Tensor): Translation vector (3 x 1). Note that the</span>
+<span class="sd">                (negative of the) tranlation is applied before rotation,</span>
+<span class="sd">                to be consistent with the projective geometry convention</span>
+<span class="sd">                of transforming a 3D point X by doing</span>
+<span class="sd">                torch.matmul(R.transpose(), X - t) (default: None)</span>
+<span class="sd">            perspective_distort (bool): Whether or not to perform perspective</span>
+<span class="sd">                distortion (to simulate field-of-view based distortion effects)</span>
+<span class="sd">                (default: True).</span>
+<span class="sd">            viewing_angle (float): Angle at which the object is to be viewed</span>
+<span class="sd">                (assumed to be in degrees!) (default: 30.)</span>
+<span class="sd">            camera_direction (float): Direction in which the camera is facing</span>
+<span class="sd">                (used only in the `look` and `look_at` modes) (default:</span>
+<span class="sd">                :math:`[0, 0, 1]`)</span>
+<span class="sd">            near (float): Near clipping plane (for depth values) (default: 0.1)</span>
+<span class="sd">            far (float): Far clipping plane (for depth values) (default: 100)</span>
+<span class="sd">            light_intensity_ambient (float): Intensity of ambient light (in the</span>
+<span class="sd">                range :math:`\left[ 0, 1 \right]`) (default: 0.5).</span>
+<span class="sd">            light_intensity_directional (float): Intensity of directional light</span>
+<span class="sd">                (in the range :math:`\left[ 0, 1 \right]`) (default: 0.5).</span>
+<span class="sd">            light_color_ambient (torch.Tensor): Color of ambient light</span>
+<span class="sd">                (default: :math:`\left[ 0, 0, 0 \right]`)</span>
+<span class="sd">            light_color_directional (torch.Tensor): Color of directional light</span>
+<span class="sd">                (default: :math:`\left[ 0, 0, 0 \right]`)</span>
+<span class="sd">            light_direction (torch.Tensor): Light direction, for directional</span>
+<span class="sd">                light (default: :math:`\left[ 0, 1, 0 \right]`)</span>
+<span class="sd">            device (torch.Tensor): Device on which all tensors are stored.</span>
+<span class="sd">                NOTE: Although the default device is set to &#39;cpu&#39;, at the moment,</span>
+<span class="sd">                rendering will work only if the device is CUDA enabled.</span>
+<span class="sd">                Eg. &#39;cuda:0&#39;.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="nb">super</span><span class="p">(</span><span class="n">SoftRenderer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="c1"># Size of the image to be generated.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">image_size</span> <span class="o">=</span> <span class="n">image_size</span>
+        <span class="c1"># Whether or not to enable anti-aliasing</span>
+        <span class="c1"># If enabled, we render an image that is twice as large as the required</span>
+        <span class="c1"># size, and then downsample it.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">anti_aliasing</span> <span class="o">=</span> <span class="n">anti_aliasing</span>
+        <span class="c1"># Background color of the rendered image.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bg_color</span> <span class="o">=</span> <span class="n">bg_color</span>
+        <span class="c1"># Whether or not to fill in color to the back faces of each triangle.</span>
+        <span class="c1"># Usually helps, especially when some of the triangles in the mesh</span>
+        <span class="c1"># have improper orientation specifications.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fill_back</span> <span class="o">=</span> <span class="n">fill_back</span>
+
+        <span class="c1"># Device on which tensors of the class reside. At present, this function</span>
+        <span class="c1"># only works when the device is CUDA enabled, such as a GPU.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+
+        <span class="c1"># camera_mode specifies how the scene is to be set up.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">camera_mode</span> <span class="o">=</span> <span class="n">camera_mode</span>
+        <span class="c1"># If the mode is &#39;projection&#39;, use the input camera intrinsics and</span>
+        <span class="c1"># extrinsics.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_mode</span> <span class="o">==</span> <span class="s1">&#39;projection&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">K</span> <span class="o">=</span> <span class="n">K</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rmat</span> <span class="o">=</span> <span class="n">rmat</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tvec</span> <span class="o">=</span> <span class="n">tvec</span>
+        <span class="c1"># If the mode is &#39;look&#39; or &#39;look_at&#39;, use the viewing angle to determine</span>
+        <span class="c1"># perspective distortion and camera position and orientation.</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_mode</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;look&#39;</span><span class="p">,</span> <span class="s1">&#39;look_at&#39;</span><span class="p">]:</span>
+            <span class="c1"># Whether or not to perform perspective distortion.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">perspective_distort</span> <span class="o">=</span> <span class="n">perspective_distort</span>
+            <span class="c1"># TODO: Add comments here</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">viewing_angle</span> <span class="o">=</span> <span class="n">viewing_angle</span>
+            <span class="c1"># TODO: use kal.deg2rad instead</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">eye</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="p">(</span><span class="mf">1.</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">tan</span><span class="p">(</span><span class="n">kal</span><span class="o">.</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span>
+                                                                 <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">viewing_angle</span> <span class="o">/</span> <span class="mi">180</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="c1"># Direction in which the camera&#39;s optical axis is facing</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">camera_direction</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="c1"># Near and far clipping planes.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">near</span> <span class="o">=</span> <span class="n">near</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">far</span> <span class="o">=</span> <span class="n">far</span>
+
+        <span class="c1"># Ambient and directional lighting parameters.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_intensity_ambient</span> <span class="o">=</span> <span class="n">light_intensity_ambient</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_intensity_directional</span> <span class="o">=</span> <span class="n">light_intensity_directional</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_color_ambient</span> <span class="o">=</span> <span class="n">light_color_ambient</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_color_directional</span> <span class="o">=</span> <span class="n">light_color_directional</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_direction</span> <span class="o">=</span> <span class="n">light_direction</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="c1"># TODO: Add comments here.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rasterizer_eps</span> <span class="o">=</span> <span class="mf">1e-3</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">K</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rmat</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tvec</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">rmat</span><span class="p">,</span> <span class="n">tvec</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">mode</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># If nothing is specified, render rgb, depth, and alpha channels</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">rmat</span><span class="p">,</span> <span class="n">tvec</span><span class="p">,</span>
+                               <span class="n">dist_coeffs</span><span class="p">,</span> <span class="n">orig_size</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">mode</span> <span class="ow">is</span> <span class="s1">&#39;rgb&#39;</span><span class="p">:</span>
+            <span class="c1"># Render RGB channels only</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">render_rgb</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">rmat</span><span class="p">,</span> <span class="n">tvec</span><span class="p">,</span>
+                                   <span class="n">dist_coeffs</span><span class="p">,</span> <span class="n">orig_size</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">mode</span> <span class="ow">is</span> <span class="s1">&#39;silhouette&#39;</span><span class="p">:</span>
+            <span class="c1"># Render only a silhouette, without RGB colors</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">render_silhouette</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">rmat</span><span class="p">,</span>
+                                          <span class="n">tvec</span><span class="p">,</span> <span class="n">dist_coeffs</span><span class="p">,</span> <span class="n">orig_size</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">mode</span> <span class="ow">is</span> <span class="s1">&#39;depth&#39;</span><span class="p">:</span>
+            <span class="c1"># Render depth image</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">render_depth</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">rmat</span><span class="p">,</span> <span class="n">tvec</span><span class="p">,</span>
+                                     <span class="n">dist_coeffs</span><span class="p">,</span> <span class="n">orig_size</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Mode </span><span class="si">{0}</span><span class="s1"> not implemented.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mode</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">K</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+               <span class="n">rmat</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tvec</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Renders the RGB, depth, and alpha channels.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            vertices (torch.Tensor): Vertices of the mesh (shape: :math:`B</span>
+<span class="sd">                \times V \times 3`), where :math:`B` is the batchsize,</span>
+<span class="sd">                and :math:`V` is the number of vertices in the mesh.</span>
+<span class="sd">            faces (torch.Tensor): Faces of the mesh (shape: :math:`B \times</span>
+<span class="sd">                F \times 3`), where :math:`B` is the batchsize, and :math:`F`</span>
+<span class="sd">                is the number of faces in the mesh.</span>
+<span class="sd">            textures (torch.Tensor): Mesh texture (shape: :math:`B \times F</span>
+<span class="sd">                \times 4 \times 4 \times 4 \times 3`)</span>
+<span class="sd">            mode (str): Renderer mode (choices: &#39;rgb&#39;, &#39;silhouette&#39;,</span>
+<span class="sd">                &#39;depth&#39;, None) (default: None). If the mode is None, the rgb,</span>
+<span class="sd">                depth, and alpha channels are all rendered. In the rgb mode,</span>
+<span class="sd">                only the rgb image channels are rendered. In the silhouette</span>
+<span class="sd">                mode, only a silhouette image is rendered. In the depth mode,</span>
+<span class="sd">                only a depth image is rendered.</span>
+<span class="sd">            K (torch.Tensor): Camera intrinsics (default: None) (shape:</span>
+<span class="sd">                :math:`B \times 4 \times 4` or :math:`4 \times 4`)</span>
+<span class="sd">            rmat (torch.Tensor): Rotation matrix (default: None) (shape:</span>
+<span class="sd">                :math:`B \times 4 \times 4` or :math:`4 \times 4`)</span>
+<span class="sd">            tvec (torch.Tensor): Translation vector (default: None)</span>
+<span class="sd">                (shape: :math:`B \times 3` or :math:`3`)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): rendered RGB image channels</span>
+<span class="sd">            (torch.Tensor): rendered depth channel</span>
+<span class="sd">            (torch.Tensor): rendered alpha channel</span>
+
+<span class="sd">            Each of the channels is of shape</span>
+<span class="sd">            `self.image_size` x `self.image_size`.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Fill the back faces of each triangle, if needed</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_back</span><span class="p">:</span>
+            <span class="n">faces</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">faces</span><span class="p">,</span> <span class="n">faces</span><span class="p">[:,</span> <span class="p">:,</span> <span class="nb">list</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span>
+                <span class="n">faces</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])))]),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">textures</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">textures</span><span class="p">,</span> <span class="n">textures</span><span class="o">.</span><span class="n">permute</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">)),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Lighting (not needed when we are rendering only depth/silhouette</span>
+        <span class="c1"># images)</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;depth&#39;</span><span class="p">,</span> <span class="s1">&#39;silhouette&#39;</span><span class="p">]:</span>
+            <span class="n">textures</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lighting</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">)</span>
+
+        <span class="c1"># Transform vertices to the camera frame</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">transform_to_camera_frame</span><span class="p">(</span><span class="n">vertices</span><span class="p">)</span>
+
+        <span class="c1"># Project the vertices from the camera coordinate frame to the image.</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">project_to_image</span><span class="p">(</span><span class="n">vertices</span><span class="p">)</span>
+
+        <span class="c1"># Rasterization</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rasterize</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;rgb&#39;</span><span class="p">],</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;depth&#39;</span><span class="p">],</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;alpha&#39;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">lighting</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Applies ambient and directional lighting to the mesh. &quot;&quot;&quot;</span>
+        <span class="n">faces_lighting</span> <span class="o">=</span> <span class="n">vertices_to_faces</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">)</span>
+        <span class="c1"># textures = lighting(</span>
+        <span class="c1">#     faces_lighting,</span>
+        <span class="c1">#     textures,</span>
+        <span class="c1">#     self.light_intensity_ambient,</span>
+        <span class="c1">#     self.light_intensity_directional,</span>
+        <span class="c1">#     self.light_color_ambient,</span>
+        <span class="c1">#     self.light_color_directional,</span>
+        <span class="c1">#     self.light_direction)</span>
+        <span class="n">ambient_lighting</span> <span class="o">=</span> <span class="n">kal</span><span class="o">.</span><span class="n">graphics</span><span class="o">.</span><span class="n">compute_ambient_lighting</span><span class="p">(</span>
+            <span class="n">faces_lighting</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">light_intensity_ambient</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">light_color_ambient</span><span class="p">)</span>
+        <span class="n">directional_lighting</span> <span class="o">=</span> <span class="n">kal</span><span class="o">.</span><span class="n">graphics</span><span class="o">.</span><span class="n">compute_directional_lighting</span><span class="p">(</span>
+            <span class="n">faces_lighting</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">light_intensity_directional</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">light_color_directional</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ambient_lighting</span> <span class="o">*</span> <span class="n">textures</span> <span class="o">+</span> <span class="n">directional_lighting</span> <span class="o">*</span> <span class="n">textures</span>
+
+    <span class="k">def</span> <span class="nf">shading</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Does nothing. &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">transform_to_camera_frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Transforms the mesh vertices to the camera frame, based on the</span>
+<span class="sd">        camera mode to be used.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            vertices (torch.Tensor): Mesh vertices (shape: :math:`B \times</span>
+<span class="sd">                V \times 3`), where `B` is the batchsize, and `V` is the</span>
+<span class="sd">                number of mesh vertices.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            vertices (torch.Tensor): Transformed vertices into the camera</span>
+<span class="sd">                coordinate frame (shape: :math:`B \times V \times 3`).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_mode</span> <span class="o">==</span> <span class="s1">&#39;look_at&#39;</span><span class="p">:</span>
+            <span class="n">vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">look_at</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">eye</span><span class="p">)</span>
+            <span class="c1"># # Perspective distortion</span>
+            <span class="c1"># if self.perspective_distort:</span>
+            <span class="c1">#     vertices = perspective_distort(vertices, angle=self.viewing_angle)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_mode</span> <span class="o">==</span> <span class="s1">&#39;look&#39;</span><span class="p">:</span>
+            <span class="n">vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">look</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">eye</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_direction</span><span class="p">)</span>
+            <span class="c1"># # Perspective distortion</span>
+            <span class="c1"># if self.perspective_distort:</span>
+            <span class="c1">#     vertices = perspective_distort(vertices, angle=self.viewing_angle)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_mode</span> <span class="o">==</span> <span class="s1">&#39;projection&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">K</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">K</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">K</span>
+            <span class="k">if</span> <span class="n">rmat</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">rmat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rmat</span>
+            <span class="k">if</span> <span class="n">tvec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">tvec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tvec</span>
+            <span class="c1"># vertices = perspective_projection(vertices, K, rmat, tvec)</span>
+
+    <span class="k">def</span> <span class="nf">project_to_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Projects the mesh vertices from the camera coordinate frame down</span>
+<span class="sd">        to the image.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            vertices (torch.Tensor): Mesh vertices (shape: :math:`B \times</span>
+<span class="sd">                V \times 3`), where `B` is the batchsize, and `V` is the</span>
+<span class="sd">                number of mesh vertices.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            vertices (torch.Tensor): Projected image coordinates (u, v) for</span>
+<span class="sd">                each vertex, with an appended depth channel. (shape:</span>
+<span class="sd">                :math:`B \times V \times 3`), where :math:`B` is the</span>
+<span class="sd">                batchsize and :math:`V` is the number of vertices.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># TODO: Replace all of these by perspective_projection. Use different</span>
+        <span class="c1"># rmat, tvec combinations, based on the mode, but use a consistent</span>
+        <span class="c1"># projection function across all modes. Helps avoid redundancy.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_mode</span> <span class="o">==</span> <span class="s1">&#39;look_at&#39;</span><span class="p">:</span>
+            <span class="n">vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">perspective_distort</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span>
+                                                <span class="n">angle</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">viewing_angle</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_mode</span> <span class="o">==</span> <span class="s1">&#39;look&#39;</span><span class="p">:</span>
+            <span class="n">vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">perspective_distort</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span>
+                                                <span class="n">angle</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">viewing_angle</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">camera_mode</span> <span class="o">==</span> <span class="s1">&#39;projection&#39;</span><span class="p">:</span>
+            <span class="n">vertices</span> <span class="o">=</span> <span class="n">perspective_projection</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">K</span><span class="p">,</span> <span class="n">rmat</span><span class="p">,</span> <span class="n">tvec</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">rasterize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Performs rasterization, i.e., conversion of triangles to pixels.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            vertices (torch.Tensor): Vertices of the mesh (shape: :math:`B</span>
+<span class="sd">                \times V \times 3`), where :math:`B` is the batchsize,</span>
+<span class="sd">                and :math:`V` is the number of vertices in the mesh.</span>
+<span class="sd">            faces (torch.Tensor): Faces of the mesh (shape: :math:`B \times</span>
+<span class="sd">                F \times 3`), where :math:`B` is the batchsize, and :math:`F`</span>
+<span class="sd">                is the number of faces in the mesh.</span>
+<span class="sd">            textures (torch.Tensor): Mesh texture (shape: :math:`B \times F</span>
+<span class="sd">                \times 4 \times 4 \times 4 \times 3`)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">faces</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices_to_faces</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">)</span>
+
+        <span class="c1"># If mode is unspecified, render rgb, depth, and alpha channels</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">kal</span><span class="o">.</span><span class="n">graphics</span><span class="o">.</span><span class="n">nmr</span><span class="o">.</span><span class="n">rasterize_rgbad</span><span class="p">(</span><span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span>
+                                                   <span class="bp">self</span><span class="o">.</span><span class="n">image_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">anti_aliasing</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">near</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">far</span><span class="p">,</span>
+                                                   <span class="bp">self</span><span class="o">.</span><span class="n">rasterizer_eps</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bg_color</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;rgb&#39;</span><span class="p">],</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;depth&#39;</span><span class="p">],</span> <span class="n">out</span><span class="p">[</span><span class="s1">&#39;alpha&#39;</span><span class="p">]</span>
+
+        <span class="c1"># Render RGB channels only</span>
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;rgb&#39;</span><span class="p">:</span>
+            <span class="n">images</span> <span class="o">=</span> <span class="n">kal</span><span class="o">.</span><span class="n">graphics</span><span class="o">.</span><span class="n">nmr</span><span class="o">.</span><span class="n">rasterize</span><span class="p">(</span><span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span>
+                                                <span class="bp">self</span><span class="o">.</span><span class="n">image_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">anti_aliasing</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">near</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">far</span><span class="p">,</span>
+                                                <span class="bp">self</span><span class="o">.</span><span class="n">rasterizer_eps</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">background_color</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">images</span>
+
+        <span class="c1"># Render depth image</span>
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;depth&#39;</span><span class="p">:</span>
+            <span class="n">images</span> <span class="o">=</span> <span class="n">kal</span><span class="o">.</span><span class="n">graphics</span><span class="o">.</span><span class="n">nmr</span><span class="o">.</span><span class="n">rasterize_silhouettes</span><span class="p">(</span><span class="n">faces</span><span class="p">,</span>
+                                                            <span class="bp">self</span><span class="o">.</span><span class="n">image_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">anti_aliasing</span><span class="p">)</span>
+
+        <span class="c1"># Render only a silhouette, without RGB colors</span>
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;silhouette&#39;</span><span class="p">:</span>
+            <span class="n">depth</span> <span class="o">=</span> <span class="n">kal</span><span class="o">.</span><span class="n">graphics</span><span class="o">.</span><span class="n">nmr</span><span class="o">.</span><span class="n">rasterize_depth</span><span class="p">(</span><span class="n">faces</span><span class="p">,</span>
+                                                     <span class="bp">self</span><span class="o">.</span><span class="n">image_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">anti_aliasing</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">depth</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Mode </span><span class="si">{0}</span><span class="s1"> not implemented.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mode</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">look_at</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">eye</span><span class="p">,</span> <span class="n">at</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span>
+                <span class="n">up</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Camera &quot;looks at&quot; an object whose center is at the tensor represented</span>
+<span class="sd">        by &quot;at&quot;. And &quot;up&quot; is the upwards direction.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+
+        <span class="n">device</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">device</span>
+        <span class="n">eye</span> <span class="o">=</span> <span class="n">eye</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">at</span> <span class="o">=</span> <span class="n">at</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">up</span> <span class="o">=</span> <span class="n">up</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="n">batchsize</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">eye</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">eye</span> <span class="o">=</span> <span class="n">eye</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">batchsize</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">at</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">at</span> <span class="o">=</span> <span class="n">at</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">batchsize</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">up</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">up</span> <span class="o">=</span> <span class="n">up</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">batchsize</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Create new axes</span>
+        <span class="c1"># eps is chosen as 1e-5 because that&#39;s what the authors use</span>
+        <span class="c1"># in their (Chainer) implementation</span>
+        <span class="n">z_axis</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">at</span> <span class="o">-</span> <span class="n">eye</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">)</span>
+        <span class="n">x_axis</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">up</span><span class="p">,</span> <span class="n">z_axis</span><span class="p">),</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">)</span>
+        <span class="n">y_axis</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">z_axis</span><span class="p">,</span> <span class="n">x_axis</span><span class="p">),</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">)</span>
+
+        <span class="c1"># Create rotation matrices</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">x_axis</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:],</span> <span class="n">y_axis</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:],</span>
+                       <span class="n">z_axis</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Apply</span>
+        <span class="c1"># [B, V, 3] -&gt; [B, V, 3] -&gt; [B, V, 3]</span>
+        <span class="k">if</span> <span class="n">vertices</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">eye</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="n">eye</span> <span class="o">=</span> <span class="n">eye</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">vertices</span> <span class="o">-</span> <span class="n">eye</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">R</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">vertices</span>
+
+    <span class="k">def</span> <span class="nf">look</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">eye</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]),</span>
+             <span class="n">up</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Apply the &quot;look&quot; transformation to the vertices.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+
+        <span class="n">device</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">device</span>
+        <span class="n">direction</span> <span class="o">=</span> <span class="n">direction</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">up</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">up</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">eye</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">eye</span> <span class="o">=</span> <span class="n">eye</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="k">if</span> <span class="n">direction</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">direction</span> <span class="o">=</span> <span class="n">direction</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="k">if</span> <span class="n">up</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">up</span> <span class="o">=</span> <span class="n">up</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+
+        <span class="c1"># Create new axes</span>
+        <span class="n">z_axis</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">direction</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">)</span>
+        <span class="n">x_axis</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">up</span><span class="p">,</span> <span class="n">z_axis</span><span class="p">),</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">)</span>
+        <span class="n">y_axis</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">z_axis</span><span class="p">,</span> <span class="n">x_axis</span><span class="p">),</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">)</span>
+
+        <span class="c1"># Create rotation matrix (B x 3 x 3)</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">x_axis</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:],</span> <span class="n">y_axis</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:],</span>
+                       <span class="n">z_axis</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># Apply</span>
+        <span class="k">if</span> <span class="n">vertices</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">eye</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="n">eye</span> <span class="o">=</span> <span class="n">eye</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">vertices</span> <span class="o">-</span> <span class="n">eye</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">R</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">vertices</span>
+
+    <span class="k">def</span> <span class="nf">perspective_distort</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="mf">30.</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute perspective distortion from a given viewing angle.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">device</span>
+        <span class="n">angle</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="n">angle</span> <span class="o">*</span> <span class="mi">180</span> <span class="o">/</span> <span class="n">kal</span><span class="o">.</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span><span class="p">])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tan</span><span class="p">(</span><span class="n">angle</span><span class="p">)</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="n">width</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">vertices</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">]</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">vertices</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">z</span> <span class="o">*</span> <span class="n">width</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">vertices</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">z</span> <span class="o">*</span> <span class="n">width</span><span class="p">)</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">((</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">vertices</span>
+
+    <span class="k">def</span> <span class="nf">vertices_to_faces</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        vertices (torch.Tensor): shape: math:`B \times V \times 3`</span>
+<span class="sd">        faces (torch.Tensor): shape: math:`B \times F \times 3`</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">V</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1"># print(vertices.dim(), faces.dim())</span>
+        <span class="c1"># print(vertices.shape[0], faces.shape[0])</span>
+        <span class="c1"># print(vertices.shape[2], faces.shape[2])</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">device</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="n">faces</span> <span class="o">+</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">B</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span> <span class="o">*</span> <span class="n">V</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">B</span> <span class="o">*</span> <span class="n">V</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">vertices</span><span class="p">[</span><span class="n">faces</span><span class="p">]</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

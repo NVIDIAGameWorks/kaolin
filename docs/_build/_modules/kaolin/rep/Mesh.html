@@ -1,0 +1,1197 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.rep.Mesh &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>kaolin.rep.Mesh</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for kaolin.rep.Mesh</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.</span>
+
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
+
+<span class="kn">from</span> <span class="nn">abc</span> <span class="k">import</span> <span class="n">abstractmethod</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="k">import</span> <span class="n">Image</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">kaolin.helpers</span> <span class="k">import</span> <span class="n">_assert_tensor</span>
+<span class="kn">from</span> <span class="nn">kaolin.helpers</span> <span class="k">import</span> <span class="n">_composedecorator</span>
+
+<span class="kn">import</span> <span class="nn">kaolin.cuda.load_textures</span> <span class="k">as</span> <span class="nn">load_textures_cuda</span>
+<span class="kn">import</span> <span class="nn">kaolin</span> <span class="k">as</span> <span class="nn">kal</span>
+
+
+<div class="viewcode-block" id="Mesh"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh">[docs]</a><span class="k">class</span> <span class="nc">Mesh</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot; Abstract class to represent 3D polygon meshes. &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">vertices</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">faces</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+                 <span class="n">uvs</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">face_textures</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+                 <span class="n">textures</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">edges</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">edge2key</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">vv</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+                 <span class="n">vv_count</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">vf</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+                 <span class="n">ve</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">ff</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+                 <span class="n">ff_count</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">ef</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">ef_count</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+                 <span class="n">ee</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+
+        <span class="c1"># Vertices of the mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="n">vertices</span>
+        <span class="c1"># Faces of the mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">faces</span> <span class="o">=</span> <span class="n">faces</span>
+        <span class="c1"># uv coordinates of each vertex</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">uvs</span> <span class="o">=</span> <span class="n">uvs</span>
+        <span class="c1"># uv indecies for each face</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">face_textures</span> <span class="o">=</span> <span class="n">face_textures</span>
+        <span class="c1"># texture for each face</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">textures</span> <span class="o">=</span> <span class="n">textures</span>
+        <span class="c1"># Edges of the mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">edges</span> <span class="o">=</span> <span class="n">edges</span>
+        <span class="c1"># Dictionary that maps an edge (tuple) to an edge idx</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">edge2key</span> <span class="o">=</span> <span class="n">edge2key</span>
+        <span class="c1"># Vertex-Vertex neighborhood tensor (for each vertex, contains</span>
+        <span class="c1"># indices of the vertices neighboring it)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vv</span> <span class="o">=</span> <span class="n">vv</span>
+        <span class="c1"># Number of vertices neighbouring each vertex</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vv_count</span> <span class="o">=</span> <span class="n">vv_count</span>
+        <span class="c1"># Vertex-Face neighborhood tensor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf</span> <span class="o">=</span> <span class="n">vf</span>
+        <span class="c1"># Number of faces neighbouring each vertex</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf_count</span> <span class="o">=</span> <span class="n">vf_count</span>
+        <span class="c1"># Vertex-Edge neighborhood tensor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ve</span> <span class="o">=</span> <span class="n">ve</span>
+        <span class="c1"># Number of edges neighboring each vertex</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ve_count</span> <span class="o">=</span> <span class="n">ve_count</span>
+        <span class="c1"># Face-Face neighborhood tensor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ff</span> <span class="o">=</span> <span class="n">ff</span>
+        <span class="c1"># Number of faces neighbouring each face</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ff_count</span> <span class="o">=</span> <span class="n">ff_count</span>
+        <span class="c1"># Edge-Face neighbourhood tensor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ef</span> <span class="o">=</span> <span class="n">ef</span>
+        <span class="c1"># Number of edges neighbouring each face</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ef_count</span> <span class="o">=</span> <span class="n">ef_count</span>
+        <span class="c1"># Edge-Edge neighbourhood tensor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ee</span> <span class="o">=</span> <span class="n">ee</span>
+        <span class="c1"># Number of edges neighbouring each edge</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ee_count</span> <span class="o">=</span> <span class="n">ee_count</span>
+        <span class="c1"># adjacency matrix for verts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">adj</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Initialize device on which tensors reside.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">device</span>
+
+<div class="viewcode-block" id="Mesh.from_tensors"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.from_tensors">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_tensors</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">vertices</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">faces</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+                     <span class="n">uvs</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                     <span class="n">face_textures</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                     <span class="n">textures</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">enable_adjacency</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns mesh with supplied tensor information.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            vertices (torch.Tensor): mesh vertices.</span>
+<span class="sd">            faces (torch.Tensor): mesh faces.</span>
+<span class="sd">            uvs (torch.Tensor): uv coordinates for the vertices in mesh.</span>
+<span class="sd">            face_textures (torch.Tensor): uv number for each face&#39;s vertices.</span>
+<span class="sd">            textures (torch.Tensor):  texture info for each face.</span>
+<span class="sd">            enable_adjacency (torch.Tensor): adjacency information is computed</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="n">faces</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">enable_adjacency</span><span class="p">:</span>
+            <span class="n">edge2key</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> <span class="n">ff</span><span class="p">,</span> \
+                <span class="n">ff_count</span><span class="p">,</span> <span class="n">ee</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">,</span> <span class="n">ef</span><span class="p">,</span> <span class="n">ef_count</span> <span class="o">=</span> \
+                <span class="bp">cls</span><span class="o">.</span><span class="n">compute_adjacency_info</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">uvs</span><span class="p">,</span> <span class="n">face_textures</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span>
+                       <span class="n">edge2key</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span>
+                       <span class="n">ff</span><span class="p">,</span> <span class="n">ff_count</span><span class="p">,</span> <span class="n">ef</span><span class="p">,</span> <span class="n">ef_count</span><span class="p">,</span> <span class="n">ee</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">uvs</span><span class="p">,</span> <span class="n">face_textures</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span>
+                       <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+                       <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Mesh.from_obj"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.from_obj">[docs]</a>    <span class="nd">@_composedecorator</span><span class="p">(</span><span class="nb">classmethod</span><span class="p">,</span> <span class="n">abstractmethod</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">from_obj</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">with_vt</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+                 <span class="n">enable_adjacency</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">texture_res</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Loads object in .obj wavefront format.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            filename (str) : location of file.</span>
+<span class="sd">            with_vt (bool): objects loaded with textures specified by vertex</span>
+<span class="sd">                textures.</span>
+<span class="sd">            enable_adjacency (bool): adjacency information is computed.</span>
+<span class="sd">            texture_res (int): resolution of loaded face colors.</span>
+
+<span class="sd">        Note: the with_vt parameter requires cuda.</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            &gt;&gt;&gt; mesh = Mesh.from_obj(&#39;model.obj&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; mesh.vertices.shape</span>
+<span class="sd">            torch.Size([482, 3])</span>
+<span class="sd">            &gt;&gt;&gt; mesh.faces.shape</span>
+<span class="sd">            torch.Size([960, 3])</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># run through obj file and extract obj info</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">face_textures</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">uvs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">mesh</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">mesh</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+
+                <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">da</span> <span class="k">for</span> <span class="n">da</span> <span class="ow">in</span> <span class="n">data</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">da</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;v&#39;</span><span class="p">:</span>
+                    <span class="n">vertices</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:]])</span>
+
+                <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;vt&#39;</span><span class="p">:</span>
+                    <span class="n">uvs</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">3</span><span class="p">]])</span>
+
+                <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;f&#39;</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="s1">&#39;//&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                        <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">da</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;//&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">da</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span>
+                        <span class="n">faces</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:]])</span>
+                    <span class="k">elif</span> <span class="s1">&#39;/&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                        <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">da</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">da</span> <span class="ow">in</span> <span class="n">data</span><span class="p">]</span>
+                        <span class="n">faces</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:]])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">faces</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:]])</span>
+
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">face_textures</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:]])</span>
+                    <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
+                        <span class="k">continue</span>
+
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">faces</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># compute texture info</span>
+        <span class="n">textures</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">with_vt</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">textures</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;mtllib&#39;</span><span class="p">):</span>
+                        <span class="n">filename_mtl</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">filename</span><span class="p">),</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="n">textures</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_textures</span><span class="p">(</span>
+                            <span class="n">filename</span><span class="p">,</span> <span class="n">filename_mtl</span><span class="p">,</span> <span class="n">texture_res</span><span class="p">)</span>
+
+                <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">uvs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">uvs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">uvs</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">uvs</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">face_textures</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">face_textures</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">(</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">face_textures</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">face_textures</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">enable_adjacency</span><span class="p">:</span>
+            <span class="n">edge2key</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> <span class="n">ff</span><span class="p">,</span> <span class="n">ff_count</span><span class="p">,</span> \
+                <span class="n">ee</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">,</span> <span class="n">ef</span><span class="p">,</span> <span class="n">ef_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_adjacency_info</span><span class="p">(</span>
+                    <span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">edge2key</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> <span class="n">ff</span><span class="p">,</span> \
+                <span class="n">ff_count</span><span class="p">,</span> <span class="n">ee</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">,</span> <span class="n">ef</span><span class="p">,</span> <span class="n">ef_count</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> \
+                <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> \
+                <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">uvs</span><span class="p">,</span> <span class="n">face_textures</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span>
+                    <span class="n">edge2key</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span> <span class="n">ff</span><span class="p">,</span> <span class="n">ff_count</span><span class="p">,</span>
+                    <span class="n">ef</span><span class="p">,</span> <span class="n">ef_count</span><span class="p">,</span> <span class="n">ee</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">)</span></div>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_off</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                 <span class="n">enable_adjacency</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Loads a mesh from a .off file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            filename (str): Path to the .off file.</span>
+<span class="sd">            enable_adjacency (str): Whether or not to compute adjacency info.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (kaolin.rep.Mesh): Mesh object.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">num_vertices</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">num_faces</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">num_edges</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># Flag to store the number of vertices, faces, and edges that have</span>
+        <span class="c1"># been read.</span>
+        <span class="n">read_vertices</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">read_faces</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">read_edgs</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="c1"># Flag to indicate whether or not metadata (number of vertices,</span>
+        <span class="c1"># number of faces, (optionally) number of edges) has been read.</span>
+        <span class="c1"># For .off files, metadata is the first valid line of each file</span>
+        <span class="c1"># (neglecting the &quot;OFF&quot; header).</span>
+        <span class="n">metadata_read</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">infile</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">infile</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
+                <span class="c1"># Ignore comments</span>
+                <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;#&#39;</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;OFF&#39;</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">da</span> <span class="k">for</span> <span class="n">da</span> <span class="ow">in</span> <span class="n">data</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">da</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>
+                <span class="c1"># Ignore blank lines</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">metadata_read</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+                    <span class="n">num_vertices</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="n">num_faces</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                        <span class="n">num_edges</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="n">metadata_read</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">read_vertices</span> <span class="o">&lt;</span> <span class="n">num_vertices</span><span class="p">:</span>
+                    <span class="n">vertices</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">])</span>
+                    <span class="n">read_vertices</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">read_faces</span> <span class="o">&lt;</span> <span class="n">num_faces</span><span class="p">:</span>
+                    <span class="n">numedges</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="n">faces</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="mi">1</span><span class="o">+</span><span class="n">numedges</span><span class="p">]])</span>
+                    <span class="n">read_faces</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">read_edges</span> <span class="o">&lt;</span> <span class="n">num_edges</span><span class="p">:</span>
+                    <span class="n">edges</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">:]])</span>
+                    <span class="n">read_edges</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">continue</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">faces</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">enable_adjacency</span><span class="p">:</span>
+            <span class="n">edge2key</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> <span class="n">ff</span><span class="p">,</span> <span class="n">ff_count</span><span class="p">,</span> \
+                <span class="n">ee</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">,</span> <span class="n">ef</span><span class="p">,</span> <span class="n">ef_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_adjacency_info</span><span class="p">(</span>
+                    <span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">edge2key</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> <span class="n">ff</span><span class="p">,</span> \
+                <span class="n">ff_count</span><span class="p">,</span> <span class="n">ee</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">,</span> <span class="n">ef</span><span class="p">,</span> <span class="n">ef_count</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> \
+                <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> \
+                <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="p">(</span><span class="n">vertices</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span>
+                    <span class="n">edge2key</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span> <span class="n">ff</span><span class="p">,</span> <span class="n">ff_count</span><span class="p">,</span>
+                    <span class="n">ef</span><span class="p">,</span> <span class="n">ef_count</span><span class="p">,</span> <span class="n">ee</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_cuda_helper</span><span class="p">(</span><span class="n">tensor</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">tensor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tensor</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_cpu_helper</span><span class="p">(</span><span class="n">tensor</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">tensor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tensor</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_to_helper</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">tensor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tensor</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Mesh.cuda"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.cuda">[docs]</a>    <span class="k">def</span> <span class="nf">cuda</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;&quot;Maps all tensors of the current class to CUDA. &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">faces</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">faces</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">uvs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">uvs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">face_textures</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">face_textures</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">textures</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">textures</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">edges</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vv</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vv_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vv_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vf</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vf_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ve</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ve</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ve_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ve_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ff</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ff</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ff_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ff_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ef</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ef</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ef_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ef_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ee</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ee</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ee_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cuda_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ee_count</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">device</span></div>
+
+<div class="viewcode-block" id="Mesh.cpu"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.cpu">[docs]</a>    <span class="k">def</span> <span class="nf">cpu</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;&quot;Maps all tensors of the current class to CPU. &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">faces</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">faces</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">uvs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">uvs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">face_textures</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">face_textures</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">textures</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">textures</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">edges</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vv</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vv_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vv_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vf</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vf_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ve</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ve</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ve_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ve_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ff</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ff</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ff_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ff_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ef</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ef</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ef_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ef_count</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ee</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ee</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ee_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cpu_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ee_count</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">device</span></div>
+
+    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Maps all tensors of the current class to the specified device. &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">faces</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">faces</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">uvs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">uvs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">face_textures</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">face_textures</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">textures</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">textures</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">edges</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edges</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vv</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vv_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vv_count</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vf</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vf_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vf_count</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ve</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ve</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ve_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ve_count</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ff</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ff</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ff_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ff_count</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ef</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ef</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ef_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ef_count</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ee</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ee</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ee_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_helper</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ee_count</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">device</span>
+
+
+<div class="viewcode-block" id="Mesh.load_mtl"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.load_mtl">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">load_mtl</span><span class="p">(</span><span class="n">filename_mtl</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Returns all colours and texture files found in an mtl files.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">                filename_mtl (str) : mtl file name</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">texture_filenames</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">colors</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">material_name</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename_mtl</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">())</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;newmtl&#39;</span><span class="p">:</span>
+                        <span class="n">material_name</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;map_Kd&#39;</span><span class="p">:</span>
+                        <span class="n">texture_filenames</span><span class="p">[</span><span class="n">material_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;Kd&#39;</span><span class="p">:</span>
+                        <span class="n">colors</span><span class="p">[</span><span class="n">material_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                            <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">:</span><span class="mi">4</span><span class="p">])))</span>
+        <span class="k">return</span> <span class="n">colors</span><span class="p">,</span> <span class="n">texture_filenames</span></div>
+
+<div class="viewcode-block" id="Mesh.load_textures"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.load_textures">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">load_textures</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename_obj</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">filename_mtl</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                      <span class="n">texture_res</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Returns texture for a given obj file, where texture is</span>
+<span class="sd">        defined using vertex texture uvs.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            filename_obj (str) : obj file name</span>
+<span class="sd">            filename_mtl (str) : mtl file name</span>
+<span class="sd">            texture_res  (int) : texture resolution for each face</span>
+
+
+<span class="sd">        Returns:</span>
+<span class="sd">           textures (torch.Tensor) : texture values for each face</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">()</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename_obj</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">lines</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;vt&#39;</span><span class="p">:</span>
+                <span class="n">vertices</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="nb">float</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">:</span><span class="mi">3</span><span class="p">]])</span>
+        <span class="n">vertices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">(</span><span class="n">vertices</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+
+        <span class="c1"># load faces for textures</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">material_names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">material_name</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;f&#39;</span><span class="p">:</span>
+                <span class="n">vs</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">:]</span>
+                <span class="n">nv</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">vs</span><span class="p">)</span>
+                <span class="k">if</span> <span class="s1">&#39;/&#39;</span> <span class="ow">in</span> <span class="n">vs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;//&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">vs</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+                    <span class="n">v0</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">vs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">v0</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nv</span> <span class="o">-</span> <span class="mi">2</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="s1">&#39;/&#39;</span> <span class="ow">in</span> <span class="n">vs</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;//&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">vs</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]:</span>
+                        <span class="n">v1</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">vs</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">v1</span> <span class="o">=</span> <span class="mi">0</span>
+                    <span class="k">if</span> <span class="s1">&#39;/&#39;</span> <span class="ow">in</span> <span class="n">vs</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;//&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">vs</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]:</span>
+                        <span class="n">v2</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">vs</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">v2</span> <span class="o">=</span> <span class="mi">0</span>
+                    <span class="n">faces</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">v0</span><span class="p">,</span> <span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">))</span>
+                    <span class="n">material_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">material_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;usemtl&#39;</span><span class="p">:</span>
+                <span class="n">material_name</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">(</span><span class="n">faces</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="n">vertices</span><span class="p">[</span><span class="n">faces</span><span class="p">]</span>
+        <span class="n">faces</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">faces</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+        <span class="n">faces</span><span class="p">[</span><span class="mi">1</span> <span class="o">&lt;</span> <span class="n">faces</span><span class="p">]</span> <span class="o">=</span> <span class="n">faces</span><span class="p">[</span><span class="mi">1</span> <span class="o">&lt;</span> <span class="n">faces</span><span class="p">]</span> <span class="o">%</span> <span class="mi">1</span>
+
+        <span class="n">colors</span><span class="p">,</span> <span class="n">texture_filenames</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_mtl</span><span class="p">(</span><span class="n">filename_mtl</span><span class="p">)</span>
+        <span class="n">textures</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span>
+            <span class="n">faces</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">texture_res</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+        <span class="n">textures</span> <span class="o">=</span> <span class="n">textures</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">material_name</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">colors</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">color</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">color</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">material_name_f</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">material_names</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">material_name</span> <span class="o">==</span> <span class="n">material_name_f</span><span class="p">:</span>
+                    <span class="n">textures</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">color</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+
+        <span class="k">for</span> <span class="n">material_name</span><span class="p">,</span> <span class="n">filename_texture</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">texture_filenames</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">filename_texture</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">filename_obj</span><span class="p">),</span> <span class="n">filename_texture</span><span class="p">)</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">filename_texture</span><span class="p">)</span>
+                             <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">/</span> <span class="mf">255.</span>
+
+            <span class="c1"># texture image may have one channel (grey color)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">((</span><span class="n">image</span><span class="p">,)</span> <span class="o">*</span> <span class="mi">3</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="c1"># or has extral alpha channel shoule ignore for now</span>
+            <span class="k">if</span> <span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+                <span class="n">image</span> <span class="o">=</span> <span class="n">image</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span>
+
+            <span class="c1"># pytorch does not support negative slicing for the moment</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="n">image</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
+            <span class="n">image</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+            <span class="n">is_update</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">material_names</span><span class="p">)</span>
+                         <span class="o">==</span> <span class="n">material_name</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+            <span class="n">is_update</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">is_update</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+            <span class="n">textures</span> <span class="o">=</span> <span class="n">load_textures_cuda</span><span class="o">.</span><span class="n">load_textures</span><span class="p">(</span>
+                <span class="n">image</span><span class="p">,</span> <span class="n">faces</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="n">is_update</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">textures</span></div>
+
+<div class="viewcode-block" id="Mesh.get_edges_from_face"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.get_edges_from_face">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_edges_from_face</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns a list of edges forming the current face.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            f: Face (quadruplet of indices into &#39;vertices&#39;).</span>
+<span class="sd">            vertices (torch.Tensor): Vertices (3D points).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            edge_inds (list): List of tuples (a, b) for each edge (a, b) in</span>
+<span class="sd">                faces.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_assert_tensor</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">f</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">f</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">n</span><span class="p">]:</span>
+                <span class="n">edges</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">f</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">f</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">edges</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">f</span><span class="p">[(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">n</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">(),</span> <span class="n">f</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()))</span>
+        <span class="k">return</span> <span class="n">edges</span></div>
+
+<div class="viewcode-block" id="Mesh.get_edge_order"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.get_edge_order">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_edge_order</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns (a, b) or (b, a), depending on which is smaller.</span>
+<span class="sd">        (Smaller element first, for unique keys)</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            a (int): Index of first vertex in edge.</span>
+<span class="sd">            b (int): Index of second vertex in edge.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="k">if</span> <span class="n">a</span> <span class="o">&lt;</span> <span class="n">b</span> <span class="k">else</span> <span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Mesh.has_common_vertex"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.has_common_vertex">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">has_common_vertex</span><span class="p">(</span><span class="n">e1</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">e2</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns True if the vertices e1, e2 share a common vertex,</span>
+<span class="sd">        False otherwise.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            e1 (torch.Tensor): First edge (shape: :math:`2`).</span>
+<span class="sd">            e2 (torch.Tensor): Second edge (shape: :math: `2`).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (bool): Whether or not e1 and e2 share a common vertex.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">e1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">e2</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">e1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="n">e2</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Mesh.get_common_vertex"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.get_common_vertex">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_common_vertex</span><span class="p">(</span><span class="n">e1</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">e2</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the common vertex in edges e1 and e2 (if any).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            e1 (torch.Tensor): First edge (shape: :math:`2`).</span>
+<span class="sd">            e2 (torch.Tensor): Second edge (shape: :math:`2`).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            common_vertex (torch.LongTensor): Index of common vertex</span>
+<span class="sd">                    (shape: :math:`1`).</span>
+<span class="sd">            first_nbr (torch.LongTensor): Index of one neighbouring</span>
+<span class="sd">                    vertex of the common vertex (shape: :math:`1`).</span>
+<span class="sd">            second_nbr (torch.LongTensor): Index of the other neighbouring</span>
+<span class="sd">                    vertex of the common vertex (shape: :math:`1`).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">e1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">e2</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">e1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">e1</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">e2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">e1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">e2</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">e1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">e1</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">e2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">e1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">e2</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">e1</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">e1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">e2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">e1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">e2</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">e1</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">e1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">e2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="Mesh.list_of_lists_to_matrix"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.list_of_lists_to_matrix">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">list_of_lists_to_matrix</span><span class="p">(</span>
+            <span class="n">list_of_lists</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">sublist_lengths</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">matrix</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Takes a list of lists (each sub-list of variable size), and maps it</span>
+<span class="sd">        to a matrix. Decorated by numba, for efficiency sake.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            list_of_lists (list): A list containing &#39;sub-&#39;lists (Note: the sub-list</span>
+<span class="sd">                    cannont contain lists; needs to contain numbers).</span>
+<span class="sd">            sublist_lengths (torch.Tensor): Array containing lengths of each sublist.</span>
+<span class="sd">            matrix (torch.Tensor): Matrix in which to `mould` the list</span>
+<span class="sd">                    (Note: the matrix must contain as many columns as required to</span>
+<span class="sd">                    encapsulate the largest sub-list of `list_of_lists`).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">l</span> <span class="o">=</span> <span class="n">sublist_lengths</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">l</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">matrix</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">:</span><span class="n">l</span><span class="p">]</span> <span class="o">=</span> <span class="n">list_of_lists</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">matrix</span></div>
+
+<div class="viewcode-block" id="Mesh.compute_adjacency_info"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.compute_adjacency_info">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">compute_adjacency_info</span><span class="p">(</span><span class="n">vertices</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">faces</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Build data structures to help speed up connectivity queries. Assumes</span>
+<span class="sd">        a homogeneous mesh, i.e., each face has the same number of vertices.</span>
+
+<span class="sd">        The outputs have the following format: AA, AA_count</span>
+<span class="sd">        AA_count: [count_0, ..., count_n]</span>
+<span class="sd">        with AA:</span>
+<span class="sd">        [[aa_{0,0}, ..., aa_{0,count_0} (, -1, ..., -1)],</span>
+<span class="sd">         [aa_{1,0}, ..., aa_{1,count_1} (, -1, ..., -1)],</span>
+<span class="sd">                    ...</span>
+<span class="sd">         [aa_{n,0}, ..., aa_{n,count_n} (, -1, ..., -1)]]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">device</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">device</span>
+        <span class="n">facesize</span> <span class="o">=</span> <span class="n">faces</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">nb_vertices</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">nb_faces</span> <span class="o">=</span> <span class="n">faces</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">faces</span><span class="p">[:,</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="mi">2</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">facesize</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span> <span class="o">+</span>
+                          <span class="p">[</span><span class="n">faces</span><span class="p">[:,[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">]]],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># Sort the vertex of edges in increasing order</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># id of corresponding face in edges</span>
+        <span class="n">face_ids</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nb_faces</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">facesize</span><span class="p">)</span>
+        <span class="c1"># remove multiple occurences and sort by the first vertex</span>
+        <span class="c1"># the edge key / id is fixed from now as the first axis position</span>
+        <span class="c1"># edges_ids will give the key of the edges on the original vector</span>
+        <span class="n">edges</span><span class="p">,</span> <span class="n">edges_ids</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">edges</span><span class="p">,</span> <span class="nb">sorted</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">return_inverse</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">nb_edges</span> <span class="o">=</span> <span class="n">edges</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># EDGE2FACE</span>
+        <span class="n">sorted_edges_ids</span><span class="p">,</span> <span class="n">order_edges_ids</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">edges_ids</span><span class="p">)</span>
+        <span class="n">sorted_faces_ids</span> <span class="o">=</span> <span class="n">face_ids</span><span class="p">[</span><span class="n">order_edges_ids</span><span class="p">]</span>
+        <span class="c1"># indices of first occurences of each key</span>
+        <span class="n">idx_first</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">sorted_edges_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">!=</span> <span class="n">sorted_edges_ids</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                                    <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="n">value</span><span class="o">=</span><span class="mi">1</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">nb_faces_per_edge</span> <span class="o">=</span> <span class="n">idx_first</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">idx_first</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1"># compute sub_idx (2nd axis indices to store the faces)</span>
+        <span class="n">offsets</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">sorted_edges_ids</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span>
+        <span class="n">offsets</span><span class="p">[</span><span class="n">idx_first</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]</span> <span class="o">=</span> <span class="n">nb_faces_per_edge</span>
+        <span class="n">sub_idx</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">sorted_edges_ids</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span> <span class="o">-</span>
+                   <span class="n">torch</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">offsets</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+        <span class="c1"># TODO(cfujitsang): potential way to compute sub_idx differently</span>
+        <span class="c1">#                   to test with bigger model</span>
+        <span class="c1">#sub_idx = torch.ones(sorted_edges_ids.shape[0], device=device, dtype=torch.long)</span>
+        <span class="c1">#sub_idx[0] = 0</span>
+        <span class="c1">#sub_idx[idx_first[1:]] = 1 - nb_faces_per_edge</span>
+        <span class="c1">#sub_idx = torch.cumsum(sub_idx, dim=0)</span>
+        <span class="n">nb_faces_per_edge</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">nb_faces_per_edge</span><span class="p">,</span>
+                                       <span class="n">sorted_edges_ids</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">idx_first</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:]],</span>
+                                      <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">max_sub_idx</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">nb_faces_per_edge</span><span class="p">)</span>
+        <span class="n">ef</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">nb_edges</span><span class="p">,</span> <span class="n">max_sub_idx</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">ef</span><span class="p">[</span><span class="n">sorted_edges_ids</span><span class="p">,</span> <span class="n">sub_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">sorted_faces_ids</span>
+        <span class="c1"># FACE2FACES</span>
+        <span class="n">nb_faces_per_face</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">nb_faces_per_edge</span><span class="p">[</span><span class="n">edges_ids</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="n">nb_faces</span><span class="p">:(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">nb_faces</span><span class="p">]]</span>
+                                         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">facesize</span><span class="p">)],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">facesize</span>
+        <span class="n">ff</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">ef</span><span class="p">[</span><span class="n">edges_ids</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="n">nb_faces</span><span class="p">:(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">nb_faces</span><span class="p">]]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">facesize</span><span class="p">)],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># remove self occurences</span>
+        <span class="n">ff</span><span class="p">[</span><span class="n">ff</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nb_faces</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">ff</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">ff</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">descending</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">to_del</span> <span class="o">=</span> <span class="p">(</span><span class="n">ff</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:]</span> <span class="o">==</span> <span class="n">ff</span><span class="p">[:,:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">ff</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:]</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">ff</span><span class="p">[:,</span><span class="mi">1</span><span class="p">:][</span><span class="n">to_del</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">nb_faces_per_face</span> <span class="o">=</span> <span class="n">nb_faces_per_face</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">to_del</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">max_sub_idx</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">nb_faces_per_face</span><span class="p">)</span>
+        <span class="n">ff</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">ff</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">descending</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="mi">0</span><span class="p">][:,:</span><span class="n">max_sub_idx</span><span class="p">]</span>
+
+        <span class="c1"># VERTEX2VERTICES and VERTEX2EDGES</span>
+        <span class="n">npy_edges</span> <span class="o">=</span> <span class="n">edges</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">edge2key</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">npy_edges</span><span class="p">[</span><span class="n">i</span><span class="p">]):</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nb_edges</span><span class="p">)}</span>
+        <span class="c1">#_edges and double_edges 2nd axis correspond to the triplet:</span>
+        <span class="c1"># [left vertex, right vertex, edge key]</span>
+        <span class="n">_edges</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">edges</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nb_edges</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)],</span>
+                           <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">double_edges</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">_edges</span><span class="p">,</span> <span class="n">_edges</span><span class="p">[:,[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">2</span><span class="p">]]],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">double_edges</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">double_edges</span><span class="p">,</span> <span class="nb">sorted</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># TODO(cfujitsang): potential improvment, to test with bigger model:</span>
+        <span class="c1">#double_edges0, order_double_edges = torch.sort(double_edges[0])</span>
+        <span class="n">nb_double_edges</span> <span class="o">=</span> <span class="n">double_edges</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="c1"># indices of first occurences of each key</span>
+        <span class="n">idx_first</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">double_edges</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">double_edges</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">],</span>
+                                    <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="n">value</span><span class="o">=</span><span class="mi">1</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">nb_edges_per_vertex</span> <span class="o">=</span> <span class="n">idx_first</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">idx_first</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1"># compute sub_idx (2nd axis indices to store the edges)</span>
+        <span class="n">offsets</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">nb_double_edges</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span>
+        <span class="n">offsets</span><span class="p">[</span><span class="n">idx_first</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]</span> <span class="o">=</span> <span class="n">nb_edges_per_vertex</span>
+        <span class="n">sub_idx</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nb_double_edges</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span> <span class="o">-</span>
+                   <span class="n">torch</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">offsets</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+        <span class="n">nb_edges_per_vertex</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">nb_edges_per_vertex</span><span class="p">,</span>
+                                         <span class="n">nb_double_edges</span> <span class="o">-</span> <span class="n">idx_first</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:]],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">max_sub_idx</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">nb_edges_per_vertex</span><span class="p">)</span>
+        <span class="n">vv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">nb_vertices</span><span class="p">,</span> <span class="n">max_sub_idx</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">vv</span><span class="p">[</span><span class="n">double_edges</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span> <span class="n">sub_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">double_edges</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">ve</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">nb_vertices</span><span class="p">,</span> <span class="n">max_sub_idx</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">ve</span><span class="p">[</span><span class="n">double_edges</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span> <span class="n">sub_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">double_edges</span><span class="p">[:,</span><span class="mi">2</span><span class="p">]</span>
+        <span class="c1"># EDGE2EDGES</span>
+        <span class="n">ee</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">ve</span><span class="p">[</span><span class="n">edges</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],:],</span> <span class="n">ve</span><span class="p">[</span><span class="n">edges</span><span class="p">[:,</span><span class="mi">1</span><span class="p">],:]],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">nb_edges_per_edge</span> <span class="o">=</span> <span class="n">nb_edges_per_vertex</span><span class="p">[</span><span class="n">edges</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]]</span> <span class="o">+</span> <span class="n">nb_edges_per_vertex</span><span class="p">[</span><span class="n">edges</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]]</span> <span class="o">-</span> <span class="mi">2</span>
+        <span class="n">max_sub_idx</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">nb_edges_per_edge</span><span class="p">)</span>
+        <span class="c1"># remove self occurences</span>
+        <span class="n">ee</span><span class="p">[</span><span class="n">ee</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">nb_edges</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">ee</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">ee</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">descending</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="mi">0</span><span class="p">][:,:</span><span class="n">max_sub_idx</span><span class="p">]</span>
+        <span class="c1"># VERTEX2FACES</span>
+        <span class="n">vertex_ordered</span><span class="p">,</span> <span class="n">order_vertex</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">faces</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">face_ids_in_vertex_order</span> <span class="o">=</span> <span class="n">order_vertex</span> <span class="o">/</span> <span class="n">facesize</span>
+        <span class="c1"># indices of first occurences of each id</span>
+        <span class="n">idx_first</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">vertex_ordered</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">!=</span> <span class="n">vertex_ordered</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="n">value</span><span class="o">=</span><span class="mi">1</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">nb_faces_per_vertex</span> <span class="o">=</span> <span class="n">idx_first</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">idx_first</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1"># compute sub_idx (2nd axis indices to store the faces)</span>
+        <span class="n">offsets</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">vertex_ordered</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span>
+        <span class="n">offsets</span><span class="p">[</span><span class="n">idx_first</span><span class="p">[</span><span class="mi">1</span><span class="p">:]]</span> <span class="o">=</span> <span class="n">nb_faces_per_vertex</span>
+        <span class="n">sub_idx</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">vertex_ordered</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span> <span class="o">-</span>
+                   <span class="n">torch</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">offsets</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+        <span class="c1"># TODO(cfujitsang): it seems that nb_faces_per_vertex == nb_edges_per_vertex ?</span>
+        <span class="n">nb_faces_per_vertex</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">nb_faces_per_vertex</span><span class="p">,</span>
+                                         <span class="n">vertex_ordered</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">idx_first</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:]],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">max_sub_idx</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">nb_faces_per_vertex</span><span class="p">)</span>
+        <span class="n">vf</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">nb_vertices</span><span class="p">,</span> <span class="n">max_sub_idx</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">long</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">vf</span><span class="p">[</span><span class="n">vertex_ordered</span><span class="p">,</span> <span class="n">sub_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">face_ids_in_vertex_order</span>
+
+        <span class="k">return</span> <span class="n">edge2key</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">nb_edges_per_vertex</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">nb_edges_per_vertex</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> \
+            <span class="n">nb_faces_per_vertex</span><span class="p">,</span> <span class="n">ff</span><span class="p">,</span> <span class="n">nb_faces_per_face</span><span class="p">,</span> <span class="n">ee</span><span class="p">,</span> <span class="n">nb_edges_per_edge</span><span class="p">,</span> <span class="n">ef</span><span class="p">,</span> <span class="n">nb_faces_per_edge</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">old_compute_adjacency_info</span><span class="p">(</span><span class="n">vertices</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">faces</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Build data structures to help speed up connectivity queries. Assumes</span>
+<span class="sd">        a homogeneous mesh, i.e., each face has the same number of vertices.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">device</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">device</span>
+
+        <span class="n">facesize</span> <span class="o">=</span> <span class="n">faces</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># Dictionary to hash each edge</span>
+        <span class="n">edge2key</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="c1"># List of edges</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># List of neighboring vertices to each vertex</span>
+        <span class="n">vertex_vertex_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="nb">set</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">vertices</span><span class="p">]</span>
+        <span class="c1"># List of neighboring edges to each vertex</span>
+        <span class="n">vertex_edge_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="nb">set</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">vertices</span><span class="p">]</span>
+        <span class="c1"># List of neighboring faces to each vertex</span>
+        <span class="n">vertex_face_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="nb">set</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">vertices</span><span class="p">]</span>
+        <span class="c1"># List of neighboring edges to each edge</span>
+        <span class="n">edge_edge_nbd</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># List of neighboring faces to each edge</span>
+        <span class="n">edge_face_nbd</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># List of neighboring faces to each face</span>
+        <span class="n">face_face_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="nb">set</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">faces</span><span class="p">]</span>
+        <span class="c1"># Counter for edges</span>
+        <span class="n">num_edges</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">fid</span><span class="p">,</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">faces</span><span class="p">):</span>
+
+            <span class="c1"># Get a list of edges in the current face</span>
+            <span class="n">face_edges</span> <span class="o">=</span> <span class="n">Mesh</span><span class="o">.</span><span class="n">get_edges_from_face</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="c1"># Run a pass through the edges, and add any new</span>
+            <span class="c1"># edges found, to the list of edges. Also, initialize</span>
+            <span class="c1"># corresponding neighborhood info.</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">edge</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">face_edges</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">edge</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">edge2key</span><span class="p">:</span>
+                    <span class="n">edge2key</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_edges</span>
+                    <span class="n">edges</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">edge</span><span class="p">))</span>
+                    <span class="n">edge_edge_nbd</span><span class="o">.</span><span class="n">append</span><span class="p">([])</span>
+                    <span class="n">edge_face_nbd</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">fid</span><span class="p">])</span>
+                    <span class="n">vertex_edge_nbd</span><span class="p">[</span><span class="n">edge</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">num_edges</span><span class="p">)</span>
+                    <span class="n">vertex_edge_nbd</span><span class="p">[</span><span class="n">edge</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">num_edges</span><span class="p">)</span>
+                    <span class="n">num_edges</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="c1"># Now, run another pass through the edges, this time to</span>
+            <span class="c1"># compute adjacency info.</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">edge</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">face_edges</span><span class="p">):</span>
+                <span class="n">k</span> <span class="o">=</span> <span class="n">edge2key</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">facesize</span><span class="p">):</span>
+                    <span class="n">q</span> <span class="o">=</span> <span class="n">edge2key</span><span class="p">[</span><span class="n">face_edges</span><span class="p">[(</span><span class="n">idx</span> <span class="o">+</span> <span class="n">j</span><span class="p">)</span> <span class="o">%</span> <span class="n">facesize</span><span class="p">]]</span>
+                    <span class="n">common_vtx</span><span class="p">,</span> <span class="n">first_nbr</span><span class="p">,</span> <span class="n">second_nbr</span> <span class="o">=</span> <span class="n">Mesh</span><span class="o">.</span><span class="n">get_common_vertex</span><span class="p">(</span>
+                        <span class="n">edges</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">edges</span><span class="p">[</span><span class="n">q</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="n">common_vtx</span><span class="p">:</span>
+                        <span class="n">edge_edge_nbd</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+                        <span class="n">vertex_vertex_nbd</span><span class="p">[</span><span class="n">common_vtx</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">first_nbr</span><span class="p">)</span>
+                        <span class="n">vertex_vertex_nbd</span><span class="p">[</span><span class="n">common_vtx</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">second_nbr</span><span class="p">)</span>
+                        <span class="n">vertex_vertex_nbd</span><span class="p">[</span><span class="n">first_nbr</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">common_vtx</span><span class="p">)</span>
+                        <span class="n">vertex_vertex_nbd</span><span class="p">[</span><span class="n">second_nbr</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">common_vtx</span><span class="p">)</span>
+
+                <span class="c1"># q = edge2key[face_edges[(idx+1)%facesize]]</span>
+                <span class="c1"># r = edge2key[face_edges[(idx+2)%facesize]]</span>
+                <span class="c1"># s = edge2key[face_edges[(idx+3)%facesize]]</span>
+                <span class="c1"># if Mesh.has_common_vertex(edges[k], edges[q]):</span>
+                <span class="c1">#     edge_edge_nbd[k].append(q)</span>
+                <span class="c1"># if Mesh.has_common_vertex(edges[k], edges[r]):</span>
+                <span class="c1">#     edge_edge_nbd[k].append(r)</span>
+                <span class="c1"># if Mesh.has_common_vertex(edges[k], edges[s]):</span>
+                <span class="c1">#     edge_edge_nbd[k].append(s)</span>
+                <span class="k">if</span> <span class="n">fid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">edge_face_nbd</span><span class="p">[</span><span class="n">k</span><span class="p">]:</span>
+                    <span class="n">edge_face_nbd</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fid</span><span class="p">)</span>
+                <span class="n">vertex_edge_nbd</span><span class="p">[</span><span class="n">edge</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+                <span class="n">vertex_edge_nbd</span><span class="p">[</span><span class="n">edge</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+                <span class="n">vertex_face_nbd</span><span class="p">[</span><span class="n">edge</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">fid</span><span class="p">)</span>
+                <span class="n">vertex_face_nbd</span><span class="p">[</span><span class="n">edge</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">fid</span><span class="p">)</span>
+        <span class="c1"># Compute face-face adjacency info</span>
+        <span class="k">for</span> <span class="n">fid</span><span class="p">,</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">faces</span><span class="p">):</span>
+            <span class="n">face_edges</span> <span class="o">=</span> <span class="n">Mesh</span><span class="o">.</span><span class="n">get_edges_from_face</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">edge</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">face_edges</span><span class="p">):</span>
+                <span class="n">k</span> <span class="o">=</span> <span class="n">edge2key</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">nbr</span> <span class="ow">in</span> <span class="n">edge_face_nbd</span><span class="p">[</span><span class="n">k</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="n">nbr</span> <span class="o">==</span> <span class="n">fid</span><span class="p">:</span>
+                        <span class="k">continue</span>
+                    <span class="n">face_face_nbd</span><span class="p">[</span><span class="n">fid</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">nbr</span><span class="p">)</span>
+
+        <span class="c1"># Helper variables</span>
+        <span class="n">N</span> <span class="o">=</span> <span class="n">vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">M</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">edges</span><span class="p">)</span>
+        <span class="n">P</span> <span class="o">=</span> <span class="n">faces</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># Convert sets to lists in vertex_edge_nbd, vertex_face_nbd, and</span>
+        <span class="c1"># face_face_nbd</span>
+        <span class="n">vertex_vertex_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">l</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                             <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">vertex_vertex_nbd</span><span class="p">]</span>
+        <span class="n">vertex_edge_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">l</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                           <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">vertex_edge_nbd</span><span class="p">]</span>
+        <span class="n">vertex_face_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">l</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                           <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">vertex_face_nbd</span><span class="p">]</span>
+        <span class="n">face_face_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">l</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                         <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">face_face_nbd</span><span class="p">]</span>
+        <span class="n">edge_edge_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="n">l</span><span class="p">)</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                         <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">edge_edge_nbd</span><span class="p">]</span>
+        <span class="n">edge_face_nbd</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="n">l</span><span class="p">)</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+                         <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">edge_face_nbd</span><span class="p">]</span>
+
+        <span class="c1"># Map vertex_vertex_nbd to a matrix</span>
+        <span class="n">vv_count</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">vertex_vertex_nbd</span><span class="p">])</span><span class="o">.</span><span class="n">long</span><span class="p">()</span>
+        <span class="n">vv_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">vv_count</span><span class="p">)</span>
+        <span class="n">vv</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">vv_max</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">vv</span> <span class="o">=</span> <span class="n">Mesh</span><span class="o">.</span><span class="n">list_of_lists_to_matrix</span><span class="p">(</span><span class="n">vertex_vertex_nbd</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">vv</span><span class="p">)</span>
+
+        <span class="c1"># Map vertex_edge_nbd to a matrix</span>
+        <span class="n">ve_count</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">vertex_edge_nbd</span><span class="p">])</span><span class="o">.</span><span class="n">long</span><span class="p">()</span>
+        <span class="n">ve_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">ve_count</span><span class="p">)</span>
+        <span class="n">ve</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">ve_max</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">ve</span> <span class="o">=</span> <span class="n">Mesh</span><span class="o">.</span><span class="n">list_of_lists_to_matrix</span><span class="p">(</span><span class="n">vertex_edge_nbd</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">)</span>
+
+        <span class="c1"># Map vertex_face_nbd to a matrix</span>
+        <span class="n">vf_count</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">vertex_face_nbd</span><span class="p">])</span><span class="o">.</span><span class="n">long</span><span class="p">()</span>
+        <span class="n">vf_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">vf_count</span><span class="p">)</span>
+        <span class="n">vf</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="n">vf_max</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">vf</span> <span class="o">=</span> <span class="n">Mesh</span><span class="o">.</span><span class="n">list_of_lists_to_matrix</span><span class="p">(</span><span class="n">vertex_face_nbd</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">)</span>
+
+        <span class="c1"># Map edge_edge_nbd to a matrix</span>
+        <span class="n">ee_count</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">edge_edge_nbd</span><span class="p">])</span><span class="o">.</span><span class="n">long</span><span class="p">()</span>
+        <span class="n">ee_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">ee_count</span><span class="p">)</span>
+        <span class="n">ee</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">M</span><span class="p">,</span> <span class="n">ee_max</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">ee</span> <span class="o">=</span> <span class="n">Mesh</span><span class="o">.</span><span class="n">list_of_lists_to_matrix</span><span class="p">(</span><span class="n">edge_edge_nbd</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">,</span> <span class="n">ee</span><span class="p">)</span>
+
+        <span class="c1"># Map edge_face_nbd to a matrix</span>
+        <span class="n">ef_count</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">edge_face_nbd</span><span class="p">])</span><span class="o">.</span><span class="n">long</span><span class="p">()</span>
+        <span class="n">ef_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">ef_count</span><span class="p">)</span>
+        <span class="n">ef</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">M</span><span class="p">,</span> <span class="n">ef_max</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">ef</span> <span class="o">=</span> <span class="n">Mesh</span><span class="o">.</span><span class="n">list_of_lists_to_matrix</span><span class="p">(</span><span class="n">edge_face_nbd</span><span class="p">,</span> <span class="n">ef_count</span><span class="p">,</span> <span class="n">ef</span><span class="p">)</span>
+
+        <span class="c1"># Map face_face_nbd to a matrix</span>
+        <span class="n">ff_count</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">face_face_nbd</span><span class="p">])</span><span class="o">.</span><span class="n">long</span><span class="p">()</span>
+        <span class="n">ff_max</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">ff_count</span><span class="p">)</span>
+        <span class="n">ff</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">P</span><span class="p">,</span> <span class="n">ff_max</span><span class="p">))</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">ff</span> <span class="o">=</span> <span class="n">Mesh</span><span class="o">.</span><span class="n">list_of_lists_to_matrix</span><span class="p">(</span><span class="n">face_face_nbd</span><span class="p">,</span> <span class="n">ff_count</span><span class="p">,</span> <span class="n">ff</span><span class="p">)</span>
+
+        <span class="c1"># Convert to numpy arrays</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="n">edges</span><span class="p">)</span><span class="o">.</span><span class="n">long</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">edge2key</span><span class="p">,</span> <span class="n">edges</span><span class="p">,</span> <span class="n">vv</span><span class="p">,</span> <span class="n">vv_count</span><span class="p">,</span> <span class="n">ve</span><span class="p">,</span> <span class="n">ve_count</span><span class="p">,</span> <span class="n">vf</span><span class="p">,</span> <span class="n">vf_count</span><span class="p">,</span> \
+            <span class="n">ff</span><span class="p">,</span> <span class="n">ff_count</span><span class="p">,</span> <span class="n">ee</span><span class="p">,</span> <span class="n">ee_count</span><span class="p">,</span> <span class="n">ef</span><span class="p">,</span> <span class="n">ef_count</span>
+
+<div class="viewcode-block" id="Mesh.laplacian_smoothing"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.laplacian_smoothing">[docs]</a>    <span class="k">def</span> <span class="nf">laplacian_smoothing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Applies laplacian smoothing to the mesh.</span>
+
+<span class="sd">            Args:</span>
+<span class="sd">                iterations (int) : number of iterations to run the algorithm for.</span>
+
+<span class="sd">            Example:</span>
+<span class="sd">                &gt;&gt;&gt; mesh = Mesh.from_obj(&#39;model.obj&#39;)</span>
+<span class="sd">                &gt;&gt;&gt; mesh.compute_laplacian().abs().mean()</span>
+<span class="sd">                tensor(0.0010)</span>
+<span class="sd">                &gt;&gt;&gt; mesh.laplacian_smoothing(iterations=3)</span>
+<span class="sd">                &gt;&gt;&gt; mesh.compute_laplacian().abs().mean()</span>
+<span class="sd">                tensor(9.9956e-05)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+        <span class="n">adj_sparse</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_adjacency_matrix_sparse</span><span class="p">()</span>
+
+        <span class="n">neighbor_num</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
+            <span class="n">adj_sparse</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to_dense</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">iterations</span><span class="p">):</span>
+            <span class="n">neighbor_sum</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">mm</span><span class="p">(</span><span class="n">adj_sparse</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="n">neighbor_sum</span> <span class="o">/</span> <span class="n">neighbor_num</span></div>
+
+<div class="viewcode-block" id="Mesh.compute_laplacian"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.compute_laplacian">[docs]</a>    <span class="k">def</span> <span class="nf">compute_laplacian</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Calcualtes the laplcaian of the graph, meaning the average</span>
+<span class="sd">                difference between a vertex and its neighbors.</span>
+
+<span class="sd">            Returns:</span>
+<span class="sd">                (FloatTensor) : laplacian of the mesh.</span>
+
+<span class="sd">            Example:</span>
+<span class="sd">                &gt;&gt;&gt; mesh = Mesh.from_obj(&#39;model.obj&#39;)</span>
+<span class="sd">                &gt;&gt;&gt; lap = mesh.compute_laplacian()</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">adj_sparse</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_adjacency_matrix_sparse</span><span class="p">()</span>
+
+        <span class="n">neighbor_sum</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">mm</span><span class="p">(</span>
+            <span class="n">adj_sparse</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span>
+        <span class="n">neighbor_num</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
+            <span class="n">adj_sparse</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to_dense</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">neighbor_num</span><span class="p">[</span><span class="n">neighbor_num</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">neighbor_num</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">/</span> <span class="n">neighbor_num</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">neighbor_sum</span> <span class="o">=</span> <span class="n">neighbor_sum</span> <span class="o">*</span> <span class="n">neighbor_num</span>
+        <span class="n">lap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span> <span class="o">-</span> <span class="n">neighbor_sum</span>
+        <span class="k">return</span> <span class="n">lap</span></div>
+
+<div class="viewcode-block" id="Mesh.show"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.show">[docs]</a>    <span class="k">def</span> <span class="nf">show</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Visuailizes the mesh.</span>
+
+<span class="sd">            Example:</span>
+<span class="sd">                &gt;&gt;&gt; mesh = Mesh.from_obj(&#39;model.obj&#39;)</span>
+<span class="sd">                &gt;&gt;&gt; mesh.show()</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">kal</span><span class="o">.</span><span class="n">visualize</span><span class="o">.</span><span class="n">show_mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Mesh.save_tensors"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.save_tensors">[docs]</a>    <span class="k">def</span> <span class="nf">save_tensors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="p">(</span><span class="nb">str</span><span class="p">)):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Saves the tensor information of the mesh in a numpy .npz format.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            filename: the file name to save the file under</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            &gt;&gt;&gt; mesh = Mesh.from_obj(&#39;model.obj&#39;)</span>
+<span class="sd">            &gt;&gt;&gt; mesh.save_tensors()</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">savez</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">vertices</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
+                 <span class="n">faces</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">faces</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="Mesh.normalize_zerosafe"><a class="viewcode-back" href="../../../modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.normalize_zerosafe">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">normalize_zerosafe</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Normalizes each row of a matrix in a &#39;division by zero&#39;-safe way.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            matrix (torch.tensor): Matrix where each row contains a vector</span>
+<span class="sd">                to be normalized.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">assert</span> <span class="n">matrix</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;Need matrix to contain exactly 2 dimensions&#39;</span>
+        <span class="n">magnitude</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">pow</span><span class="p">(</span><span class="n">matrix</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">valid_inds</span> <span class="o">=</span> <span class="n">magnitude</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="n">matrix</span><span class="p">[</span><span class="n">valid_inds</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">div</span><span class="p">(</span><span class="n">matrix</span><span class="p">[</span><span class="n">valid_inds</span><span class="p">],</span> <span class="n">magnitude</span><span class="p">[</span>
+                                       <span class="n">valid_inds</span><span class="p">]</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">matrix</span></div>
+
+    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_points</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">compute_vertex_normals</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">compute_edge_lengths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">compute_face_areas</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">compute_interior_angles_per_edge</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">def</span> <span class="nf">compute_dihedral_angles_per_edge</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

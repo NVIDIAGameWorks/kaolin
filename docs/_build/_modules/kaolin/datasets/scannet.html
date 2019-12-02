@@ -1,0 +1,615 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.datasets.scannet &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>kaolin.datasets.scannet</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for kaolin.datasets.scannet</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">OrderedDict</span>
+<span class="kn">import</span> <span class="nn">torch.utils.data</span> <span class="k">as</span> <span class="nn">data</span>
+<span class="kn">from</span> <span class="nn">torchvision</span> <span class="k">import</span> <span class="n">transforms</span>
+
+
+<div class="viewcode-block" id="ScanNet"><a class="viewcode-back" href="../../../modules/datasets.scannet.html#kaolin.datasets.scannet.ScanNet">[docs]</a><span class="k">class</span> <span class="nc">ScanNet</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;ScanNet dataset http://www.scan-net.org/</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        root_dir (str): Path to the base directory of the dataset.</span>
+<span class="sd">        scene_file (str): Path to file containing a list of scenes</span>
+<span class="sd">            to be loaded.</span>
+<span class="sd">        transform (callable, optional): A function/transform that takes in a PIL</span>
+<span class="sd">            image and returns a transformed version of the image (default: None).</span>
+<span class="sd">        label_transform (callable, optional): A function/transform that takes</span>
+<span class="sd">            in the target and transforms it. (default: None).</span>
+<span class="sd">        loader (callable, optional): A function to load an image given its path.</span>
+<span class="sd">            By default, ``default_loader`` is used.</span>
+<span class="sd">        color_mean (list): A list of length 3, containing the R, G, B channelwise</span>
+<span class="sd">            mean.</span>
+<span class="sd">        color_std (list): A list of length 3, containing the R, G, B channelwise</span>
+<span class="sd">            standard deviation.</span>
+<span class="sd">        load_depth (bool): Whether or not to load depth images (architectures</span>
+<span class="sd">            that use depth information need depth to be loaded).</span>
+<span class="sd">        seg_classes (string): The palette of classes that the network should</span>
+<span class="sd">            learn.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">scene_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                 <span class="n">mode</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;inference&#39;</span><span class="p">,</span>
+                 <span class="n">transform</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="n">label_transform</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="n">loader</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                 <span class="n">color_mean</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.</span><span class="p">,</span><span class="mf">0.</span><span class="p">,</span><span class="mf">0.</span><span class="p">],</span>
+                 <span class="n">color_std</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.</span><span class="p">,</span><span class="mf">1.</span><span class="p">,</span><span class="mf">1.</span><span class="p">],</span>
+                 <span class="n">load_depth</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+                 <span class="n">seg_classes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;nyu40&#39;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">root_dir</span> <span class="o">=</span> <span class="n">root_dir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span> <span class="o">=</span> <span class="n">scene_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform</span> <span class="o">=</span> <span class="n">transform</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">label_transform</span> <span class="o">=</span> <span class="n">label_transform</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">loader</span> <span class="o">=</span> <span class="n">loader</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">color_mean</span> <span class="o">=</span> <span class="n">color_mean</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">color_std</span> <span class="o">=</span> <span class="n">color_std</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">load_depth</span> <span class="o">=</span> <span class="n">load_depth</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seg_classes</span> <span class="o">=</span> <span class="n">seg_classes</span>
+        <span class="c1"># color_encoding has to be initialized AFTER seg_classes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">color_encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_color_encoding</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">loader</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_depth</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">loader</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scannet_loader_depth</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">loader</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scannet_loader</span>
+
+        <span class="c1"># Get test data and labels filepaths</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="n">get_filenames_scannet</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">root_dir</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">scene_id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>        
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns element at index in the dataset.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            index (``int``): index of the item in the dataset</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple of ``PIL.Image`` (image, label) where label is the ground-truth of the image</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_depth</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+
+            <span class="n">data_path</span><span class="p">,</span> <span class="n">depth_path</span><span class="p">,</span> <span class="n">label_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">depth</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+            <span class="n">rgbd</span><span class="p">,</span> <span class="n">label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loader</span><span class="p">(</span><span class="n">data_path</span><span class="p">,</span> <span class="n">depth_path</span><span class="p">,</span> <span class="n">label_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">color_mean</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">color_std</span><span class="p">,</span> \
+                <span class="bp">self</span><span class="o">.</span><span class="n">seg_classes</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">rgbd</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">data_path</span><span class="p">,</span> <span class="n">depth_path</span><span class="p">,</span> <span class="n">label_path</span>
+
+        <span class="k">else</span><span class="p">:</span>
+
+            <span class="n">data_path</span><span class="p">,</span> <span class="n">label_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">index</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+            <span class="n">img</span><span class="p">,</span> <span class="n">label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">loader</span><span class="p">(</span><span class="n">data_path</span><span class="p">,</span> <span class="n">label_path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">color_mean</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">color_std</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">seg_classes</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">img</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">data_path</span><span class="p">,</span> <span class="n">label_path</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns the length of the dataset. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">length</span>
+
+    <span class="k">def</span> <span class="nf">get_color_encoding</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">seg_classes</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;nyu40&#39;</span><span class="p">:</span>
+            <span class="sd">&quot;&quot;&quot;Color palette for nyu40 labels &quot;&quot;&quot;</span>
+            <span class="k">return</span> <span class="n">OrderedDict</span><span class="p">([</span>
+                <span class="p">(</span><span class="s1">&#39;unlabeled&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;wall&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">174</span><span class="p">,</span> <span class="mi">199</span><span class="p">,</span> <span class="mi">232</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;floor&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">152</span><span class="p">,</span> <span class="mi">223</span><span class="p">,</span> <span class="mi">138</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;cabinet&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">31</span><span class="p">,</span> <span class="mi">119</span><span class="p">,</span> <span class="mi">180</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;bed&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">187</span><span class="p">,</span> <span class="mi">120</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;chair&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">188</span><span class="p">,</span> <span class="mi">189</span><span class="p">,</span> <span class="mi">34</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;sofa&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">140</span><span class="p">,</span> <span class="mi">86</span><span class="p">,</span> <span class="mi">75</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;table&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">152</span><span class="p">,</span> <span class="mi">150</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;door&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">214</span><span class="p">,</span> <span class="mi">39</span><span class="p">,</span> <span class="mi">40</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;window&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">197</span><span class="p">,</span> <span class="mi">176</span><span class="p">,</span> <span class="mi">213</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;bookshelf&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">148</span><span class="p">,</span> <span class="mi">103</span><span class="p">,</span> <span class="mi">189</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;picture&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">196</span><span class="p">,</span> <span class="mi">156</span><span class="p">,</span> <span class="mi">148</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;counter&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">23</span><span class="p">,</span> <span class="mi">190</span><span class="p">,</span> <span class="mi">207</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;blinds&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">178</span><span class="p">,</span> <span class="mi">76</span><span class="p">,</span> <span class="mi">76</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;desk&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">247</span><span class="p">,</span> <span class="mi">182</span><span class="p">,</span> <span class="mi">210</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;shelves&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">66</span><span class="p">,</span> <span class="mi">188</span><span class="p">,</span> <span class="mi">102</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;curtain&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">219</span><span class="p">,</span> <span class="mi">219</span><span class="p">,</span> <span class="mi">141</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;dresser&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">140</span><span class="p">,</span> <span class="mi">57</span><span class="p">,</span> <span class="mi">197</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;pillow&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">202</span><span class="p">,</span> <span class="mi">185</span><span class="p">,</span> <span class="mi">52</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;mirror&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">51</span><span class="p">,</span> <span class="mi">176</span><span class="p">,</span> <span class="mi">203</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;floormat&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">54</span><span class="p">,</span> <span class="mi">131</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;clothes&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">92</span><span class="p">,</span> <span class="mi">193</span><span class="p">,</span> <span class="mi">61</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;ceiling&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">78</span><span class="p">,</span> <span class="mi">71</span><span class="p">,</span> <span class="mi">183</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;books&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">172</span><span class="p">,</span> <span class="mi">114</span><span class="p">,</span> <span class="mi">82</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;refrigerator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">127</span><span class="p">,</span> <span class="mi">14</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;television&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">91</span><span class="p">,</span> <span class="mi">163</span><span class="p">,</span> <span class="mi">138</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;paper&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">153</span><span class="p">,</span> <span class="mi">98</span><span class="p">,</span> <span class="mi">156</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;towel&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">140</span><span class="p">,</span> <span class="mi">153</span><span class="p">,</span> <span class="mi">101</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;showercurtain&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">158</span><span class="p">,</span> <span class="mi">218</span><span class="p">,</span> <span class="mi">229</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;box&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">125</span><span class="p">,</span> <span class="mi">154</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;whiteboard&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">178</span><span class="p">,</span> <span class="mi">127</span><span class="p">,</span> <span class="mi">135</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;person&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">120</span><span class="p">,</span> <span class="mi">185</span><span class="p">,</span> <span class="mi">128</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;nightstand&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">146</span><span class="p">,</span> <span class="mi">111</span><span class="p">,</span> <span class="mi">194</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;toilet&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">44</span><span class="p">,</span> <span class="mi">160</span><span class="p">,</span> <span class="mi">44</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;sink&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">112</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">144</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;lamp&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">96</span><span class="p">,</span> <span class="mi">207</span><span class="p">,</span> <span class="mi">209</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;bathtub&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">227</span><span class="p">,</span> <span class="mi">119</span><span class="p">,</span> <span class="mi">194</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;bag&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">213</span><span class="p">,</span> <span class="mi">92</span><span class="p">,</span> <span class="mi">176</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;otherstructure&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">94</span><span class="p">,</span> <span class="mi">106</span><span class="p">,</span> <span class="mi">211</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;otherfurniture&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">82</span><span class="p">,</span> <span class="mi">84</span><span class="p">,</span> <span class="mi">163</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;otherprop&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">85</span><span class="p">,</span> <span class="mi">144</span><span class="p">)),</span>
+            <span class="p">])</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">seg_classes</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;scannet20&#39;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">OrderedDict</span><span class="p">([</span>
+                <span class="p">(</span><span class="s1">&#39;unlabeled&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;wall&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">174</span><span class="p">,</span> <span class="mi">199</span><span class="p">,</span> <span class="mi">232</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;floor&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">152</span><span class="p">,</span> <span class="mi">223</span><span class="p">,</span> <span class="mi">138</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;cabinet&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">31</span><span class="p">,</span> <span class="mi">119</span><span class="p">,</span> <span class="mi">180</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;bed&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">187</span><span class="p">,</span> <span class="mi">120</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;chair&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">188</span><span class="p">,</span> <span class="mi">189</span><span class="p">,</span> <span class="mi">34</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;sofa&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">140</span><span class="p">,</span> <span class="mi">86</span><span class="p">,</span> <span class="mi">75</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;table&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">152</span><span class="p">,</span> <span class="mi">150</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;door&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">214</span><span class="p">,</span> <span class="mi">39</span><span class="p">,</span> <span class="mi">40</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;window&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">197</span><span class="p">,</span> <span class="mi">176</span><span class="p">,</span> <span class="mi">213</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;bookshelf&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">148</span><span class="p">,</span> <span class="mi">103</span><span class="p">,</span> <span class="mi">189</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;picture&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">196</span><span class="p">,</span> <span class="mi">156</span><span class="p">,</span> <span class="mi">148</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;counter&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">23</span><span class="p">,</span> <span class="mi">190</span><span class="p">,</span> <span class="mi">207</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;desk&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">247</span><span class="p">,</span> <span class="mi">182</span><span class="p">,</span> <span class="mi">210</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;curtain&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">219</span><span class="p">,</span> <span class="mi">219</span><span class="p">,</span> <span class="mi">141</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;refrigerator&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">127</span><span class="p">,</span> <span class="mi">14</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;showercurtain&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">158</span><span class="p">,</span> <span class="mi">218</span><span class="p">,</span> <span class="mi">229</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;toilet&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">44</span><span class="p">,</span> <span class="mi">160</span><span class="p">,</span> <span class="mi">44</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;sink&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">112</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">144</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;bathtub&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">227</span><span class="p">,</span> <span class="mi">119</span><span class="p">,</span> <span class="mi">194</span><span class="p">)),</span>
+                <span class="p">(</span><span class="s1">&#39;otherfurniture&#39;</span><span class="p">,</span> <span class="p">(</span><span class="mi">82</span><span class="p">,</span> <span class="mi">84</span><span class="p">,</span> <span class="mi">163</span><span class="p">)),</span>
+            <span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">get_filenames_scannet</span><span class="p">(</span><span class="n">base_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">scene_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Helper function that returns a list of scannet images and the</span>
+<span class="sd">        corresponding segmentation labels, given a base directory name</span>
+<span class="sd">        and a scene id.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">        base_dir (str): Path to the base directory containing ScanNet</span>
+<span class="sd">            data, in the directory structure specified in</span>
+<span class="sd">            https://github.com/angeladai/3DMV/tree/master/prepare_data</span>
+<span class="sd">        scene_id (str): ScanNet scene id</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">base_dir</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\&#39;</span><span class="si">{0}</span><span class="se">\&#39;</span><span class="s1"> is not a directory.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">base_dir</span><span class="p">))</span>
+
+        <span class="n">color_images</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">depth_images</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Explore the directory tree to get a list of all files</span>
+        <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                                      <span class="n">base_dir</span><span class="p">,</span> <span class="n">scene_id</span><span class="p">,</span> <span class="s1">&#39;color&#39;</span><span class="p">)):</span>
+            <span class="n">files</span> <span class="o">=</span> <span class="n">natsorted</span><span class="p">(</span><span class="n">files</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+                <span class="n">filename</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+                <span class="n">depthfile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">base_dir</span><span class="p">,</span> <span class="n">scene_id</span><span class="p">,</span> <span class="s1">&#39;depth&#39;</span><span class="p">,</span>
+                    <span class="n">filename</span> <span class="o">+</span> <span class="s1">&#39;.png&#39;</span><span class="p">)</span>
+                <span class="n">labelfile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">base_dir</span><span class="p">,</span> <span class="n">scene_id</span><span class="p">,</span> <span class="s1">&#39;label&#39;</span><span class="p">,</span>
+                    <span class="n">filename</span> <span class="o">+</span> <span class="s1">&#39;.png&#39;</span><span class="p">)</span>
+                <span class="c1"># Add this file to the list of train samples, only if its</span>
+                <span class="c1"># corresponding depth and label files exist.</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">depthfile</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">labelfile</span><span class="p">):</span>
+                    <span class="n">color_images</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">base_dir</span><span class="p">,</span> <span class="n">scene_id</span><span class="p">,</span>
+                        <span class="s1">&#39;color&#39;</span><span class="p">,</span> <span class="n">filename</span> <span class="o">+</span> <span class="s1">&#39;.jpg&#39;</span><span class="p">))</span>
+                    <span class="n">depth_images</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">depthfile</span><span class="p">)</span>
+                    <span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">labelfile</span><span class="p">)</span>
+
+        <span class="c1"># Assert that we have the same number of color, depth images as labels</span>
+        <span class="k">assert</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">color_images</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">depth_images</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">color_images</span><span class="p">,</span> <span class="n">depth_images</span><span class="p">,</span> <span class="n">labels</span>
+
+    <span class="k">def</span> <span class="nf">get_files</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">folder</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">name_filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                  <span class="n">extension_filter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Helper function that returns the list of files in a specified folder</span>
+<span class="sd">        with a specified extension.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">        folder (str): The path to a folder.</span>
+<span class="sd">        name_filter (str, optional): The returned files must contain</span>
+<span class="sd">            this substring in their filename (default: None, files are</span>
+<span class="sd">            not filtered).</span>
+<span class="sd">        extension_filter (str, optional): The desired file extension</span>
+<span class="sd">            (default: None; files are not filtered).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">folder</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\&quot;</span><span class="si">{0}</span><span class="se">\&quot;</span><span class="s2"> is not a folder.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">folder</span><span class="p">))</span>
+
+        <span class="c1"># Filename filter: if not specified don&#39;t filter (condition always</span>
+        <span class="c1"># true); otherwise, use a lambda expression to filter out files that</span>
+        <span class="c1"># do not contain &quot;name_filter&quot;</span>
+        <span class="k">if</span> <span class="n">name_filter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># This looks hackish...there is probably a better way</span>
+            <span class="n">name_cond</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">filename</span><span class="p">:</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">name_cond</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">filename</span><span class="p">:</span> <span class="n">name_filter</span> <span class="ow">in</span> <span class="n">filename</span>
+
+        <span class="c1"># Extension filter: if not specified don&#39;t filter (condition always</span>
+        <span class="c1"># true); otherwise, use a lambda expression to filter out files whose</span>
+        <span class="c1"># extension is not &quot;extension_filter&quot;</span>
+        <span class="k">if</span> <span class="n">extension_filter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># This looks hackish...there is probably a better way</span>
+            <span class="n">ext_cond</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">filename</span><span class="p">:</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ext_cond</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">filename</span><span class="p">:</span> <span class="n">filename</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">extension_filter</span><span class="p">)</span>
+
+        <span class="n">filtered_files</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Explore the directory tree to get files that contain &quot;name_filter&quot;</span>
+        <span class="c1"># and with extension &quot;extension_filter&quot;</span>
+        <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">folder</span><span class="p">):</span>
+            <span class="n">files</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">name_cond</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="ow">and</span> <span class="n">ext_cond</span><span class="p">(</span><span class="n">file</span><span class="p">):</span>
+                    <span class="n">full_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">file</span><span class="p">)</span>
+                    <span class="n">filtered_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">full_path</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">filtered_files</span>
+
+    <span class="k">def</span> <span class="nf">scannet_loader</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">label_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                       <span class="n">color_mean</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.</span><span class="p">,</span><span class="mf">0.</span><span class="p">,</span><span class="mf">0.</span><span class="p">],</span>
+                       <span class="n">color_std</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.</span><span class="p">,</span><span class="mf">1.</span><span class="p">,</span><span class="mf">1.</span><span class="p">],</span>
+                       <span class="n">seg_classes</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;nyu40&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Loads a sample and label image given their path as PIL images</span>
+<span class="sd">        (nyu40 classes).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">        data_path (str): The filepath to the image.</span>
+<span class="sd">        label_path (str): The filepath to the ground-truth image.</span>
+<span class="sd">        color_mean (str): R, G, B channel-wise mean</span>
+<span class="sd">        color_std (str): R, G, B channel-wise stddev</span>
+<span class="sd">        seg_classes (str): Palette of classes to load labels for</span>
+<span class="sd">            (&#39;nyu40&#39; or &#39;scannet20&#39;)</span>
+
+<span class="sd">        Returns the image and the label as PIL images.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Load image.</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">imageio</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">data_path</span><span class="p">))</span>
+        <span class="c1"># Reshape data from H x W x C to C x H x W.</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># Define normalizing transform.</span>
+        <span class="n">normalize</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">(</span><span class="n">mean</span><span class="o">=</span><span class="n">color_mean</span><span class="p">,</span> <span class="n">std</span><span class="o">=</span><span class="n">color_std</span><span class="p">)</span>
+        <span class="c1"># Convert image to float and map range from [0, 255] to [0.0, 1.0].</span>
+        <span class="c1"># Then normalize.</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">/</span> <span class="mf">255.0</span><span class="p">))</span>
+
+        <span class="c1"># Load label.</span>
+        <span class="k">if</span> <span class="n">seg_classes</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;nyu40&#39;</span><span class="p">:</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">imageio</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">label_path</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">seg_classes</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;scannet20&#39;</span><span class="p">:</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">imageio</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">label_path</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="c1"># Remap classes from &#39;nyu40&#39; to &#39;scannet20&#39;</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nyu40_to_scannet20</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">label</span>
+
+
+    <span class="k">def</span> <span class="nf">scannet_loader_depth</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">depth_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                             <span class="n">label_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                             <span class="n">color_mean</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.</span><span class="p">,</span><span class="mf">0.</span><span class="p">,</span><span class="mf">0.</span><span class="p">],</span>
+                             <span class="n">color_std</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.</span><span class="p">,</span><span class="mf">1.</span><span class="p">,</span><span class="mf">1.</span><span class="p">],</span>
+                             <span class="n">seg_classes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;nyu40&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Loads a sample and label image given their path as PIL images</span>
+<span class="sd">        (nyu40 classes).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">        data_path (str): The filepath to the image.</span>
+<span class="sd">        depth_path (str): The filepath to the depth png.</span>
+<span class="sd">        label_path (str): The filepath to the ground-truth image.</span>
+<span class="sd">        color_mean (list): R, G, B channel-wise mean.</span>
+<span class="sd">        color_std (list): R, G, B channel-wise stddev.</span>
+<span class="sd">        seg_classes (str): Palette of classes to load labels for</span>
+<span class="sd">            (&#39;nyu40&#39; or &#39;scannet20&#39;).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (PIL.Image): the image</span>
+<span class="sd">            (PIL.Image): the label as PIL images.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># Load image</span>
+        <span class="n">rgb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">imageio</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">data_path</span><span class="p">))</span>
+        <span class="c1"># Reshape rgb from H x W x C to C x H x W</span>
+        <span class="n">rgb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">rgb</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># Define normalizing transform</span>
+        <span class="n">normalize</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">(</span><span class="n">mean</span><span class="o">=</span><span class="n">color_mean</span><span class="p">,</span> <span class="n">std</span><span class="o">=</span><span class="n">color_std</span><span class="p">)</span>
+        <span class="c1"># Convert image to float and map range from [0, 255] to [0.0, 1.0].</span>
+        <span class="c1"># Then normalize.</span>
+        <span class="n">rgb</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="n">rgb</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">/</span> <span class="mf">255.0</span><span class="p">))</span>
+
+        <span class="c1"># Load depth</span>
+        <span class="n">depth</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">imageio</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">depth_path</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1000.0</span><span class="p">)</span>
+        <span class="n">depth</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">depth</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># Concatenate rgb and depth</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">rgb</span><span class="p">,</span> <span class="n">depth</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># Load label</span>
+        <span class="k">if</span> <span class="n">seg_classes</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;nyu40&#39;</span><span class="p">:</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">imageio</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">label_path</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">seg_classes</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;scannet20&#39;</span><span class="p">:</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">imageio</span><span class="o">.</span><span class="n">imread</span><span class="p">(</span><span class="n">label_path</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+            <span class="c1"># Remap classes from &#39;nyu40&#39; to &#39;scannet20&#39;</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nyu40_to_scannet20</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">label</span>
+
+
+    <span class="k">def</span> <span class="nf">nyu40_to_scannet20</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Remap a label image from the &#39;nyu40&#39; class palette to the</span>
+<span class="sd">        &#39;scannet20&#39; class palette &quot;&quot;&quot;</span>
+
+        <span class="c1"># Ignore indices 13, 15, 17, 18, 19, 20, 21, 22, 23, 25, 26. 27. 29.</span>
+        <span class="c1"># 30. 31. 32, 35. 37. 38, 40</span>
+        <span class="c1"># Because, these classes from &#39;nyu40&#39; are absent from &#39;scannet20&#39;.</span>
+        <span class="c1"># Our label files are in &#39;nyu40&#39; format, hence this &#39;hack&#39;.</span>
+        <span class="c1"># To see detailed class lists visit:</span>
+        <span class="c1"># http://kaldir.vc.in.tum.de/scannet_benchmark/labelids_all.txt</span>
+        <span class="c1"># (for &#39;nyu40&#39; labels), and</span>
+        <span class="c1"># http://kaldir.vc.in.tum.de/scannet_benchmark/labelids.txt</span>
+        <span class="c1"># (for &#39;scannet20&#39; labels).</span>
+        <span class="c1"># The remaining labels are then to be mapped onto a contiguous</span>
+        <span class="c1"># ordering in the range [0,20].</span>
+
+        <span class="c1"># The remapping array comprises tuples (src, tar), where &#39;src&#39;</span>
+        <span class="c1"># is the &#39;nyu40&#39; label, and &#39;tar&#39; is the corresponding target</span>
+        <span class="c1"># &#39;scannet20&#39; label.</span>
+        <span class="n">remapping</span> <span class="o">=</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">13</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">17</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">18</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">19</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                     <span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">21</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">22</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">23</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">25</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">26</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                     <span class="p">(</span><span class="mi">27</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">29</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">31</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">35</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
+                     <span class="p">(</span><span class="mi">37</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">38</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mi">13</span><span class="p">),</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">14</span><span class="p">),</span> <span class="p">(</span><span class="mi">24</span><span class="p">,</span> <span class="mi">15</span><span class="p">),</span>
+                     <span class="p">(</span><span class="mi">28</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span> <span class="p">(</span><span class="mi">33</span><span class="p">,</span> <span class="mi">17</span><span class="p">),</span> <span class="p">(</span><span class="mi">34</span><span class="p">,</span> <span class="mi">18</span><span class="p">),</span> <span class="p">(</span><span class="mi">36</span><span class="p">,</span> <span class="mi">19</span><span class="p">),</span> <span class="p">(</span><span class="mi">39</span><span class="p">,</span> <span class="mi">20</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">src</span><span class="p">,</span> <span class="n">tar</span> <span class="ow">in</span> <span class="n">remapping</span><span class="p">:</span>
+            <span class="n">label</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">label</span><span class="o">==</span><span class="n">src</span><span class="p">)]</span> <span class="o">=</span> <span class="n">tar</span>
+        <span class="k">return</span> <span class="n">label</span>
+
+    <span class="k">def</span> <span class="nf">create_label_image</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">color_palette</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a label image, given a network output (each pixel contains</span>
+<span class="sd">        # class index) and a color palette.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">        output (np.array, dtype = np.uint8): Output image. Height x Width.</span>
+<span class="sd">            Each pixel contains an integer, corresponding to the class label</span>
+<span class="sd">            for that pixel.</span>
+<span class="sd">        color_palette (OrderedDict): Contains (R, G, B) colors (uint8)</span>
+<span class="sd">            for each class.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">label_image</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">output</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">3</span><span class="p">),</span>
+                               <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">color</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">color_palette</span><span class="p">):</span>
+            <span class="n">label_image</span><span class="p">[</span><span class="n">output</span><span class="o">==</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">color</span>
+        <span class="k">return</span> <span class="n">label_image</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
