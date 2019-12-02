@@ -232,8 +232,9 @@ class ShapeNet_Images(data.Dataset):
         torch.Size([10, 4, 137, 137])
     """
 
-    def __init__(self, root: str, categories: list=['chair'], train: bool=True,
-                 split: float=.7, views: int=24, transform=None):
+    def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
+                 split: float = .7, views: int = 23, transform=None,
+                 no_progress: bool = False):
         self.root = Path(root)
         self.synsets = _convert_categories(categories)
         self.labels = [synset_to_label[s] for s in self.synsets]
@@ -242,15 +243,16 @@ class ShapeNet_Images(data.Dataset):
         self.names = []
         self.synset_idx = []
 
+        shapenet_img_root = self.root / 'images'
         # check if images exist
-        if not self.root.exists():
+        if not shapenet_img_root.exists():
             raise ValueError('ShapeNet images were not found at location {0}.'.format(
-                str(self.root)))
+                str(shapenet_img_root)))
 
         # find all needed images
-        for i in range(len(self.synsets)):
+        for i in tqdm(range(len(self.synsets)), disable=no_progress):
             syn = self.synsets[i]
-            class_target = self.root / syn
+            class_target = shapenet_img_root / syn
             assert class_target.exists(), \
                 "ShapeNet class, {0}, is not found".format(syn)
 
@@ -272,7 +274,7 @@ class ShapeNet_Images(data.Dataset):
         """Returns the item at index idx. """
         data = dict()
         attributes = dict()
-        img_name = self.names[index]
+        name = self.names[index]
         view_num = random.randrange(0, self.views)
         # load and process image
         img = Image.open(str(img_name / f'rendering/{view_num:02}.png'))
@@ -286,7 +288,7 @@ class ShapeNet_Images(data.Dataset):
         # load and process camera parameters
         param_location = img_name / 'rendering/rendering_metadata.txt'
         azimuth, elevation, _, distance, _ = np.loadtxt(param_location)[view_num]
-        cam_params = kal.mathutils.geometry.transformations.compute_camera_params(
+        cam_params = kal.math.geometry.transformations.compute_camera_params(
             azimuth, elevation, distance)
 
         data['images'] = img
@@ -296,8 +298,8 @@ class ShapeNet_Images(data.Dataset):
         data['params']['azi'] = azimuth
         data['params']['elevation'] = elevation
         data['params']['distance'] = distance
-        attributes['name'] = img_name
-        attributes['synset'] = self.synsets[self.synset_idx[index]]
+        attributes['name'] = name
+        attributes['synset'] = self.synsets[synset_idx]
         attributes['label'] = self.labels[self.synset_idx[index]]
         return {'data': data, 'attributes': attributes}
 

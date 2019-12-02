@@ -19,6 +19,9 @@ from torch import nn
 from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 
+import torch
+from torch.nn import Parameter
+
 
 # from torch_geometric.nn import GCNConv
 
@@ -37,7 +40,7 @@ class VGG(nn.Module):
             nn.ReLU(inplace=True))
 
         self.layer3 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=3, padding=1, stride=2),
+            nn.Conv2d(16, 32, kernel_size=3, padding=1, stride = 2),
             nn.BatchNorm2d(32), 
             nn.ReLU(inplace=True))
 
@@ -52,7 +55,7 @@ class VGG(nn.Module):
             nn.ReLU(inplace=True))
 
         self.layer6 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, padding=1, stride=2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1, stride = 2),
             nn.BatchNorm2d(64), 
             nn.ReLU(inplace=True))
 
@@ -67,7 +70,7 @@ class VGG(nn.Module):
             nn.ReLU(inplace=True))
 
         self.layer9 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=3, padding=1, stride=2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1, stride = 2),
             nn.BatchNorm2d(128),    
             nn.ReLU(inplace=True))
 
@@ -82,7 +85,7 @@ class VGG(nn.Module):
             nn.ReLU(inplace=True))
 
         self.layer12 = nn.Sequential(
-            nn.Conv2d(128, 256, kernel_size=3, padding=1, stride=2),
+            nn.Conv2d(128, 256, kernel_size=3, padding=1, stride = 2),
             nn.BatchNorm2d(256),    
             nn.ReLU(inplace=True))
 
@@ -91,13 +94,14 @@ class VGG(nn.Module):
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True))
 
+    
         self.layer14 = nn.Sequential(
             nn.Conv2d(256, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True))
 
         self.layer15 = nn.Sequential(
-            nn.Conv2d(256, 512, kernel_size=3, padding=1, stride=2),
+            nn.Conv2d(256, 512, kernel_size=3, padding=1, stride = 2),
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True))
 
@@ -139,11 +143,11 @@ class VGG(nn.Module):
         x = self.layer17(x)
         D = self.layer18(x)
 
-        return [A, B, C, D]
+        return [A,B,C,D]
 
 
 class G_Res_Net(nn.Module):
-    def __init__(self, input_features, hidden=192, output_features=3):
+    def __init__(self, input_features, hidden = 192, output_features = 3):
         super(G_Res_Net, self).__init__()
         self.gc1 = ZNGCN(input_features, hidden)
         self.gc2 = ZNGCN(hidden, hidden)
@@ -158,10 +162,10 @@ class G_Res_Net(nn.Module):
         self.gc11 = ZNGCN(hidden , hidden)
         self.gc12 = ZNGCN(hidden, hidden)
         self.gc13 = ZNGCN(hidden , hidden)
-        self.gc14 = ZNGCN(hidden, output_features)
+        self.gc14 = ZNGCN(hidden,  output_features)
         self.hidden = hidden
-
     def forward(self, features, adj):
+
         x = (F.relu(self.gc1(features, adj)))
         x = (F.relu(self.gc2(x, adj)))
         features = features[..., :self.hidden] + x
@@ -202,7 +206,14 @@ class G_Res_Net(nn.Module):
         features /= 2.
 
         coords = (self.gc14(features, adj))
-        return coords, features
+        return coords,features
+
+
+
+
+
+
+
 
 
 class ZNGCN(nn.Module):
@@ -223,7 +234,7 @@ class ZNGCN(nn.Module):
 
     def reset_parameters(self):
         stdv = 6. / math.sqrt((self.weight1.size(1) + self.weight1.size(0)))
-        stdv *= .6
+        stdv*= .6
 
 
         # stdv = math.sqrt(6. / (self.weight1.size(1) + self.weight1.size(0)))
@@ -233,27 +244,32 @@ class ZNGCN(nn.Module):
             self.bias.data.uniform_(-.1, .1)
 
     def forward(self, input, adj):
+        
         support = torch.mm(input, self.weight1)
-        side_len = max(support.shape[1] // 3, 2)
+        side_len = max(support.shape[1]//3, 2)
         if adj.type() == 'torch.cuda.sparse.FloatTensor': 
-
-            norm = torch.sparse.mm(adj, torch.ones((support.shape[0], 1)).cuda())
-            normalized_support = support[:, :side_len] / norm
+         
+            norm = torch.sparse.mm(adj,torch.ones((support.shape[0], 1)).cuda())
+            normalized_support = support[:, :side_len] /norm
             side_1 = torch.sparse.mm(adj, normalized_support)
         else: 
             side_1 = torch.mm(adj, support[:, :side_len])
-
-        side_2 = support[:, side_len:]
-        output = torch.cat((side_1, side_2), dim=1)
-
+        
+        side_2 = support[:,side_len: ]
+        output = torch.cat((side_1, side_2), dim = 1)
+        
         if self.bias is not None:
             output = output + self.bias
         return output
 
     def __repr__(self):
         return self.__class__.__name__ + ' (' \
-            + str(self.in_features) + ' -> ' \
-            + str(self.out_features) + ')'
+               + str(self.in_features) + ' -> ' \
+               + str(self.out_features) + ')'
+
+
+
+
 
 
 class MeshEncoder(nn.Module):
@@ -263,7 +279,7 @@ class MeshEncoder(nn.Module):
         self.h21 = ZNGCN(60, 60)
         self.h22 = ZNGCN(60, 60)
         self.h23 = ZNGCN(60, 60)
-        self.h24 = ZNGCN(60, 120)
+        self.h24 = ZNGCN(60,120)
         self.h3 = ZNGCN(120, 120)
         self.h4 = ZNGCN(120, 120)
         self.h41 = ZNGCN(120, 150)
@@ -275,15 +291,14 @@ class MeshEncoder(nn.Module):
         self.h9 = ZNGCN(300, 300)
         self.h10 = ZNGCN(300, 300)
         self.h11 = ZNGCN(300, 300)
-        self.reduce = ZNGCN(300, latent_length) 
-
-    def resnet(self, features, res):
-        temp = features[:, :res.shape[1]]
+        self.reduce = ZNGCN(300,latent_length) 
+    def resnet( self, features, res):
+        temp = features[:,:res.shape[1]]
         temp = temp + res
-        features = torch.cat((temp, features[:, res.shape[1]:]), dim=1)
+        features = torch.cat((temp,features[:,res.shape[1]:]), dim = 1)
         return features, features
 
-    def forward(self, positions, adj):
+    def forward(self, positions,  adj):
         res = positions
         features = F.elu(self.h1(positions, adj))
         features = F.elu(self.h21(features, adj))
@@ -301,9 +316,10 @@ class MeshEncoder(nn.Module):
         features = F.elu(self.h9(features, adj))
         features = F.elu(self.h10(features, adj))
         features = F.elu(self.h11(features, adj))
+            
 
         latent = F.elu(self.reduce(features , adj))  
-        latent = (torch.max(latent, dim=0)[0])      
+        latent = (torch.max(latent, dim = 0)[0])      
         return latent
 
 
@@ -311,32 +327,32 @@ class VoxelDecoder(nn.Module):
     def __init__(self, latent_length): 
         super(VoxelDecoder, self).__init__()
         self.fully = torch.nn.Sequential(
-            torch.nn.Linear(latent_length, 512)
-        )
+              torch.nn.Linear(latent_length, 512)
+            )
 
         self.model = torch.nn.Sequential(
-            torch.nn.ConvTranspose3d(64, 64, 4, stride=2, padding=(1, 1, 1), ), 
+            torch.nn.ConvTranspose3d( 64, 64, 4, stride=2, padding=(1, 1, 1), ), 
             nn.BatchNorm3d(64),
             nn.ELU(inplace=True),
 
-            torch.nn.ConvTranspose3d(64, 64, 4, stride=2, padding=(1, 1, 1)), 
+            torch.nn.ConvTranspose3d( 64, 64, 4, stride=2, padding=(1, 1, 1)), 
             nn.BatchNorm3d(64),
             nn.ELU(inplace=True),
 
-            torch.nn.ConvTranspose3d(64, 32, 4, stride=2, padding=(1, 1, 1)), 
+            torch.nn.ConvTranspose3d( 64, 32, 4, stride=2, padding=(1, 1, 1)), 
             nn.BatchNorm3d(32),
             nn.ELU(inplace=True),
 
-            torch.nn.ConvTranspose3d(32, 8, 4, stride=2, padding=(1, 1, 1)), 
+            torch.nn.ConvTranspose3d( 32, 8, 4, stride=2, padding=(1, 1, 1)), 
             nn.BatchNorm3d(8),
             nn.ELU(inplace=True),
 
             nn.Conv3d(8, 1, (3, 3, 3), stride=1, padding=(1, 1, 1))
-        )
+            )
 
 
     def forward(self, latent):
-        decode = self.fully(latent).view(-1, 64, 2, 2, 2)
-        decode = self.model(decode).reshape(-1, 32, 32, 32)
-        voxels = torch.sigmoid(decode)
+        decode = self.fully(latent).view(-1,64, 2, 2,2)
+        decode = self.model(decode).reshape(-1,32,32,32)
+        voxels = F.sigmoid(decode)
         return voxels
