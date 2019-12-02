@@ -24,17 +24,15 @@ from torch.utils.data import DataLoader
 from kaolin.datasets import shapenet
 
 
-SHAPENET_ROOT = '/data/ShapeNet/'
-SHAPENET_RENDERING_ROOT = '/data/ShapeNetRendering'
+SHAPENET_ROOT = 'data/ShapeNet/'
 CACHE_DIR = 'tests/datasets/cache'
 
 
 # Tests below can only be run is a ShapeNet dataset is available
-SHAPENET_NOT_FOUND = 'ShapeNet not found at default location: {}'.format(SHAPENET_ROOT)
-SHAPENET_RENDERING_NOT_FOUND = 'ShapeNetRendering not found at default location: {}'.format(
-    SHAPENET_RENDERING_ROOT)
+REASON = 'ShapeNet not found at default location: {}'.format(SHAPENET_ROOT)
 
-@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=SHAPENET_NOT_FOUND)
+
+@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=REASON)
 def test_Meshes():
     meshes1 = shapenet.ShapeNet_Meshes(root=SHAPENET_ROOT,
                                        categories=['can'], train=True, split=.7)
@@ -48,7 +46,7 @@ def test_Meshes():
     assert len(meshes2) > len(meshes1)
 
 
-@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=SHAPENET_NOT_FOUND)
+@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=REASON)
 def test_Voxels():
     voxels = shapenet.ShapeNet_Voxels(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
                                       categories=['can'], train=True, split=.7, resolutions=[32])
@@ -65,25 +63,19 @@ def test_Voxels():
 
     shutil.rmtree('tests/datasets/cache/voxels')
 
-@pytest.mark.parametrize('categories', [['chair'], ['plane', 'bench', 'cabinet', 'car', 'chair',
-                                                    'monitor', 'lamp', 'speaker', 'rifle',
-                                                    'sofa', 'table', 'phone', 'watercraft']])
-@pytest.mark.skipif(not Path(SHAPENET_RENDERING_ROOT).exists(),
-                    reason=SHAPENET_RENDERING_NOT_FOUND)
-def test_Images(categories):
-    images = shapenet.ShapeNet_Images(root=SHAPENET_RENDERING_ROOT,
-                                      categories=categories, views=24, train=True, split=.7)
-    if categories == ['chair']:
-        assert len(images) == 4744
-    else:
-        assert len(images) == 30644
-    for obj in images:
-        assert list(obj['data']['images'].shape) == [4, 137, 137]
-        assert os.path.isfile(obj['attributes']['name'] / 'rendering/00.png')
-        assert list(obj['data']['params']['cam_mat'].shape) == [3, 3]
-        assert list(obj['data']['params']['cam_pos'].shape) == [3]
 
-@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=SHAPENET_NOT_FOUND)
+# def test_Images():
+#     images = shapenet.ShapeNet_Images(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
+#                                       categories=['phone'], views=1, train=True, split=.7)
+#     assert len(images) == 736
+#     for obj in images:
+#         assert set(obj['data']['images'].shape) == set([137, 137, 4])
+#         assert os.path.isfile(obj['attributes']['name'] + '/rendering/00.png')
+#         assert set(obj['data']['params']['cam_mat'].shape) == set([3, 3])
+#         assert set(obj['data']['params']['cam_pos'].shape) == set([3])
+
+
+@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=REASON)
 def test_Surface_Meshes():
     surface_meshes = shapenet.ShapeNet_Surface_Meshes(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
                                                       categories=['can'], train=True, split=.1,
@@ -112,7 +104,7 @@ def test_Surface_Meshes():
     shutil.rmtree('tests/datasets/cache/surface_meshes')
 
 
-@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=SHAPENET_NOT_FOUND)
+@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=REASON)
 def test_Points():
     points = shapenet.ShapeNet_Points(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
                                       categories=['can'], train=True, split=.1,
@@ -145,7 +137,7 @@ def test_Points():
     shutil.rmtree('tests/datasets/cache/surface_meshes')
 
 
-@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=SHAPENET_NOT_FOUND)
+@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=REASON)
 def test_SDF_Points():
     sdf_points = shapenet.ShapeNet_SDF_Points(root=SHAPENET_ROOT, cache_dir=CACHE_DIR,
                                               categories=['can'], train=True, split=.1,
@@ -178,7 +170,7 @@ def test_SDF_Points():
     shutil.rmtree('tests/datasets/cache/surface_meshes')
 
 
-@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=SHAPENET_NOT_FOUND)
+@pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=REASON)
 def test_Combination():
     dataset_params = {
         'root': SHAPENET_ROOT,
