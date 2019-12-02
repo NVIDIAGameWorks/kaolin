@@ -33,7 +33,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--shapenet-root', type=str, help='Root directory of the ShapeNet dataset.')
 parser.add_argument('--shapenet-rendering-root', type=str, help='Root directory of the ShapeNet Rendering dataset.')
 parser.add_argument('--cache-dir', type=str, default=None, help='Path to write intermediate representation to.')
-parser.add_argument('--expid', type=str, default='Direct', help='Unique experiment identifier.')
+parser.add_argument('--expid', type=str, default='Direct', help='Unique experiment identifier. If using latent-loss, '
+    'must be the same expid used during auto-encoder training.')
 parser.add_argument('--device', type=str, default='cuda', help='Device to use')
 parser.add_argument('--categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
 parser.add_argument('--epochs', type=int, default=50, help='Number of train epochs.')
@@ -57,11 +58,12 @@ if args.latent_loss:
     mesh_set = shapenet.ShapeNet_Surface_Meshes(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
                                                 resolution=32, train=True, split=.7, mode='Tri')
     train_set = shapenet.ShapeNet_Combination([points_set, images_set, mesh_set])
+    dataloader_train = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn,
+                                  num_workers=8)
 else: 
     train_set = shapenet.ShapeNet_Combination([points_set, images_set])
-
-dataloader_train = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,
-                              num_workers=8)
+    dataloader_train = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,
+                                  num_workers=8)
 
 
 points_set_valid = shapenet.ShapeNet_Points(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
@@ -73,7 +75,6 @@ valid_set = shapenet.ShapeNet_Combination([points_set_valid, images_set_valid])
 dataloader_val = DataLoader(valid_set, batch_size=args.batch_size, shuffle=False, num_workers=8)
 
 
-
 # Setup models
 meshes = setup_meshes(filename='meshes/386.obj', device=args.device)
 
@@ -82,11 +83,11 @@ mesh_update_kernels = [963, 1091, 1091]
 mesh_updates = [G_Res_Net(mesh_update_kernels[i], hidden=128, output_features=3).to(args.device) for i in range(3)]
 if args.latent_loss:
     mesh_encoder = MeshEncoder(30).to(args.device)
-    mesh_encoder.load_state_dict(torch.load('log/{}/auto_best_encoder.pth'.format(args.expid)))
+    mesh_encoder.load_state_dict(torch.load(os.path.join(args.logdir, args.expid, 'AutoEncoder/best_encoder.pth')))
 
 parameters = []
 
-for i in range(3): 
+for i in range(3):
     parameters += list(encoders[i].parameters()) 
     parameters += list(mesh_updates[i].parameters())
 optimizer = optim.Adam(parameters, lr=args.learning_rate)
@@ -115,7 +116,7 @@ class Engine(object):
     def __init__(self, print_every, resume_name='none'):
         self.cur_epoch = 0
         self.train_loss = []
-        self.val_loss = []
+        self.val_score = []
         self.bestval = 0
         self.print_every = print_every
 
@@ -140,7 +141,7 @@ class Engine(object):
             if (tgt_points.shape[0] != args.batch_size) and (inp_images.shape[0] != args.batch_size) \
                     and (cam_mat.shape[0] != args.batch_size) and (cam_pos.shape[0] != args.batch_size): 
                 continue
-            surf_loss, edge_loss, lap_loss, loss, f_loss = 0, 0, 0, 0, 0
+            surf_loss, edge_loss, lap_loss, loss, f_score = 0, 0, 0, 0, 0
 
             # Inference
             img_features = [e(inp_images) for e in encoders]
@@ -173,9 +174,9 @@ class Engine(object):
                 meshes['update'][2].vertices = (meshes['init'][2].vertices + delta.clone())
 
                 if args.latent_loss:
-                    inds = data['adj_indices'][bn]
-                    vals = data['adj_values'][bn]
-                    gt_verts = data['verts'][bn].to(args.device)
+                    inds = data['adj']['indices'][bn]
+                    vals = data['adj']['values'][bn]
+                    gt_verts = data['vertices'][bn].to(args.device)
                     vert_len = gt_verts.shape[0]
                     gt_adj = torch.sparse.FloatTensor(inds, vals, torch.Size([vert_len, vert_len])).to(args.device)
 
@@ -188,22 +189,24 @@ class Engine(object):
                 surf_loss += (6000 * loss_surf(meshes, tgt_points[bn]) / float(args.batch_size))
                 edge_loss += (300 * .6 * loss_edge(meshes) / float(args.batch_size))
                 lap_loss += (1500 * loss_lap(meshes) / float(args.batch_size))
-                f_loss += kal.metrics.point.f_score(.57 * meshes['update'][2].sample(2466)[0], .57 * tgt_points[bn],
-                                                    extend=False) / float(args.batch_size)
+
+                # F-Score
+                f_score += kal.metrics.point.f_score(.57 * meshes['update'][2].sample(2466)[0], .57 * tgt_points[bn],
+                                                     extend=False) / float(args.batch_size)
 
 
                 loss = surf_loss + edge_loss + lap_loss
                 if args.latent_loss: 
                     loss += latent_loss
             loss.backward()
-            loss_epoch += float(surf_loss.item())
+            loss_epoch += float(loss.item())
 
             # logging
             num_batches += 1
             if i % args.print_every == 0:
-                message = f'[TRAIN] Epoch {self.cur_epoch:03d}, Batch {i:03d}:, Loss: {(surf_loss.item()):4.3f}, '
-                message = message + f'Lap: {(lap_loss.item()):3.3f}, Edge: {(edge_loss.item()):3.3f}'
-                message = message + f' F: {(f_loss.item()):3.3f}'
+                message = f'[TRAIN] Epoch {self.cur_epoch:03d}, Batch {i:03d}:, Loss: {loss_epoch:4.3f}, '
+                message += f'Surf: {(surf_loss.item()):3.3f}, Lap: {(lap_loss.item()):3.3f}, '
+                message += f'Edge: {(edge_loss.item()):3.3f}, F-score: {(f_score.item()):3.3f}'
                 if args.latent_loss: 
                     message = message + f', Lat: {(latent_loss.item()):3.3f}'
                 tqdm.write(message)
@@ -219,7 +222,7 @@ class Engine(object):
         with torch.no_grad():	
             num_batches = 0
             loss_epoch = 0.
-            loss_f = 0 
+            f_score = 0 
             # Validation loop
             for i, sample in enumerate(tqdm(dataloader_val), 0):
                 data = sample['data']
@@ -269,8 +272,10 @@ class Engine(object):
 
                     # Losses
                     surf_loss = 3000 * kal.metrics.point.chamfer_distance(pred_points, tgt_points[bn])
-                    loss_f += (kal.metrics.point.f_score(.57 * meshes['update'][2].sample(2466)[0], .57 * tgt_points[bn],
-                                                         extend=False).item() / float(args.batch_size))
+
+                    # F-Score
+                    f_score += (kal.metrics.point.f_score(.57 * meshes['update'][2].sample(2466)[0], .57 * tgt_points[bn],
+                                                          extend=False).item() / float(args.batch_size))
 
                     loss_epoch += (surf_loss.item() / float(args.batch_size))
 
@@ -278,14 +283,14 @@ class Engine(object):
                 num_batches += 1
                 if i % args.print_every == 0:
                     out_loss = loss_epoch / float(num_batches)
-                    out_f_loss = loss_f / float(num_batches)
-                    tqdm.write(f'[VAL] Epoch {self.cur_epoch:03d}, Batch {i:03d}: loss: {out_loss:3.3f}, loss: {out_f_loss:3.3f}')
+                    out_f_score = f_score / float(num_batches)
+                    tqdm.write(f'[VAL] Epoch {self.cur_epoch:03d}, Batch {i:03d}: loss: {out_loss:3.3f}, F-Score: {out_f_score:3.3f}')
 
-            out_f_loss = loss_f / float(num_batches)
+            out_f_score = f_score / float(num_batches)
             out_loss = loss_epoch / float(num_batches)
-            tqdm.write(f'[VAL Total] Epoch {self.cur_epoch:03d}, Batch {i:03d}: loss: {out_loss:3.3f},  loss: {out_f_loss:3.3f}')
+            tqdm.write(f'[VAL Total] Epoch {self.cur_epoch:03d}, Batch {i:03d}: Loss: {out_loss:3.3f},  F-Score: {out_f_score:3.3f}')
 
-            self.val_loss.append(out_f_loss)
+            self.val_score.append(out_f_score)
 
     def load(self, resume_name):
         for i, e in enumerate(encoders):
@@ -302,8 +307,8 @@ class Engine(object):
 
     def save(self):
         save_best = False
-        if self.val_loss[-1] >= self.bestval:
-            self.bestval = self.val_loss[-1]
+        if self.val_score[-1] >= self.bestval:
+            self.bestval = self.val_score[-1]
             save_best = True
 
         # Create a dictionary of all data to save
@@ -311,7 +316,7 @@ class Engine(object):
             'epoch': self.cur_epoch,
             'bestval': self.bestval,
             'train_loss': self.train_loss,
-            'val_loss': self.val_loss,
+            'val_score': self.val_score,
         }
 
         # Save the recent model/optimizer states
@@ -341,6 +346,6 @@ trainer = Engine(print_every=args.print_every, resume_name=args.resume)
 
 for epoch in range(args.epochs): 
     trainer.train()
-    if epoch % args.validate_every == 0:
+    if epoch % args.val_every == 0:
         trainer.validate()
     trainer.save()
