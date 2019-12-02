@@ -25,40 +25,40 @@ from architectures import MeshEncoder, VoxelDecoder
 
 import kaolin as kal 
 from kaolin.datasets import shapenet
-"""
-Commandline arguments
-"""
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument('-expid', type=str, default='Direct', help='Unique experiment identifier.')
-parser.add_argument('-device', type=str, default='cuda', help='Device to use')
-parser.add_argument('-categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
-parser.add_argument('-epochs', type=int, default=50, help='Number of train epochs.')
-parser.add_argument('-lr', type=float, default=1e-4, help='Learning rate.')
-parser.add_argument('-val-every', type=int, default=5, help='Validation frequency (epochs).')
-parser.add_argument('-batch_size', type=int, default=25, help='batch size')
-parser.add_argument('-print-every', type=int, default=20, help='Print frequency (batches).')
-parser.add_argument('-logdir', type=str, default='log', help='Directory to log data to.')
-parser.add_argument('-save-model', action='store_true', help='Saves the model and a snapshot \
-    of the optimizer state.')
+parser.add_argument('--shapenet-root', type=str, help='Root directory of the ShapeNet dataset.')
+parser.add_argument('--cache-dir', type=str, default=None, help='Path to write intermediate representation to.')
+parser.add_argument('--expid', type=str, default='Direct', help='Unique experiment identifier.')
+parser.add_argument('--device', type=str, default='cuda', help='Device to use')
+parser.add_argument('--categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
+parser.add_argument('--epochs', type=int, default=50, help='Number of train epochs.')
+parser.add_argument('-lr', '--learning-rate', type=float, default=1e-4, help='Learning rate.')
+parser.add_argument('--val-every', type=int, default=5, help='Validation frequency (epochs).')
+parser.add_argument('--batch-size', type=int, default=25, help='batch size')
+parser.add_argument('--print-every', type=int, default=20, help='Print frequency (batches).')
+parser.add_argument('--logdir', type=str, default='log', help='Directory to log data to.')
+parser.add_argument('--resume', choices=['best', 'recent'], default=None,
+                    help='Choose which weights to resume training from (none to start from random initialization.)')
 args = parser.parse_args()
 
 
-
-# Setup Datasets
-# Training
-mesh_set = shapenet.ShapeNet.Surface_Meshes(root='../../datasets/', categories=args.categories,
+# Setup Datasets - Training
+mesh_set = shapenet.ShapeNet_Surface_Meshes(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
                                             train=True, split=.7, mode='Tri', resolution=32)
-voxel_set = shapenet.ShapeNet.Voxels(root='../../datasets/', categories=args.categories,
+voxel_set = shapenet.ShapeNet_Voxels(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
                                      train=True, split=.7, resolutions=[32])
 
-train_set = shapenet.ShapeNet.Combination([mesh_set, voxel_set], root='../../datasets/')
+train_set = shapenet.ShapeNet_Combination([mesh_set, voxel_set])
 
-# Validation
-mesh_set = shapenet.ShapeNet.Surface_Meshes(root='../../datasets/', categories=args.categories,
+
+# Setup Datasets - Validation
+mesh_set = shapenet.ShapeNet_Surface_Meshes(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
                                             train=False, split=.7, mode='Tri', resolution=32)
-voxel_set = shapenet.ShapeNet.Voxels(root='../../datasets/', categories=args.categories,
+voxel_set = shapenet.ShapeNet_Voxels(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
                                      train=False, split=.7, resolutions=[32])
-valid_set = kal.dataloader.ShapeNet.Combination([mesh_set, voxel_set], root='../../datasets/')
+valid_set = shapenet.ShapeNet_Combination([mesh_set, voxel_set])
 
 
 # Setup Models
@@ -66,35 +66,39 @@ encoder = MeshEncoder(30).to(args.device)
 decoder = VoxelDecoder(30).to(args.device)
 
 parameters = list(encoder.parameters()) + list(decoder.parameters()) 
-optimizer = optim.Adam(parameters, lr=args.lr)
+optimizer = optim.Adam(parameters, lr=args.learning_rate)
 
 loss_fn = torch.nn.MSELoss()
 
 
 # Create log directory, if it doesn't already exist
-args.logdir = os.path.join(args.logdir, args.expid)
-if not os.path.isdir(args.logdir):
-    os.makedirs(args.logdir)
-    print('Created dir:', args.logdir)
+logdir = os.path.join(args.logdir, args.expid, 'AutoEncoder')
+if not os.path.isdir(logdir):
+    os.makedirs(logdir)
+    print('Created dir:', logdir)
 
 # Log all commandline args
-with open(os.path.join(args.logdir, 'args.txt'), 'w') as f:
+with open(os.path.join(logdir, 'args.txt'), 'w') as f:
     json.dump(args.__dict__, f, indent=2)
 
 
 class Engine(object):
     """Engine that runs training and inference.
     Args
-        - cur_epoch (int): Current epoch.
         - print_every (int): How frequently (# batches) to print loss.
-        - validate_every (int): How frequently (# epochs) to run validation.
+        - resume_name (str, optional): Prefix of weights from which to resume training.
+            If None, no weights are loaded.
     """
 
-    def __init__(self, cur_epoch=0, print_every=1, validate_every=1):
-        self.cur_epoch = cur_epoch
+    def __init__(self, print_every=1, resume_name=None):
+        self.cur_epoch = 0
         self.train_loss = []
         self.val_loss = []
         self.bestval = 0.
+        self.print_every = print_every
+
+        if resume_name:
+            self.load(resume_name)
 
     def train(self):
         loss_epoch = 0.
@@ -105,14 +109,16 @@ class Engine(object):
         for i in tqdm(range(len(train_set) // args.batch_size)): 
             tgt_voxels = []
             latent_encodings = []
+
+            # Can't use a dataloader due to the adj matrix
             for j in range(args.batch_size):
                 optimizer.zero_grad()
 
                 # Data Creation
                 selection = random.randint(0, len(train_set) - 1)
-                tgt_voxels.append(train_set[selection]['32'].to(args.device).unsqueeze(0))
-                inp_verts = train_set[selection]['verts'].to(args.device)
-                inp_adj = train_set[selection]['adj'].to(args.device)
+                tgt_voxels.append(train_set[selection]['data']['32'].to(args.device).unsqueeze(0))
+                inp_verts = train_set[selection]['data']['vertices'].to(args.device)
+                inp_adj = train_set[selection]['data']['adj'].to(args.device)
 
                 # Inverence
                 latent_encodings.append(encoder(inp_verts, inp_adj).unsqueeze(0))
@@ -152,9 +158,9 @@ class Engine(object):
                     optimizer.zero_grad()
 
                     # Data Creation
-                    tgt_voxels.append(valid_set[i * args.batch_size + j]['32'].to(args.device).unsqueeze(0))
-                    inp_verts = valid_set[i * args.batch_size + j]['verts'].to(args.device)
-                    inp_adj = valid_set[i * args.batch_size + j]['adj'].to(args.device)
+                    tgt_voxels.append(valid_set[i * args.batch_size + j]['data']['32'].to(args.device).unsqueeze(0))
+                    inp_verts = valid_set[i * args.batch_size + j]['data']['vertices'].to(args.device)
+                    inp_adj = valid_set[i * args.batch_size + j]['data']['adj'].to(args.device)
 
                     # Inference
                     latent_encodings.append(encoder(inp_verts, inp_adj).unsqueeze(0))
@@ -177,6 +183,17 @@ class Engine(object):
             tqdm.write(f'[VAL Total] Epoch {self.cur_epoch:03d}, Batch {i:03d}: IoU: {out_iou}')
             self.val_loss.append(out_iou)
 
+    def load(self, resume_name):
+        encoder.load_state_dict(torch.load(os.path.join(logdir, f'{resume_name}_encoder.pth')))
+        decoder.load_state_dict(torch.load(os.path.join(logdir, f'{resume_name}_decoder.pth')))
+
+        optimizer.load_state_dict(torch.load(os.path.join(logdir, f'{resume_name}_optim.pth')))
+        # Read data corresponding to the loaded model
+        with open(os.path.join(logdir, f'{resume_name}.log'), 'r') as f:
+            run_data = json.load(f)
+        self.cur_epoch = run_data['epoch']
+        self.bestval = run_data['bestval']
+
     def save(self):
         save_best = False
         if self.val_loss[-1] >= self.bestval:
@@ -194,25 +211,27 @@ class Engine(object):
         }
 
         # Save the recent model/optimizer states
-        torch.save(encoder.state_dict(), os.path.join(args.logdir, 'auto_encoder.pth'))
-        torch.save(decoder.state_dict(), os.path.join(args.logdir, 'auto_decoder.pth'))
-        torch.save(optimizer.state_dict(), os.path.join(args.logdir, 'recent_optim.pth'))
+        torch.save(encoder.state_dict(), os.path.join(logdir, 'recent_encoder.pth'))
+        torch.save(decoder.state_dict(), os.path.join(logdir, 'recent_decoder.pth'))
+        torch.save(optimizer.state_dict(), os.path.join(logdir, 'recent_optim.pth'))
         # Log other data corresponding to the recent model
-        with open(os.path.join(args.logdir, 'auto_recent.log'), 'w') as f:
+        with open(os.path.join(logdir, 'recent.log'), 'w') as f:
             f.write(json.dumps(log_table))
 
         tqdm.write('====== Saved recent model ======>')
 
         if save_best:
-            torch.save(encoder.state_dict(), os.path.join(args.logdir, 'auto_best_encoder.pth'))
-            torch.save(decoder.state_dict(), os.path.join(args.logdir, 'auto_best_decoder.pth'))
-            torch.save(optimizer.state_dict(), os.path.join(args.logdir, 'best_optim.pth'))
+            torch.save(encoder.state_dict(), os.path.join(logdir, 'best_encoder.pth'))
+            torch.save(decoder.state_dict(), os.path.join(logdir, 'best_decoder.pth'))
+            torch.save(optimizer.state_dict(), os.path.join(logdir, 'best_optim.pth'))
+            with open(os.path.join(logdir, 'best.log'), 'w') as f:
+                f.write(json.dumps(log_table))
             tqdm.write('====== Overwrote best model ======>')
 
-trainer = Engine()
+trainer = Engine(print_every=args.print_every, resume_name=args.resume)
 
 for epoch in range(args.epochs): 
     trainer.train()
-    if epoch % 1 == 0: 
+    if epoch % args.val_every == 0: 
         trainer.validate()
-        trainer.save()
+    trainer.save()
