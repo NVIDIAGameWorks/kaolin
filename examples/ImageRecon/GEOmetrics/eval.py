@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import argparse
 import numpy as np
 import torch
@@ -28,25 +29,29 @@ import kaolin as kal
 from kaolin.datasets import shapenet
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-expid', type=str, default='Direct', help='Unique experiment identifier.')
-parser.add_argument('-device', type=str, default='cuda', help='Device to use')
-parser.add_argument('-categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
-parser.add_argument('-vis', action='store_true', help='Visualize each model while evaluating')
-parser.add_argument('-f_score', action='store_true', help='compute F-score')
-parser.add_argument('-batchsize', type=int, default=1, help='Batch size.')
+parser.add_argument('--shapenet-root', type=str, help='Root directory of the ShapeNet dataset.')
+parser.add_argument('--shapenet-rendering-root', type=str, help='Root directory of the ShapeNet Rendering dataset.')
+parser.add_argument('--cache-dir', type=str, default=None, help='Path to write intermediate representation to.')
+parser.add_argument('--expid', type=str, default='Direct', help='Unique experiment identifier.')
+parser.add_argument('--device', type=str, default='cuda', help='Device to use')
+parser.add_argument('--categories', type=str, nargs='+', default=['chair'], help='list of object classes to use')
+parser.add_argument('--no-vis', action='store_true', help='Turn off visualization of each model while evaluating')
+parser.add_argument('--f_score', action='store_true', help='compute F-score')
+parser.add_argument('--batch-size', type=int, default=1, help='Batch size.')
+parser.add_argument('--logdir', type=str, default='log', help='Directory where log data was saved to.')
 args = parser.parse_args()
 
 
 # Data
-points_set_valid = shapenet.ShapeNet_Points(root='../../datasets/', categories=args.categories,
+points_set_valid = shapenet.ShapeNet_Points(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
                                             train=False, split=.7, num_points=5000)
-images_set_valid = shapenet.ShapeNet_Images(root='../../datasets/', categories=args.categories,
+images_set_valid = shapenet.ShapeNet_Images(root=args.shapenet_rendering_root, categories=args.categories,
                                             train=False, split=.7, views=1, transform=preprocess)
-meshes_set_valid = nvl.dataloader.ShapeNet_Meshes(root='../../datasets/', categories=args.categories,
-                                                  train=False, split=.7)
-valid_set = shapenet.ShapeNet.Combination([points_set_valid, images_set_valid, meshes_set_valid], root='../../datasets/')
+meshes_set_valid = shapenet.ShapeNet_Meshes(root=args.shapenet_root, categories=args.categories,
+                                            train=False, split=.7)
+valid_set = shapenet.ShapeNet_Combination([points_set_valid, images_set_valid, meshes_set_valid])
 
-dataloader_val = DataLoader(valid_set, batch_size=args.batchsize, collate_fn=collate_fn, shuffle=False, 
+dataloader_val = DataLoader(valid_set, batch_size=args.batch_size, collate_fn=collate_fn, shuffle=False, 
                             num_workers=8)
 
 # Model
@@ -56,11 +61,15 @@ encoders = [Encoder().to(args.device) for i in range(3)]
 mesh_update_kernels = [963, 1091, 1091] 
 mesh_updates = [G_Res_Net(mesh_update_kernels[i], hidden=128, output_features=3).to(args.device) for i in range(3)]
 
+logdir = os.path.join(args.logdir, args.expid)
+
 # Load saved weights
 for i, e in enumerate(encoders):
-    e.load_state_dict(torch.load('log/{}/best_encoder_{}.pth'.format(args.expid, i)))
+    e.load_state_dict(torch.load(os.path.join(logdir, f'best_encoder_{i}.pth')))
+    e.eval()
 for i, m in enumerate(mesh_updates):
-    m.load_state_dict(torch.load('log/{}/best_mesh_update_{}.pth'.format(args.expid, i)))
+    m.load_state_dict(torch.load(os.path.join(logdir, f'best_mesh_update_{i}.pth')))
+    m.eval()
 encoding_dims = [56, 28, 14, 7]
 
 loss_epoch = 0.
@@ -68,15 +77,15 @@ f_epoch = 0.
 num_batches = 0
 num_items = 0
 
-[e.eval() for e in encoders], [m.eval() for m in mesh_updates]
 with torch.no_grad():
-    for data in tqdm(valid_set): 
+    for sample in tqdm(valid_set):
+        data = sample['data']
         # data creation
         tgt_points = data['points'].to(args.device)
-        inp_images = data['imgs'].to(args.device).unsqueeze(0)
-        cam_mat = data['cam_mat'].to(args.device)
-        cam_pos = data['cam_pos'].to(args.device)
-        tgt_verts = data['verts'].to(args.device)
+        inp_images = data['images'].to(args.device).unsqueeze(0)
+        cam_mat = data['params']['cam_mat'].to(args.device)
+        cam_pos = data['params']['cam_pos'].to(args.device)
+        tgt_verts = data['vertices'].to(args.device)
         tgt_faces = data['faces'].to(args.device)
 
         # Inference
@@ -113,7 +122,7 @@ with torch.no_grad():
 
         loss = 3000 * kal.metrics.point.chamfer_distance(pred_points, tgt_points)
 
-        if args.vis: 
+        if not args.no_vis: 
 
             tgt_mesh = kal.rep.TriangleMesh.from_tensors(tgt_verts, tgt_faces)
 
@@ -131,7 +140,7 @@ with torch.no_grad():
         if args.f_score: 
             # Compute f score
             f_score = kal.metrics.point.f_score(tgt_points, pred_points, extend=False)
-            f_epoch += (f_score / float(args.batchsize)).item()
+            f_epoch += (f_score / float(args.batch_size)).item()
 
         loss_epoch += loss.item()
 
