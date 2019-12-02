@@ -17,6 +17,7 @@ from torchvision import transforms
 import kaolin as kal
 from collections import defaultdict
 import numpy as np
+from torch._six import container_abcs
 
 from kaolin.rep import TriangleMesh
 
@@ -27,40 +28,37 @@ preprocess = transforms.Compose([
 ])
 
 
-def collate_fn(data): 
-    new_data = {}
-    for k in data[0].keys():
+def collate_fn(batch):
+    elem = batch[0]
+    elem_module = type(batch[0]).__module__
 
-        if k in ['points', 'norms', 'imgs', 'cam_mat', 'cam_pos']:
-            new_info = tuple(d[k] for d in data)
-            new_info = torch.stack(new_info, 0)
-        elif k in ['adj']: 
-
-            adj_values = tuple(d[k].coalesce().values() for d in data)
-            adj_indices = tuple(d[k].coalesce().indices() for d in data)
-            new_data['adj_values'] = adj_values
-            new_data['adj_indices'] = adj_indices
-
-        else: 
-            new_info = tuple(d[k] for d in data)
-
-        new_data[k] = new_info
-    return new_data
-
-
-
+    if isinstance(elem, torch.Tensor):
+        if elem.is_sparse:
+            return {
+                'values': tuple(b.coalesce().values() for b in batch),
+                'indices': tuple(b.coalesce().indices() for b in batch),
+            }
+        elif all([list(d.size()) == list(batch[0].size()) for d in batch]):
+            return torch.stack(batch, 0)
+        else:
+            return batch
+    elif elem_module == 'numpy':
+        return torch.tensor(np.stack(batch))
+    elif isinstance(elem, container_abcs.Mapping):
+        return {key: collate_fn([d[key] for d in batch]) for key in elem}
+    return batch
 
 
 def get_pooling_index(positions, cam_mat, cam_pos, dims):
     device = positions.device
     # project points into 2D
-    positions = positions * .57  # accounting for recaling in 3Dr2n
+    positions = positions * .57  # accounting for recalling in 3Dr2n
     positions = positions - cam_pos 
     positions = torch.mm(positions, cam_mat.permute(1, 0))
     positions_xs = positions[:, 1] / positions[:, 2]
     positions_ys = -positions[:, 0] / positions[:, 2] 
 
-    # do bilinear interpolation over pixel coordiantes
+    # do bilinear interpolation over pixel coordinates
     data_meta = defaultdict(list)
 
     for dim in dims:
@@ -145,13 +143,13 @@ def chamfer_normal(pred_mesh, gt_points, gt_norms):
 
     # find closest gt points
     gt_indices = norm_distance(pred_mesh.vertices.unsqueeze(0), gt_points.unsqueeze(0))[0]
-    # select norms from closest points and exand to match edges lengths
+    # select norms from closest points and expand to match edges lengths
 
     gt_norm_selections = gt_norms[gt_indices]
     new_dimensions = (gt_norm_selections.shape[0], pred_mesh.ve.shape[1], 3)
     vertex_norms = gt_norm_selections.view(-1, 1, 3).expand(new_dimensions)
 
-    # get all nieghbor positions
+    # get all neighbour positions
     neighbor_indices = pred_mesh.vv.clone()
     empty_indices = (neighbor_indices < 0)
     neighbor_indices[empty_indices] = 0 
@@ -165,7 +163,7 @@ def chamfer_normal(pred_mesh, gt_points, gt_norms):
     vertex_neighbors = vertex_neighbors * empty_indices 
     vertex_neighbors = vertex_neighbors.contiguous().view(-1, 3)
 
-    # calculate normal loss, devide by number of unmasked elements to get mean 
+    # calculate normal loss, divide by number of unmasked elements to get mean 
     normal_loss = (torch.abs(torch.sum(vertex_norms * vertex_neighbors, dim=1))) 
     normal_loss = normal_loss.sum() / float(empty_indices.sum())
     return normal_loss
@@ -174,8 +172,7 @@ def chamfer_normal(pred_mesh, gt_points, gt_norms):
 
 def setup_meshes(filename='meshes/156.obj', device='cuda'): 
     mesh_1 = kal.rep.TriangleMesh.from_obj(filename, enable_adjacency=True)
-    if device == "cuda":
-        mesh_1.cuda()
+    mesh_1.to(device)
     adj_1 = mesh_1.compute_adjacency_matrix_full().clone()
     adj_1 = normalize_adj(adj_1)
     mesh_1_i = kal.rep.TriangleMesh.from_tensors(mesh_1.vertices.clone(), mesh_1.faces.clone())
@@ -214,7 +211,7 @@ def calc_face_list(mesh):
                     face_list[e][f1_position] = [index, 1, e]
                 elif f2[0] in f1 and f2[2] in f1: 
                     face_list[e][f1_position] = [index, 2, e]
-    
+
     return torch.LongTensor(face_list).to(mesh.faces.device)
 
 
@@ -228,7 +225,7 @@ def compute_splitting_faces(meshes, index, angle=50, show=False):
     p1 = torch.index_select(verts, 0, faces[:, 1])
     p2 = torch.index_select(verts, 0, faces[:, 0])
     p3 = torch.index_select(verts, 0, faces[:, 2])
- 
+
     # cauculate normals of each face 
     e1 = p2 - p1
     e2 = p3 - p1
@@ -250,7 +247,7 @@ def compute_splitting_faces(meshes, index, angle=50, show=False):
     face_3_normals = torch.index_select(face_normals, 0, face_list[:, 2, 0])
     curvature_proxi_rad = torch.sum(main_face_normals * face_3_normals, dim=1).clamp(-1.0 + eps, 1.0 - eps).acos()
     curvature_proxi_3 = (curvature_proxi_rad).view(-1, 1)
-    
+
     # get average over neighbors 
     curvature_proxi_full = torch.cat((curvature_proxi_1, curvature_proxi_2, curvature_proxi_3), dim=1)
     curvature_proxi = torch.mean(curvature_proxi_full, dim=1)
@@ -308,11 +305,13 @@ def split_features(split_mx, features):
     features = torch.cat((features, new_features), dim=1).permute(1, 0)
     return features
 
+
 def loss_surf(meshes, tgt_points):	
     loss = kal.metrics.point.chamfer_distance(tgt_points, meshes['update'][0].sample(3000)[0])
     loss += kal.metrics.point.chamfer_distance(tgt_points, meshes['update'][1].sample(3000)[0])
     loss += kal.metrics.point.chamfer_distance(tgt_points, meshes['update'][2].sample(3000)[0])
     return loss
+
 
 def loss_surf2(meshes, tgt_points):	
     loss = nvl.metrics.mesh.point_to_surface(tgt_points, meshes['update'][0])
@@ -329,6 +328,7 @@ def loss_edge(meshes):
     loss += kal.metrics.mesh.edge_length(meshes['update'][1])
     loss += kal.metrics.mesh.edge_length(meshes['update'][2])
     return loss
+
 
 def loss_lap(meshes): 
     loss = .3 * kal.metrics.mesh.laplacian_loss(meshes['init'][0], meshes['update'][0])
