@@ -1,0 +1,758 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.mathutils.geometry.transformations &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="../../../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../../index.html">Module code</a> &raquo;</li>
+        
+      <li>kaolin.mathutils.geometry.transformations</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for kaolin.mathutils.geometry.transformations</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.</span>
+<span class="c1"># Kornia components:</span>
+<span class="c1"># Copyright (C) 2017-2019, Arraiy, Inc., all rights reserved.</span>
+<span class="c1"># Copyright (C) 2019-    , Open Source Vision Foundation, all rights reserved.</span>
+<span class="c1"># Copyright (C) 2019-    , Kornia authors, all rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="c1"># Borrows from kornia</span>
+<span class="c1"># https://github.com/arraiyopensource/kornia</span>
+
+<div class="viewcode-block" id="rotx"><a class="viewcode-back" href="../../../../modules/mathutils.html#kaolin.mathutils.rotx">[docs]</a><span class="k">def</span> <span class="nf">rotx</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">enc</span><span class="o">=</span><span class="s1">&#39;rad&#39;</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns a 3D rotation matrix about the X-axis</span>
+
+<span class="sd">    Returns the 3 x 3 rotation matrix :math:`R` that rotates a 3D point by an angle</span>
+<span class="sd">    theta about the X-axis of the canonical Cartesian axes :math:`\left[ e_1 e_2 e_3 \right]`.</span>
+
+<span class="sd">    Note:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        e_1 = \begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix}, e_2 = \begin{bmatrix} 0 \\ 1 \\ 0 \end{bmatrix}, e_3 = \begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix}</span>
+
+<span class="sd">    Generated matrix:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        R = \begin{bmatrix}</span>
+<span class="sd">                1 &amp; 0 &amp; 0 \\</span>
+<span class="sd">                0 &amp; cos(\theta) &amp; -sin(\theta) \\</span>
+<span class="sd">                0 &amp; sin(\theta) &amp; cos(\theta)</span>
+<span class="sd">            \end{bmatrix}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        theta (Tensor or np.array): degree of rotation (assumes radians</span>
+<span class="sd">            by default)</span>
+<span class="sd">        enc (str, choices=[&#39;rad&#39;, &#39;deg&#39;]): whether the angle is specified in</span>
+<span class="sd">            degrees (&#39;deg&#39;) or radians (&#39;rad&#39;). Default: &#39;rad&#39;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tensor: one 3 x 3 rotation matrix, for each input entry in theta</span>
+
+<span class="sd">    Shape:</span>
+<span class="sd">        - Input: :math:`(B)` (or) :math:`(B, 1)` (:math:`B` is the batchsize)</span>
+<span class="sd">        - Output: :math:`(B, 3, 3)`</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; # Create a random batch of angles of rotation</span>
+<span class="sd">        &gt;&gt;&gt; theta = torch.randn(10, 1)</span>
+<span class="sd">        &gt;&gt;&gt; # Get a 10 x 3 x 3 rotation matrix, one 3 x 3 matrix for each element</span>
+<span class="sd">        &gt;&gt;&gt; rx = kaolin.mathutils.rotx(theta)</span>
+<span class="sd">        &gt;&gt;&gt; # Alternatively, use rotations specified in degrees</span>
+<span class="sd">        &gt;&gt;&gt; theta = 180 * torch.randn(10, 1)</span>
+<span class="sd">        &gt;&gt;&gt; rx = kaolin.mathutils.rotx(theta, enc=&#39;deg&#39;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">theta</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+    <span class="c1"># Used an f-string here, so can maybe support only Python 3.6+</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected type torch.Tensor for argument theta. </span><span class="se">\</span>
+<span class="s1">            Got </span><span class="si">{}</span><span class="s1"> instead&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">theta</span><span class="p">)))</span>
+
+    <span class="c1"># Check that the passed tensor is 1D (or 1D-like)</span>
+    <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">theta</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;Invalid shape. Exceeds two dimensions.&#39;</span>
+        <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span>
+                    <span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">),</span> <span class="s1">&#39;Must be 1D-like.&#39;</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">theta</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+
+    <span class="c1"># Raise a NotImplementedError if the input encoding is something other</span>
+    <span class="c1"># than &#39;rad&#39;</span>
+    <span class="k">if</span> <span class="n">enc</span> <span class="o">!=</span> <span class="s1">&#39;rad&#39;</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="c1"># Compute the rotation matrix</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">rx</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numel</span><span class="p">(),</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">rx</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+    <span class="n">rx</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">rx</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">c</span>
+    <span class="n">rx</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">s</span>
+    <span class="n">rx</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">s</span>
+
+    <span class="k">return</span> <span class="n">rx</span></div>
+
+
+<div class="viewcode-block" id="roty"><a class="viewcode-back" href="../../../../modules/mathutils.html#kaolin.mathutils.roty">[docs]</a><span class="k">def</span> <span class="nf">roty</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">enc</span><span class="o">=</span><span class="s1">&#39;rad&#39;</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns a 3D rotation matrix about the Y-axis</span>
+
+<span class="sd">    Returns the 3 x 3 rotation matrix that rotates a 3D point by an angle</span>
+<span class="sd">    theta about the Y-axis of the canonical Cartesian axes [e1 e2 e3].</span>
+
+<span class="sd">    Note:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        e_1 = \begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix}, e_2 = \begin{bmatrix} 0 \\ 1 \\ 0 \end{bmatrix}, e_3 = \begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix}</span>
+
+<span class="sd">    Generated matrix:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        R = \begin{bmatrix}</span>
+<span class="sd">                cos(\theta) &amp; 0 &amp; sin(\theta) \\</span>
+<span class="sd">                0 &amp; 1 &amp; 0 \\</span>
+<span class="sd">                -sin(\theta) &amp; 0 &amp; cos(\theta)</span>
+<span class="sd">            \end{bmatrix}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        theta (Tensor or np.array): degree of rotation (assumes radians</span>
+<span class="sd">            by default)</span>
+<span class="sd">        enc (str, choices=[&#39;rad&#39;, &#39;deg&#39;]): whether the angle is specified in</span>
+<span class="sd">            degrees (&#39;deg&#39;) or radians (&#39;rad&#39;). Default: &#39;rad&#39;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tensor: one 3 x 3 rotation matrix, for each input entry in theta</span>
+
+<span class="sd">    Shape:</span>
+<span class="sd">        - Input: :math:`(B)` (or) :math:`(B, 1)` (:math:`B` is the batchsize)</span>
+<span class="sd">        - Output: :math:`(B, 3, 3)`</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; # Create a random batch of angles of rotation</span>
+<span class="sd">        &gt;&gt;&gt; theta = torch.randn(10, 1)</span>
+<span class="sd">        &gt;&gt;&gt; # Get a 10 x 3 x 3 rotation matrix, one 3 x 3 matrix for each element</span>
+<span class="sd">        &gt;&gt;&gt; ry = kaolin.mathutils.roty(theta)</span>
+<span class="sd">        &gt;&gt;&gt; # Alternatively, use rotations specified in degrees</span>
+<span class="sd">        &gt;&gt;&gt; theta = 180 * torch.randn(10, 1)</span>
+<span class="sd">        &gt;&gt;&gt; ry = kaolin.mathutils.roty(theta, enc=&#39;deg&#39;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">theta</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+    <span class="c1"># Used an f-string here, so can maybe support only Python 3.6+</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected type torch.Tensor for argument theta. </span><span class="se">\</span>
+<span class="s1">            Got </span><span class="si">{}</span><span class="s1"> instead&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">theta</span><span class="p">)))</span>
+
+    <span class="c1"># Check that the passed tensor is 1D (or 1D-like)</span>
+    <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">theta</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;Invalid shape. Exceeds two dimensions.&#39;</span>
+        <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span>
+                    <span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">),</span> <span class="s1">&#39;Must be 1D-like.&#39;</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">theta</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+
+    <span class="c1"># Raise a NotImplementedError if the input encoding is something other</span>
+    <span class="c1"># than &#39;rad&#39;</span>
+    <span class="k">if</span> <span class="n">enc</span> <span class="o">!=</span> <span class="s1">&#39;rad&#39;</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="c1"># Compute the rotation matrix</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">ry</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numel</span><span class="p">(),</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">ry</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+    <span class="n">ry</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">ry</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">c</span>
+    <span class="n">ry</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">s</span>
+    <span class="n">ry</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">s</span>
+
+    <span class="k">return</span> <span class="n">ry</span></div>
+
+
+<div class="viewcode-block" id="rotz"><a class="viewcode-back" href="../../../../modules/mathutils.html#kaolin.mathutils.rotz">[docs]</a><span class="k">def</span> <span class="nf">rotz</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">enc</span><span class="o">=</span><span class="s1">&#39;rad&#39;</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns a 3D rotation matrix about the Z-axis</span>
+
+<span class="sd">    Returns the 3 x 3 rotation matrix that rotates a 3D point by an angle</span>
+<span class="sd">    theta about the Z-axis of the canonical Cartesian axes [e1 e2 e3].</span>
+
+<span class="sd">    Note:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        e_1 = \begin{bmatrix} 1 \\ 0 \\ 0 \end{bmatrix}, e_2 = \begin{bmatrix} 0 \\ 1 \\ 0 \end{bmatrix}, e_3 = \begin{bmatrix} 0 \\ 0 \\ 1 \end{bmatrix}</span>
+
+<span class="sd">    Generated matrix:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        R = \begin{bmatrix}</span>
+<span class="sd">                cos(\theta) &amp; -sin(\theta) &amp; 0  \\</span>
+<span class="sd">                sin(\theta) &amp; cos(\theta) &amp; 0 \\</span>
+<span class="sd">                0 &amp; 0 &amp; 1</span>
+<span class="sd">            \end{bmatrix}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        theta (Tensor or np.array): degree of rotation (assumes radians</span>
+<span class="sd">            by default)</span>
+<span class="sd">        enc (str, choices=[&#39;rad&#39;, &#39;deg&#39;]): whether the angle is specified in</span>
+<span class="sd">            degrees (&#39;deg&#39;) or radians (&#39;rad&#39;). Default: &#39;rad&#39;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tensor: one 3 x 3 rotation matrix, for each input entry in theta</span>
+
+<span class="sd">    Shape:</span>
+<span class="sd">        - Input: :math:`(B)` (or) :math:`(B, 1)` (:math:`B` is the batchsize)</span>
+<span class="sd">        - Output: :math:`(B, 3, 3)`</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; # Create a random batch of angles of rotation</span>
+<span class="sd">        &gt;&gt;&gt; theta = torch.randn(10, 1)</span>
+<span class="sd">        &gt;&gt;&gt; # Get a 10 x 3 x 3 rotation matrix, one 3 x 3 matrix for each element</span>
+<span class="sd">        &gt;&gt;&gt; rz = kaolin.mathutils.rotz(theta)</span>
+<span class="sd">        &gt;&gt;&gt; # Alternatively, use rotations specified in degrees</span>
+<span class="sd">        &gt;&gt;&gt; theta = 180 * torch.randn(10, 1)</span>
+<span class="sd">        &gt;&gt;&gt; rz = kaolin.mathutils.rotz(theta, enc=&#39;deg&#39;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">theta</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">theta</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+
+    <span class="c1"># Used an f-string here, so can maybe support only Python 3.6+</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">theta</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected type torch.Tensor for argument theta. </span><span class="se">\</span>
+<span class="s1">            Got </span><span class="si">{}</span><span class="s1"> instead&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">theta</span><span class="p">)))</span>
+
+    <span class="c1"># Check that the passed tensor is 1D (or 1D-like)</span>
+    <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">theta</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;Invalid shape. Exceeds two dimensions.&#39;</span>
+        <span class="k">if</span> <span class="n">theta</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">theta</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span>
+                    <span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">),</span> <span class="s1">&#39;Must be 1D-like.&#39;</span>
+        <span class="n">theta</span> <span class="o">=</span> <span class="n">theta</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+
+    <span class="c1"># Raise a NotImplementedError if the input encoding is something other</span>
+    <span class="c1"># than &#39;rad&#39;</span>
+    <span class="k">if</span> <span class="n">enc</span> <span class="o">!=</span> <span class="s1">&#39;rad&#39;</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="c1"># Compute the rotation matrix</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">rz</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numel</span><span class="p">(),</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">rz</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">theta</span><span class="o">.</span><span class="n">numel</span><span class="p">())</span>
+    <span class="n">rz</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">rz</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">c</span>
+    <span class="n">rz</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">s</span>
+    <span class="n">rz</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">s</span>
+
+    <span class="k">return</span> <span class="n">rz</span></div>
+
+
+<span class="c1"># Borrows from Kornia.</span>
+<span class="c1"># https://github.com/kornia/kornia/blob/master/kornia/geometry/conversions.py</span>
+<div class="viewcode-block" id="homogenize_points"><a class="viewcode-back" href="../../../../modules/mathutils.html#kaolin.mathutils.homogenize_points">[docs]</a><span class="k">def</span> <span class="nf">homogenize_points</span><span class="p">(</span><span class="n">pts</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Converts a set of points to homogeneous coordinates.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pts (torch.Tensor): Tensor containing points to be homogenized.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (torch.Tensor): Homogeneous coordinates for pts.</span>
+
+<span class="sd">    Shape:</span>
+<span class="sd">        pts: :math:`\cdots \times 2` or :math:`\cdots \times 3`</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; pts = torch.randn(2, 5, 3)</span>
+<span class="sd">        tensor([[[ 0.0897, -0.1876,  0.1637],</span>
+<span class="sd">                 [-0.1026, -0.4994,  0.8622],</span>
+<span class="sd">                 [-1.2909,  0.2678, -1.8021],</span>
+<span class="sd">                 [-0.2500,  0.3505,  0.9121],</span>
+<span class="sd">                 [ 0.0580,  1.4497, -0.7224]],</span>
+
+<span class="sd">                [[ 0.8102, -0.2467,  0.1951],</span>
+<span class="sd">                 [ 0.4059, -1.9658,  0.1850],</span>
+<span class="sd">                 [ 1.5487, -0.8154, -0.5592],</span>
+<span class="sd">                 [ 0.2269, -0.4137,  0.7187],</span>
+<span class="sd">                 [-1.1810, -2.3412, -0.4925]]])</span>
+
+<span class="sd">        &gt;&gt;&gt; homo_pts = homogenize_points(pts)</span>
+<span class="sd">        tensor([[[ 0.0897, -0.1876,  0.1637,  1.0000],</span>
+<span class="sd">                 [-0.1026, -0.4994,  0.8622,  1.0000],</span>
+<span class="sd">                 [-1.2909,  0.2678, -1.8021,  1.0000],</span>
+<span class="sd">                 [-0.2500,  0.3505,  0.9121,  1.0000],</span>
+<span class="sd">                 [ 0.0580,  1.4497, -0.7224,  1.0000]],</span>
+
+<span class="sd">                [[ 0.8102, -0.2467,  0.1951,  1.0000],</span>
+<span class="sd">                 [ 0.4059, -1.9658,  0.1850,  1.0000],</span>
+<span class="sd">                 [ 1.5487, -0.8154, -0.5592,  1.0000],</span>
+<span class="sd">                 [ 0.2269, -0.4137,  0.7187,  1.0000],</span>
+<span class="sd">                 [-1.1810, -2.3412, -0.4925,  1.0000]]])</span>
+
+<span class="sd">        &gt;&gt;&gt; homo_pts.shape</span>
+<span class="sd">        torch.Size([2, 5, 4])</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">pts</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input of type torch.Tensor. &#39;</span>
+                        <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">pts</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input tensors must have at least 2 dims. &#39;</span>
+                         <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()))</span>
+
+    <span class="n">pad</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">ConstantPad1d</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="mf">1.</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">pad</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span></div>
+
+
+<span class="c1"># Borrows from Kornia.</span>
+<span class="c1"># https://github.com/kornia/kornia/blob/master/kornia/geometry/conversions.py</span>
+<div class="viewcode-block" id="unhomogenize_points"><a class="viewcode-back" href="../../../../modules/mathutils.html#kaolin.mathutils.unhomogenize_points">[docs]</a><span class="k">def</span> <span class="nf">unhomogenize_points</span><span class="p">(</span><span class="n">pts</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Convert a set of points from homogeneous coordinates</span>
+<span class="sd">    (i.e., projective space) to Euclidean space.</span>
+
+<span class="sd">    Usually, for each point :math:`(x, y, z, w)` for the 3D case,</span>
+<span class="sd">    `unhomogenize_points` returns :math:`\left(\frac{x}{w}, \frac{y}{w},</span>
+<span class="sd">    \frac{z}{w} \right)`. For the special case where :math:`w` is zero,</span>
+<span class="sd">    `unhomogenize_points` returns :math:`(x, y, z)`, following OpenCV&#39;s</span>
+<span class="sd">    convention.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pts (torch.Tensor): Tensor containing points to be unhomogenized.</span>
+
+<span class="sd">    Shape:</span>
+<span class="sd">        pts: :math:`\cdots \times 3` or :math:`\cdots \times 4` (usually).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (torch.Tensor): Unhomogenized coordinates for `pts`.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; homo_pts = torch.randn(2, 5, 4)</span>
+<span class="sd">        tensor([[[ 0.0897, -0.1876,  0.1637,  1.0000],</span>
+<span class="sd">                 [-0.1026, -0.4994,  0.8622,  1.0000],</span>
+<span class="sd">                 [-1.2909,  0.2678, -1.8021,  1.0000],</span>
+<span class="sd">                 [-0.2500,  0.3505,  0.9121,  1.0000],</span>
+<span class="sd">                 [ 0.0580,  1.4497, -0.7224,  1.0000]],</span>
+
+<span class="sd">                [[ 0.8102, -0.2467,  0.1951,  1.0000],</span>
+<span class="sd">                 [ 0.4059, -1.9658,  0.1850,  1.0000],</span>
+<span class="sd">                 [ 1.5487, -0.8154, -0.5592,  1.0000],</span>
+<span class="sd">                 [ 0.2269, -0.4137,  0.7187,  1.0000],</span>
+<span class="sd">                 [-1.1810, -2.3412, -0.4925,  1.0000]]])</span>
+
+<span class="sd">        &gt;&gt;&gt; unhomo_pts = kal.math.unhomogenize_points(homo_pts)</span>
+<span class="sd">        tensor([[[ 0.0897, -0.1876,  0.1637],</span>
+<span class="sd">                 [-0.1026, -0.4994,  0.8622],</span>
+<span class="sd">                 [-1.2909,  0.2678, -1.8021],</span>
+<span class="sd">                 [-0.2500,  0.3505,  0.9121],</span>
+<span class="sd">                 [ 0.0580,  1.4497, -0.7224]],</span>
+
+<span class="sd">                [[ 0.8102, -0.2467,  0.1951],</span>
+<span class="sd">                 [ 0.4059, -1.9658,  0.1850],</span>
+<span class="sd">                 [ 1.5487, -0.8154, -0.5592],</span>
+<span class="sd">                 [ 0.2269, -0.4137,  0.7187],</span>
+<span class="sd">                 [-1.1810, -2.3412, -0.4925]]])</span>
+
+<span class="sd">        &gt;&gt;&gt; unhomo_pts = kal.math.unhomogenize_points(unhomo_pts)</span>
+<span class="sd">        tensor([[[  0.5482,  -1.1463],</span>
+<span class="sd">                 [ -0.1190,  -0.5792],</span>
+<span class="sd">                 [  0.7163,  -0.1486],</span>
+<span class="sd">                 [ -0.2741,   0.3843],</span>
+<span class="sd">                 [ -0.0803,  -2.0066]],</span>
+
+<span class="sd">                [[  4.1518,  -1.2645],</span>
+<span class="sd">                 [  2.1938, -10.6255],</span>
+<span class="sd">                 [ -2.7696,   1.4582],</span>
+<span class="sd">                 [  0.3157,  -0.5756],</span>
+<span class="sd">                 [  2.3977,   4.7533]]])</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">pts</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input of type torch.Tensor. &#39;</span>
+                        <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">pts</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input tensors must have at least 2 dims. &#39;</span>
+                         <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()))</span>
+
+    <span class="c1"># Get points with the last coordinate (scale) as 0 (points at inf).</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">pts</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="c1"># Determine the scale factor each point needs to be multiplied by.</span>
+    <span class="c1"># For points at infinity, use a scale factor 1.</span>
+    <span class="n">eps</span> <span class="o">=</span> <span class="mf">1e-6</span>
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">w</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">eps</span><span class="p">,</span> <span class="mf">1.</span> <span class="o">/</span> <span class="n">w</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">w</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">pts</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
+
+
+<span class="c1"># Borrows from Kornia.</span>
+<span class="c1"># https://github.com/kornia/kornia/blob/master/kornia/geometry/linalg.py</span>
+<div class="viewcode-block" id="transform3d"><a class="viewcode-back" href="../../../../modules/mathutils.html#kaolin.mathutils.transform3d">[docs]</a><span class="k">def</span> <span class="nf">transform3d</span><span class="p">(</span><span class="n">pts</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">tform</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Transform a set of points `pts` using a general 3D transform</span>
+<span class="sd">    `tform`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pts (torch.Tensor): Points to be transformed (shape: :math:`\cdots</span>
+<span class="sd">            \times 4`)</span>
+<span class="sd">        tform (torch.Tensor): A 3D projective transformation matrix.</span>
+<span class="sd">            (shape: :math:`4 \times 4`)</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">        (torch.Tensor): Transformed points.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">pts</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input pts to be of type torch.Tensor. &#39;</span>
+                        <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">pts</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">tform</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input tform to be of type torch.Tensor. &#39;</span>
+                        <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">tform</span><span class="p">)))</span>
+
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input pts must have at least 2 dimensions. &#39;</span>
+                         <span class="s1">&#39;Got only </span><span class="si">{0}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input pts must have shape 4 in its last dimension. &#39;</span>
+                         <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+    <span class="k">if</span> <span class="n">tform</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">tform</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">4</span> <span class="ow">or</span> <span class="n">tform</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input tform must have at least 2 dimensions &#39;</span>
+                         <span class="s1">&#39;and the last two dims must be of shape 4. Got </span><span class="si">{0}</span><span class="s1"> dimensions and &#39;</span>
+                         <span class="s1">&#39;shape </span><span class="si">{1}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tform</span><span class="o">.</span><span class="n">dim</span><span class="p">(),</span> <span class="n">tform</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+
+    <span class="c1"># Unsqueezing at dim -3 (to handle arbitrary batchsizes)</span>
+    <span class="c1"># For a 2D tensor, unsqueeze(-3) is equivalent to unsqueeze(0)</span>
+    <span class="c1"># tform is ordered as (B, 4, 4)</span>
+    <span class="c1"># pts is ordered as (B, N, 3), where B: batchsize, N: num points</span>
+    <span class="n">pts_tformed_homo</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">tform</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">3</span><span class="p">),</span> <span class="n">pts</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">pts_tformed</span> <span class="o">=</span> <span class="n">unhomogenize_points</span><span class="p">(</span><span class="n">pts_tformed_homo</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">pts_tformed</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span></div>
+
+
+<span class="c1"># Borrows from Kornia.</span>
+<span class="c1"># https://github.com/kornia/kornia/blob/master/kornia/geometry/linalg.py</span>
+<div class="viewcode-block" id="invert_rigid_transform_3d"><a class="viewcode-back" href="../../../../modules/mathutils.html#kaolin.mathutils.invert_rigid_transform_3d">[docs]</a><span class="k">def</span> <span class="nf">invert_rigid_transform_3d</span><span class="p">(</span><span class="n">tform</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Invert a 3D rigid body (SE(3)) transform.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tform (torch.Tensor): SE(3) transformation matrix (shape:</span>
+<span class="sd">            :math:`\cdots \times 4 \times 4`)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        inv_tform (torch.Tensor): Inverse transformation matrix (shape:</span>
+<span class="sd">            :math:`\cdots \times 4 \times 4`)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">tform</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input tform to be of type torch.Tensor. &#39;</span>
+                        <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">tform</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="n">tform</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">!=</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input tform must be of shape (..., 4, 4). &#39;</span>
+                         <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tform</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+
+    <span class="c1"># Unpack translation and rotation components</span>
+    <span class="n">rot</span> <span class="o">=</span> <span class="n">tform</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span>
+    <span class="n">trans</span> <span class="o">=</span> <span class="n">tform</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span>
+
+    <span class="c1"># Compute the inverse</span>
+    <span class="n">inv_rot</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">rot</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">inv_trans</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="o">-</span><span class="n">inv_rot</span><span class="p">,</span> <span class="n">trans</span><span class="p">)</span>
+
+    <span class="c1"># Pack the inverse rotation and translation components</span>
+    <span class="n">inv_trans</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">tform</span><span class="p">)</span>
+    <span class="n">inv_trans</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">inv_rot</span>
+    <span class="n">inv_trans</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">inv_trans</span>
+    <span class="n">inv_trans</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.</span>
+
+    <span class="k">return</span> <span class="n">inv_trans</span></div>
+
+
+<span class="c1"># Borrows from Kornia.</span>
+<span class="c1"># https://github.com/kornia/kornia/blob/master/kornia/geometry/linalg.py</span>
+<div class="viewcode-block" id="compose_transforms_3d"><a class="viewcode-back" href="../../../../modules/mathutils.html#kaolin.mathutils.compose_transforms_3d">[docs]</a><span class="k">def</span> <span class="nf">compose_transforms_3d</span><span class="p">(</span><span class="n">tforms</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compose (concatenate) a series of 3D transformation matrices.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tforms (tuple, list): Iterable containing the transforms</span>
+<span class="sd">            to be composed (Each transform must be of type torch.Tensor)</span>
+<span class="sd">            (shape: :math:`\cdots \times 4 \times 4`).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        cat (torch.Tensor): Concatenated transform. (shape:</span>
+<span class="sd">            :math:`\cdots \times 4 \times 4`)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tforms</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Expected at least 2 transforms to compose. &#39;</span>
+                         <span class="s1">&#39;Got only 1.&#39;</span><span class="p">)</span>
+    <span class="n">cat</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">tform</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">tforms</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">tform</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected elements of tforms to be of type &#39;</span>
+                            <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> at index </span><span class="si">{1}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                                <span class="nb">type</span><span class="p">(</span><span class="n">tform</span><span class="p">),</span> <span class="n">idx</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">tform</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">!=</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected elements of tforms to be of shape &#39;</span>
+                            <span class="s1">&#39;(..., 4, 4). Got </span><span class="si">{0}</span><span class="s1"> at index </span><span class="si">{1}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                                <span class="n">tform</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">idx</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">idx</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">cat</span> <span class="o">=</span> <span class="n">tform</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">cat</span><span class="p">,</span> <span class="n">tform</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">cat</span></div>
+
+
+<span class="k">def</span> <span class="nf">compute_camera_params</span><span class="p">(</span><span class="n">azimuth</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">elevation</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">distance</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+
+    <span class="n">theta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="n">azimuth</span><span class="p">)</span>
+    <span class="n">phi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">deg2rad</span><span class="p">(</span><span class="n">elevation</span><span class="p">)</span>
+
+    <span class="n">camY</span> <span class="o">=</span> <span class="n">distance</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span>
+    <span class="n">temp</span> <span class="o">=</span> <span class="n">distance</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span>
+    <span class="n">camX</span> <span class="o">=</span> <span class="n">temp</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">camZ</span> <span class="o">=</span> <span class="n">temp</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span>
+    <span class="n">cam_pos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">camX</span><span class="p">,</span> <span class="n">camY</span><span class="p">,</span> <span class="n">camZ</span><span class="p">])</span>
+
+    <span class="n">axisZ</span> <span class="o">=</span> <span class="n">cam_pos</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">axisY</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+    <span class="n">axisX</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">axisY</span><span class="p">,</span> <span class="n">axisZ</span><span class="p">)</span>
+    <span class="n">axisY</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">axisZ</span><span class="p">,</span> <span class="n">axisX</span><span class="p">)</span>
+
+    <span class="n">cam_mat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">axisX</span><span class="p">,</span> <span class="n">axisY</span><span class="p">,</span> <span class="n">axisZ</span><span class="p">])</span>
+    <span class="n">l2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">cam_mat</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">l2</span><span class="p">[</span><span class="n">l2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">cam_mat</span> <span class="o">=</span> <span class="n">cam_mat</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">expand_dims</span><span class="p">(</span><span class="n">l2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">cam_mat</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">cam_pos</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

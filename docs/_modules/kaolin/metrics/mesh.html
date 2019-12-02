@@ -1,0 +1,581 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.metrics.mesh &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>kaolin.metrics.mesh</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for kaolin.metrics.mesh</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1">#</span>
+<span class="c1">#</span>
+<span class="c1"># GEOMetrics</span>
+<span class="c1">#</span>
+<span class="c1"># Copyright (c) 2019 Edward Smith</span>
+<span class="c1">#</span>
+<span class="c1"># Permission is hereby granted, free of charge, to any person obtaining a copy</span>
+<span class="c1"># of this software and associated documentation files (the &quot;Software&quot;), to deal</span>
+<span class="c1"># in the Software without restriction, including without limitation the rights</span>
+<span class="c1"># to use, copy, modify, merge, publish, distribute, sublicense, and/or sell</span>
+<span class="c1"># copies of the Software, and to permit persons to whom the Software is</span>
+<span class="c1"># furnished to do so, subject to the following conditions:</span>
+<span class="c1">#</span>
+<span class="c1"># The above copyright notice and this permission notice shall be included in all</span>
+<span class="c1"># copies or substantial portions of the Software.</span>
+<span class="c1">#</span>
+<span class="c1"># THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR</span>
+<span class="c1"># IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,</span>
+<span class="c1"># FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE</span>
+<span class="c1"># AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER</span>
+<span class="c1"># LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,</span>
+<span class="c1"># OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE</span>
+<span class="c1"># SOFTWARE.</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">kaolin</span> <span class="k">as</span> <span class="nn">kal</span>
+<span class="kn">from</span> <span class="nn">kaolin.rep</span> <span class="k">import</span> <span class="n">Mesh</span>
+<span class="kn">import</span> <span class="nn">kaolin.cuda.tri_distance</span> <span class="k">as</span> <span class="nn">td</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+
+
+<span class="k">class</span> <span class="nc">TriangleDistanceFunction</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">Function</span><span class="p">):</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">verts_1</span><span class="p">,</span> <span class="n">verts_2</span><span class="p">,</span> <span class="n">verts_3</span><span class="p">):</span>
+        <span class="n">batchsize</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">points</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">points</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="n">verts_1</span> <span class="o">=</span> <span class="n">verts_1</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="n">verts_2</span> <span class="o">=</span> <span class="n">verts_2</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="n">verts_3</span> <span class="o">=</span> <span class="n">verts_3</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+
+        <span class="n">dist1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">batchsize</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+        <span class="n">idx1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">batchsize</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+        <span class="n">type1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">batchsize</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+
+        <span class="n">dist1</span> <span class="o">=</span> <span class="n">dist1</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+        <span class="n">idx1</span> <span class="o">=</span> <span class="n">idx1</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+        <span class="n">type1</span> <span class="o">=</span> <span class="n">type1</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+        <span class="n">td</span><span class="o">.</span><span class="n">forward_cuda</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">verts_1</span><span class="p">,</span> <span class="n">verts_2</span><span class="p">,</span> <span class="n">verts_3</span><span class="p">,</span> <span class="n">dist1</span><span class="p">,</span> <span class="n">idx1</span><span class="p">,</span> <span class="n">type1</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">save_for_backward</span><span class="p">(</span><span class="n">idx1</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">dist1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">detach</span><span class="p">(),</span> <span class="n">idx1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">long</span><span class="p">(),</span> <span class="n">type1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">long</span><span class="p">()</span>
+
+
+<span class="k">class</span> <span class="nc">TriangleDistance</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">verts_1</span><span class="p">,</span> <span class="n">verts_2</span><span class="p">,</span> <span class="n">verts_3</span><span class="p">):</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">points</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="n">verts_1</span> <span class="o">=</span> <span class="n">verts_1</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="n">verts_2</span> <span class="o">=</span> <span class="n">verts_2</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="n">verts_3</span> <span class="o">=</span> <span class="n">verts_3</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">TriangleDistanceFunction</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">verts_1</span><span class="p">,</span> <span class="n">verts_2</span><span class="p">,</span> <span class="n">verts_3</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="chamfer_distance"><a class="viewcode-back" href="../../../modules/metrics.mesh.html#kaolin.metrics.mesh.chamfer_distance">[docs]</a><span class="k">def</span> <span class="nf">chamfer_distance</span><span class="p">(</span><span class="n">mesh1</span><span class="p">:</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">mesh2</span><span class="p">:</span> <span class="n">Mesh</span><span class="p">,</span>
+                     <span class="n">w1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.</span><span class="p">,</span> <span class="n">w2</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.</span><span class="p">,</span> <span class="n">num_points</span><span class="o">=</span><span class="mi">3000</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; computes the chamfer distance bewteen two meshes by sampling the two surfaces</span>
+<span class="sd">    Args:</span>
+<span class="sd">            mesh1: (Mesh): first mesh</span>
+<span class="sd">            mesh2: (Mesh): second mesh</span>
+<span class="sd">            w1: (float): weighting of forward direction</span>
+<span class="sd">            w2: (float): weighting of backward direction</span>
+<span class="sd">            num_points: number of points to sample on each mesh</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">            chamfer_distance (torch.Tensor): chamfer distance</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">            &gt;&gt;&gt; mesh1 = TriangleMesh.from_obj(file1)</span>
+<span class="sd">            &gt;&gt;&gt; mesh2 = TriangleMesh.from_obj(file2)</span>
+<span class="sd">            &gt;&gt;&gt; distance = chamfer_distance(mesh1, mesh2, 500)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">set1</span> <span class="o">=</span> <span class="n">mesh1</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">num_points</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">set2</span> <span class="o">=</span> <span class="n">mesh2</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">num_points</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">kal</span><span class="o">.</span><span class="n">metrics</span><span class="o">.</span><span class="n">point</span><span class="o">.</span><span class="n">chamfer_distance</span><span class="p">(</span><span class="n">set1</span><span class="p">,</span> <span class="n">set2</span><span class="p">,</span> <span class="n">w1</span><span class="p">,</span> <span class="n">w2</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="edge_length"><a class="viewcode-back" href="../../../modules/metrics.mesh.html#kaolin.metrics.mesh.edge_length">[docs]</a><span class="k">def</span> <span class="nf">edge_length</span><span class="p">(</span><span class="n">mesh</span><span class="p">:</span> <span class="n">Mesh</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the average length of a face in a mesh</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">            mesh (Mesh): mesh over which to calcuale edge length</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">            edge_length (torch.Tensor): averge lenght of mesh edge</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">            &gt;&gt;&gt; mesh  = TriangleMesh.from_obj(file)</span>
+<span class="sd">            &gt;&gt;&gt; length = edge_length(mesh)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
+    <span class="n">p2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
+    <span class="n">p3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">])</span>
+    <span class="c1"># get edge lentgh</span>
+    <span class="n">e1</span> <span class="o">=</span> <span class="n">p2</span> <span class="o">-</span> <span class="n">p1</span>
+    <span class="n">e2</span> <span class="o">=</span> <span class="n">p3</span> <span class="o">-</span> <span class="n">p1</span>
+    <span class="n">e3</span> <span class="o">=</span> <span class="n">p2</span> <span class="o">-</span> <span class="n">p3</span>
+
+    <span class="n">el1</span> <span class="o">=</span> <span class="p">((</span><span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">e1</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">el2</span> <span class="o">=</span> <span class="p">((</span><span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">e2</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">el3</span> <span class="o">=</span> <span class="p">((</span><span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">e3</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+    <span class="n">edge_length</span> <span class="o">=</span> <span class="p">(</span><span class="n">el1</span> <span class="o">+</span> <span class="n">el2</span> <span class="o">+</span> <span class="n">el3</span><span class="p">)</span> <span class="o">/</span> <span class="mf">6.</span>
+    <span class="k">return</span> <span class="n">edge_length</span></div>
+
+
+<div class="viewcode-block" id="laplacian_loss"><a class="viewcode-back" href="../../../modules/metrics.mesh.html#kaolin.metrics.mesh.laplacian_loss">[docs]</a><span class="k">def</span> <span class="nf">laplacian_loss</span><span class="p">(</span><span class="n">mesh1</span><span class="p">:</span> <span class="n">Mesh</span><span class="p">,</span> <span class="n">mesh2</span><span class="p">:</span> <span class="n">Mesh</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the change in laplacian over two meshes</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">            mesh1 (Mesh): first mesh</span>
+<span class="sd">            mesh2: (Mesh): second mesh</span>
+
+
+<span class="sd">    Returns:</span>
+<span class="sd">            lap_loss (torch.Tensor):  laplacian change over the mesh</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">            &gt;&gt;&gt; mesh1 = TriangleMesh.from_obj(file)</span>
+<span class="sd">            &gt;&gt;&gt; mesh2 = TriangleMesh.from_obj(file)</span>
+<span class="sd">            &gt;&gt;&gt; mesh2.vertices = mesh2.vertices * 1.05</span>
+<span class="sd">            &gt;&gt;&gt; lap = laplacian_loss(mesh1, mesh2)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">lap1</span> <span class="o">=</span> <span class="n">mesh1</span><span class="o">.</span><span class="n">compute_laplacian</span><span class="p">()</span>
+    <span class="n">lap2</span> <span class="o">=</span> <span class="n">mesh2</span><span class="o">.</span><span class="n">compute_laplacian</span><span class="p">()</span>
+    <span class="n">lap_loss</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">lap1</span> <span class="o">-</span> <span class="n">lap2</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">lap_loss</span></div>
+
+
+<div class="viewcode-block" id="point_to_surface"><a class="viewcode-back" href="../../../modules/metrics.mesh.html#kaolin.metrics.mesh.point_to_surface">[docs]</a><span class="k">def</span> <span class="nf">point_to_surface</span><span class="p">(</span><span class="n">points</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">Mesh</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes the minimum distances from a set of points to a mesh</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">            points (torch.Tensor): set of points</span>
+<span class="sd">            mesh (Mesh): mesh to calculate distance</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">            distance: mean distance between points and surface</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">            &gt;&gt;&gt; mesh = TriangleMesh.from_obj(file)</span>
+<span class="sd">            &gt;&gt;&gt; points = torch.rand(1000,3)</span>
+<span class="sd">            &gt;&gt;&gt; loss = point_to_surface(points, mesh)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># extract triangle defs from mesh</span>
+    <span class="n">v1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">clone</span><span class="p">(),</span> <span class="mi">0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
+    <span class="n">v2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">clone</span><span class="p">(),</span> <span class="mi">0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
+    <span class="n">v3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">clone</span><span class="p">(),</span> <span class="mi">0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">])</span>
+
+    <span class="c1"># if quad mesh the separate the triangles</span>
+    <span class="k">if</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="n">v4</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">index_select</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">clone</span><span class="p">(),</span> <span class="mi">0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">[:,</span> <span class="mi">3</span><span class="p">])</span>
+        <span class="n">temp1</span> <span class="o">=</span> <span class="n">v1</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+        <span class="n">temp2</span> <span class="o">=</span> <span class="n">v2</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+        <span class="n">temp3</span> <span class="o">=</span> <span class="n">v3</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+        <span class="n">v1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">v1</span><span class="p">,</span> <span class="n">v1</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">v2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">v2</span><span class="p">,</span> <span class="n">v4</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">v3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">v3</span><span class="p">,</span> <span class="n">v3</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">points</span><span class="o">.</span><span class="n">is_cuda</span><span class="p">:</span>
+
+        <span class="n">tri_minimum_dist</span> <span class="o">=</span> <span class="n">TriangleDistance</span><span class="p">()</span>
+        <span class="c1"># pass to cuda</span>
+        <span class="n">distance</span><span class="p">,</span> <span class="n">indx</span><span class="p">,</span> <span class="n">dist_type</span> <span class="o">=</span> <span class="n">tri_minimum_dist</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="n">v3</span><span class="p">)</span>
+        <span class="n">indx</span> <span class="o">=</span> <span class="n">indx</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">dist_type</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">LongTensor</span><span class="p">(</span><span class="n">dist_type</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="c1"># reconpute distances to define gradient</span>
+        <span class="n">grad_dist</span> <span class="o">=</span> <span class="n">_recompute_point_to_surface</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="n">v3</span><span class="p">],</span> <span class="n">points</span><span class="p">,</span> <span class="n">indx</span><span class="p">,</span> <span class="n">dist_type</span><span class="p">)</span>
+        <span class="c1"># sanity check</span>
+        <span class="c1"># print(distance.mean(), grad_dist)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">grad_dist</span> <span class="o">=</span> <span class="n">_point_to_surface_cpu</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="n">v3</span><span class="p">,</span> <span class="n">points</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">grad_dist</span></div>
+
+
+<span class="k">def</span> <span class="nf">_recompute_point_to_surface</span><span class="p">(</span><span class="n">verts</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">indecies</span><span class="p">,</span> <span class="n">dist_type</span><span class="p">):</span>
+    <span class="c1"># recompute surface based the calcualted correct assignments of points and triangles</span>
+    <span class="c1"># and the type of distacne, type 1 to 3 idicates which edge to calcualte to,</span>
+    <span class="c1"># type 4 indicates the distance is from a point on the triangle not an edge</span>
+    <span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="n">v3</span> <span class="o">=</span> <span class="n">verts</span>
+    <span class="n">v1</span> <span class="o">=</span> <span class="n">v1</span><span class="p">[</span><span class="n">indecies</span><span class="p">]</span>
+    <span class="n">v2</span> <span class="o">=</span> <span class="n">v2</span><span class="p">[</span><span class="n">indecies</span><span class="p">]</span>
+    <span class="n">v3</span> <span class="o">=</span> <span class="n">v3</span><span class="p">[</span><span class="n">indecies</span><span class="p">]</span>
+
+    <span class="n">type_1</span> <span class="o">=</span> <span class="p">(</span><span class="n">dist_type</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">type_2</span> <span class="o">=</span> <span class="p">(</span><span class="n">dist_type</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">type_3</span> <span class="o">=</span> <span class="p">(</span><span class="n">dist_type</span> <span class="o">==</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">type_4</span> <span class="o">=</span> <span class="p">(</span><span class="n">dist_type</span> <span class="o">==</span> <span class="mi">3</span><span class="p">)</span>
+
+    <span class="n">v21</span> <span class="o">=</span> <span class="n">v2</span> <span class="o">-</span> <span class="n">v1</span>
+    <span class="n">v32</span> <span class="o">=</span> <span class="n">v3</span> <span class="o">-</span> <span class="n">v2</span>
+    <span class="n">v13</span> <span class="o">=</span> <span class="n">v1</span> <span class="o">-</span> <span class="n">v3</span>
+
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">p</span> <span class="o">-</span> <span class="n">v1</span>
+    <span class="n">p2</span> <span class="o">=</span> <span class="n">p</span> <span class="o">-</span> <span class="n">v2</span>
+    <span class="n">p3</span> <span class="o">=</span> <span class="n">p</span> <span class="o">-</span> <span class="n">v3</span>
+
+    <span class="n">dists</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">dists</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_compute_edge_dist</span><span class="p">(</span><span class="n">v21</span><span class="p">[</span><span class="n">type_1</span><span class="p">],</span> <span class="n">p1</span><span class="p">[</span><span class="n">type_1</span><span class="p">])</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">dists</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_compute_edge_dist</span><span class="p">(</span><span class="n">v32</span><span class="p">[</span><span class="n">type_2</span><span class="p">],</span> <span class="n">p2</span><span class="p">[</span><span class="n">type_2</span><span class="p">])</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">dists</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_compute_edge_dist</span><span class="p">(</span><span class="n">v13</span><span class="p">[</span><span class="n">type_3</span><span class="p">],</span> <span class="n">p3</span><span class="p">[</span><span class="n">type_3</span><span class="p">])</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">type_4</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">nor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">v21</span><span class="p">[</span><span class="n">type_4</span><span class="p">],</span> <span class="n">v13</span><span class="p">[</span><span class="n">type_4</span><span class="p">])</span>
+        <span class="n">dists</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_compute_planar_dist</span><span class="p">(</span><span class="n">nor</span><span class="p">,</span> <span class="n">p1</span><span class="p">[</span><span class="n">type_4</span><span class="p">]))</span>
+
+    <span class="n">distances</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">dists</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">distances</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">_compute_edge_dist</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="c1"># batched distance between an edge and a point</span>
+    <span class="k">if</span> <span class="n">v</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">v</span>
+    <span class="n">dots</span> <span class="o">=</span> <span class="n">_compute_dot</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+    <span class="n">dots_div</span> <span class="o">=</span> <span class="n">_compute_dot</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v</span><span class="p">,)</span>
+    <span class="n">dots</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">dots</span> <span class="o">/</span> <span class="n">dots_div</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">dots</span> <span class="o">=</span> <span class="p">(</span><span class="n">v</span> <span class="o">*</span> <span class="n">dots</span><span class="p">)</span> <span class="o">-</span> <span class="n">p</span>
+    <span class="n">dots</span> <span class="o">=</span> <span class="n">_compute_dot</span><span class="p">(</span><span class="n">dots</span><span class="p">,</span> <span class="n">dots</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dots</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_compute_dot</span><span class="p">(</span><span class="n">p1</span><span class="p">,</span> <span class="n">p2</span><span class="p">):</span>
+    <span class="c1"># batched dot product</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">bmm</span><span class="p">(</span><span class="n">p1</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">p1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
+                     <span class="n">p2</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">p2</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_compute_planar_dist</span><span class="p">(</span><span class="n">nor</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="c1"># batched distance between a point and a tiangle</span>
+    <span class="k">if</span> <span class="n">nor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">nor</span>
+    <span class="n">dot</span> <span class="o">=</span> <span class="n">_compute_dot</span><span class="p">(</span><span class="n">nor</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+    <span class="n">dot_div</span> <span class="o">=</span> <span class="n">_compute_dot</span><span class="p">(</span><span class="n">nor</span><span class="p">,</span> <span class="n">nor</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dot</span> <span class="o">*</span> <span class="n">dot</span> <span class="o">/</span> <span class="n">dot_div</span>
+
+
+<span class="k">def</span> <span class="nf">_point_to_surface_cpu</span><span class="p">(</span><span class="n">v1</span><span class="p">,</span> <span class="n">v2</span><span class="p">,</span> <span class="n">v3</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
+
+    <span class="n">faces_len</span> <span class="o">=</span> <span class="n">v1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">v21</span> <span class="o">=</span> <span class="n">v2</span> <span class="o">-</span> <span class="n">v1</span>
+    <span class="n">v32</span> <span class="o">=</span> <span class="n">v3</span> <span class="o">-</span> <span class="n">v2</span>
+    <span class="n">v13</span> <span class="o">=</span> <span class="n">v1</span> <span class="o">-</span> <span class="n">v3</span>
+    <span class="n">nor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">v21</span><span class="p">,</span> <span class="n">v13</span><span class="p">)</span>
+
+    <span class="c1"># make more of them, one set for each sampled point</span>
+    <span class="n">v1</span> <span class="o">=</span> <span class="n">v1</span><span class="o">.</span><span class="n">view</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">v2</span> <span class="o">=</span> <span class="n">v2</span><span class="o">.</span><span class="n">view</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v2</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">v3</span> <span class="o">=</span> <span class="n">v3</span><span class="o">.</span><span class="n">view</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v3</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">v21</span> <span class="o">=</span> <span class="n">v21</span><span class="o">.</span><span class="n">view</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v21</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">v32</span> <span class="o">=</span> <span class="n">v32</span><span class="o">.</span><span class="n">view</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v32</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">v13</span> <span class="o">=</span> <span class="n">v13</span><span class="o">.</span><span class="n">view</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v13</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">nor</span> <span class="o">=</span> <span class="n">nor</span><span class="o">.</span><span class="n">view</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">nor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">points</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span>
+                    <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">faces_len</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">p</span> <span class="o">-</span> <span class="n">v1</span>
+    <span class="n">p2</span> <span class="o">=</span> <span class="n">p</span> <span class="o">-</span> <span class="n">v2</span>
+    <span class="n">p3</span> <span class="o">=</span> <span class="n">p</span> <span class="o">-</span> <span class="n">v3</span>
+
+    <span class="k">del</span><span class="p">(</span><span class="n">v1</span><span class="p">)</span>
+    <span class="k">del</span><span class="p">(</span><span class="n">v2</span><span class="p">)</span>
+    <span class="k">del</span><span class="p">(</span><span class="n">v3</span><span class="p">)</span>
+
+    <span class="n">sign1</span> <span class="o">=</span> <span class="n">_compute_sign</span><span class="p">(</span><span class="n">v21</span><span class="p">,</span> <span class="n">nor</span><span class="p">,</span> <span class="n">p1</span><span class="p">)</span>
+    <span class="n">sign2</span> <span class="o">=</span> <span class="n">_compute_sign</span><span class="p">(</span><span class="n">v32</span><span class="p">,</span> <span class="n">nor</span><span class="p">,</span> <span class="n">p2</span><span class="p">)</span>
+    <span class="n">sign3</span> <span class="o">=</span> <span class="n">_compute_sign</span><span class="p">(</span><span class="n">v13</span><span class="p">,</span> <span class="n">nor</span><span class="p">,</span> <span class="n">p3</span><span class="p">)</span>
+
+    <span class="n">outside_triangle</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">le</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">sign1</span> <span class="o">+</span> <span class="n">sign2</span> <span class="o">+</span> <span class="n">sign3</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">inside_triangle</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">gt</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">sign1</span> <span class="o">+</span> <span class="n">sign2</span> <span class="o">+</span> <span class="n">sign3</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">distances</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">sign1</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+
+    <span class="k">del</span> <span class="p">(</span><span class="n">sign1</span><span class="p">)</span>
+    <span class="k">del</span> <span class="p">(</span><span class="n">sign2</span><span class="p">)</span>
+    <span class="k">del</span> <span class="p">(</span><span class="n">sign3</span><span class="p">)</span>
+
+    <span class="n">outside_triangle</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">outside_triangle</span><span class="p">)</span>
+    <span class="n">inside_triangle</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">inside_triangle</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">dotter1</span> <span class="o">=</span> <span class="n">_compute_dotter</span><span class="p">(</span><span class="n">v21</span><span class="p">[</span><span class="n">outside_triangle</span><span class="p">],</span> <span class="n">p1</span><span class="p">[</span><span class="n">outside_triangle</span><span class="p">])</span>
+        <span class="n">dotter2</span> <span class="o">=</span> <span class="n">_compute_dotter</span><span class="p">(</span><span class="n">v32</span><span class="p">[</span><span class="n">outside_triangle</span><span class="p">],</span> <span class="n">p2</span><span class="p">[</span><span class="n">outside_triangle</span><span class="p">])</span>
+        <span class="n">dotter3</span> <span class="o">=</span> <span class="n">_compute_dotter</span><span class="p">(</span><span class="n">v13</span><span class="p">[</span><span class="n">outside_triangle</span><span class="p">],</span> <span class="n">p3</span><span class="p">[</span><span class="n">outside_triangle</span><span class="p">])</span>
+        <span class="n">dots</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">dotter1</span><span class="p">,</span> <span class="n">dotter2</span><span class="p">,</span> <span class="n">dotter3</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">edge_distance</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">dots</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
+        <span class="n">edge_distance</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">distances</span><span class="p">[</span><span class="n">outside_triangle</span><span class="p">]</span> <span class="o">=</span> <span class="n">edge_distance</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">face_distance</span> <span class="o">=</span> <span class="n">_compute_planar_dist</span><span class="p">(</span>
+            <span class="n">nor</span><span class="p">[</span><span class="n">inside_triangle</span><span class="p">],</span> <span class="n">p1</span><span class="p">[</span><span class="n">inside_triangle</span><span class="p">])</span>
+    <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
+        <span class="n">face_distance</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">distances</span><span class="p">[</span><span class="n">inside_triangle</span><span class="p">]</span> <span class="o">=</span> <span class="n">face_distance</span>
+
+    <span class="n">distances</span> <span class="o">=</span> <span class="n">distances</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">faces_len</span><span class="p">)</span>
+
+    <span class="n">min_distaces</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">distances</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">min_distaces</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_compute_sign</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">nor</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="n">sign</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">nor</span><span class="p">)</span>
+    <span class="n">sign</span> <span class="o">=</span> <span class="n">_compute_dot</span><span class="p">(</span><span class="n">sign</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+    <span class="n">sign</span> <span class="o">=</span> <span class="n">sign</span><span class="o">.</span><span class="n">sign</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">sign</span>
+
+
+<span class="k">def</span> <span class="nf">_compute_dotter</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">v</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">v</span>
+    <span class="n">dotter</span> <span class="o">=</span> <span class="n">_compute_dot</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span>
+    <span class="n">dotter_div</span> <span class="o">=</span> <span class="n">_compute_dot</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v</span><span class="p">,)</span>
+    <span class="n">dotter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="n">dotter</span> <span class="o">/</span> <span class="n">dotter_div</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">dotter</span> <span class="o">=</span> <span class="p">(</span><span class="n">v</span> <span class="o">*</span> <span class="n">dotter</span><span class="p">)</span> <span class="o">-</span> <span class="n">p</span>
+    <span class="n">dotter</span> <span class="o">=</span> <span class="n">_compute_dot</span><span class="p">(</span><span class="n">dotter</span><span class="p">,</span> <span class="n">dotter</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">dotter</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

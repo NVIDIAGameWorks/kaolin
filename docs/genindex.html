@@ -1,0 +1,804 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Index &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script type="text/javascript" src="_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="#" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Index</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+
+<h1 id="index">Index</h1>
+
+<div class="genindex-jumpbox">
+ <a href="#_"><strong>_</strong></a>
+ | <a href="#A"><strong>A</strong></a>
+ | <a href="#B"><strong>B</strong></a>
+ | <a href="#C"><strong>C</strong></a>
+ | <a href="#D"><strong>D</strong></a>
+ | <a href="#E"><strong>E</strong></a>
+ | <a href="#F"><strong>F</strong></a>
+ | <a href="#G"><strong>G</strong></a>
+ | <a href="#H"><strong>H</strong></a>
+ | <a href="#I"><strong>I</strong></a>
+ | <a href="#K"><strong>K</strong></a>
+ | <a href="#L"><strong>L</strong></a>
+ | <a href="#M"><strong>M</strong></a>
+ | <a href="#N"><strong>N</strong></a>
+ | <a href="#O"><strong>O</strong></a>
+ | <a href="#P"><strong>P</strong></a>
+ | <a href="#Q"><strong>Q</strong></a>
+ | <a href="#R"><strong>R</strong></a>
+ | <a href="#S"><strong>S</strong></a>
+ | <a href="#T"><strong>T</strong></a>
+ | <a href="#U"><strong>U</strong></a>
+ | <a href="#V"><strong>V</strong></a>
+ 
+</div>
+<h2 id="_">_</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.PointCloud.html#kaolin.rep.PointCloud.__init__">__init__() (PointCloud method)</a>
+
+      <ul>
+        <li><a href="modules/rep.VoxelGrid.html#kaolin.rep.VoxelGrid.VoxelGrid.__init__">(VoxelGrid method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="A">A</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/graphics.html#graphics.Lighting.apply_ambient_light">apply_ambient_light() (in module graphics.Lighting)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/graphics.html#graphics.Lighting.apply_directional_light">apply_directional_light() (in module graphics.Lighting)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="B">B</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.PointCloud.html#kaolin.rep.PointCloud.bounding_points">bounding_points() (in module kaolin.rep.PointCloud)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="C">C</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/transforms.html#kaolin.transforms.CacheCompose">CacheCompose (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.CBatchNorm1d">CBatchNorm1d (class in kaolin.models.OccupancyNetwork)</a>
+</li>
+      <li><a href="modules/metrics.mesh.html#kaolin.metrics.mesh.chamfer_distance">chamfer_distance() (in module kaolin.metrics.mesh)</a>
+
+      <ul>
+        <li><a href="modules/metrics.point.html#kaolin.metrics.point.chamfer_distance">(in module kaolin.metrics.point)</a>
+</li>
+      </ul></li>
+      <li><a href="modules/rep.SDF.html#kaolin.rep.SDF.check_sign">check_sign() (in module kaolin.rep.SDF)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.Compose">Compose (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.compose_transforms_3d">compose_transforms_3d() (in module kaolin.mathutils)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.compute_adjacency_info">compute_adjacency_info() (Mesh static method)</a>
+</li>
+      <li><a href="modules/rep.QuadMesh.html#kaolin.rep.QuadMesh.QuadMesh.compute_adjacency_matrix_full">compute_adjacency_matrix_full() (QuadMesh method)</a>
+
+      <ul>
+        <li><a href="modules/rep.TriangleMesh.html#kaolin.rep.TriangleMesh.TriangleMesh.compute_adjacency_matrix_full">(TriangleMesh method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.TriangleMesh.html#kaolin.rep.TriangleMesh.TriangleMesh.compute_adjacency_matrix_sparse">compute_adjacency_matrix_sparse() (TriangleMesh method)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.compute_elbo">compute_elbo() (OccupancyNetwork method)</a>
+</li>
+      <li><a href="modules/rep.TriangleMesh.html#kaolin.rep.TriangleMesh.TriangleMesh.compute_face_normals">compute_face_normals() (TriangleMesh method)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.compute_laplacian">compute_laplacian() (Mesh method)</a>
+</li>
+      <li><a href="modules/rep.TriangleMesh.html#kaolin.rep.TriangleMesh.TriangleMesh.compute_vertex_normals">compute_vertex_normals() (TriangleMesh method)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.cpu">cpu() (Mesh method)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.CResnetBlockConv1d">CResnetBlockConv1d (class in kaolin.models.OccupancyNetwork)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.cuda">cuda() (Mesh method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="D">D</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.decode">decode() (OccupancyNetwork method)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.DecoderCBatchNorm">DecoderCBatchNorm (class in kaolin.models.OccupancyNetwork)</a>
+</li>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.deg2rad">deg2rad() (in module kaolin.mathutils)</a>
+</li>
+      <li><a href="modules/models.html#models.dgcnn.DGCNN">DGCNN() (in module models.dgcnn)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/models.html#kaolin.models.DIBREncoder.DIBREncoder">DIBREncoder (class in kaolin.models.DIBREncoder)</a>
+</li>
+      <li><a href="modules/graphics.html#graphics.DIBRenderer">DIBRenderer (class in graphics)</a>
+</li>
+      <li><a href="modules/graphics.html#graphics.DifferentiableRenderer">DifferentiableRenderer (class in graphics)</a>
+</li>
+      <li><a href="modules/metrics.point.html#kaolin.metrics.point.directed_distance">directed_distance() (in module kaolin.metrics.point)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.DownsampleVoxelGrid">DownsampleVoxelGrid (class in kaolin.transforms)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="E">E</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/metrics.mesh.html#kaolin.metrics.mesh.edge_length">edge_length() (in module kaolin.metrics.mesh)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.encode_inputs">encode_inputs() (OccupancyNetwork method)</a>
+</li>
+      <li><a href="modules/models.html#models.VoxelSuperresSimple.EncoderDecoder">EncoderDecoder() (in module models.VoxelSuperresSimple)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/transforms.html#kaolin.transforms.ExtractOdmsFromVoxelGrid">ExtractOdmsFromVoxelGrid (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.ExtractProjectOdmsFromVoxelGrid">ExtractProjectOdmsFromVoxelGrid (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.ExtractSurfaceVoxels">ExtractSurfaceVoxels (class in kaolin.transforms)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="F">F</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/metrics.point.html#kaolin.metrics.point.f_score">f_score() (in module kaolin.metrics.point)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.FillVoxelGrid">FillVoxelGrid (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.CBatchNorm1d.forward">forward() (CBatchNorm1d method)</a>
+
+      <ul>
+        <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.CResnetBlockConv1d.forward">(CResnetBlockConv1d method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.DecoderCBatchNorm.forward">(DecoderCBatchNorm method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.DIBREncoder.DIBREncoder.forward">(DIBREncoder method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.Pixel2Mesh.G_Res_Net.forward">(G_Res_Net method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.Pixel2Mesh.GCN.forward">(GCN method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.GraphResNet.GraphResNet.forward">(GraphResNet method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.Image2MeshReconstructionBaseline.ImageToMeshReconstructionBaseline.forward">(ImageToMeshReconstructionBaseline method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.MeshEncoder.MeshEncoder.forward">(MeshEncoder method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.forward">(OccupancyNetwork method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.Resnet18.forward">(Resnet18 method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.SimpleGCN.SimpleGCN.forward">(SimpleGCN method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.Pixel2Mesh.VGG.forward">(VGG method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.VGG18.VGG18.forward">(VGG18 method)</a>
+</li>
+        <li><a href="modules/models.html#kaolin.models.GEOMetrics.VoxelDecoder.forward">(VoxelDecoder method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.from_obj">from_obj() (Mesh class method)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.from_tensors">from_tensors() (Mesh class method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="G">G</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/models.html#kaolin.models.Pixel2Mesh.G_Res_Net">G_Res_Net (class in kaolin.models.Pixel2Mesh)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.Pixel2Mesh.GCN">GCN (class in kaolin.models.Pixel2Mesh)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.get_common_vertex">get_common_vertex() (Mesh static method)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.get_edge_order">get_edge_order() (Mesh static method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.get_edges_from_face">get_edges_from_face() (Mesh static method)</a>
+</li>
+      <li><a href="modules/graphics.html#graphics.Transformations.get_eye_from_spherical_coords">get_eye_from_spherical_coords() (in module graphics.Transformations)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.get_prior_z">get_prior_z() (in module kaolin.models.OccupancyNetwork)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.get_z_from_prior">get_z_from_prior() (OccupancyNetwork method)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.GraphResNet.GraphResNet">GraphResNet (class in kaolin.models.GraphResNet)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="H">H</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.has_common_vertex">has_common_vertex() (Mesh static method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.homogenize_points">homogenize_points() (in module kaolin.mathutils)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="I">I</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/models.html#kaolin.models.Image2MeshReconstructionBaseline.ImageToMeshReconstructionBaseline">ImageToMeshReconstructionBaseline (class in kaolin.models.Image2MeshReconstructionBaseline)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.infer_z">infer_z() (OccupancyNetwork method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.invert_rigid_transform_3d">invert_rigid_transform_3d() (in module kaolin.mathutils)</a>
+</li>
+      <li><a href="modules/metrics.point.html#kaolin.metrics.point.iou">iou() (in module kaolin.metrics.point)</a>
+
+      <ul>
+        <li><a href="modules/metrics.voxel.html#kaolin.metrics.voxel.iou">(in module kaolin.metrics.voxel)</a>
+</li>
+      </ul></li>
+  </ul></td>
+</tr></table>
+
+<h2 id="K">K</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/models.html#module-kaolin.models.DIBREncoder">kaolin.models.DIBREncoder (module)</a>
+</li>
+      <li><a href="modules/models.html#module-kaolin.models.GEOMetrics">kaolin.models.GEOMetrics (module)</a>
+</li>
+      <li><a href="modules/models.html#module-kaolin.models.GraphResNet">kaolin.models.GraphResNet (module)</a>
+</li>
+      <li><a href="modules/models.html#module-kaolin.models.Image2MeshReconstructionBaseline">kaolin.models.Image2MeshReconstructionBaseline (module)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/models.html#module-kaolin.models.MeshEncoder">kaolin.models.MeshEncoder (module)</a>
+</li>
+      <li><a href="modules/models.html#module-kaolin.models.OccupancyNetwork">kaolin.models.OccupancyNetwork (module)</a>
+</li>
+      <li><a href="modules/models.html#module-kaolin.models.Pixel2Mesh">kaolin.models.Pixel2Mesh (module)</a>
+</li>
+      <li><a href="modules/models.html#module-kaolin.models.SimpleGCN">kaolin.models.SimpleGCN (module)</a>
+</li>
+      <li><a href="modules/models.html#module-kaolin.models.VGG18">kaolin.models.VGG18 (module)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="L">L</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/metrics.mesh.html#kaolin.metrics.mesh.laplacian_loss">laplacian_loss() (in module kaolin.metrics.mesh)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.laplacian_smoothing">laplacian_smoothing() (Mesh method)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.list_of_lists_to_matrix">list_of_lists_to_matrix() (Mesh static method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.load_mtl">load_mtl() (Mesh static method)</a>
+</li>
+      <li><a href="modules/rep.QuadMesh.html#kaolin.rep.QuadMesh.QuadMesh.load_tensors">load_tensors() (QuadMesh method)</a>
+
+      <ul>
+        <li><a href="modules/rep.TriangleMesh.html#kaolin.rep.TriangleMesh.TriangleMesh.load_tensors">(TriangleMesh method)</a>
+</li>
+      </ul></li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.load_textures">load_textures() (Mesh class method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="M">M</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh">Mesh (class in kaolin.rep.Mesh)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.MeshEncoder.MeshEncoder">MeshEncoder (class in kaolin.models.MeshEncoder)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/transforms.html#kaolin.transforms.MeshLaplacianSmoothing">MeshLaplacianSmoothing (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/datasets.modelnet.html#kaolin.datasets.modelnet.ModelNet">ModelNet (class in kaolin.datasets.modelnet)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="N">N</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/graphics.html#graphics.NeuralMeshRenderer">NeuralMeshRenderer (class in graphics)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.normalize_imagenet">normalize_imagenet() (in module kaolin.models.OccupancyNetwork)</a>
+</li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.normalize_zerosafe">normalize_zerosafe() (Mesh static method)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/transforms.html#kaolin.transforms.NormalizeMesh">NormalizeMesh (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.NormalizePointCloud">NormalizePointCloud (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.NumpyToTensor">NumpyToTensor (class in kaolin.transforms)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="O">O</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork">OccupancyNetwork (class in kaolin.models.OccupancyNetwork)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="P">P</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/metrics.mesh.html#kaolin.metrics.mesh.point_to_surface">point_to_surface() (in module kaolin.metrics.mesh)</a>
+</li>
+      <li><a href="modules/rep.PointCloud.html#kaolin.rep.PointCloud">PointCloud (class in kaolin.rep)</a>
+</li>
+      <li><a href="modules/conversions.pointcloudconversions.html#kaolin.conversions.pointcloudconversions.pointcloud_to_sdf">pointcloud_to_sdf() (in module kaolin.conversions.pointcloudconversions)</a>
+</li>
+      <li><a href="modules/conversions.pointcloudconversions.html#kaolin.conversions.pointcloudconversions.pointcloud_to_trianglemesh">pointcloud_to_trianglemesh() (in module kaolin.conversions.pointcloudconversions)</a>
+</li>
+      <li><a href="modules/conversions.pointcloudconversions.html#kaolin.conversions.pointcloudconversions.pointcloud_to_voxelgrid">pointcloud_to_voxelgrid() (in module kaolin.conversions.pointcloudconversions)</a>
+</li>
+      <li><a href="modules/models.html#models.PointNet2.PointNet2Classifier">PointNet2Classifier() (in module models.PointNet2)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/models.html#models.PointNet2.PointNet2FeaturePropagator">PointNet2FeaturePropagator() (in module models.PointNet2)</a>
+</li>
+      <li><a href="modules/models.html#models.PointNet2.PointNet2Segmenter">PointNet2Segmenter() (in module models.PointNet2)</a>
+</li>
+      <li><a href="modules/models.html#models.PointNet2.PointNet2SetAbstraction">PointNet2SetAbstraction() (in module models.PointNet2)</a>
+</li>
+      <li><a href="modules/models.html#models.PointNet.PointNetClassifier">PointNetClassifier() (in module models.PointNet)</a>
+</li>
+      <li><a href="modules/models.html#models.PointNet.PointNetFeatureExtractor">PointNetFeatureExtractor() (in module models.PointNet)</a>
+</li>
+      <li><a href="modules/models.html#models.PointNet.PointNetSegmenter">PointNetSegmenter() (in module models.PointNet)</a>
+</li>
+      <li><a href="modules/vision.html#kaolin.vision.project_points">project_points() (in module kaolin.vision)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="Q">Q</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.QuadMesh.html#kaolin.rep.QuadMesh.QuadMesh">QuadMesh (class in kaolin.rep.QuadMesh)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="R">R</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.rad2deg">rad2deg() (in module kaolin.mathutils)</a>
+</li>
+      <li><a href="modules/rep.PointCloud.html#kaolin.rep.PointCloud.random_input_dropout">random_input_dropout() (in module kaolin.rep.PointCloud)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.RealignMesh">RealignMesh (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.RealignPointCloud">RealignPointCloud (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.OccupancyNetwork.Resnet18">Resnet18 (class in kaolin.models.OccupancyNetwork)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/transforms.html#kaolin.transforms.RotateMesh">RotateMesh (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.RotatePointCloud">RotatePointCloud (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.rotx">rotx() (in module kaolin.mathutils)</a>
+</li>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.roty">roty() (in module kaolin.mathutils)</a>
+</li>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.rotz">rotz() (in module kaolin.mathutils)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="S">S</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/rep.QuadMesh.html#kaolin.rep.QuadMesh.QuadMesh.sample">sample() (QuadMesh method)</a>
+
+      <ul>
+        <li><a href="modules/rep.TriangleMesh.html#kaolin.rep.TriangleMesh.TriangleMesh.sample">(TriangleMesh method)</a>
+</li>
+      </ul></li>
+      <li><a href="modules/transforms.html#kaolin.transforms.SampleTriangleMesh">SampleTriangleMesh (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/rep.QuadMesh.html#kaolin.rep.QuadMesh.QuadMesh.save_mesh">save_mesh() (QuadMesh method)</a>
+
+      <ul>
+        <li><a href="modules/rep.TriangleMesh.html#kaolin.rep.TriangleMesh.TriangleMesh.save_mesh">(TriangleMesh method)</a>
+</li>
+      </ul></li>
+      <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.save_tensors">save_tensors() (Mesh method)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.ScaleMesh">ScaleMesh (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.ScalePointCloud">ScalePointCloud (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/datasets.scannet.html#kaolin.datasets.scannet.ScanNet">ScanNet (class in kaolin.datasets.scannet)</a>
+</li>
+      <li><a href="modules/conversions.sdfconversions.html#kaolin.conversions.sdfconversions.sdf_to_pointcloud">sdf_to_pointcloud() (in module kaolin.conversions.sdfconversions)</a>
+</li>
+      <li><a href="modules/conversions.sdfconversions.html#kaolin.conversions.sdfconversions.sdf_to_trianglemesh">sdf_to_trianglemesh() (in module kaolin.conversions.sdfconversions)</a>
+</li>
+      <li><a href="modules/conversions.sdfconversions.html#kaolin.conversions.sdfconversions.sdf_to_voxelgrid">sdf_to_voxelgrid() (in module kaolin.conversions.sdfconversions)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.SDFToPointCloud">SDFToPointCloud (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.SDFToTriangleMesh">SDFToTriangleMesh (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.SDFToVoxelGrid">SDFToVoxelGrid (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Combination">ShapeNet_Combination (class in kaolin.datasets.shapenet)</a>
+</li>
+      <li><a href="modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Images">ShapeNet_Images (class in kaolin.datasets.shapenet)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Meshes">ShapeNet_Meshes (class in kaolin.datasets.shapenet)</a>
+</li>
+      <li><a href="modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Points">ShapeNet_Points (class in kaolin.datasets.shapenet)</a>
+</li>
+      <li><a href="modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_SDF_Points">ShapeNet_SDF_Points (class in kaolin.datasets.shapenet)</a>
+</li>
+      <li><a href="modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Surface_Meshes">ShapeNet_Surface_Meshes (class in kaolin.datasets.shapenet)</a>
+</li>
+      <li><a href="modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Tags">ShapeNet_Tags (class in kaolin.datasets.shapenet)</a>
+</li>
+      <li><a href="modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Voxels">ShapeNet_Voxels (class in kaolin.datasets.shapenet)</a>
+</li>
+      <li><a href="modules/visualize.html#kaolin.visualize.show">show() (in module kaolin.visualize)</a>
+
+      <ul>
+        <li><a href="modules/rep.Mesh.html#kaolin.rep.Mesh.Mesh.show">(Mesh method)</a>
+</li>
+      </ul></li>
+      <li><a href="modules/visualize.html#kaolin.visualize.show_mesh">show_mesh() (in module kaolin.visualize)</a>
+</li>
+      <li><a href="modules/visualize.html#kaolin.visualize.show_pointcloud">show_pointcloud() (in module kaolin.visualize)</a>
+</li>
+      <li><a href="modules/visualize.html#kaolin.visualize.show_sdf">show_sdf() (in module kaolin.visualize)</a>
+</li>
+      <li><a href="modules/visualize.html#kaolin.visualize.show_voxelgrid">show_voxelgrid() (in module kaolin.visualize)</a>
+</li>
+      <li><a href="modules/datasets.shrec.html#kaolin.datasets.shrec.SHREC16">SHREC16 (class in kaolin.datasets.shrec)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.SimpleGCN.SimpleGCN">SimpleGCN (class in kaolin.models.SimpleGCN)</a>
+</li>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.SO3Exp">SO3Exp (class in kaolin.mathutils)</a>
+</li>
+      <li><a href="modules/graphics.html#graphics.SoftRenderer">SoftRenderer (class in graphics)</a>
+</li>
+      <li><a href="modules/models.html#models.VoxelSuperresODM.SuperresNetwork">SuperresNetwork() (in module models.VoxelSuperresODM)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="T">T</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/transforms.html#kaolin.transforms.ThresholdVoxelGrid">ThresholdVoxelGrid (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.transform3d">transform3d() (in module kaolin.mathutils)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.TranslateMesh">TranslateMesh (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/rep.TriangleMesh.html#kaolin.rep.TriangleMesh.TriangleMesh">TriangleMesh (class in kaolin.rep.TriangleMesh)</a>
+</li>
+      <li><a href="modules/conversions.meshconversions.html#kaolin.conversions.meshconversions.trianglemesh_to_pointcloud">trianglemesh_to_pointcloud() (in module kaolin.conversions.meshconversions)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/conversions.meshconversions.html#kaolin.conversions.meshconversions.trianglemesh_to_sdf">trianglemesh_to_sdf() (in module kaolin.conversions.meshconversions)</a>
+</li>
+      <li><a href="modules/conversions.meshconversions.html#kaolin.conversions.meshconversions.trianglemesh_to_voxelgrid">trianglemesh_to_voxelgrid() (in module kaolin.conversions.meshconversions)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.TriangleMeshToPointCloud">TriangleMeshToPointCloud (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.TriangleMeshToSDF">TriangleMeshToSDF (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.TriangleMeshToVoxelGrid">TriangleMeshToVoxelGrid (class in kaolin.transforms)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="U">U</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/mathutils.html#kaolin.mathutils.unhomogenize_points">unhomogenize_points() (in module kaolin.mathutils)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/vision.html#kaolin.vision.unproject_points">unproject_points() (in module kaolin.vision)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.UpsampleVoxelGrid">UpsampleVoxelGrid (class in kaolin.transforms)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="V">V</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/models.html#kaolin.models.Pixel2Mesh.VGG">VGG (class in kaolin.models.Pixel2Mesh)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.VGG18.VGG18">VGG18 (class in kaolin.models.VGG18)</a>
+</li>
+      <li><a href="modules/models.html#models.Voxel3DIWGAN.Voxel3DIWDiscriminator">Voxel3DIWDiscriminator() (in module models.Voxel3DIWGAN)</a>
+</li>
+      <li><a href="modules/models.html#models.Voxel3DIWGAN.Voxel3DIWGenerator">Voxel3DIWGenerator() (in module models.Voxel3DIWGAN)</a>
+</li>
+      <li><a href="modules/models.html#kaolin.models.GEOMetrics.VoxelDecoder">VoxelDecoder (class in kaolin.models.GEOMetrics)</a>
+</li>
+      <li><a href="modules/rep.VoxelGrid.html#kaolin.rep.VoxelGrid.VoxelGrid">VoxelGrid (class in kaolin.rep.VoxelGrid)</a>
+</li>
+      <li><a href="modules/conversions.voxelgridconversions.html#kaolin.conversions.voxelgridconversions.voxelgrid_to_pointcloud">voxelgrid_to_pointcloud() (in module kaolin.conversions.voxelgridconversions)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="modules/conversions.voxelgridconversions.html#kaolin.conversions.voxelgridconversions.voxelgrid_to_quadmesh">voxelgrid_to_quadmesh() (in module kaolin.conversions.voxelgridconversions)</a>
+</li>
+      <li><a href="modules/conversions.voxelgridconversions.html#kaolin.conversions.voxelgridconversions.voxelgrid_to_sdf">voxelgrid_to_sdf() (in module kaolin.conversions.voxelgridconversions)</a>
+</li>
+      <li><a href="modules/conversions.voxelgridconversions.html#kaolin.conversions.voxelgridconversions.voxelgrid_to_trianglemesh">voxelgrid_to_trianglemesh() (in module kaolin.conversions.voxelgridconversions)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.VoxelGridToPointCloud">VoxelGridToPointCloud (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.VoxelGridToQuadMesh">VoxelGridToQuadMesh (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.VoxelGridToSDF">VoxelGridToSDF (class in kaolin.transforms)</a>
+</li>
+      <li><a href="modules/transforms.html#kaolin.transforms.VoxelGridToTriangleMesh">VoxelGridToTriangleMesh (class in kaolin.transforms)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

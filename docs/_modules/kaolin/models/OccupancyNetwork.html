@@ -1,0 +1,603 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.models.OccupancyNetwork &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>kaolin.models.OccupancyNetwork</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for kaolin.models.OccupancyNetwork</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.</span>
+
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1">#</span>
+<span class="c1">#</span>
+<span class="c1"># Copyright 2019 Lars Mescheder, Michael Oechsle, Michael Niemeyer,</span>
+<span class="c1"># Andreas Geiger, Sebastian Nowozin</span>
+
+<span class="c1"># Permission is hereby granted, free of charge, to any person obtaining</span>
+<span class="c1"># a copy of this software and associated documentation files (the &quot;Software&quot;),</span>
+<span class="c1"># to deal in the Software without restriction, including without limitation the</span>
+<span class="c1"># rights to use, copy, modify, merge, publish, distribute, sublicense, and/or</span>
+<span class="c1"># sell copies of the Software, and to permit persons to whom the Software is</span>
+<span class="c1"># furnished to do so, subject to the following conditions:</span>
+
+<span class="c1"># The above copyright notice and this permission notice shall be included in</span>
+<span class="c1"># all copies or substantial portions of the Software.</span>
+
+<span class="c1"># THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR</span>
+<span class="c1"># IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,</span>
+<span class="c1"># FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE</span>
+<span class="c1"># AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,</span>
+<span class="c1"># WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN</span>
+<span class="c1"># CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</span>
+
+<span class="kn">import</span> <span class="nn">math</span>
+
+<span class="kn">import</span> <span class="nn">torch</span> 
+<span class="kn">from</span> <span class="nn">torch</span> <span class="k">import</span> <span class="n">nn</span> 
+<span class="kn">from</span> <span class="nn">torch.nn.parameter</span> <span class="k">import</span> <span class="n">Parameter</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+<span class="kn">from</span> <span class="nn">torchvision</span> <span class="k">import</span> <span class="n">models</span>
+<span class="kn">import</span> <span class="nn">torch.distributions</span> <span class="k">as</span> <span class="nn">dist</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch.nn</span> <span class="k">import</span> <span class="n">Parameter</span>
+
+<div class="viewcode-block" id="Resnet18"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.Resnet18">[docs]</a><span class="k">class</span> <span class="nc">Resnet18</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&#39;&#39;&#39; ResNet-18 encoder network for image input.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        c_dim (int): output dimension of the latent embedding</span>
+<span class="sd">        normalize (bool): whether the input images should be normalized</span>
+<span class="sd">        use_linear (bool): whether a final linear layer should be used</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">c_dim</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_linear</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span> <span class="o">=</span> <span class="n">normalize</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_linear</span> <span class="o">=</span> <span class="n">use_linear</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">features</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">features</span><span class="o">.</span><span class="n">fc</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">use_linear</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fc</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">512</span><span class="p">,</span> <span class="n">c_dim</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">c_dim</span> <span class="o">==</span> <span class="mi">512</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fc</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;c_dim must be 512 if use_linear is False&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Resnet18.forward"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.Resnet18.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">:</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">normalize_imagenet</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">features</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc</span><span class="p">(</span><span class="n">net</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="normalize_imagenet"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.normalize_imagenet">[docs]</a><span class="k">def</span> <span class="nf">normalize_imagenet</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Normalize input images according to ImageNet standards.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        x (tensor): input images</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+    <span class="n">x</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mf">0.485</span><span class="p">)</span> <span class="o">/</span> <span class="mf">0.229</span>
+    <span class="n">x</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mf">0.456</span><span class="p">)</span> <span class="o">/</span> <span class="mf">0.224</span>
+    <span class="n">x</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="mf">0.406</span><span class="p">)</span> <span class="o">/</span> <span class="mf">0.225</span>
+    <span class="k">return</span> <span class="n">x</span></div>
+
+
+<div class="viewcode-block" id="DecoderCBatchNorm"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.DecoderCBatchNorm">[docs]</a><span class="k">class</span> <span class="nc">DecoderCBatchNorm</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Decoder with conditional batch normalization (CBN) class.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        dim (int): input dimension</span>
+<span class="sd">        z_dim (int): dimension of latent code z</span>
+<span class="sd">        c_dim (int): dimension of latent conditioned code c</span>
+<span class="sd">        hidden_size (int): hidden size of Decoder network</span>
+<span class="sd">        leaky (bool): whether to use leaky ReLUs</span>
+<span class="sd">        legacy (bool): whether to use the legacy structure</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">z_dim</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span> <span class="n">c_dim</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+                 <span class="n">hidden_size</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span> <span class="n">leaky</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">legacy</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">z_dim</span> <span class="o">=</span> <span class="n">z_dim</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">z_dim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fc_z</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">z_dim</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">fc_p</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">block0</span> <span class="o">=</span> <span class="n">CResnetBlockConv1d</span><span class="p">(</span><span class="n">c_dim</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">,</span> <span class="n">legacy</span><span class="o">=</span><span class="n">legacy</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">block1</span> <span class="o">=</span> <span class="n">CResnetBlockConv1d</span><span class="p">(</span><span class="n">c_dim</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">,</span> <span class="n">legacy</span><span class="o">=</span><span class="n">legacy</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">block2</span> <span class="o">=</span> <span class="n">CResnetBlockConv1d</span><span class="p">(</span><span class="n">c_dim</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">,</span> <span class="n">legacy</span><span class="o">=</span><span class="n">legacy</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">block3</span> <span class="o">=</span> <span class="n">CResnetBlockConv1d</span><span class="p">(</span><span class="n">c_dim</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">,</span> <span class="n">legacy</span><span class="o">=</span><span class="n">legacy</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">block4</span> <span class="o">=</span> <span class="n">CResnetBlockConv1d</span><span class="p">(</span><span class="n">c_dim</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">,</span> <span class="n">legacy</span><span class="o">=</span><span class="n">legacy</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">legacy</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bn</span> <span class="o">=</span> <span class="n">CBatchNorm1d</span><span class="p">(</span><span class="n">c_dim</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bn</span> <span class="o">=</span> <span class="n">CBatchNorm1d_legacy</span><span class="p">(</span><span class="n">c_dim</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">fc_out</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="n">hidden_size</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">leaky</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">actvn</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">actvn</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">F</span><span class="o">.</span><span class="n">leaky_relu</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DecoderCBatchNorm.forward"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.DecoderCBatchNorm.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">batch_size</span><span class="p">,</span> <span class="n">D</span><span class="p">,</span> <span class="n">T</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc_p</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_dim</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">net_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc_z</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">net</span> <span class="o">=</span> <span class="n">net</span> <span class="o">+</span> <span class="n">net_z</span>
+
+        <span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block0</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block1</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block2</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block3</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block4</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+
+        <span class="n">out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc_out</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">actvn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bn</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">c</span><span class="p">)))</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+
+<div class="viewcode-block" id="get_prior_z"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.get_prior_z">[docs]</a><span class="k">def</span> <span class="nf">get_prior_z</span><span class="p">(</span><span class="n">device</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Returns prior distribution for latent code z.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        cfg (dict): imported yaml config</span>
+<span class="sd">        device (device): pytorch device</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">z_dim</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">p0_z</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">z_dim</span><span class="p">,</span> <span class="n">device</span> <span class="o">=</span> <span class="n">device</span><span class="p">),</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">z_dim</span><span class="p">,</span> <span class="n">device</span> <span class="o">=</span> <span class="n">device</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">p0_z</span></div>
+
+
+<div class="viewcode-block" id="CBatchNorm1d"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.CBatchNorm1d">[docs]</a><span class="k">class</span> <span class="nc">CBatchNorm1d</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Conditional batch normalization layer class.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        c_dim (int): dimension of latent conditioned code c</span>
+<span class="sd">        f_dim (int): feature dimension</span>
+<span class="sd">        norm_method (str): normalization method</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">c_dim</span><span class="p">,</span> <span class="n">f_dim</span><span class="p">,</span> <span class="n">norm_method</span><span class="o">=</span><span class="s1">&#39;batch_norm&#39;</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">c_dim</span> <span class="o">=</span> <span class="n">c_dim</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f_dim</span> <span class="o">=</span> <span class="n">f_dim</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">norm_method</span> <span class="o">=</span> <span class="n">norm_method</span>
+        <span class="c1"># Submodules</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv_gamma</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="n">c_dim</span><span class="p">,</span> <span class="n">f_dim</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conv_beta</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="n">c_dim</span><span class="p">,</span> <span class="n">f_dim</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">norm_method</span> <span class="o">==</span> <span class="s1">&#39;batch_norm&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">BatchNorm1d</span><span class="p">(</span><span class="n">f_dim</span><span class="p">,</span> <span class="n">affine</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">norm_method</span> <span class="o">==</span> <span class="s1">&#39;instance_norm&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">InstanceNorm1d</span><span class="p">(</span><span class="n">f_dim</span><span class="p">,</span> <span class="n">affine</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">norm_method</span> <span class="o">==</span> <span class="s1">&#39;group_norm&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">GroupNorm1d</span><span class="p">(</span><span class="n">f_dim</span><span class="p">,</span> <span class="n">affine</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Invalid normalization method!&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reset_parameters</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">reset_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">zeros_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv_gamma</span><span class="o">.</span><span class="n">weight</span><span class="p">)</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">zeros_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv_beta</span><span class="o">.</span><span class="n">weight</span><span class="p">)</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">ones_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv_gamma</span><span class="o">.</span><span class="n">bias</span><span class="p">)</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">zeros_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv_beta</span><span class="o">.</span><span class="n">bias</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CBatchNorm1d.forward"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.CBatchNorm1d.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">c</span><span class="p">):</span>
+        <span class="k">assert</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="n">c</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+        <span class="k">assert</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">c_dim</span><span class="p">)</span>
+
+        <span class="c1"># c is assumed to be of size batch_size x c_dim x T</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">size</span><span class="p">())</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="n">c</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="c1"># Affine mapping</span>
+        <span class="n">gamma</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv_gamma</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+        <span class="n">beta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conv_beta</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+
+        <span class="c1"># Batchnorm</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">gamma</span> <span class="o">*</span> <span class="n">net</span> <span class="o">+</span> <span class="n">beta</span>
+
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+
+<div class="viewcode-block" id="CResnetBlockConv1d"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.CResnetBlockConv1d">[docs]</a><span class="k">class</span> <span class="nc">CResnetBlockConv1d</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Conditional batch normalization-based Resnet block class.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        c_dim (int): dimension of latend conditioned code c</span>
+<span class="sd">        size_in (int): input dimension</span>
+<span class="sd">        size_out (int): output dimension</span>
+<span class="sd">        size_h (int): hidden dimension</span>
+<span class="sd">        norm_method (str): normalization method</span>
+<span class="sd">        legacy (bool): whether to use legacy blocks </span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">c_dim</span><span class="p">,</span> <span class="n">size_in</span><span class="p">,</span> <span class="n">size_h</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">size_out</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">norm_method</span><span class="o">=</span><span class="s1">&#39;batch_norm&#39;</span><span class="p">,</span> <span class="n">legacy</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="c1"># Attributes</span>
+        <span class="k">if</span> <span class="n">size_h</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">size_h</span> <span class="o">=</span> <span class="n">size_in</span>
+        <span class="k">if</span> <span class="n">size_out</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">size_out</span> <span class="o">=</span> <span class="n">size_in</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">size_in</span> <span class="o">=</span> <span class="n">size_in</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">size_h</span> <span class="o">=</span> <span class="n">size_h</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">size_out</span> <span class="o">=</span> <span class="n">size_out</span>
+        <span class="c1"># Submodules</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">legacy</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bn_0</span> <span class="o">=</span> <span class="n">CBatchNorm1d</span><span class="p">(</span>
+                <span class="n">c_dim</span><span class="p">,</span> <span class="n">size_in</span><span class="p">,</span> <span class="n">norm_method</span><span class="o">=</span><span class="n">norm_method</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bn_1</span> <span class="o">=</span> <span class="n">CBatchNorm1d</span><span class="p">(</span>
+                <span class="n">c_dim</span><span class="p">,</span> <span class="n">size_h</span><span class="p">,</span> <span class="n">norm_method</span><span class="o">=</span><span class="n">norm_method</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bn_0</span> <span class="o">=</span> <span class="n">CBatchNorm1d_legacy</span><span class="p">(</span>
+                <span class="n">c_dim</span><span class="p">,</span> <span class="n">size_in</span><span class="p">,</span> <span class="n">norm_method</span><span class="o">=</span><span class="n">norm_method</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bn_1</span> <span class="o">=</span> <span class="n">CBatchNorm1d_legacy</span><span class="p">(</span>
+                <span class="n">c_dim</span><span class="p">,</span> <span class="n">size_h</span><span class="p">,</span> <span class="n">norm_method</span><span class="o">=</span><span class="n">norm_method</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">fc_0</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="n">size_in</span><span class="p">,</span> <span class="n">size_h</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fc_1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="n">size_h</span><span class="p">,</span> <span class="n">size_out</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">actvn</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">size_in</span> <span class="o">==</span> <span class="n">size_out</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">shortcut</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">shortcut</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv1d</span><span class="p">(</span><span class="n">size_in</span><span class="p">,</span> <span class="n">size_out</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="c1"># Initialization</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">zeros_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fc_1</span><span class="o">.</span><span class="n">weight</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CResnetBlockConv1d.forward"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.CResnetBlockConv1d.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">c</span><span class="p">):</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc_0</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">actvn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bn_0</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">c</span><span class="p">)))</span>
+        <span class="n">dx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc_1</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">actvn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bn_1</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">c</span><span class="p">)))</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">shortcut</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">x_s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shortcut</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">x_s</span> <span class="o">=</span> <span class="n">x</span>
+
+        <span class="k">return</span> <span class="n">x_s</span> <span class="o">+</span> <span class="n">dx</span></div></div>
+
+
+<div class="viewcode-block" id="OccupancyNetwork"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork">[docs]</a><span class="k">class</span> <span class="nc">OccupancyNetwork</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39; Occupancy Network class.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        decoder (nn.Module): decoder network</span>
+<span class="sd">        encoder (nn.Module): encoder network</span>
+<span class="sd">        p0_z (dist): prior distribution for latent code z</span>
+<span class="sd">        device (device): torch device</span>
+
+<span class="sd">    .. note::</span>
+
+<span class="sd">        If you use this code, please cite the original paper in addition to Kaolin.</span>
+<span class="sd">        </span>
+<span class="sd">        .. code-block::</span>
+
+<span class="sd">            @inproceedings{Occupancy Networks,</span>
+<span class="sd">                title = {Occupancy Networks: Learning 3D Reconstruction in Function Space},</span>
+<span class="sd">                author = {Mescheder, Lars and Oechsle, Michael and Niemeyer, Michael and Nowozin, Sebastian and Geiger, Andreas},</span>
+<span class="sd">                booktitle = {Proceedings IEEE Conf. on Computer Vision and Pattern Recognition (CVPR)},</span>
+<span class="sd">                year = {2019}</span>
+<span class="sd">            }</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">decoder</span> <span class="o">=</span> <span class="n">DecoderCBatchNorm</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">z_dim</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">c_dim</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+            <span class="n">hidden_size</span><span class="o">=</span><span class="mi">256</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">encoder</span> <span class="o">=</span> <span class="n">Resnet18</span><span class="p">(</span><span class="mi">256</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_linear</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">p0_z</span> <span class="o">=</span> <span class="n">get_prior_z</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+<div class="viewcode-block" id="OccupancyNetwork.forward"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">sample</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Performs a forward pass through the network.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            p (tensor): sampled points</span>
+<span class="sd">            inputs (tensor): conditioning input</span>
+<span class="sd">            sample (bool): whether to sample for z</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">batch_size</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_z_from_prior</span><span class="p">((</span><span class="n">batch_size</span><span class="p">,),</span> <span class="n">sample</span><span class="o">=</span><span class="n">sample</span><span class="p">)</span>
+        <span class="n">p_r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p_r</span></div>
+
+<div class="viewcode-block" id="OccupancyNetwork.compute_elbo"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.compute_elbo">[docs]</a>    <span class="k">def</span> <span class="nf">compute_elbo</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">occ</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Computes the expectation lower bound.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            p (tensor): sampled points</span>
+<span class="sd">            occ (tensor): occupancy values for p</span>
+<span class="sd">            inputs (tensor): conditioning input</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="n">q_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">infer_z</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">occ</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">q_z</span><span class="o">.</span><span class="n">rsample</span><span class="p">()</span>
+        <span class="n">p_r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="n">rec_error</span> <span class="o">=</span> <span class="o">-</span><span class="n">p_r</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">occ</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">kl</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">kl_divergence</span><span class="p">(</span><span class="n">q_z</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">p0_z</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">elbo</span> <span class="o">=</span> <span class="o">-</span><span class="n">rec_error</span> <span class="o">-</span> <span class="n">kl</span>
+
+        <span class="k">return</span> <span class="n">elbo</span><span class="p">,</span> <span class="n">rec_error</span><span class="p">,</span> <span class="n">kl</span></div>
+
+<div class="viewcode-block" id="OccupancyNetwork.encode_inputs"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.encode_inputs">[docs]</a>    <span class="k">def</span> <span class="nf">encode_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Encodes the input.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            input (tensor): the input</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoder</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+       
+
+        <span class="k">return</span> <span class="n">c</span></div>
+
+<div class="viewcode-block" id="OccupancyNetwork.decode"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.decode">[docs]</a>    <span class="k">def</span> <span class="nf">decode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Returns occupancy probabilities for the sampled points.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            p (tensor): points</span>
+<span class="sd">            z (tensor): latent code z</span>
+<span class="sd">            c (tensor): latent conditioned code c</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+
+        <span class="n">logits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoder</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">p_r</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">Bernoulli</span><span class="p">(</span><span class="n">logits</span><span class="o">=</span><span class="n">logits</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p_r</span></div>
+
+<div class="viewcode-block" id="OccupancyNetwork.infer_z"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.infer_z">[docs]</a>    <span class="k">def</span> <span class="nf">infer_z</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">occ</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Infers z.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            p (tensor): points tensor</span>
+<span class="sd">            occ (tensor): occupancy values for occ</span>
+<span class="sd">            c (tensor): latent conditioned code c</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        
+        <span class="n">batch_size</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">mean_z</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">logstd_z</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="n">q_z</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">mean_z</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">logstd_z</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">q_z</span></div>
+
+<div class="viewcode-block" id="OccupancyNetwork.get_z_from_prior"><a class="viewcode-back" href="../../../modules/models.html#kaolin.models.OccupancyNetwork.OccupancyNetwork.get_z_from_prior">[docs]</a>    <span class="k">def</span> <span class="nf">get_z_from_prior</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">([]),</span> <span class="n">sample</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&#39;&#39;&#39; Returns z from prior distribution.</span>
+<span class="sd">        Args:</span>
+<span class="sd">            size (Size): size of z</span>
+<span class="sd">            sample (bool): whether to sample</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">sample</span><span class="p">:</span>
+            <span class="n">z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">p0_z</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">size</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">p0_z</span><span class="o">.</span><span class="n">mean</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">z</span> <span class="o">=</span> <span class="n">z</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="o">*</span><span class="n">size</span><span class="p">,</span> <span class="o">*</span><span class="n">z</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
+
+        <span class="k">return</span> <span class="n">z</span></div></div>
+        
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

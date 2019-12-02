@@ -1,0 +1,1194 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.models &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+        <script type="text/javascript" src="../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="kaolin.rep" href="rep.html" />
+    <link rel="prev" title="kaolin.metrics.voxel" href="metrics.voxel.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">kaolin.models</a><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>kaolin.models</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/modules/models.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="kaolin-models">
+<h1>kaolin.models<a class="headerlink" href="#kaolin-models" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<dl class="function">
+<dt id="models.PointNet.PointNetFeatureExtractor">
+<code class="sig-name descname">PointNetFeatureExtractor</code><span class="sig-paren">(</span><em class="sig-param">in_channels: int = 3, feat_size: int = 1024, layer_dims: Iterable[int] = [64, 128], global_feat: bool = True, activation=&lt;function relu&gt;, batchnorm: bool = True, transposed_input: bool = False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/PointNet.html#PointNetFeatureExtractor"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.PointNet.PointNetFeatureExtractor" title="Permalink to this definition">¶</a></dt>
+<dd><p>PointNet feature extractor (extracts either global or local, i.e.,
+per-point features).</p>
+<p>Based on the original PointNet paper:.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">qi2016pointnet</span><span class="p">,</span>
+  <span class="n">title</span><span class="o">=</span><span class="p">{</span><span class="n">PointNet</span><span class="p">:</span> <span class="n">Deep</span> <span class="n">Learning</span> <span class="n">on</span> <span class="n">Point</span> <span class="n">Sets</span> <span class="k">for</span> <span class="mi">3</span><span class="n">D</span> <span class="n">Classification</span> <span class="ow">and</span> <span class="n">Segmentation</span><span class="p">},</span>
+  <span class="n">author</span><span class="o">=</span><span class="p">{</span><span class="n">Qi</span><span class="p">,</span> <span class="n">Charles</span> <span class="n">R</span> <span class="ow">and</span> <span class="n">Su</span><span class="p">,</span> <span class="n">Hao</span> <span class="ow">and</span> <span class="n">Mo</span><span class="p">,</span> <span class="n">Kaichun</span> <span class="ow">and</span> <span class="n">Guibas</span><span class="p">,</span> <span class="n">Leonidas</span> <span class="n">J</span><span class="p">},</span>
+  <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">arXiv</span> <span class="n">preprint</span> <span class="n">arXiv</span><span class="p">:</span><span class="mf">1612.00593</span><span class="p">},</span>
+  <span class="n">year</span><span class="o">=</span><span class="p">{</span><span class="mi">2016</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>in_channels</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Number of channels in the input pointcloud
+(default: 3, for X, Y, Z coordinates respectively).</p></li>
+<li><p><strong>feat_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Size of the global feature vector
+(default: 1024)</p></li>
+<li><p><strong>layer_dims</strong> (<em>Iterable</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a><em>]</em>) – Sizes of fully connected layers
+to be used in the feature extractor (excluding the input and
+the output layer sizes). Note: the number of
+layers in the feature extractor is implicitly parsed from
+this variable.</p></li>
+<li><p><strong>global_feat</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Extract global features (i.e., one feature
+for the entire pointcloud) if set to True. If set to False,
+extract per-point (local) features (default: True).</p></li>
+<li><p><strong>activation</strong> (<em>function</em>) – Nonlinearity to be used as activation
+function after each batchnorm (default: F.relu)</p></li>
+<li><p><strong>batchnorm</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use batchnorm layers
+(default: True)</p></li>
+<li><p><strong>transposed_input</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether the input’s second and third dimension
+is already transposed. If so, a transpose operation can be avoided,
+improving performance.
+See documentation for the forward method for more details.</p></li>
+</ul>
+</dd>
+</dl>
+<p>For example, to specify a PointNet feature extractor with 4 linear
+layers (sizes 6 -&gt; 10, 10 -&gt; 40, 40 -&gt; 500, 500 -&gt; 1024), with
+3 input channels in the pointcloud and a global feature vector of size
+1024, see the example below.</p>
+<p class="rubric">Example</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pointnet</span> <span class="o">=</span> <span class="n">PointNetFeatureExtractor</span><span class="p">(</span><span class="n">in_channels</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">feat_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+<span class="go">                                   layer_dims=[10, 20, 40, 500])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">y</span> <span class="o">=</span> <span class="n">pointnet</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="go">print(y.shape)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.PointNet.PointNetClassifier">
+<code class="sig-name descname">PointNetClassifier</code><span class="sig-paren">(</span><em class="sig-param">in_channels: int = 3, feat_size: int = 1024, num_classes: int = 2, dropout: float = 0.0, classifier_layer_dims: Iterable[int] = [512, 256], feat_layer_dims: Iterable[int] = [64, 128], activation=&lt;function relu&gt;, batchnorm: bool = True, transposed_input: bool = False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/PointNet.html#PointNetClassifier"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.PointNet.PointNetClassifier" title="Permalink to this definition">¶</a></dt>
+<dd><p>PointNet classifier. Uses the PointNet feature extractor, and
+adds classification layers on top.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">qi2016pointnet</span><span class="p">,</span>
+  <span class="n">title</span><span class="o">=</span><span class="p">{</span><span class="n">PointNet</span><span class="p">:</span> <span class="n">Deep</span> <span class="n">Learning</span> <span class="n">on</span> <span class="n">Point</span> <span class="n">Sets</span> <span class="k">for</span> <span class="mi">3</span><span class="n">D</span> <span class="n">Classification</span> <span class="ow">and</span> <span class="n">Segmentation</span><span class="p">},</span>
+  <span class="n">author</span><span class="o">=</span><span class="p">{</span><span class="n">Qi</span><span class="p">,</span> <span class="n">Charles</span> <span class="n">R</span> <span class="ow">and</span> <span class="n">Su</span><span class="p">,</span> <span class="n">Hao</span> <span class="ow">and</span> <span class="n">Mo</span><span class="p">,</span> <span class="n">Kaichun</span> <span class="ow">and</span> <span class="n">Guibas</span><span class="p">,</span> <span class="n">Leonidas</span> <span class="n">J</span><span class="p">},</span>
+  <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">arXiv</span> <span class="n">preprint</span> <span class="n">arXiv</span><span class="p">:</span><span class="mf">1612.00593</span><span class="p">},</span>
+  <span class="n">year</span><span class="o">=</span><span class="p">{</span><span class="mi">2016</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>in_channels</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Number of channels in the input pointcloud
+(default: 3, for X, Y, Z coordinates respectively).</p></li>
+<li><p><strong>feat_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Size of the global feature vector
+(default: 1024)</p></li>
+<li><p><strong>num_classes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Number of classes (for the classification
+task) (default: 2).</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.8)"><em>float</em></a>) – Dropout ratio to use (default: 0.). Note: If
+the ratio is set to 0., we altogether skip using a dropout
+layer.</p></li>
+<li><p><strong>layer_dims</strong> (<em>Iterable</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a><em>]</em>) – Sizes of fully connected layers
+to be used in the feature extractor (excluding the input and
+the output layer sizes). Note: the number of
+layers in the feature extractor is implicitly parsed from
+this variable.</p></li>
+<li><p><strong>activation</strong> (<em>function</em>) – Nonlinearity to be used as activation
+function after each batchnorm (default: F.relu)</p></li>
+<li><p><strong>batchnorm</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use batchnorm layers
+(default: True)</p></li>
+<li><p><strong>transposed_input</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether the input’s second and third dimension
+is already transposed. If so, a transpose operation can be avoided,
+improving performance.
+See documentation of PointNetFeatureExtractor for more details.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<dl class="simple">
+<dt>pointnet = PointNetClassifier(in_channels=6, feat_size=1024,</dt><dd><p>feat_layer_dims=[32, 64, 256],
+classifier_layer_dims=[500, 200, 100])</p>
+</dd>
+</dl>
+<p>x = torch.rand(5, 6, 30)
+y = pointnet(x)
+print(y.shape)</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.PointNet.PointNetSegmenter">
+<code class="sig-name descname">PointNetSegmenter</code><span class="sig-paren">(</span><em class="sig-param">in_channels: int = 3, feat_size: int = 1024, num_classes: int = 2, dropout: float = 0.0, classifier_layer_dims: Iterable[int] = [512, 256], feat_layer_dims: Iterable[int] = [64, 128], activation=&lt;function relu&gt;, batchnorm: bool = True, transposed_input: bool = False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/PointNet.html#PointNetSegmenter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.PointNet.PointNetSegmenter" title="Permalink to this definition">¶</a></dt>
+<dd><p>PointNet segmenter. Uses the PointNet feature extractor, and
+adds per-point segmentation layers on top.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">qi2016pointnet</span><span class="p">,</span>
+  <span class="n">title</span><span class="o">=</span><span class="p">{</span><span class="n">PointNet</span><span class="p">:</span> <span class="n">Deep</span> <span class="n">Learning</span> <span class="n">on</span> <span class="n">Point</span> <span class="n">Sets</span> <span class="k">for</span> <span class="mi">3</span><span class="n">D</span> <span class="n">Classification</span> <span class="ow">and</span> <span class="n">Segmentation</span><span class="p">},</span>
+  <span class="n">author</span><span class="o">=</span><span class="p">{</span><span class="n">Qi</span><span class="p">,</span> <span class="n">Charles</span> <span class="n">R</span> <span class="ow">and</span> <span class="n">Su</span><span class="p">,</span> <span class="n">Hao</span> <span class="ow">and</span> <span class="n">Mo</span><span class="p">,</span> <span class="n">Kaichun</span> <span class="ow">and</span> <span class="n">Guibas</span><span class="p">,</span> <span class="n">Leonidas</span> <span class="n">J</span><span class="p">},</span>
+  <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">arXiv</span> <span class="n">preprint</span> <span class="n">arXiv</span><span class="p">:</span><span class="mf">1612.00593</span><span class="p">},</span>
+  <span class="n">year</span><span class="o">=</span><span class="p">{</span><span class="mi">2016</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>in_channels</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Number of channels in the input pointcloud
+(default: 3, for X, Y, Z coordinates respectively).</p></li>
+<li><p><strong>feat_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Size of the global feature vector
+(default: 1024)</p></li>
+<li><p><strong>num_classes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Number of classes (for the segmentation
+task) (default: 2).</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.8)"><em>float</em></a>) – Dropout ratio to use (default: 0.). Note: If
+the ratio is set to 0., we altogether skip using a dropout
+layer.</p></li>
+<li><p><strong>layer_dims</strong> (<em>Iterable</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a><em>]</em>) – Sizes of fully connected layers
+to be used in the feature extractor (excluding the input and
+the output layer sizes). Note: the number of
+layers in the feature extractor is implicitly parsed from
+this variable.</p></li>
+<li><p><strong>activation</strong> (<em>function</em>) – Nonlinearity to be used as activation
+function after each batchnorm (default: F.relu)</p></li>
+<li><p><strong>batchnorm</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use batchnorm layers
+(default: True)</p></li>
+<li><p><strong>transposed_input</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether the input’s second and third dimension
+is already transposed. If so, a transpose operation can be avoided,
+improving performance.
+See documentation of PointNetFeatureExtractor for more details.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<dl class="simple">
+<dt>pointnet = PointNetSegmenter(in_channels=6, feat_size=1024,</dt><dd><p>feat_layer_dims=[32, 64, 256],
+classifier_layer_dims=[500, 200, 100])</p>
+</dd>
+</dl>
+<p>x = torch.rand(5, 6, 30)
+y = pointnet(x)
+print(y.shape)</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.PointNet2.PointNet2SetAbstraction">
+<code class="sig-name descname">PointNet2SetAbstraction</code><span class="sig-paren">(</span><em class="sig-param">num_points_out</em>, <em class="sig-param">pointnet_in_features</em>, <em class="sig-param">pointnet_layer_dims_list</em>, <em class="sig-param">radii_list=None</em>, <em class="sig-param">num_samples_list=None</em>, <em class="sig-param">batchnorm=True</em>, <em class="sig-param">use_xyz_feature=True</em>, <em class="sig-param">use_random_ball_query=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/PointNet2.html#PointNet2SetAbstraction"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.PointNet2.PointNet2SetAbstraction" title="Permalink to this definition">¶</a></dt>
+<dd><p>A single set-abstraction layer for the PointNet++ architecture.
+Supports multi-scale grouping (MSG).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">qi2017pointnet2</span><span class="p">,</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="p">{</span><span class="n">PointNet</span><span class="o">++</span><span class="p">:</span> <span class="n">Deep</span> <span class="n">Hierarchical</span> <span class="n">Feature</span> <span class="n">Learning</span> <span class="n">on</span> <span class="n">Point</span> <span class="n">Sets</span> <span class="ow">in</span> <span class="n">a</span> <span class="n">Metric</span> <span class="n">Space</span><span class="p">},</span>
+    <span class="n">author</span> <span class="o">=</span> <span class="p">{</span><span class="n">Qi</span><span class="p">,</span> <span class="n">Charles</span> <span class="n">R</span><span class="o">.</span> <span class="ow">and</span> <span class="n">Yi</span><span class="p">,</span> <span class="n">Li</span> <span class="ow">and</span> <span class="n">Su</span><span class="p">,</span> <span class="n">Hao</span> <span class="ow">and</span> <span class="n">Guibas</span><span class="p">,</span> <span class="n">Leonidas</span> <span class="n">J</span><span class="o">.</span><span class="p">},</span>
+    <span class="n">year</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2017</span><span class="p">},</span>
+    <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">arXiv</span> <span class="n">preprint</span> <span class="n">arXiv</span><span class="p">:</span><span class="mf">1706.02413</span><span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_points_out</strong> (<em>int|None</em>) – The number of output points.
+If None, group all points together.</p></li>
+<li><p><strong>pointnet_in_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – The number of features to input into pointnet.
+Note: if use_xyz_feature is true, this value will be increased by 3.</p></li>
+<li><p><strong>pointnet_layer_dims_list</strong> (<em>List</em><em>[</em><em>List</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a><em>]</em><em>]</em>) – The pointnet MLP dimensions list for each scale.
+Note: the first (input) dimension SHOULD NOT be included in each list,
+while the last (output) dimension SHOULD be included in each list.</p></li>
+<li><p><strong>radii_list</strong> (<em>List</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.8)"><em>float</em></a><em>]</em><em>|None</em>) – The grouping radius for each scale.
+If num_points_out is None, this value is ignored.</p></li>
+<li><p><strong>num_samples_list</strong> (<em>List</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a><em>]</em><em>|None</em>) – The number of samples in each ball query for each scale.
+If num_points_out is None, this value is ignored.</p></li>
+<li><p><strong>batchnorm</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use batch normalization.</p></li>
+<li><p><strong>use_xyz_feature</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use the coordinates of the
+points as feature.</p></li>
+<li><p><strong>use_random_ball_query</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use random sampling when
+there are too many points per ball.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.PointNet2.PointNet2FeaturePropagator">
+<code class="sig-name descname">PointNet2FeaturePropagator</code><span class="sig-paren">(</span><em class="sig-param">num_features</em>, <em class="sig-param">num_features_prev</em>, <em class="sig-param">layer_dims</em>, <em class="sig-param">batchnorm=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/PointNet2.html#PointNet2FeaturePropagator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.PointNet2.PointNet2FeaturePropagator" title="Permalink to this definition">¶</a></dt>
+<dd><p>A single feature-propagation layer for the PointNet++ architecture.</p>
+<p>Used for segmentation.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">qi2017pointnet2</span><span class="p">,</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="p">{</span><span class="n">PointNet</span><span class="o">++</span><span class="p">:</span> <span class="n">Deep</span> <span class="n">Hierarchical</span> <span class="n">Feature</span> <span class="n">Learning</span> <span class="n">on</span> <span class="n">Point</span> <span class="n">Sets</span> <span class="ow">in</span> <span class="n">a</span> <span class="n">Metric</span> <span class="n">Space</span><span class="p">},</span>
+    <span class="n">author</span> <span class="o">=</span> <span class="p">{</span><span class="n">Qi</span><span class="p">,</span> <span class="n">Charles</span> <span class="n">R</span><span class="o">.</span> <span class="ow">and</span> <span class="n">Yi</span><span class="p">,</span> <span class="n">Li</span> <span class="ow">and</span> <span class="n">Su</span><span class="p">,</span> <span class="n">Hao</span> <span class="ow">and</span> <span class="n">Guibas</span><span class="p">,</span> <span class="n">Leonidas</span> <span class="n">J</span><span class="o">.</span><span class="p">},</span>
+    <span class="n">year</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2017</span><span class="p">},</span>
+    <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">arXiv</span> <span class="n">preprint</span> <span class="n">arXiv</span><span class="p">:</span><span class="mf">1706.02413</span><span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – The number of features in the current layer.
+Note: this is the number of output features of the corresponding
+set abstraction layer.</p></li>
+<li><p><strong>num_features_prev</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – The number of features from the previous
+feature propagation layer (corresponding to the next layer during
+feature extraction).
+Note: this is the number of output features of the previous feature
+propagation layer (or the number of output features of the final set
+abstraction layer, if this is the very first feature propagation
+layer)</p></li>
+<li><p><strong>layer_dims</strong> (<em>List</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a><em>]</em>) – Sizes of the MLP layer.
+Note: the first (input) dimension SHOULD NOT be included in the list,
+while the last (output) dimension SHOULD be included in the list.</p></li>
+<li><p><strong>batchnorm</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use batch normalization.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.PointNet2.PointNet2Classifier">
+<code class="sig-name descname">PointNet2Classifier</code><span class="sig-paren">(</span><em class="sig-param">in_features=0</em>, <em class="sig-param">num_classes=2</em>, <em class="sig-param">batchnorm=True</em>, <em class="sig-param">use_xyz_feature=True</em>, <em class="sig-param">use_random_ball_query=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/PointNet2.html#PointNet2Classifier"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.PointNet2.PointNet2Classifier" title="Permalink to this definition">¶</a></dt>
+<dd><p>PointNet++ classification network.</p>
+<p>Based on the original PointNet++ paper.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">qi2017pointnet2</span><span class="p">,</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="p">{</span><span class="n">PointNet</span><span class="o">++</span><span class="p">:</span> <span class="n">Deep</span> <span class="n">Hierarchical</span> <span class="n">Feature</span> <span class="n">Learning</span> <span class="n">on</span> <span class="n">Point</span> <span class="n">Sets</span> <span class="ow">in</span> <span class="n">a</span> <span class="n">Metric</span> <span class="n">Space</span><span class="p">},</span>
+    <span class="n">author</span> <span class="o">=</span> <span class="p">{</span><span class="n">Qi</span><span class="p">,</span> <span class="n">Charles</span> <span class="n">R</span><span class="o">.</span> <span class="ow">and</span> <span class="n">Yi</span><span class="p">,</span> <span class="n">Li</span> <span class="ow">and</span> <span class="n">Su</span><span class="p">,</span> <span class="n">Hao</span> <span class="ow">and</span> <span class="n">Guibas</span><span class="p">,</span> <span class="n">Leonidas</span> <span class="n">J</span><span class="o">.</span><span class="p">},</span>
+    <span class="n">year</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2017</span><span class="p">},</span>
+    <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">arXiv</span> <span class="n">preprint</span> <span class="n">arXiv</span><span class="p">:</span><span class="mf">1706.02413</span><span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>in_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Number of features (not including xyz coordinates) in
+the input point cloud (default: 0).</p></li>
+<li><p><strong>num_classes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Number of classes (for the classification
+task) (default: 2).</p></li>
+<li><p><strong>batchnorm</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use batch normalization.
+(default: True)</p></li>
+<li><p><strong>use_xyz_feature</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use the coordinates of the
+points as feature.</p></li>
+<li><p><strong>use_random_ball_query</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use random sampling when
+there are too many points per ball.</p></li>
+</ul>
+</dd>
+</dl>
+<p>TODO: Documentation: add example</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.PointNet2.PointNet2Segmenter">
+<code class="sig-name descname">PointNet2Segmenter</code><span class="sig-paren">(</span><em class="sig-param">in_features=0</em>, <em class="sig-param">num_classes=2</em>, <em class="sig-param">batchnorm=True</em>, <em class="sig-param">use_xyz_feature=True</em>, <em class="sig-param">use_random_ball_query=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/PointNet2.html#PointNet2Segmenter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.PointNet2.PointNet2Segmenter" title="Permalink to this definition">¶</a></dt>
+<dd><p>PointNet++ classification network.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">qi2017pointnet2</span><span class="p">,</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="p">{</span><span class="n">PointNet</span><span class="o">++</span><span class="p">:</span> <span class="n">Deep</span> <span class="n">Hierarchical</span> <span class="n">Feature</span> <span class="n">Learning</span> <span class="n">on</span> <span class="n">Point</span> <span class="n">Sets</span> <span class="ow">in</span> <span class="n">a</span> <span class="n">Metric</span> <span class="n">Space</span><span class="p">},</span>
+    <span class="n">author</span> <span class="o">=</span> <span class="p">{</span><span class="n">Qi</span><span class="p">,</span> <span class="n">Charles</span> <span class="n">R</span><span class="o">.</span> <span class="ow">and</span> <span class="n">Yi</span><span class="p">,</span> <span class="n">Li</span> <span class="ow">and</span> <span class="n">Su</span><span class="p">,</span> <span class="n">Hao</span> <span class="ow">and</span> <span class="n">Guibas</span><span class="p">,</span> <span class="n">Leonidas</span> <span class="n">J</span><span class="o">.</span><span class="p">},</span>
+    <span class="n">year</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2017</span><span class="p">},</span>
+    <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">arXiv</span> <span class="n">preprint</span> <span class="n">arXiv</span><span class="p">:</span><span class="mf">1706.02413</span><span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>in_features</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Number of features (not including xyz coordinates) in
+the input point cloud (default: 0).</p></li>
+<li><p><strong>num_classes</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – Number of classes (for the classification
+task) (default: 2).</p></li>
+<li><p><strong>batchnorm</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use batch normalization.
+(default: True)</p></li>
+<li><p><strong>use_xyz_feature</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use the coordinates of the
+points as feature.</p></li>
+<li><p><strong>use_random_ball_query</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – Whether or not to use random sampling when
+there are too many points per ball.</p></li>
+</ul>
+</dd>
+</dl>
+<p>TODO: Documentation: add example</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.dgcnn.DGCNN">
+<code class="sig-name descname">DGCNN</code><span class="sig-paren">(</span><em class="sig-param">input_dim=3, conv_dims=[64, 64, 128, 256], emb_dims=1024, fc_dims=[512, 256], output_channels=64, dropout=0.5, k=20, use_cuda=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/dgcnn.html#DGCNN"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.dgcnn.DGCNN" title="Permalink to this definition">¶</a></dt>
+<dd><p>Implementation of the DGCNNfor pointcloud classificaiton.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input_dim</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – number of features per point. Default: <code class="docutils literal notranslate"><span class="pre">3</span></code> (xyz point coordinates)</p></li>
+<li><p><strong>conv_dims</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.8)"><em>list</em></a>) – list of output feature dimensions of the convolutional layers. Default: <code class="docutils literal notranslate"><span class="pre">[64,64,128,256]</span></code> (as preoposed in original implementation).</p></li>
+<li><p><strong>emb_dims</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – dimensionality of the intermediate embedding.</p></li>
+<li><p><strong>fc_dims</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.8)"><em>list</em></a>) – list of output feature dimensions of the fully connected layers. Default: <code class="docutils literal notranslate"><span class="pre">[512,</span> <span class="pre">256]</span></code> (as preoposed in original implementation).</p></li>
+<li><p><strong>output_channels</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – number of output channels. Default: <code class="docutils literal notranslate"><span class="pre">64</span></code>.</p></li>
+<li><p><strong>dropout</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.8)"><em>float</em></a>) – dropout probability (applied to fully connected layers only). Default: <code class="docutils literal notranslate"><span class="pre">0.5</span></code>.</p></li>
+<li><p><strong>k</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.8)"><em>int</em></a>) – number of nearest neighbors.</p></li>
+<li><p><strong>use_cuda</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.8)"><em>bool</em></a>) – if <code class="docutils literal notranslate"><span class="pre">True</span></code> will move the model to GPU</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">dgcnn</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="p">{</span><span class="n">Dynamic</span> <span class="n">Graph</span> <span class="n">CNN</span> <span class="k">for</span> <span class="n">Learning</span> <span class="n">on</span> <span class="n">Point</span> <span class="n">Clouds</span><span class="p">},</span>
+    <span class="n">author</span><span class="o">=</span><span class="p">{</span><span class="n">Wang</span><span class="p">,</span> <span class="n">Yue</span> <span class="ow">and</span> <span class="n">Sun</span><span class="p">,</span> <span class="n">Yongbin</span> <span class="ow">and</span> <span class="n">Liu</span><span class="p">,</span> <span class="n">Ziwei</span> <span class="ow">and</span> <span class="n">Sarma</span><span class="p">,</span> <span class="n">Sanjay</span> <span class="n">E</span><span class="o">.</span> <span class="ow">and</span> <span class="n">Bronstein</span><span class="p">,</span> <span class="n">Michael</span> <span class="n">M</span><span class="o">.</span> <span class="ow">and</span> <span class="n">Solomon</span><span class="p">,</span> <span class="n">Justin</span> <span class="n">M</span><span class="o">.</span><span class="p">},</span>
+    <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">ACM</span> <span class="n">Transactions</span> <span class="n">on</span> <span class="n">Graphics</span> <span class="p">(</span><span class="n">TOG</span><span class="p">)},</span>
+    <span class="n">year</span><span class="o">=</span><span class="p">{</span><span class="mi">2019</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.Voxel3DIWGAN.Voxel3DIWGenerator">
+<code class="sig-name descname">Voxel3DIWGenerator</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/Voxel3DIWGAN.html#Voxel3DIWGenerator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.Voxel3DIWGAN.Voxel3DIWGenerator" title="Permalink to this definition">¶</a></dt>
+<dd><p>TODO: Add docstring.</p>
+<p><a class="reference external" href="https://arxiv.org/abs/1707.09557">https://arxiv.org/abs/1707.09557</a></p>
+<p>Input shape: B x 200
+Output shape: B x 32 x 32 x 32</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">DBLP</span><span class="p">:</span><span class="n">journals</span><span class="o">/</span><span class="n">corr</span><span class="o">/</span><span class="n">SmithM17</span><span class="p">,</span>
+  <span class="n">author</span>    <span class="o">=</span> <span class="p">{</span><span class="n">Edward</span> <span class="n">J</span><span class="o">.</span> <span class="n">Smith</span> <span class="ow">and</span>
+               <span class="n">David</span> <span class="n">Meger</span><span class="p">},</span>
+  <span class="n">title</span>     <span class="o">=</span> <span class="p">{</span><span class="n">Improved</span> <span class="n">Adversarial</span> <span class="n">Systems</span> <span class="k">for</span> <span class="mi">3</span><span class="n">D</span> <span class="n">Object</span> <span class="n">Generation</span> <span class="ow">and</span> <span class="n">Reconstruction</span><span class="p">},</span>
+  <span class="n">journal</span>   <span class="o">=</span> <span class="p">{</span><span class="n">CoRR</span><span class="p">},</span>
+  <span class="n">volume</span>    <span class="o">=</span> <span class="p">{</span><span class="nb">abs</span><span class="o">/</span><span class="mf">1707.09557</span><span class="p">},</span>
+  <span class="n">year</span>      <span class="o">=</span> <span class="p">{</span><span class="mi">2017</span><span class="p">},</span>
+  <span class="n">url</span>       <span class="o">=</span> <span class="p">{</span><span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">arxiv</span><span class="o">.</span><span class="n">org</span><span class="o">/</span><span class="nb">abs</span><span class="o">/</span><span class="mf">1707.09557</span><span class="p">},</span>
+  <span class="n">archivePrefix</span> <span class="o">=</span> <span class="p">{</span><span class="n">arXiv</span><span class="p">},</span>
+  <span class="n">eprint</span>    <span class="o">=</span> <span class="p">{</span><span class="mf">1707.09557</span><span class="p">},</span>
+  <span class="n">timestamp</span> <span class="o">=</span> <span class="p">{</span><span class="n">Mon</span><span class="p">,</span> <span class="mi">13</span> <span class="n">Aug</span> <span class="mi">2018</span> <span class="mi">16</span><span class="p">:</span><span class="mi">46</span><span class="p">:</span><span class="mi">50</span> <span class="o">+</span><span class="mi">0200</span><span class="p">},</span>
+  <span class="n">biburl</span>    <span class="o">=</span> <span class="p">{</span><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">dblp</span><span class="o">.</span><span class="n">org</span><span class="o">/</span><span class="n">rec</span><span class="o">/</span><span class="n">bib</span><span class="o">/</span><span class="n">journals</span><span class="o">/</span><span class="n">corr</span><span class="o">/</span><span class="n">SmithM17</span><span class="p">},</span>
+  <span class="n">bibsource</span> <span class="o">=</span> <span class="p">{</span><span class="n">dblp</span> <span class="n">computer</span> <span class="n">science</span> <span class="n">bibliography</span><span class="p">,</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">dblp</span><span class="o">.</span><span class="n">org</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.Voxel3DIWGAN.Voxel3DIWDiscriminator">
+<code class="sig-name descname">Voxel3DIWDiscriminator</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/Voxel3DIWGAN.html#Voxel3DIWDiscriminator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.Voxel3DIWGAN.Voxel3DIWDiscriminator" title="Permalink to this definition">¶</a></dt>
+<dd><p>TODO: Add docstring.</p>
+<p><a class="reference external" href="https://arxiv.org/abs/1707.09557">https://arxiv.org/abs/1707.09557</a></p>
+<p>Input shape: B x 32 x 32 x 32
+Output shape: B x 1</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.VoxelSuperresODM.SuperresNetwork">
+<code class="sig-name descname">SuperresNetwork</code><span class="sig-paren">(</span><em class="sig-param">high</em>, <em class="sig-param">low</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/VoxelSuperresODM.html#SuperresNetwork"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.VoxelSuperresODM.SuperresNetwork" title="Permalink to this definition">¶</a></dt>
+<dd><p>TODO: Add docstring.</p>
+<p><a class="reference external" href="https://arxiv.org/abs/1802.09987">https://arxiv.org/abs/1802.09987</a></p>
+<p>Input shape: B x 128 x 128 x 128
+Output shape: B x (high//low * 128) x (high//low * 128) x (high//low * 128)</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@incollection</span><span class="p">{</span><span class="n">ODM</span><span class="p">,</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="p">{</span><span class="n">Multi</span><span class="o">-</span><span class="n">View</span> <span class="n">Silhouette</span> <span class="ow">and</span> <span class="n">Depth</span> <span class="n">Decomposition</span> <span class="k">for</span> <span class="n">High</span> <span class="n">Resolution</span> <span class="mi">3</span><span class="n">D</span> <span class="n">Object</span> <span class="n">Representation</span><span class="p">},</span>
+    <span class="n">author</span> <span class="o">=</span> <span class="p">{</span><span class="n">Smith</span><span class="p">,</span> <span class="n">Edward</span> <span class="ow">and</span> <span class="n">Fujimoto</span><span class="p">,</span> <span class="n">Scott</span> <span class="ow">and</span> <span class="n">Meger</span><span class="p">,</span> <span class="n">David</span><span class="p">},</span>
+    <span class="n">booktitle</span> <span class="o">=</span> <span class="p">{</span><span class="n">Advances</span> <span class="ow">in</span> <span class="n">Neural</span> <span class="n">Information</span> <span class="n">Processing</span> <span class="n">Systems</span> <span class="mi">31</span><span class="p">},</span>
+    <span class="n">editor</span> <span class="o">=</span> <span class="p">{</span><span class="n">S</span><span class="o">.</span> <span class="n">Bengio</span> <span class="ow">and</span> <span class="n">H</span><span class="o">.</span> <span class="n">Wallach</span> <span class="ow">and</span> <span class="n">H</span><span class="o">.</span> <span class="n">Larochelle</span> <span class="ow">and</span> <span class="n">K</span><span class="o">.</span> <span class="n">Grauman</span> <span class="ow">and</span> <span class="n">N</span><span class="o">.</span> <span class="n">Cesa</span><span class="o">-</span><span class="n">Bianchi</span> <span class="ow">and</span> <span class="n">R</span><span class="o">.</span> <span class="n">Garnett</span><span class="p">},</span>
+    <span class="n">pages</span> <span class="o">=</span> <span class="p">{</span><span class="mi">6479</span><span class="o">--</span><span class="mi">6489</span><span class="p">},</span>
+    <span class="n">year</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2018</span><span class="p">},</span>
+    <span class="n">publisher</span> <span class="o">=</span> <span class="p">{</span><span class="n">Curran</span> <span class="n">Associates</span><span class="p">,</span> <span class="n">Inc</span><span class="o">.</span><span class="p">},</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="p">{</span><span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">papers</span><span class="o">.</span><span class="n">nips</span><span class="o">.</span><span class="n">cc</span><span class="o">/</span><span class="n">paper</span><span class="o">/</span><span class="mi">7883</span><span class="o">-</span><span class="n">multi</span><span class="o">-</span><span class="n">view</span><span class="o">-</span><span class="n">silhouette</span><span class="o">-</span><span class="ow">and</span><span class="o">-</span><span class="n">depth</span><span class="o">-</span><span class="n">decomposition</span><span class="o">-</span><span class="k">for</span><span class="o">-</span><span class="n">high</span><span class="o">-</span><span class="n">resolution</span><span class="o">-</span><span class="mi">3</span><span class="n">d</span><span class="o">-</span><span class="nb">object</span><span class="o">-</span><span class="n">representation</span><span class="o">.</span><span class="n">pdf</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="models.VoxelSuperresSimple.EncoderDecoder">
+<code class="sig-name descname">EncoderDecoder</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/models/VoxelSuperresSimple.html#EncoderDecoder"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#models.VoxelSuperresSimple.EncoderDecoder" title="Permalink to this definition">¶</a></dt>
+<dd><p>A simple encoder-decoder style voxel superresolution network</p>
+</dd></dl>
+
+<span class="target" id="module-kaolin.models.DIBREncoder"></span><dl class="class">
+<dt id="kaolin.models.DIBREncoder.DIBREncoder">
+<em class="property">class </em><code class="sig-name descname">DIBREncoder</code><span class="sig-paren">(</span><em class="sig-param">N_CHANNELS</em>, <em class="sig-param">N_KERNELS</em>, <em class="sig-param">BATCH_SIZE</em>, <em class="sig-param">IMG_DIM</em>, <em class="sig-param">VERTS</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/DIBREncoder.html#DIBREncoder"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.DIBREncoder.DIBREncoder" title="Permalink to this definition">¶</a></dt>
+<dd><p>Encoder architecture used for single-image based mesh prediction in
+the Neurips 2019 paper “Learning to Predict 3D Objects with an
+Interpolation-based Differentiable Renderer”</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@inproceedings</span><span class="p">{</span><span class="n">chen2019dibrender</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="p">{</span><span class="n">Learning</span> <span class="n">to</span> <span class="n">Predict</span> <span class="mi">3</span><span class="n">D</span> <span class="n">Objects</span> <span class="k">with</span> <span class="n">an</span> <span class="n">Interpolation</span><span class="o">-</span><span class="n">based</span> <span class="n">Differentiable</span> <span class="n">Renderer</span><span class="p">},</span>
+    <span class="n">author</span><span class="o">=</span><span class="p">{</span><span class="n">Wenzheng</span> <span class="n">Chen</span> <span class="ow">and</span> <span class="n">Jun</span> <span class="n">Gao</span> <span class="ow">and</span> <span class="n">Huan</span> <span class="n">Ling</span> <span class="ow">and</span> <span class="n">Edward</span> <span class="n">Smith</span> <span class="ow">and</span> <span class="n">Jaakko</span> <span class="n">Lehtinen</span> <span class="ow">and</span> <span class="n">Alec</span> <span class="n">Jacobson</span> <span class="ow">and</span> <span class="n">Sanja</span> <span class="n">Fidler</span><span class="p">},</span>
+    <span class="n">booktitle</span><span class="o">=</span><span class="p">{</span><span class="n">Advances</span> <span class="n">In</span> <span class="n">Neural</span> <span class="n">Information</span> <span class="n">Processing</span> <span class="n">Systems</span><span class="p">},</span>
+    <span class="n">year</span><span class="o">=</span><span class="p">{</span><span class="mi">2019</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="method">
+<dt id="kaolin.models.DIBREncoder.DIBREncoder.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">x</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/DIBREncoder.html#DIBREncoder.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.DIBREncoder.DIBREncoder.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-kaolin.models.GEOMetrics"></span><dl class="class">
+<dt id="kaolin.models.GEOMetrics.VoxelDecoder">
+<em class="property">class </em><code class="sig-name descname">VoxelDecoder</code><span class="sig-paren">(</span><em class="sig-param">latent_length</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/GEOMetrics.html#VoxelDecoder"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.GEOMetrics.VoxelDecoder" title="Permalink to this definition">¶</a></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@InProceedings</span><span class="p">{</span><span class="n">smith19a</span><span class="p">,</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="p">{{</span><span class="n">GEOM</span><span class="p">}</span><span class="n">etrics</span><span class="p">:</span> <span class="n">Exploiting</span> <span class="n">Geometric</span> <span class="n">Structure</span> <span class="k">for</span> <span class="n">Graph</span><span class="o">-</span><span class="n">Encoded</span> <span class="n">Objects</span><span class="p">},</span>
+    <span class="n">author</span> <span class="o">=</span> <span class="p">{</span><span class="n">Smith</span><span class="p">,</span> <span class="n">Edward</span> <span class="ow">and</span> <span class="n">Fujimoto</span><span class="p">,</span> <span class="n">Scott</span> <span class="ow">and</span> <span class="n">Romero</span><span class="p">,</span> <span class="n">Adriana</span> <span class="ow">and</span> <span class="n">Meger</span><span class="p">,</span> <span class="n">David</span><span class="p">},</span>
+    <span class="n">booktitle</span> <span class="o">=</span> <span class="p">{</span><span class="n">Proceedings</span> <span class="n">of</span> <span class="n">the</span> <span class="mi">36</span><span class="n">th</span> <span class="n">International</span> <span class="n">Conference</span> <span class="n">on</span> <span class="n">Machine</span> <span class="n">Learning</span><span class="p">},</span>
+    <span class="n">pages</span> <span class="o">=</span> <span class="p">{</span><span class="mi">5866</span><span class="o">--</span><span class="mi">5876</span><span class="p">},</span>
+    <span class="n">year</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2019</span><span class="p">},</span>
+    <span class="n">volume</span> <span class="o">=</span> <span class="p">{</span><span class="mi">97</span><span class="p">},</span>
+    <span class="n">series</span> <span class="o">=</span> <span class="p">{</span><span class="n">Proceedings</span> <span class="n">of</span> <span class="n">Machine</span> <span class="n">Learning</span> <span class="n">Research</span><span class="p">},</span>
+    <span class="n">publisher</span> <span class="o">=</span> <span class="p">{</span><span class="n">PMLR</span><span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="method">
+<dt id="kaolin.models.GEOMetrics.VoxelDecoder.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">latent</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/GEOMetrics.html#VoxelDecoder.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.GEOMetrics.VoxelDecoder.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-kaolin.models.GraphResNet"></span><dl class="class">
+<dt id="kaolin.models.GraphResNet.GraphResNet">
+<em class="property">class </em><code class="sig-name descname">GraphResNet</code><span class="sig-paren">(</span><em class="sig-param">input_features</em>, <em class="sig-param">hidden=192</em>, <em class="sig-param">output_features=3</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/GraphResNet.html#GraphResNet"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.GraphResNet.GraphResNet" title="Permalink to this definition">¶</a></dt>
+<dd><p>An enhanced version of the MeshEncoder; used residual connections
+across graph convolution layers.</p>
+<dl class="method">
+<dt id="kaolin.models.GraphResNet.GraphResNet.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">features</em>, <em class="sig-param">adj</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/GraphResNet.html#GraphResNet.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.GraphResNet.GraphResNet.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-kaolin.models.Image2MeshReconstructionBaseline"></span><dl class="class">
+<dt id="kaolin.models.Image2MeshReconstructionBaseline.ImageToMeshReconstructionBaseline">
+<em class="property">class </em><code class="sig-name descname">ImageToMeshReconstructionBaseline</code><span class="sig-paren">(</span><em class="sig-param">N_CHANNELS</em>, <em class="sig-param">N_KERNELS</em>, <em class="sig-param">BATCH_SIZE</em>, <em class="sig-param">IMG_DIM</em>, <em class="sig-param">VERTS</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/Image2MeshReconstructionBaseline.html#ImageToMeshReconstructionBaseline"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.Image2MeshReconstructionBaseline.ImageToMeshReconstructionBaseline" title="Permalink to this definition">¶</a></dt>
+<dd><p>A simple mesh reconstruction architecture from images. This serves
+as a baseline for mesh reconstruction systems.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@InProceedings</span><span class="p">{</span><span class="n">smith19a</span><span class="p">,</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="p">{{</span><span class="n">GEOM</span><span class="p">}</span><span class="n">etrics</span><span class="p">:</span> <span class="n">Exploiting</span> <span class="n">Geometric</span> <span class="n">Structure</span> <span class="k">for</span> <span class="n">Graph</span><span class="o">-</span><span class="n">Encoded</span> <span class="n">Objects</span><span class="p">},</span>
+    <span class="n">author</span> <span class="o">=</span> <span class="p">{</span><span class="n">Smith</span><span class="p">,</span> <span class="n">Edward</span> <span class="ow">and</span> <span class="n">Fujimoto</span><span class="p">,</span> <span class="n">Scott</span> <span class="ow">and</span> <span class="n">Romero</span><span class="p">,</span> <span class="n">Adriana</span> <span class="ow">and</span> <span class="n">Meger</span><span class="p">,</span> <span class="n">David</span><span class="p">},</span>
+    <span class="n">booktitle</span> <span class="o">=</span> <span class="p">{</span><span class="n">Proceedings</span> <span class="n">of</span> <span class="n">the</span> <span class="mi">36</span><span class="n">th</span> <span class="n">International</span> <span class="n">Conference</span> <span class="n">on</span> <span class="n">Machine</span> <span class="n">Learning</span><span class="p">},</span>
+    <span class="n">pages</span> <span class="o">=</span> <span class="p">{</span><span class="mi">5866</span><span class="o">--</span><span class="mi">5876</span><span class="p">},</span>
+    <span class="n">year</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2019</span><span class="p">},</span>
+    <span class="n">volume</span> <span class="o">=</span> <span class="p">{</span><span class="mi">97</span><span class="p">},</span>
+    <span class="n">series</span> <span class="o">=</span> <span class="p">{</span><span class="n">Proceedings</span> <span class="n">of</span> <span class="n">Machine</span> <span class="n">Learning</span> <span class="n">Research</span><span class="p">},</span>
+    <span class="n">publisher</span> <span class="o">=</span> <span class="p">{</span><span class="n">PMLR</span><span class="p">},</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="method">
+<dt id="kaolin.models.Image2MeshReconstructionBaseline.ImageToMeshReconstructionBaseline.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">x</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/Image2MeshReconstructionBaseline.html#ImageToMeshReconstructionBaseline.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.Image2MeshReconstructionBaseline.ImageToMeshReconstructionBaseline.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-kaolin.models.MeshEncoder"></span><dl class="class">
+<dt id="kaolin.models.MeshEncoder.MeshEncoder">
+<em class="property">class </em><code class="sig-name descname">MeshEncoder</code><span class="sig-paren">(</span><em class="sig-param">latent_length</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/MeshEncoder.html#MeshEncoder"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.MeshEncoder.MeshEncoder" title="Permalink to this definition">¶</a></dt>
+<dd><p>A simple mesh encoder architecture. Takes in a polygon mesh (graph)
+and encodes each node feature into a compact latent code.</p>
+<dl class="method">
+<dt id="kaolin.models.MeshEncoder.MeshEncoder.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">positions</em>, <em class="sig-param">adj</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/MeshEncoder.html#MeshEncoder.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.MeshEncoder.MeshEncoder.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-kaolin.models.OccupancyNetwork"></span><dl class="class">
+<dt id="kaolin.models.OccupancyNetwork.CBatchNorm1d">
+<em class="property">class </em><code class="sig-name descname">CBatchNorm1d</code><span class="sig-paren">(</span><em class="sig-param">c_dim</em>, <em class="sig-param">f_dim</em>, <em class="sig-param">norm_method='batch_norm'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#CBatchNorm1d"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.CBatchNorm1d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Conditional batch normalization layer class.
+:param c_dim: dimension of latent conditioned code c
+:type c_dim: int
+:param f_dim: feature dimension
+:type f_dim: int
+:param norm_method: normalization method
+:type norm_method: str</p>
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.CBatchNorm1d.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">c</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#CBatchNorm1d.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.CBatchNorm1d.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="kaolin.models.OccupancyNetwork.CResnetBlockConv1d">
+<em class="property">class </em><code class="sig-name descname">CResnetBlockConv1d</code><span class="sig-paren">(</span><em class="sig-param">c_dim</em>, <em class="sig-param">size_in</em>, <em class="sig-param">size_h=None</em>, <em class="sig-param">size_out=None</em>, <em class="sig-param">norm_method='batch_norm'</em>, <em class="sig-param">legacy=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#CResnetBlockConv1d"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.CResnetBlockConv1d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Conditional batch normalization-based Resnet block class.
+:param c_dim: dimension of latend conditioned code c
+:type c_dim: int
+:param size_in: input dimension
+:type size_in: int
+:param size_out: output dimension
+:type size_out: int
+:param size_h: hidden dimension
+:type size_h: int
+:param norm_method: normalization method
+:type norm_method: str
+:param legacy: whether to use legacy blocks
+:type legacy: bool</p>
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.CResnetBlockConv1d.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">c</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#CResnetBlockConv1d.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.CResnetBlockConv1d.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="kaolin.models.OccupancyNetwork.DecoderCBatchNorm">
+<em class="property">class </em><code class="sig-name descname">DecoderCBatchNorm</code><span class="sig-paren">(</span><em class="sig-param">dim=3</em>, <em class="sig-param">z_dim=128</em>, <em class="sig-param">c_dim=128</em>, <em class="sig-param">hidden_size=256</em>, <em class="sig-param">leaky=False</em>, <em class="sig-param">legacy=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#DecoderCBatchNorm"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.DecoderCBatchNorm" title="Permalink to this definition">¶</a></dt>
+<dd><p>Decoder with conditional batch normalization (CBN) class.
+:param dim: input dimension
+:type dim: int
+:param z_dim: dimension of latent code z
+:type z_dim: int
+:param c_dim: dimension of latent conditioned code c
+:type c_dim: int
+:param hidden_size: hidden size of Decoder network
+:type hidden_size: int
+:param leaky: whether to use leaky ReLUs
+:type leaky: bool
+:param legacy: whether to use the legacy structure
+:type legacy: bool</p>
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.DecoderCBatchNorm.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">p</em>, <em class="sig-param">z</em>, <em class="sig-param">c</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#DecoderCBatchNorm.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.DecoderCBatchNorm.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="kaolin.models.OccupancyNetwork.OccupancyNetwork">
+<em class="property">class </em><code class="sig-name descname">OccupancyNetwork</code><span class="sig-paren">(</span><em class="sig-param">device</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#OccupancyNetwork"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.OccupancyNetwork" title="Permalink to this definition">¶</a></dt>
+<dd><p>Occupancy Network class.
+:param decoder: decoder network
+:type decoder: nn.Module
+:param encoder: encoder network
+:type encoder: nn.Module
+:param p0_z: prior distribution for latent code z
+:type p0_z: dist
+:param device: torch device
+:type device: device</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@inproceedings</span><span class="p">{</span><span class="n">Occupancy</span> <span class="n">Networks</span><span class="p">,</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="p">{</span><span class="n">Occupancy</span> <span class="n">Networks</span><span class="p">:</span> <span class="n">Learning</span> <span class="mi">3</span><span class="n">D</span> <span class="n">Reconstruction</span> <span class="ow">in</span> <span class="n">Function</span> <span class="n">Space</span><span class="p">},</span>
+    <span class="n">author</span> <span class="o">=</span> <span class="p">{</span><span class="n">Mescheder</span><span class="p">,</span> <span class="n">Lars</span> <span class="ow">and</span> <span class="n">Oechsle</span><span class="p">,</span> <span class="n">Michael</span> <span class="ow">and</span> <span class="n">Niemeyer</span><span class="p">,</span> <span class="n">Michael</span> <span class="ow">and</span> <span class="n">Nowozin</span><span class="p">,</span> <span class="n">Sebastian</span> <span class="ow">and</span> <span class="n">Geiger</span><span class="p">,</span> <span class="n">Andreas</span><span class="p">},</span>
+    <span class="n">booktitle</span> <span class="o">=</span> <span class="p">{</span><span class="n">Proceedings</span> <span class="n">IEEE</span> <span class="n">Conf</span><span class="o">.</span> <span class="n">on</span> <span class="n">Computer</span> <span class="n">Vision</span> <span class="ow">and</span> <span class="n">Pattern</span> <span class="n">Recognition</span> <span class="p">(</span><span class="n">CVPR</span><span class="p">)},</span>
+    <span class="n">year</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2019</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.OccupancyNetwork.compute_elbo">
+<code class="sig-name descname">compute_elbo</code><span class="sig-paren">(</span><em class="sig-param">p</em>, <em class="sig-param">occ</em>, <em class="sig-param">inputs</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#OccupancyNetwork.compute_elbo"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.OccupancyNetwork.compute_elbo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes the expectation lower bound.
+:param p: sampled points
+:type p: tensor
+:param occ: occupancy values for p
+:type occ: tensor
+:param inputs: conditioning input
+:type inputs: tensor</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.OccupancyNetwork.decode">
+<code class="sig-name descname">decode</code><span class="sig-paren">(</span><em class="sig-param">p</em>, <em class="sig-param">z</em>, <em class="sig-param">c</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#OccupancyNetwork.decode"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.OccupancyNetwork.decode" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns occupancy probabilities for the sampled points.
+:param p: points
+:type p: tensor
+:param z: latent code z
+:type z: tensor
+:param c: latent conditioned code c
+:type c: tensor</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.OccupancyNetwork.encode_inputs">
+<code class="sig-name descname">encode_inputs</code><span class="sig-paren">(</span><em class="sig-param">inputs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#OccupancyNetwork.encode_inputs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.OccupancyNetwork.encode_inputs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Encodes the input.
+:param input: the input
+:type input: tensor</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.OccupancyNetwork.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">p</em>, <em class="sig-param">inputs</em>, <em class="sig-param">sample=True</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#OccupancyNetwork.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.OccupancyNetwork.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs a forward pass through the network.
+:param p: sampled points
+:type p: tensor
+:param inputs: conditioning input
+:type inputs: tensor
+:param sample: whether to sample for z
+:type sample: bool</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.OccupancyNetwork.get_z_from_prior">
+<code class="sig-name descname">get_z_from_prior</code><span class="sig-paren">(</span><em class="sig-param">size=torch.Size([])</em>, <em class="sig-param">sample=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#OccupancyNetwork.get_z_from_prior"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.OccupancyNetwork.get_z_from_prior" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns z from prior distribution.
+:param size: size of z
+:type size: Size
+:param sample: whether to sample
+:type sample: bool</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.OccupancyNetwork.infer_z">
+<code class="sig-name descname">infer_z</code><span class="sig-paren">(</span><em class="sig-param">p</em>, <em class="sig-param">occ</em>, <em class="sig-param">c</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#OccupancyNetwork.infer_z"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.OccupancyNetwork.infer_z" title="Permalink to this definition">¶</a></dt>
+<dd><p>Infers z.
+:param p: points tensor
+:type p: tensor
+:param occ: occupancy values for occ
+:type occ: tensor
+:param c: latent conditioned code c
+:type c: tensor</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="kaolin.models.OccupancyNetwork.Resnet18">
+<em class="property">class </em><code class="sig-name descname">Resnet18</code><span class="sig-paren">(</span><em class="sig-param">c_dim</em>, <em class="sig-param">normalize=True</em>, <em class="sig-param">use_linear=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#Resnet18"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.Resnet18" title="Permalink to this definition">¶</a></dt>
+<dd><p>ResNet-18 encoder network for image input.
+:param c_dim: output dimension of the latent embedding
+:type c_dim: int
+:param normalize: whether the input images should be normalized
+:type normalize: bool
+:param use_linear: whether a final linear layer should be used
+:type use_linear: bool</p>
+<dl class="method">
+<dt id="kaolin.models.OccupancyNetwork.Resnet18.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">x</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#Resnet18.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.Resnet18.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="kaolin.models.OccupancyNetwork.get_prior_z">
+<code class="sig-name descname">get_prior_z</code><span class="sig-paren">(</span><em class="sig-param">device</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#get_prior_z"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.get_prior_z" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns prior distribution for latent code z.
+:param cfg: imported yaml config
+:type cfg: dict
+:param device: pytorch device
+:type device: device</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="kaolin.models.OccupancyNetwork.normalize_imagenet">
+<code class="sig-name descname">normalize_imagenet</code><span class="sig-paren">(</span><em class="sig-param">x</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/OccupancyNetwork.html#normalize_imagenet"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.OccupancyNetwork.normalize_imagenet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Normalize input images according to ImageNet standards.
+:param x: input images
+:type x: tensor</p>
+</dd></dl>
+
+<span class="target" id="module-kaolin.models.Pixel2Mesh"></span><dl class="class">
+<dt id="kaolin.models.Pixel2Mesh.GCN">
+<em class="property">class </em><code class="sig-name descname">GCN</code><span class="sig-paren">(</span><em class="sig-param">in_features</em>, <em class="sig-param">out_features</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/Pixel2Mesh.html#GCN"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.Pixel2Mesh.GCN" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simple GCN layer, similar to <a class="reference external" href="https://arxiv.org/abs/1609.02907">https://arxiv.org/abs/1609.02907</a></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">kipf2016semi</span><span class="p">,</span>
+  <span class="n">title</span><span class="o">=</span><span class="p">{</span><span class="n">Semi</span><span class="o">-</span><span class="n">Supervised</span> <span class="n">Classification</span> <span class="k">with</span> <span class="n">Graph</span> <span class="n">Convolutional</span> <span class="n">Networks</span><span class="p">},</span>
+  <span class="n">author</span><span class="o">=</span><span class="p">{</span><span class="n">Kipf</span><span class="p">,</span> <span class="n">Thomas</span> <span class="n">N</span> <span class="ow">and</span> <span class="n">Welling</span><span class="p">,</span> <span class="n">Max</span><span class="p">},</span>
+  <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">arXiv</span> <span class="n">preprint</span> <span class="n">arXiv</span><span class="p">:</span><span class="mf">1609.02907</span><span class="p">},</span>
+  <span class="n">year</span><span class="o">=</span><span class="p">{</span><span class="mi">2016</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="method">
+<dt id="kaolin.models.Pixel2Mesh.GCN.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">input</em>, <em class="sig-param">adj</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/Pixel2Mesh.html#GCN.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.Pixel2Mesh.GCN.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="kaolin.models.Pixel2Mesh.G_Res_Net">
+<em class="property">class </em><code class="sig-name descname">G_Res_Net</code><span class="sig-paren">(</span><em class="sig-param">input_features</em>, <em class="sig-param">hidden=128</em>, <em class="sig-param">output_features=3</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/Pixel2Mesh.html#G_Res_Net"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.Pixel2Mesh.G_Res_Net" title="Permalink to this definition">¶</a></dt>
+<dd><p>Pixel2Mesh architecture.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@inProceedings</span><span class="p">{</span><span class="n">wang2018pixel2mesh</span><span class="p">,</span>
+  <span class="n">title</span><span class="o">=</span><span class="p">{</span><span class="n">Pixel2Mesh</span><span class="p">:</span> <span class="n">Generating</span> <span class="mi">3</span><span class="n">D</span> <span class="n">Mesh</span> <span class="n">Models</span> <span class="kn">from</span> <span class="nn">Single</span> <span class="n">RGB</span> <span class="n">Images</span><span class="p">},</span>
+  <span class="n">author</span><span class="o">=</span><span class="p">{</span><span class="n">Nanyang</span> <span class="n">Wang</span> <span class="ow">and</span> <span class="n">Yinda</span> <span class="n">Zhang</span> <span class="ow">and</span> <span class="n">Zhuwen</span> <span class="n">Li</span> <span class="ow">and</span> <span class="n">Yanwei</span> <span class="n">Fu</span> <span class="ow">and</span> <span class="n">Wei</span> <span class="n">Liu</span> <span class="ow">and</span> <span class="n">Yu</span><span class="o">-</span><span class="n">Gang</span> <span class="n">Jiang</span><span class="p">},</span>
+  <span class="n">booktitle</span><span class="o">=</span><span class="p">{</span><span class="n">ECCV</span><span class="p">},</span>
+  <span class="n">year</span><span class="o">=</span><span class="p">{</span><span class="mi">2018</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="method">
+<dt id="kaolin.models.Pixel2Mesh.G_Res_Net.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">features</em>, <em class="sig-param">adj</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/Pixel2Mesh.html#G_Res_Net.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.Pixel2Mesh.G_Res_Net.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="kaolin.models.Pixel2Mesh.VGG">
+<em class="property">class </em><code class="sig-name descname">VGG</code><span class="sig-paren">(</span><em class="sig-param">channels=4</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/Pixel2Mesh.html#VGG"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.Pixel2Mesh.VGG" title="Permalink to this definition">¶</a></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@InProceedings</span><span class="p">{</span><span class="n">Simonyan15</span><span class="p">,</span>
+  <span class="n">author</span>       <span class="o">=</span> <span class="s2">&quot;Karen Simonyan and Andrew Zisserman&quot;</span><span class="p">,</span>
+  <span class="n">title</span>        <span class="o">=</span> <span class="s2">&quot;Very Deep Convolutional Networks for Large-Scale Image Recognition&quot;</span><span class="p">,</span>
+  <span class="n">booktitle</span>    <span class="o">=</span> <span class="s2">&quot;International Conference on Learning Representations&quot;</span><span class="p">,</span>
+  <span class="n">year</span>         <span class="o">=</span> <span class="s2">&quot;2015&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="method">
+<dt id="kaolin.models.Pixel2Mesh.VGG.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">img</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/Pixel2Mesh.html#VGG.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.Pixel2Mesh.VGG.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-kaolin.models.SimpleGCN"></span><dl class="class">
+<dt id="kaolin.models.SimpleGCN.SimpleGCN">
+<em class="property">class </em><code class="sig-name descname">SimpleGCN</code><span class="sig-paren">(</span><em class="sig-param">in_features</em>, <em class="sig-param">out_features</em>, <em class="sig-param">bias=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/SimpleGCN.html#SimpleGCN"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.SimpleGCN.SimpleGCN" title="Permalink to this definition">¶</a></dt>
+<dd><p>A simple graph convolution layer, similar to the one defined in
+Kipf et al. <a class="reference external" href="https://arxiv.org/abs/1609.02907">https://arxiv.org/abs/1609.02907</a></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@article</span><span class="p">{</span><span class="n">kipf2016semi</span><span class="p">,</span>
+  <span class="n">title</span><span class="o">=</span><span class="p">{</span><span class="n">Semi</span><span class="o">-</span><span class="n">Supervised</span> <span class="n">Classification</span> <span class="k">with</span> <span class="n">Graph</span> <span class="n">Convolutional</span> <span class="n">Networks</span><span class="p">},</span>
+  <span class="n">author</span><span class="o">=</span><span class="p">{</span><span class="n">Kipf</span><span class="p">,</span> <span class="n">Thomas</span> <span class="n">N</span> <span class="ow">and</span> <span class="n">Welling</span><span class="p">,</span> <span class="n">Max</span><span class="p">},</span>
+  <span class="n">journal</span><span class="o">=</span><span class="p">{</span><span class="n">arXiv</span> <span class="n">preprint</span> <span class="n">arXiv</span><span class="p">:</span><span class="mf">1609.02907</span><span class="p">},</span>
+  <span class="n">year</span><span class="o">=</span><span class="p">{</span><span class="mi">2016</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="method">
+<dt id="kaolin.models.SimpleGCN.SimpleGCN.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">input</em>, <em class="sig-param">adj</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/SimpleGCN.html#SimpleGCN.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.SimpleGCN.SimpleGCN.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-kaolin.models.VGG18"></span><dl class="class">
+<dt id="kaolin.models.VGG18.VGG18">
+<em class="property">class </em><code class="sig-name descname">VGG18</code><a class="reference internal" href="../_modules/kaolin/models/VGG18.html#VGG18"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.VGG18.VGG18" title="Permalink to this definition">¶</a></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you use this code, please cite the original paper in addition to Kaolin.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@InProceedings</span><span class="p">{</span><span class="n">Simonyan15</span><span class="p">,</span>
+  <span class="n">author</span>       <span class="o">=</span> <span class="s2">&quot;Karen Simonyan and Andrew Zisserman&quot;</span><span class="p">,</span>
+  <span class="n">title</span>        <span class="o">=</span> <span class="s2">&quot;Very Deep Convolutional Networks for Large-Scale Image Recognition&quot;</span><span class="p">,</span>
+  <span class="n">booktitle</span>    <span class="o">=</span> <span class="s2">&quot;International Conference on Learning Representations&quot;</span><span class="p">,</span>
+  <span class="n">year</span>         <span class="o">=</span> <span class="s2">&quot;2015&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<dl class="method">
+<dt id="kaolin.models.VGG18.VGG18.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">tensor</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/kaolin/models/VGG18.html#VGG18.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#kaolin.models.VGG18.VGG18.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines the computation performed at every call.</p>
+<p>Should be overridden by all subclasses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Although the recipe for forward pass needs to be defined within
+this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
+instead of this since the former takes care of running the
+registered hooks while the latter silently ignores them.</p>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="rep.html" class="btn btn-neutral float-right" title="kaolin.rep" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="metrics.voxel.html" class="btn btn-neutral float-left" title="kaolin.metrics.voxel" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

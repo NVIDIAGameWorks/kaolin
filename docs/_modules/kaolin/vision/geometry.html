@@ -1,0 +1,487 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.vision.geometry &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>kaolin.vision.geometry</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for kaolin.vision.geometry</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.</span>
+<span class="c1"># Kornia components:</span>
+<span class="c1"># Copyright (C) 2017-2019, Arraiy, Inc., all rights reserved.</span>
+<span class="c1"># Copyright (C) 2019-    , Open Source Vision Foundation, all rights reserved.</span>
+<span class="c1"># Copyright (C) 2019-    , Kornia authors, all rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Projective geometry utility functions</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">kaolin.mathutils</span> <span class="k">import</span> <span class="o">*</span>
+
+<span class="c1"># Borrows from Kornia.</span>
+<span class="c1"># https://github.com/kornia/kornia/blob/master/kornia/geometry/camera/perspective.py</span>
+<div class="viewcode-block" id="project_points"><a class="viewcode-back" href="../../../modules/vision.html#kaolin.vision.project_points">[docs]</a><span class="k">def</span> <span class="nf">project_points</span><span class="p">(</span><span class="n">pts</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">intrinsics</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+                   <span class="n">extrinsics</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Projects a set of 3D points onto a 2D image, given the</span>
+<span class="sd">    camera parameters (intrinsics and extrinsics).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pts (torch.Tensor): 3D points to be projected onto the image</span>
+<span class="sd">            (shape: :math:`\cdots \times N \times 3` or :math:`\cdots</span>
+<span class="sd">            \times N \times 4`).</span>
+<span class="sd">        intrinsics (torch.Tensor): camera intrinsic matrix/matrices</span>
+<span class="sd">            (shape: :math:`B \times 4 \times 4` or :math:`4 \times 4`).</span>
+<span class="sd">        extrinsics (torch.Tensor): camera extrinsic matrix/matrices</span>
+<span class="sd">            (shape: :math:`B \times 4 \times 4` or :math:`4 \times 4`).</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        If pts is not of dim 2, then it is treated as a minibatch. For</span>
+<span class="sd">        each point set in the minibatch (of size :math:`B`), one can</span>
+<span class="sd">        apply the same pair of intrinsics or extrinsics (size :math:`4</span>
+<span class="sd">        \times 4`), or choose a different intrinsic-extrinsic pair. In</span>
+<span class="sd">        the latter case, the passed intrinsics/extrinsics must be of</span>
+<span class="sd">        shape (:math:`B \times 4 \times 4`).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (torch.Tensor): pixel coordinates of the input 3D points.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; pts = torch.rand(5, 3)</span>
+<span class="sd">        tensor([[0.6411, 0.4996, 0.7689],</span>
+<span class="sd">                [0.2288, 0.9391, 0.2062],</span>
+<span class="sd">                [0.4991, 0.4673, 0.6192],</span>
+<span class="sd">                [0.0397, 0.3477, 0.4895],</span>
+<span class="sd">                [0.9219, 0.4121, 0.8046]])</span>
+<span class="sd">        &gt;&gt;&gt; intrinsics = torch.FloatTensor([[720, 0, 120, 0],</span>
+<span class="sd">                                            [0, 720, 90, 0],</span>
+<span class="sd">                                            [0, 0, 1, 0],</span>
+<span class="sd">                                            [0, 0, 0, 1]])</span>
+<span class="sd">        &gt;&gt;&gt; img_pts = kal.vision.project_points(pts, intrinsics)</span>
+<span class="sd">        tensor([[ 720.3091,  557.8361],</span>
+<span class="sd">                [ 919.0596, 3369.7185],</span>
+<span class="sd">                [ 700.4019,  633.3636],</span>
+<span class="sd">                [ 178.3637,  601.4078],</span>
+<span class="sd">                [ 945.0151,  458.7479]])</span>
+<span class="sd">        &gt;&gt;&gt; img_pts.shape</span>
+<span class="sd">        torch.Size([5, 2])</span>
+
+<span class="sd">        &gt;&gt;&gt; # `project_points()` also takes in batched inputs</span>
+<span class="sd">        &gt;&gt;&gt; pts = torch.rand(10, 5, 3)</span>
+<span class="sd">        &gt;&gt;&gt; # Applies the same intrinsics to all samples in the batch</span>
+<span class="sd">        &gt;&gt;&gt; img_pts = kal.vision.project_points(pts, intrinsics)</span>
+<span class="sd">        torch.Size([10, 5, 2])</span>
+
+<span class="sd">        &gt;&gt;&gt; # Optionally, can use a per-sample intrinsic, for each</span>
+<span class="sd">        &gt;&gt;&gt; # example in the minibatch.</span>
+<span class="sd">        &gt;&gt;&gt; intrinsics_a = intrinsics.repeat(5, 1, 1)</span>
+<span class="sd">        &gt;&gt;&gt; intrinsics_b = torch.eye(4).repeat(5, 1, 1)</span>
+<span class="sd">        &gt;&gt;&gt; # Use `intrinsics_a` for the first 5 samples and</span>
+<span class="sd">        &gt;&gt;&gt; # `intrinsics_b` for the last 5</span>
+<span class="sd">        &gt;&gt;&gt; intrinsics = torch.cat((intrinsics_a, intrinsics_b), dim=0)</span>
+<span class="sd">        &gt;&gt;&gt; img_pts = kal.vision.project_points(pts, intrinsics)</span>
+<span class="sd">        &gt;&gt;&gt; img_pts.shape</span>
+<span class="sd">        torch.Size([10, 5, 2])</span>
+
+<span class="sd">        &gt;&gt;&gt; # Can also use a per sample extrinsics matrix</span>
+<span class="sd">        &gt;&gt;&gt; pts = torch.rand(10, 5, 3)</span>
+<span class="sd">        &gt;&gt;&gt; extrinsics = torch.eye(4).repeat(10, 1, 1)</span>
+<span class="sd">        &gt;&gt;&gt; img_pts = kal.vision.project_points(pts, intrinsics, extrinsics)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">pts</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input pts to be of type torch.Tensor. &#39;</span>
+                        <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">pts</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">intrinsics</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input intrinsics to be of type &#39;</span>
+                        <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> instead&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">intrinsics</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="n">extrinsics</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">extrinsics</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input extrinsics to be of type &#39;</span>
+                            <span class="s1">&#39;torch.Tensor. Got</span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">extrinsics</span><span class="p">)))</span>
+
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Expected input pts to have at least 2 dims. &#39;</span>
+                         <span class="s1">&#39;Got only </span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Last dim of input pts must be of shape &#39;</span>
+                         <span class="s1">&#39;3 or 4. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+
+    <span class="c1"># Infer the batchsize of pts (assume it is 1, to begin with)</span>
+    <span class="n">batchsize</span> <span class="o">=</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">batchsize</span> <span class="o">=</span> <span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="c1"># if pts.dim() == 2:</span>
+    <span class="c1">#     pts = pts.unsqueeze(0)</span>
+
+    <span class="c1"># If extrinsics is None, set to identity</span>
+    <span class="k">if</span> <span class="n">extrinsics</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">extrinsics</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">intrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">:]</span> <span class="o">!=</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Expected intrinsics to be of shape (4, 4). &#39;</span>
+                         <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">intrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">extrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">:]</span> <span class="o">!=</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Expected extrinsics to be of shape (4, 4). &#39;</span>
+                         <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">intrinsics</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">intrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">batchsize</span> <span class="ow">and</span> <span class="n">intrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Dimension 0 of intrinsics must be either &#39;</span>
+                             <span class="s1">&#39;equal to 1, or equal to the batch size of input pts. &#39;</span>
+                             <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">intrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+    <span class="k">if</span> <span class="n">extrinsics</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">extrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">batchsize</span> <span class="ow">and</span> <span class="n">extrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Dimension 0 of extrinsics must be either &#39;</span>
+                             <span class="s1">&#39;equal to 1, or equal to the batch size of input pts. &#39;</span>
+                             <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="k">if</span> <span class="n">intrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">extrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Inputs intrinsics and extrinsics must &#39;</span>
+                             <span class="s1">&#39;have same shape at dim 0. Got </span><span class="si">{0}</span><span class="s1"> and </span><span class="si">{1}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                                 <span class="n">intrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">extrinsics</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+
+    <span class="c1"># Determine whether or not to homogenize pts</span>
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">homogenize_points</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+
+    <span class="c1"># Perform projection</span>
+    <span class="n">pts</span> <span class="o">=</span> <span class="n">transform3d</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">intrinsics</span><span class="p">,</span> <span class="n">extrinsics</span><span class="p">))</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">pts</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">pts</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">pts</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+    <span class="n">u</span> <span class="o">=</span> <span class="n">x</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">z</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">z</span><span class="p">),</span> <span class="n">z</span><span class="p">)</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">y</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">z</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">z</span><span class="p">),</span> <span class="n">z</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">],</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+<span class="c1"># Borrows from Kornia.</span>
+<span class="c1"># https://github.com/kornia/kornia/blob/master/kornia/geometry/camera/perspective.py</span>
+<div class="viewcode-block" id="unproject_points"><a class="viewcode-back" href="../../../modules/vision.html#kaolin.vision.unproject_points">[docs]</a><span class="k">def</span> <span class="nf">unproject_points</span><span class="p">(</span><span class="n">pts</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">depth</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+                     <span class="n">intrinsics</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Unprojects (back-projects) a set of points from a 2D image</span>
+<span class="sd">    to 3D camera coordinates, given depths and the intrinsics.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pts (torch.Tensor): 2D points to be &#39;un&#39;projected to 3D.</span>
+<span class="sd">            (shape: :math:`\cdots \times N \times 2` or</span>
+<span class="sd">            :math:`\cdots \times 3`).</span>
+<span class="sd">        depth (torch.Tensor): Depth for each point in pts (shape:</span>
+<span class="sd">            :math:`\cdots \times N \times 1`).</span>
+<span class="sd">        intrinsics (torch.Tensor): Camera intrinsics (shape: :math:`</span>
+<span class="sd">            \cdots \times 4 \times 4`).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (torch.Tensor): Camera coordinates of the input points.</span>
+<span class="sd">            (shape: :math:`\cdots \times 3`)</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; img_pts = torch.rand(5, 2)</span>
+<span class="sd">        tensor([[0.6591, 0.8643],</span>
+<span class="sd">                [0.4913, 0.8048],</span>
+<span class="sd">                [0.2129, 0.2338],</span>
+<span class="sd">                [0.9604, 0.2347],</span>
+<span class="sd">                [0.5779, 0.9745]])</span>
+<span class="sd">        &gt;&gt;&gt; depths = torch.rand(5) + 1.</span>
+<span class="sd">        tensor([1.4135, 1.0138, 1.6001, 1.6868, 1.0867])</span>
+<span class="sd">        &gt;&gt;&gt; intrinsics = torch.FloatTensor([[720, 0, 120, 0],</span>
+<span class="sd">                                            [0, 720, 90, 0],</span>
+<span class="sd">                                            [0, 0, 1, 0],</span>
+<span class="sd">                                            [0, 0, 0, 1]])</span>
+<span class="sd">        &gt;&gt;&gt; cam_pts = kal.vision.unproject_points(img_pts, depths, intrinsics)</span>
+<span class="sd">        tensor([[-0.2343, -0.1750,  1.4135],</span>
+<span class="sd">                [-0.1683, -0.1256,  1.0138],</span>
+<span class="sd">                [-0.2662, -0.1995,  1.6001],</span>
+<span class="sd">                [-0.2789, -0.2103,  1.6868],</span>
+<span class="sd">                [-0.1802, -0.1344,  1.0867]])</span>
+<span class="sd">        &gt;&gt;&gt; cam_pts.shape</span>
+<span class="sd">        torch.Size([5, 3])</span>
+
+<span class="sd">        &gt;&gt;&gt; # Also works for batched inputs</span>
+<span class="sd">        &gt;&gt;&gt; img_pts = torch.rand(10, 5, 2)</span>
+<span class="sd">        &gt;&gt;&gt; depths = torch.rand(10, 5) + 1.</span>
+<span class="sd">        &gt;&gt;&gt; cam_pts = kal.vision.unproject_points(img_pts, depths, intrinsics)</span>
+<span class="sd">        &gt;&gt;&gt; cam_pts.shape</span>
+<span class="sd">        torch.Size([10, 5, 3])</span>
+
+<span class="sd">        &gt;&gt;&gt; # Just like for `project_points()`, can use a per-sample intrinsics</span>
+<span class="sd">        &gt;&gt;&gt; # matrix.</span>
+<span class="sd">        &gt;&gt;&gt; intrinsics_a = intrinsics.repeat(5, 1, 1)</span>
+<span class="sd">        &gt;&gt;&gt; intrinsics_b = torch.eye(4).repeat(5, 1, 1)</span>
+<span class="sd">        &gt;&gt;&gt; # Use `intrinsics_a` for the first 5 samples and</span>
+<span class="sd">        &gt;&gt;&gt; # `intrinsics_b` for the last 5</span>
+<span class="sd">        &gt;&gt;&gt; intrinsics = torch.cat((intrinsics_a, intrinsics_b), dim=0)</span>
+<span class="sd">        &gt;&gt;&gt; cam_pts = kal.vision.project_points(img_pts, depths, intrinsics)</span>
+<span class="sd">        &gt;&gt;&gt; cam_pts.shape</span>
+<span class="sd">        torch.Size([10, 5, 3])</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">pts</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input pts to be of type torch.Tensor. &#39;</span>
+                        <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">pts</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">depth</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input depth to be of type torch.Tensor. &#39;</span>
+                        <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">depth</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">intrinsics</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input intrinsics to be of type &#39;</span>
+                        <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> instead&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="nb">type</span><span class="p">(</span><span class="n">intrinsics</span><span class="p">)))</span>
+
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Expected input pts to have at least 2 dims. &#39;</span>
+                         <span class="s1">&#39;Got only </span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()))</span>
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Last dim of input pts must be of shape &#39;</span>
+                         <span class="s1">&#39;2 or 3. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+
+    <span class="k">if</span> <span class="n">depth</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">depth</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="n">pts</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># If the dim of depth differs from the dim of pts by just 1,</span>
+            <span class="c1"># try appending an additional dimension to make it work.</span>
+            <span class="c1"># Else, raise a ValueError.</span>
+            <span class="n">depth</span> <span class="o">=</span> <span class="n">depth</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input depth must have shape 1 in the last &#39;</span>
+                             <span class="s1">&#39;dimension. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">depth</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+    <span class="k">if</span> <span class="n">depth</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Inputs pts and depth must have matching shapes &#39;</span>
+                         <span class="s1">&#39;except at the last dimension. Got </span><span class="si">{0}</span><span class="s1"> and </span><span class="si">{1}</span><span class="s1"> respectively.&#39;</span>
+                         <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">depth</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+
+    <span class="c1"># Homogenize pts if needed</span>
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="c1"># If pts is 2D, homogenize twice (as we need to</span>
+        <span class="c1"># apply a 4 x 4 intrinsics inverse matrix)</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">homogenize_points</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">homogenize_points</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">homogenize_points</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">transform3d</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">intrinsics</span><span class="o">.</span><span class="n">inverse</span><span class="p">())</span> <span class="o">*</span> <span class="n">depth</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

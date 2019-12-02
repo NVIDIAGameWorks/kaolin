@@ -1,0 +1,297 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>USD Tutorial &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+        <script type="text/javascript" src="../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Datasets" href="datasets_tutorial.html" />
+    <link rel="prev" title="Hello, 3D world!" href="hello3d.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">USD Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#creating-a-mesh-dataset-from-a-usd-scene">Creating a Mesh Dataset from a USD Scene</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#viewing-usd-files">Viewing USD Files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#some-notes">Some Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>USD Tutorial</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/notes/usd_tutorial.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="usd-tutorial">
+<h1>USD Tutorial<a class="headerlink" href="#usd-tutorial" title="Permalink to this headline">¶</a></h1>
+<p>Universal Scene Description (USD) is an open-source 3D scene
+description file format developed by Pixar developed to be
+versatile, extensible and interchangeable between different 3D
+tools.</p>
+<p>USD supports asset referencing, making it suitable for
+organizing entire datasets into interpretable, viewable
+subsets based on tags, class or other metadata label.</p>
+<div class="section" id="creating-a-mesh-dataset-from-a-usd-scene">
+<h2>Creating a Mesh Dataset from a USD Scene<a class="headerlink" href="#creating-a-mesh-dataset-from-a-usd-scene" title="Permalink to this headline">¶</a></h2>
+<p>Kaolin supports importing meshes from a provided scene file.
+Let’s use Pixar’s <a class="reference external" href="http://graphics.pixar.com/usd/downloads.html">KitchenSet</a> for our example.</p>
+<img alt="../../docsrc/images/kitchenset.png" src="../../docsrc/images/kitchenset.png" />
+<p>Next we will create a mesh dataset from this scene. First, we need
+to set our environment variables:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>&gt;&gt;&gt; <span class="nb">source</span> setenv.sh
+</pre></div>
+</div>
+<p>This step is required for any interactions with USD (this will
+be addressed in future releases!). Now, we can create our dataset:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">kaolin.datasets.usdfile</span> <span class="kn">import</span> <span class="n">USDMeshes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">usd_meshes</span> <span class="o">=</span> <span class="n">USDMeshes</span><span class="p">(</span><span class="n">usd_filepath</span><span class="o">=</span><span class="s1">&#39;./data/Kitchen_set/Kitchen_set.usd&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">len</span><span class="p">(</span><span class="n">usd_meshes</span><span class="p">)</span>
+<span class="go">740</span>
+</pre></div>
+</div>
+<p>And just like that, we have a dataset of 740 diverse objects for our use!
+Let’s see what they look like.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">kaolin.visualize.vis_usd</span> <span class="k">import</span> <span class="n">VisUsd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">vis</span> <span class="o">=</span> <span class="n">VisUsd</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">vis</span><span class="o">.</span><span class="n">set_stage</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">spacing</span> <span class="o">=</span> <span class="mi">200</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sample</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">usd_meshes</span><span class="p">):</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">attr</span><span class="p">,</span> <span class="n">data</span> <span class="o">=</span> <span class="n">sample</span><span class="p">[</span><span class="s1">&#39;attributes&#39;</span><span class="p">],</span> <span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">max_x</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">usd_meshes</span><span class="p">)))</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">%</span> <span class="n">max_x</span><span class="p">)</span> <span class="o">*</span> <span class="n">spacing</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">y</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">//</span> <span class="n">max_x</span><span class="p">)</span> <span class="o">*</span> <span class="n">spacing</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">vis</span><span class="o">.</span><span class="n">visualize</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">object_path</span><span class="o">=</span><span class="n">f</span><span class="s1">&#39;/Root/Visualizer/</span><span class="si">{attr[&quot;name&quot;]}</span><span class="s1">&#39;</span><span class="p">,</span> \
+<span class="gp">&gt;&gt;&gt; </span>                  <span class="n">translation</span><span class="o">=</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>And opening the USD in your favourite USD viewer with a bit of styling, we get:</p>
+<img alt="../../docsrc/images/kitchenset_meshes.png" src="../../docsrc/images/kitchenset_meshes.png" />
+</div>
+<div class="section" id="viewing-usd-files">
+<h2>Viewing USD Files<a class="headerlink" href="#viewing-usd-files" title="Permalink to this headline">¶</a></h2>
+<p>USD files can be visualized using Pixar’s USDView which you can obtain by visiting
+<a class="reference external" href="https://developer.nvidia.com/usd">https://developer.nvidia.com/usd</a> and selecting the
+corresponding platform under <em>.USD Pre-Built Libraries and Tools</em>. Note, USDView only supports
+python 2.7.</p>
+</div>
+<div class="section" id="some-notes">
+<h2>Some Notes<a class="headerlink" href="#some-notes" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Currently, *.usd and *.usda file extensions are supported.</p></li>
+<li><p>When importing meshes, any mesh that has a varying number of vertices per face cannot be imported.</p></li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="datasets_tutorial.html" class="btn btn-neutral float-right" title="Datasets" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="hello3d.html" class="btn btn-neutral float-left" title="Hello, 3D world!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

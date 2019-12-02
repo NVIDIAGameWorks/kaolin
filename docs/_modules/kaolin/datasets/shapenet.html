@@ -1,0 +1,1262 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.datasets.shapenet &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>kaolin.datasets.shapenet</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for kaolin.datasets.shapenet</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="k">import</span> <span class="n">Path</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.utils.data</span> <span class="k">as</span> <span class="nn">data</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">import</span> <span class="nn">urllib.request</span>
+<span class="kn">import</span> <span class="nn">zipfile</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="k">import</span> <span class="n">glob</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">random</span>
+
+<span class="kn">from</span> <span class="nn">tqdm</span> <span class="k">import</span> <span class="n">tqdm</span>
+<span class="kn">import</span> <span class="nn">scipy.sparse</span>
+<span class="kn">import</span> <span class="nn">tarfile</span>
+<span class="kn">from</span> <span class="nn">PIL</span> <span class="k">import</span> <span class="n">Image</span>
+
+<span class="kn">import</span> <span class="nn">kaolin</span> <span class="k">as</span> <span class="nn">kal</span>
+<span class="kn">from</span> <span class="nn">kaolin.rep.TriangleMesh</span> <span class="k">import</span> <span class="n">TriangleMesh</span>
+<span class="kn">from</span> <span class="nn">kaolin.rep.QuadMesh</span> <span class="k">import</span> <span class="n">QuadMesh</span>
+
+<span class="kn">from</span> <span class="nn">kaolin.transforms</span> <span class="k">import</span> <span class="n">pointcloudfunc</span> <span class="k">as</span> <span class="n">pcfunc</span>
+<span class="kn">from</span> <span class="nn">kaolin.transforms</span> <span class="k">import</span> <span class="n">meshfunc</span>
+<span class="kn">from</span> <span class="nn">kaolin.transforms</span> <span class="k">import</span> <span class="n">voxelfunc</span>
+<span class="kn">from</span> <span class="nn">kaolin.transforms</span> <span class="k">import</span> <span class="n">transforms</span> <span class="k">as</span> <span class="n">tfs</span>
+<span class="kn">from</span> <span class="nn">kaolin</span> <span class="k">import</span> <span class="n">helpers</span>
+<span class="kn">import</span> <span class="nn">kaolin.conversions.meshconversions</span> <span class="k">as</span> <span class="nn">mesh_cvt</span>
+
+
+<span class="c1"># Synset to Label mapping (for ShapeNet core classes)</span>
+<span class="n">synset_to_label</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;04379243&#39;</span><span class="p">:</span> <span class="s1">&#39;table&#39;</span><span class="p">,</span> <span class="s1">&#39;03211117&#39;</span><span class="p">:</span> <span class="s1">&#39;monitor&#39;</span><span class="p">,</span> <span class="s1">&#39;04401088&#39;</span><span class="p">:</span> <span class="s1">&#39;phone&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;04530566&#39;</span><span class="p">:</span> <span class="s1">&#39;watercraft&#39;</span><span class="p">,</span> <span class="s1">&#39;03001627&#39;</span><span class="p">:</span> <span class="s1">&#39;chair&#39;</span><span class="p">,</span> <span class="s1">&#39;03636649&#39;</span><span class="p">:</span> <span class="s1">&#39;lamp&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;03691459&#39;</span><span class="p">:</span> <span class="s1">&#39;speaker&#39;</span><span class="p">,</span> <span class="s1">&#39;02828884&#39;</span><span class="p">:</span> <span class="s1">&#39;bench&#39;</span><span class="p">,</span> <span class="s1">&#39;02691156&#39;</span><span class="p">:</span> <span class="s1">&#39;plane&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;02808440&#39;</span><span class="p">:</span> <span class="s1">&#39;bathtub&#39;</span><span class="p">,</span> <span class="s1">&#39;02871439&#39;</span><span class="p">:</span> <span class="s1">&#39;bookcase&#39;</span><span class="p">,</span> <span class="s1">&#39;02773838&#39;</span><span class="p">:</span> <span class="s1">&#39;bag&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;02801938&#39;</span><span class="p">:</span> <span class="s1">&#39;basket&#39;</span><span class="p">,</span> <span class="s1">&#39;02880940&#39;</span><span class="p">:</span> <span class="s1">&#39;bowl&#39;</span><span class="p">,</span> <span class="s1">&#39;02924116&#39;</span><span class="p">:</span> <span class="s1">&#39;bus&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;02933112&#39;</span><span class="p">:</span> <span class="s1">&#39;cabinet&#39;</span><span class="p">,</span> <span class="s1">&#39;02942699&#39;</span><span class="p">:</span> <span class="s1">&#39;camera&#39;</span><span class="p">,</span> <span class="s1">&#39;02958343&#39;</span><span class="p">:</span> <span class="s1">&#39;car&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;03207941&#39;</span><span class="p">:</span> <span class="s1">&#39;dishwasher&#39;</span><span class="p">,</span> <span class="s1">&#39;03337140&#39;</span><span class="p">:</span> <span class="s1">&#39;file&#39;</span><span class="p">,</span> <span class="s1">&#39;03624134&#39;</span><span class="p">:</span> <span class="s1">&#39;knife&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;03642806&#39;</span><span class="p">:</span> <span class="s1">&#39;laptop&#39;</span><span class="p">,</span> <span class="s1">&#39;03710193&#39;</span><span class="p">:</span> <span class="s1">&#39;mailbox&#39;</span><span class="p">,</span> <span class="s1">&#39;03761084&#39;</span><span class="p">:</span> <span class="s1">&#39;microwave&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;03928116&#39;</span><span class="p">:</span> <span class="s1">&#39;piano&#39;</span><span class="p">,</span> <span class="s1">&#39;03938244&#39;</span><span class="p">:</span> <span class="s1">&#39;pillow&#39;</span><span class="p">,</span> <span class="s1">&#39;03948459&#39;</span><span class="p">:</span> <span class="s1">&#39;pistol&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;04004475&#39;</span><span class="p">:</span> <span class="s1">&#39;printer&#39;</span><span class="p">,</span> <span class="s1">&#39;04099429&#39;</span><span class="p">:</span> <span class="s1">&#39;rocket&#39;</span><span class="p">,</span> <span class="s1">&#39;04256520&#39;</span><span class="p">:</span> <span class="s1">&#39;sofa&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;04554684&#39;</span><span class="p">:</span> <span class="s1">&#39;washer&#39;</span><span class="p">,</span> <span class="s1">&#39;04090263&#39;</span><span class="p">:</span> <span class="s1">&#39;rifle&#39;</span><span class="p">,</span> <span class="s1">&#39;02946921&#39;</span><span class="p">:</span> <span class="s1">&#39;can&#39;</span><span class="p">}</span>
+
+<span class="c1"># Label to Synset mapping (for ShapeNet core classes)</span>
+<span class="n">label_to_synset</span> <span class="o">=</span> <span class="p">{</span><span class="n">v</span><span class="p">:</span> <span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">synset_to_label</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+
+<span class="k">class</span> <span class="nc">print_wrapper</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">text</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span> <span class="o">=</span> <span class="n">logger</span>
+
+    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">[done]</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">tqdm_hook</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Taken from https://github.com/tqdm/tqdm/blob/master/examples/tqdm_wget.py</span>
+
+<span class="sd">    Wraps tqdm instance.</span>
+<span class="sd">    Don&#39;t forget to close() or __exit__()</span>
+<span class="sd">    the tqdm instance once you&#39;re done with it (easiest using `with` syntax).</span>
+<span class="sd">    Example</span>
+<span class="sd">    -------</span>
+<span class="sd">    &gt;&gt;&gt; with tqdm(...) as t:</span>
+<span class="sd">    ...     reporthook = my_hook(t)</span>
+<span class="sd">    ...     urllib.request.urlretrieve(..., reporthook=reporthook)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">last_b</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">update_to</span><span class="p">(</span><span class="n">b</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">bsize</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">tsize</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        b  : int, optional</span>
+<span class="sd">            Number of blocks transferred so far [default: 1].</span>
+<span class="sd">        bsize  : int, optional</span>
+<span class="sd">            Size of each block (in tqdm units) [default: 1].</span>
+<span class="sd">        tsize  : int, optional</span>
+<span class="sd">            Total size (in tqdm units). If [default: None] remains unchanged.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">tsize</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">t</span><span class="o">.</span><span class="n">total</span> <span class="o">=</span> <span class="n">tsize</span>
+        <span class="n">t</span><span class="o">.</span><span class="n">update</span><span class="p">((</span><span class="n">b</span> <span class="o">-</span> <span class="n">last_b</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="n">bsize</span><span class="p">)</span>
+        <span class="n">last_b</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">b</span>
+
+    <span class="k">return</span> <span class="n">update_to</span>
+
+
+<span class="k">def</span> <span class="nf">_convert_categories</span><span class="p">(</span><span class="n">categories</span><span class="p">):</span>
+    <span class="k">assert</span> <span class="n">categories</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s1">&#39;List of categories cannot be empty!&#39;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">c</span> <span class="ow">in</span> <span class="n">synset_to_label</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">+</span> <span class="n">label_to_synset</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">categories</span><span class="p">):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s1">&#39;Some or all of the categories requested are not part of </span><span class="se">\</span>
+<span class="s1">            ShapeNetCore. Data loading may fail if these categories are not avaliable.&#39;</span><span class="p">)</span>
+    <span class="n">synsets</span> <span class="o">=</span> <span class="p">[</span><span class="n">label_to_synset</span><span class="p">[</span><span class="n">c</span><span class="p">]</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">label_to_synset</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+               <span class="k">else</span> <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">categories</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">synsets</span>
+
+
+<div class="viewcode-block" id="ShapeNet_Meshes"><a class="viewcode-back" href="../../../modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Meshes">[docs]</a><span class="k">class</span> <span class="nc">ShapeNet_Meshes</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;ShapeNet Dataset class for meshes.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        root (str): Path to the root directory of the ShapeNet dataset.</span>
+<span class="sd">        categories (str): List of categories to load from ShapeNet. This list may</span>
+<span class="sd">                contain synset ids, class label names (for ShapeNetCore classes),</span>
+<span class="sd">                or a combination of both.</span>
+<span class="sd">        train (bool): return the training set else the test set</span>
+<span class="sd">        split (float): amount of dataset that is training out of 1</span>
+<span class="sd">        no_progress (bool): if True, disables progress bar</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        .. code-block::</span>
+
+<span class="sd">        dict: {</span>
+<span class="sd">            attributes: {name: str, path: str, synset: str, label: str},</span>
+<span class="sd">            data: {vertices: torch.Tensor, faces: torch.Tensor}</span>
+<span class="sd">        }</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; meshes = ShapeNet_Meshes(root=&#39;../data/ShapeNet/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; obj = next(iter(meshes))</span>
+<span class="sd">        &gt;&gt;&gt; obj[&#39;data&#39;][&#39;vertices&#39;].shape</span>
+<span class="sd">        torch.Size([2133, 3])</span>
+<span class="sd">        &gt;&gt;&gt; obj[&#39;data&#39;][&#39;faces&#39;].shape</span>
+<span class="sd">        torch.Size([1910, 3])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">categories</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;chair&#39;</span><span class="p">],</span> <span class="n">train</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+                 <span class="n">split</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="o">.</span><span class="mi">7</span><span class="p">,</span> <span class="n">no_progress</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span> <span class="o">=</span> <span class="n">_convert_categories</span><span class="p">(</span><span class="n">categories</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">synset_to_label</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">]</span>
+
+        <span class="c1"># loops through desired classes</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">)):</span>
+            <span class="n">syn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">class_target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">/</span> <span class="n">syn</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">class_target</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Class </span><span class="si">{0}</span><span class="s1"> (</span><span class="si">{1}</span><span class="s1">) was not found at location </span><span class="si">{2}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">syn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="nb">str</span><span class="p">(</span><span class="n">class_target</span><span class="p">)))</span>
+
+            <span class="c1"># find all objects in the class</span>
+            <span class="n">models</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">class_target</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">))</span>
+            <span class="n">stop</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">models</span><span class="p">)</span> <span class="o">*</span> <span class="n">split</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">train</span><span class="p">:</span>
+                <span class="n">models</span> <span class="o">=</span> <span class="n">models</span><span class="p">[:</span><span class="n">stop</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">models</span> <span class="o">=</span> <span class="n">models</span><span class="p">[</span><span class="n">stop</span><span class="p">:]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">+=</span> <span class="n">models</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span> <span class="o">+=</span> <span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">models</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the length of the dataset. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the item at index idx. &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">attributes</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">synset_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">obj_location</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">/</span> <span class="s1">&#39;model.obj&#39;</span>
+        <span class="n">mesh</span> <span class="o">=</span> <span class="n">TriangleMesh</span><span class="o">.</span><span class="n">from_obj</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">obj_location</span><span class="p">))</span>
+
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;vertices&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;faces&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;path&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">obj_location</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;synset&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span> <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="n">attributes</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="ShapeNet_Images"><a class="viewcode-back" href="../../../modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Images">[docs]</a><span class="k">class</span> <span class="nc">ShapeNet_Images</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;ShapeNet Dataset class for images.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        root (str): Path to the root directory of the ShapeNet dataset.</span>
+<span class="sd">        categories (str): List of categories to load from ShapeNet. This list may</span>
+<span class="sd">                contain synset ids, class label names (for ShapeNetCore classes),</span>
+<span class="sd">                or a combination of both.</span>
+<span class="sd">        train (bool): if true use the training set, else use the test set</span>
+<span class="sd">        split (float): amount of dataset that is training out of</span>
+<span class="sd">        views (int): number of viewpoints per object to load</span>
+<span class="sd">        transform (torchvision.transforms) : transformation to apply to images</span>
+<span class="sd">        no_progress (bool): if True, disables progress bar</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        .. code-block::</span>
+
+<span class="sd">        dict: {</span>
+<span class="sd">            attributes: {name: str, path: str, synset: str, label: str},</span>
+<span class="sd">            data: {vertices: torch.Tensor, faces: torch.Tensor}</span>
+<span class="sd">            params: {</span>
+<span class="sd">                cam_mat: torch.Tensor,</span>
+<span class="sd">                cam_pos: torch.Tensor,</span>
+<span class="sd">                azi: float,</span>
+<span class="sd">                elevation: float,</span>
+<span class="sd">                distance: float</span>
+<span class="sd">            }</span>
+<span class="sd">        }</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from torch.utils.data import DataLoader</span>
+<span class="sd">        &gt;&gt;&gt; images = ShapeNet_Images(root=&#39;../data/ShapeNetImages&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; train_loader = DataLoader(images, batch_size=10, shuffle=True, num_workers=8)</span>
+<span class="sd">        &gt;&gt;&gt; obj = next(iter(train_loader))</span>
+<span class="sd">        &gt;&gt;&gt; image = obj[&#39;data&#39;][&#39;imgs&#39;]</span>
+<span class="sd">        &gt;&gt;&gt; image.shape</span>
+<span class="sd">        torch.Size([10, 4, 137, 137])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">categories</span><span class="p">:</span> <span class="nb">list</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;chair&#39;</span><span class="p">],</span> <span class="n">train</span><span class="p">:</span> <span class="nb">bool</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                 <span class="n">split</span><span class="p">:</span> <span class="nb">float</span><span class="o">=.</span><span class="mi">7</span><span class="p">,</span> <span class="n">views</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">24</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span> <span class="o">=</span> <span class="n">_convert_categories</span><span class="p">(</span><span class="n">categories</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">synset_to_label</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform</span> <span class="o">=</span> <span class="n">transform</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">views</span> <span class="o">=</span> <span class="n">views</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synset_idx</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># check if images exist</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;ShapeNet images were not found at location </span><span class="si">{0}</span><span class="s1">.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">)))</span>
+
+        <span class="c1"># find all needed images</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">)):</span>
+            <span class="n">syn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">class_target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">/</span> <span class="n">syn</span>
+            <span class="k">assert</span> <span class="n">class_target</span><span class="o">.</span><span class="n">exists</span><span class="p">(),</span> \
+                <span class="s2">&quot;ShapeNet class, </span><span class="si">{0}</span><span class="s2">, is not found&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">syn</span><span class="p">)</span>
+
+            <span class="n">models</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">class_target</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">))</span>
+            <span class="n">stop</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">models</span><span class="p">)</span> <span class="o">*</span> <span class="n">split</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">train</span><span class="p">:</span>
+                <span class="n">models</span> <span class="o">=</span> <span class="n">models</span><span class="p">[:</span><span class="n">stop</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">models</span> <span class="o">=</span> <span class="n">models</span><span class="p">[</span><span class="n">stop</span><span class="p">:]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">+=</span> <span class="n">models</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">synset_idx</span> <span class="o">+=</span> <span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">models</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the length of the dataset. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the item at index idx. &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">attributes</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">img_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">view_num</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randrange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">views</span><span class="p">)</span>
+        <span class="c1"># load and process image</span>
+        <span class="n">img</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">img_name</span> <span class="o">/</span> <span class="n">f</span><span class="s1">&#39;rendering/</span><span class="si">{view_num:02}</span><span class="s1">.png&#39;</span><span class="p">))</span>
+        <span class="c1"># apply transformations</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">img</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">img</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">img</span><span class="p">))</span>
+            <span class="n">img</span> <span class="o">=</span> <span class="n">img</span><span class="o">.</span><span class="n">permute</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">img</span> <span class="o">=</span> <span class="n">img</span> <span class="o">/</span> <span class="mf">255.</span>
+        <span class="c1"># load and process camera parameters</span>
+        <span class="n">param_location</span> <span class="o">=</span> <span class="n">img_name</span> <span class="o">/</span> <span class="s1">&#39;rendering/rendering_metadata.txt&#39;</span>
+        <span class="n">azimuth</span><span class="p">,</span> <span class="n">elevation</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">distance</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">loadtxt</span><span class="p">(</span><span class="n">param_location</span><span class="p">)[</span><span class="n">view_num</span><span class="p">]</span>
+        <span class="n">cam_params</span> <span class="o">=</span> <span class="n">kal</span><span class="o">.</span><span class="n">mathutils</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">transformations</span><span class="o">.</span><span class="n">compute_camera_params</span><span class="p">(</span>
+            <span class="n">azimuth</span><span class="p">,</span> <span class="n">elevation</span><span class="p">,</span> <span class="n">distance</span><span class="p">)</span>
+
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;images&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">img</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">][</span><span class="s1">&#39;cam_mat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cam_params</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">][</span><span class="s1">&#39;cam_pos&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cam_params</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">][</span><span class="s1">&#39;azi&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">azimuth</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">][</span><span class="s1">&#39;elevation&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">elevation</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;params&#39;</span><span class="p">][</span><span class="s1">&#39;distance&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">distance</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">img_name</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;synset&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">synset_idx</span><span class="p">[</span><span class="n">index</span><span class="p">]]</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">synset_idx</span><span class="p">[</span><span class="n">index</span><span class="p">]]</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span> <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="n">attributes</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="ShapeNet_Voxels"><a class="viewcode-back" href="../../../modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Voxels">[docs]</a><span class="k">class</span> <span class="nc">ShapeNet_Voxels</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;ShapeNet Dataset class for voxels.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        root (str): Path to the root directory of the ShapeNet dataset.</span>
+<span class="sd">        cache_dir (str): Path to save cached converted representations.</span>
+<span class="sd">        categories (str): List of categories to load from ShapeNet. This list may</span>
+<span class="sd">                contain synset ids, class label names (for ShapeNetCore classes),</span>
+<span class="sd">                or a combination of both.</span>
+<span class="sd">        train (bool): return the training set else the test set</span>
+<span class="sd">        split (float): amount of dataset that is training out of 1</span>
+<span class="sd">        resolutions (list): list of resolutions to be returned</span>
+<span class="sd">        no_progress (bool): if True, disables progress bar</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        .. code-block::</span>
+
+<span class="sd">        dict: {</span>
+<span class="sd">            attributes: {name: str, synset: str, label: str},</span>
+<span class="sd">            data: {[res]: torch.Tensor}</span>
+<span class="sd">        }</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from torch.utils.data import DataLoader</span>
+<span class="sd">        &gt;&gt;&gt; voxels = ShapeNet_Voxels(root=&#39;../data/ShapeNet/&#39;, cache_dir=&#39;cache/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; train_loader = DataLoader(voxels, batch_size=10, shuffle=True, num_workers=8 )</span>
+<span class="sd">        &gt;&gt;&gt; obj = next(iter(train_loader))</span>
+<span class="sd">        &gt;&gt;&gt; obj[&#39;data&#39;][&#39;128&#39;].shape</span>
+<span class="sd">        torch.Size([10, 128, 128, 128])</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">cache_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">categories</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;chair&#39;</span><span class="p">],</span> <span class="n">train</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+                 <span class="n">split</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="o">.</span><span class="mi">7</span><span class="p">,</span> <span class="n">resolutions</span><span class="o">=</span><span class="p">[</span><span class="mi">128</span><span class="p">,</span> <span class="mi">32</span><span class="p">],</span> <span class="n">no_progress</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s1">&#39;voxels&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_transforms</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;resolutions&#39;</span><span class="p">:</span> <span class="n">resolutions</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">mesh_dataset</span> <span class="o">=</span> <span class="n">ShapeNet_Meshes</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="n">root</span><span class="p">,</span>
+                                       <span class="n">categories</span><span class="o">=</span><span class="n">categories</span><span class="p">,</span>
+                                       <span class="n">train</span><span class="o">=</span><span class="n">train</span><span class="p">,</span>
+                                       <span class="n">split</span><span class="o">=</span><span class="n">split</span><span class="p">,</span>
+                                       <span class="n">no_progress</span><span class="o">=</span><span class="n">no_progress</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="n">mesh_dataset</span><span class="o">.</span><span class="n">names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span> <span class="o">=</span> <span class="n">mesh_dataset</span><span class="o">.</span><span class="n">synset_idxs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span> <span class="o">=</span> <span class="n">mesh_dataset</span><span class="o">.</span><span class="n">synsets</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="n">mesh_dataset</span><span class="o">.</span><span class="n">labels</span>
+
+        <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;resolutions&#39;</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cache_transforms</span><span class="p">[</span><span class="n">res</span><span class="p">]</span> <span class="o">=</span> <span class="n">tfs</span><span class="o">.</span><span class="n">CacheCompose</span><span class="p">([</span>
+                <span class="n">tfs</span><span class="o">.</span><span class="n">TriangleMeshToVoxelGrid</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">vertex_offset</span><span class="o">=</span><span class="mf">0.5</span><span class="p">),</span>
+                <span class="n">tfs</span><span class="o">.</span><span class="n">FillVoxelGrid</span><span class="p">(</span><span class="n">thresh</span><span class="o">=</span><span class="mf">0.5</span><span class="p">),</span>
+                <span class="n">tfs</span><span class="o">.</span><span class="n">ExtractProjectOdmsFromVoxelGrid</span><span class="p">()</span>
+            <span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span><span class="p">)</span>
+
+            <span class="n">desc</span> <span class="o">=</span> <span class="s1">&#39;converting to voxels&#39;</span>
+            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">mesh_dataset</span><span class="p">)),</span> <span class="n">desc</span><span class="o">=</span><span class="n">desc</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="n">no_progress</span><span class="p">):</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="n">mesh_dataset</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_transforms</span><span class="p">[</span><span class="n">res</span><span class="p">]</span><span class="o">.</span><span class="n">cached_ids</span><span class="p">:</span>
+                    <span class="n">sample</span> <span class="o">=</span> <span class="n">mesh_dataset</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                    <span class="n">mesh</span> <span class="o">=</span> <span class="n">TriangleMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">][</span><span class="s1">&#39;vertices&#39;</span><span class="p">],</span>
+                                                     <span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">][</span><span class="s1">&#39;faces&#39;</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+                        <span class="n">mesh</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">cache_transforms</span><span class="p">[</span><span class="n">res</span><span class="p">](</span><span class="n">name</span><span class="p">,</span> <span class="n">mesh</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the length of the dataset. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the item at index idx. &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">attributes</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">synset_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;resolutions&#39;</span><span class="p">]:</span>
+            <span class="n">data</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">res</span><span class="p">)]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_transforms</span><span class="p">[</span><span class="n">res</span><span class="p">](</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;synset&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span> <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="n">attributes</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="ShapeNet_Surface_Meshes"><a class="viewcode-back" href="../../../modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Surface_Meshes">[docs]</a><span class="k">class</span> <span class="nc">ShapeNet_Surface_Meshes</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;ShapeNet Dataset class for watertight meshes with only the surface preserved.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        root (str): Path to the root directory of the ShapeNet dataset.</span>
+<span class="sd">        cache_dir (str): Path to save cached converted representations.</span>
+<span class="sd">        categories (str): List of categories to load from ShapeNet. This list may</span>
+<span class="sd">                contain synset ids, class label names (for ShapeNetCore classes),</span>
+<span class="sd">                or a combination of both.</span>
+<span class="sd">        train (bool): return the training set else the test set</span>
+<span class="sd">        split (float): amount of dataset that is training out of 1</span>
+<span class="sd">        resolution (int): resolution of voxel object to use when converting</span>
+<span class="sd">        smoothing_iteration (int): number of applications of laplacian smoothing</span>
+<span class="sd">        no_progress (bool): if True, disables progress bar</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        .. code-block::</span>
+
+<span class="sd">        dict: {</span>
+<span class="sd">            attributes: {name: str, synset: str, label: str},</span>
+<span class="sd">            data: {vertices: torch.Tensor, faces: torch.Tensor}</span>
+<span class="sd">        }</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; surface_meshes = ShapeNet_Surface_Meshes(root=&#39;../data/ShapeNet&#39;, cache_dir=&#39;cache/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; obj = next(iter(surface_meshes))</span>
+<span class="sd">        &gt;&gt;&gt; obj[&#39;data&#39;][&#39;vertices&#39;].shape</span>
+<span class="sd">        torch.Size([11617, 3])</span>
+<span class="sd">        &gt;&gt;&gt; obj[&#39;data&#39;][&#39;faces&#39;].shape</span>
+<span class="sd">        torch.Size([23246, 3])</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">cache_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">categories</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;chair&#39;</span><span class="p">],</span> <span class="n">train</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+                 <span class="n">split</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="o">.</span><span class="mi">7</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span> <span class="n">smoothing_iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;Tri&#39;</span><span class="p">,</span>
+                 <span class="n">no_progress</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">mode</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;Tri&#39;</span><span class="p">,</span> <span class="s1">&#39;Quad&#39;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s1">&#39;surface_meshes&#39;</span>
+        <span class="n">dataset_params</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;root&#39;</span><span class="p">:</span> <span class="n">root</span><span class="p">,</span>
+            <span class="s1">&#39;categories&#39;</span><span class="p">:</span> <span class="n">categories</span><span class="p">,</span>
+            <span class="s1">&#39;train&#39;</span><span class="p">:</span> <span class="n">train</span><span class="p">,</span>
+            <span class="s1">&#39;split&#39;</span><span class="p">:</span> <span class="n">split</span><span class="p">,</span>
+            <span class="s1">&#39;no_progress&#39;</span><span class="p">:</span> <span class="n">no_progress</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;resolution&#39;</span><span class="p">:</span> <span class="n">resolution</span><span class="p">,</span>
+            <span class="s1">&#39;smoothing_iterations&#39;</span><span class="p">:</span> <span class="n">smoothing_iterations</span><span class="p">,</span>
+            <span class="s1">&#39;mode&#39;</span><span class="p">:</span> <span class="n">mode</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="n">mesh_dataset</span> <span class="o">=</span> <span class="n">ShapeNet_Meshes</span><span class="p">(</span><span class="o">**</span><span class="n">dataset_params</span><span class="p">)</span>
+        <span class="n">voxel_dataset</span> <span class="o">=</span> <span class="n">ShapeNet_Voxels</span><span class="p">(</span><span class="o">**</span><span class="n">dataset_params</span><span class="p">,</span> <span class="n">cache_dir</span><span class="o">=</span><span class="n">cache_dir</span><span class="p">,</span> <span class="n">resolutions</span><span class="o">=</span><span class="p">[</span><span class="n">resolution</span><span class="p">])</span>
+        <span class="n">combined_dataset</span> <span class="o">=</span> <span class="n">ShapeNet_Combination</span><span class="p">([</span><span class="n">mesh_dataset</span><span class="p">,</span> <span class="n">voxel_dataset</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="n">combined_dataset</span><span class="o">.</span><span class="n">names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span> <span class="o">=</span> <span class="n">combined_dataset</span><span class="o">.</span><span class="n">synset_idxs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span> <span class="o">=</span> <span class="n">combined_dataset</span><span class="o">.</span><span class="n">synsets</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="n">combined_dataset</span><span class="o">.</span><span class="n">labels</span>
+
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s1">&#39;Tri&#39;</span><span class="p">:</span>
+            <span class="n">mesh_conversion</span> <span class="o">=</span> <span class="n">tfs</span><span class="o">.</span><span class="n">VoxelGridToTriangleMesh</span><span class="p">(</span><span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+                                                          <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;marching_cubes&#39;</span><span class="p">,</span>
+                                                          <span class="n">normalize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mesh_conversion</span> <span class="o">=</span> <span class="n">tfs</span><span class="o">.</span><span class="n">VoxelGridToQuadMesh</span><span class="p">(</span><span class="n">threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+                                                      <span class="n">normalize</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">convert</span><span class="p">(</span><span class="n">og_mesh</span><span class="p">,</span> <span class="n">voxel</span><span class="p">):</span>
+            <span class="n">transforms</span> <span class="o">=</span> <span class="n">tfs</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span><span class="n">mesh_conversion</span><span class="p">,</span>
+                                     <span class="n">tfs</span><span class="o">.</span><span class="n">MeshLaplacianSmoothing</span><span class="p">(</span><span class="n">smoothing_iterations</span><span class="p">)])</span>
+
+            <span class="n">new_mesh</span> <span class="o">=</span> <span class="n">transforms</span><span class="p">(</span><span class="n">voxel</span><span class="p">)</span>
+            <span class="n">new_mesh</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="n">pcfunc</span><span class="o">.</span><span class="n">realign</span><span class="p">(</span><span class="n">new_mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="n">og_mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;vertices&#39;</span><span class="p">:</span> <span class="n">new_mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="s1">&#39;faces&#39;</span><span class="p">:</span> <span class="n">new_mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span> <span class="o">=</span> <span class="n">helpers</span><span class="o">.</span><span class="n">Cache</span><span class="p">(</span><span class="n">convert</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span><span class="p">,</span>
+                                           <span class="n">cache_key</span><span class="o">=</span><span class="n">helpers</span><span class="o">.</span><span class="n">_get_hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">))</span>
+
+        <span class="n">desc</span> <span class="o">=</span> <span class="s1">&#39;converting to surface meshes&#39;</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">combined_dataset</span><span class="p">)),</span> <span class="n">desc</span><span class="o">=</span><span class="n">desc</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="n">no_progress</span><span class="p">):</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">combined_dataset</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span><span class="o">.</span><span class="n">cached_ids</span><span class="p">:</span>
+                <span class="n">sample</span> <span class="o">=</span> <span class="n">combined_dataset</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                <span class="n">voxel</span> <span class="o">=</span> <span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">][</span><span class="nb">str</span><span class="p">(</span><span class="n">resolution</span><span class="p">)]</span>
+                <span class="n">og_mesh</span> <span class="o">=</span> <span class="n">TriangleMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">][</span><span class="s1">&#39;vertices&#39;</span><span class="p">],</span>
+                                                    <span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">][</span><span class="s1">&#39;faces&#39;</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+                    <span class="n">voxel</span> <span class="o">=</span> <span class="n">voxel</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s1">&#39;cuda&#39;</span><span class="p">)</span>
+                    <span class="n">og_mesh</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">og_mesh</span><span class="o">=</span><span class="n">og_mesh</span><span class="p">,</span> <span class="n">voxel</span><span class="o">=</span><span class="n">voxel</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the length of the dataset. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the item at index idx. &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">attributes</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">synset_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">mesh</span> <span class="o">=</span> <span class="n">TriangleMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;vertices&#39;</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;faces&#39;</span><span class="p">])</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;adj&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">compute_adjacency_matrix_sparse</span><span class="p">()</span><span class="o">.</span><span class="n">coalesce</span><span class="p">()</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;synset&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span> <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="n">attributes</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="ShapeNet_Points"><a class="viewcode-back" href="../../../modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Points">[docs]</a><span class="k">class</span> <span class="nc">ShapeNet_Points</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;ShapeNet Dataset class for sampled point cloud from each object.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        root (str): Path to the root directory of the ShapeNet dataset.</span>
+<span class="sd">        cache_dir (str): Path to save cached converted representations.</span>
+<span class="sd">        categories (str): List of categories to load from ShapeNet. This list may</span>
+<span class="sd">                contain synset ids, class label names (for ShapeNetCore classes),</span>
+<span class="sd">                or a combination of both.</span>
+<span class="sd">        train (bool): return the training set else the test set</span>
+<span class="sd">        split (float): amount of dataset that is training out of 1</span>
+<span class="sd">        num_points (int): number of point sampled on mesh</span>
+<span class="sd">        smoothing_iteration (int): number of application of laplacian smoothing</span>
+<span class="sd">        surface (bool): if only the surface of the original mesh should be used</span>
+<span class="sd">        resolution (int): resolution of voxel object to use when converting</span>
+<span class="sd">        normals (bool): should the normals of the points be saved</span>
+<span class="sd">        no_progress (bool): if True, disables progress bar</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        .. code-block::</span>
+
+<span class="sd">        dict: {</span>
+<span class="sd">            attributes: {name: str, synset: str, label: str},</span>
+<span class="sd">            data: {points: torch.Tensor, normals: torch.Tensor}</span>
+<span class="sd">        }</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from torch.utils.data import DataLoader</span>
+<span class="sd">        &gt;&gt;&gt; points = ShapeNet_Points(root=&#39;../data/ShapeNet&#39;, cache_dir=&#39;cache/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; train_loader = DataLoader(points, batch_size=10, shuffle=True, num_workers=8)</span>
+<span class="sd">        &gt;&gt;&gt; obj = next(iter(train_loader))</span>
+<span class="sd">        &gt;&gt;&gt; obj[&#39;data&#39;][&#39;points&#39;].shape</span>
+<span class="sd">        torch.Size([10, 5000, 3])</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">cache_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">categories</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;chair&#39;</span><span class="p">],</span> <span class="n">train</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+                 <span class="n">split</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="o">.</span><span class="mi">7</span><span class="p">,</span> <span class="n">num_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5000</span><span class="p">,</span> <span class="n">smoothing_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+                 <span class="n">surface</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">normals</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">no_progress</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s1">&#39;points&#39;</span>
+
+        <span class="n">dataset_params</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;root&#39;</span><span class="p">:</span> <span class="n">root</span><span class="p">,</span>
+            <span class="s1">&#39;categories&#39;</span><span class="p">:</span> <span class="n">categories</span><span class="p">,</span>
+            <span class="s1">&#39;train&#39;</span><span class="p">:</span> <span class="n">train</span><span class="p">,</span>
+            <span class="s1">&#39;split&#39;</span><span class="p">:</span> <span class="n">split</span><span class="p">,</span>
+            <span class="s1">&#39;no_progress&#39;</span><span class="p">:</span> <span class="n">no_progress</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;num_points&#39;</span><span class="p">:</span> <span class="n">num_points</span><span class="p">,</span>
+            <span class="s1">&#39;smoothing_iterations&#39;</span><span class="p">:</span> <span class="n">smoothing_iterations</span><span class="p">,</span>
+            <span class="s1">&#39;surface&#39;</span><span class="p">:</span> <span class="n">surface</span><span class="p">,</span>
+            <span class="s1">&#39;resolution&#39;</span><span class="p">:</span> <span class="n">resolution</span><span class="p">,</span>
+            <span class="s1">&#39;normals&#39;</span><span class="p">:</span> <span class="n">normals</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="n">surface</span><span class="p">:</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="n">ShapeNet_Surface_Meshes</span><span class="p">(</span><span class="o">**</span><span class="n">dataset_params</span><span class="p">,</span>
+                                              <span class="n">cache_dir</span><span class="o">=</span><span class="n">cache_dir</span><span class="p">,</span>
+                                              <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span>
+                                              <span class="n">smoothing_iterations</span><span class="o">=</span><span class="n">smoothing_iterations</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="n">ShapeNet_Meshes</span><span class="p">(</span><span class="o">**</span><span class="n">dataset_params</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">synset_idxs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">synsets</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">labels</span>
+
+        <span class="k">def</span> <span class="nf">convert</span><span class="p">(</span><span class="n">mesh</span><span class="p">):</span>
+            <span class="n">points</span><span class="p">,</span> <span class="n">face_choices</span> <span class="o">=</span> <span class="n">mesh_cvt</span><span class="o">.</span><span class="n">trianglemesh_to_pointcloud</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">num_points</span><span class="p">)</span>
+            <span class="n">face_normals</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">compute_face_normals</span><span class="p">()</span>
+            <span class="n">point_normals</span> <span class="o">=</span> <span class="n">face_normals</span><span class="p">[</span><span class="n">face_choices</span><span class="p">]</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;points&#39;</span><span class="p">:</span> <span class="n">points</span><span class="p">,</span> <span class="s1">&#39;normals&#39;</span><span class="p">:</span> <span class="n">point_normals</span><span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span> <span class="o">=</span> <span class="n">helpers</span><span class="o">.</span><span class="n">Cache</span><span class="p">(</span><span class="n">convert</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span><span class="p">,</span>
+                                           <span class="n">cache_key</span><span class="o">=</span><span class="n">helpers</span><span class="o">.</span><span class="n">_get_hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">))</span>
+
+        <span class="n">desc</span> <span class="o">=</span> <span class="s1">&#39;converting to points&#39;</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)),</span> <span class="n">desc</span><span class="o">=</span><span class="n">desc</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="n">no_progress</span><span class="p">):</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span><span class="o">.</span><span class="n">cached_ids</span><span class="p">:</span>
+                <span class="n">idx</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="n">sample</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                <span class="n">mesh</span> <span class="o">=</span> <span class="n">TriangleMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">][</span><span class="s1">&#39;vertices&#39;</span><span class="p">],</span>
+                                                 <span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">][</span><span class="s1">&#39;faces&#39;</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+                    <span class="n">mesh</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the length of the dataset. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the item at index idx. &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">attributes</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">synset_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;synset&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span> <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="n">attributes</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="ShapeNet_SDF_Points"><a class="viewcode-back" href="../../../modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_SDF_Points">[docs]</a><span class="k">class</span> <span class="nc">ShapeNet_SDF_Points</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;ShapeNet Dataset class for signed distance functions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        root (str): Path to the root directory of the ShapeNet dataset.</span>
+<span class="sd">        cache_dir (str): Path to save cached converted representations.</span>
+<span class="sd">        categories (str): List of categories to load from ShapeNet. This list may</span>
+<span class="sd">                contain synset ids, class label names (for ShapeNetCore classes),</span>
+<span class="sd">                or a combination of both.</span>
+<span class="sd">        train (bool): return the training set else the test set</span>
+<span class="sd">        split (float): amount of dataset that is training out of 1</span>
+<span class="sd">        resolution (int): resolution of voxel object to use when converting</span>
+<span class="sd">        num_points (int): number of sdf points sampled on mesh</span>
+<span class="sd">        occ (bool): should only occupancy values be returned instead of distances</span>
+<span class="sd">        smoothing_iteration (int): number of application of laplacian smoothing</span>
+<span class="sd">        sample_box (bool): whether to sample only from within mesh extents</span>
+<span class="sd">        no_progress (bool): if True, disables progress bar</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        .. code-block::</span>
+
+<span class="sd">            dict: {</span>
+<span class="sd">                attributes: {name: str, synset: str, label: str},</span>
+<span class="sd">                data: {</span>
+<span class="sd">                    Union[&#39;occ_values&#39;, &#39;sdf_distances&#39;]: torch.Tensor,</span>
+<span class="sd">                    Union[&#39;occ_points, &#39;sdf_points&#39;]: torch.Tensor}</span>
+<span class="sd">            }</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from torch.utils.data import DataLoader</span>
+<span class="sd">        &gt;&gt;&gt; sdf_points = ShapeNet_SDF_Points(root=&#39;../data/ShapeNet&#39;, cache_dir=&#39;cache/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; train_loader = DataLoader(sdf_points, batch_size=10, shuffle=True, num_workers=8)</span>
+<span class="sd">        &gt;&gt;&gt; obj = next(iter(train_loader))</span>
+<span class="sd">        &gt;&gt;&gt; obj[&#39;data&#39;][&#39;sdf_points&#39;].shape</span>
+<span class="sd">        torch.Size([10, 5000, 3])</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">cache_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">categories</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;chair&#39;</span><span class="p">],</span> <span class="n">train</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+                 <span class="n">split</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="o">.</span><span class="mi">7</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span> <span class="n">num_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5000</span><span class="p">,</span> <span class="n">occ</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+                 <span class="n">smoothing_iterations</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">sample_box</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">no_progress</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s1">&#39;sdf_points&#39;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;resolution&#39;</span><span class="p">:</span> <span class="n">resolution</span><span class="p">,</span>
+            <span class="s1">&#39;num_points&#39;</span><span class="p">:</span> <span class="n">num_points</span><span class="p">,</span>
+            <span class="s1">&#39;occ&#39;</span><span class="p">:</span> <span class="n">occ</span><span class="p">,</span>
+            <span class="s1">&#39;smoothing_iterations&#39;</span><span class="p">:</span> <span class="n">smoothing_iterations</span><span class="p">,</span>
+            <span class="s1">&#39;sample_box&#39;</span><span class="p">:</span> <span class="n">sample_box</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="n">surface_mesh_dataset</span> <span class="o">=</span> <span class="n">ShapeNet_Surface_Meshes</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="n">root</span><span class="p">,</span>
+                                                       <span class="n">cache_dir</span><span class="o">=</span><span class="n">cache_dir</span><span class="p">,</span>
+                                                       <span class="n">categories</span><span class="o">=</span><span class="n">categories</span><span class="p">,</span>
+                                                       <span class="n">train</span><span class="o">=</span><span class="n">train</span><span class="p">,</span>
+                                                       <span class="n">split</span><span class="o">=</span><span class="n">split</span><span class="p">,</span>
+                                                       <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span>
+                                                       <span class="n">smoothing_iterations</span><span class="o">=</span><span class="n">smoothing_iterations</span><span class="p">,</span>
+                                                       <span class="n">no_progress</span><span class="o">=</span><span class="n">no_progress</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="n">surface_mesh_dataset</span><span class="o">.</span><span class="n">names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span> <span class="o">=</span> <span class="n">surface_mesh_dataset</span><span class="o">.</span><span class="n">synset_idxs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span> <span class="o">=</span> <span class="n">surface_mesh_dataset</span><span class="o">.</span><span class="n">synsets</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="n">surface_mesh_dataset</span><span class="o">.</span><span class="n">labels</span>
+
+        <span class="k">def</span> <span class="nf">convert</span><span class="p">(</span><span class="n">mesh</span><span class="p">):</span>
+            <span class="n">sdf</span> <span class="o">=</span> <span class="n">mesh_cvt</span><span class="o">.</span><span class="n">trianglemesh_to_sdf</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">num_points</span><span class="p">)</span>
+            <span class="n">bbox_true</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">((</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span>
+                                     <span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">points</span> <span class="o">=</span> <span class="mf">1.05</span> <span class="o">*</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;num_points&#39;</span><span class="p">],</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">device</span><span class="p">)</span> <span class="o">-</span> <span class="o">.</span><span class="mi">5</span><span class="p">)</span>
+            <span class="n">distances</span> <span class="o">=</span> <span class="n">sdf</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;points&#39;</span><span class="p">:</span> <span class="n">points</span><span class="p">,</span> <span class="s1">&#39;distances&#39;</span><span class="p">:</span> <span class="n">distances</span><span class="p">,</span> <span class="s1">&#39;bbox&#39;</span><span class="p">:</span> <span class="n">bbox_true</span><span class="p">}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span> <span class="o">=</span> <span class="n">helpers</span><span class="o">.</span><span class="n">Cache</span><span class="p">(</span><span class="n">convert</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span><span class="p">,</span>
+                                           <span class="n">cache_key</span><span class="o">=</span><span class="n">helpers</span><span class="o">.</span><span class="n">_get_hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">))</span>
+
+        <span class="n">desc</span> <span class="o">=</span> <span class="s1">&#39;converting to sdf points&#39;</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">surface_mesh_dataset</span><span class="p">)),</span> <span class="n">desc</span><span class="o">=</span><span class="n">desc</span><span class="p">,</span> <span class="n">disable</span><span class="o">=</span><span class="n">no_progress</span><span class="p">):</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">surface_mesh_dataset</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span><span class="o">.</span><span class="n">cached_ids</span><span class="p">:</span>
+                <span class="n">idx</span> <span class="o">=</span> <span class="n">surface_mesh_dataset</span><span class="o">.</span><span class="n">names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="n">sample</span> <span class="o">=</span> <span class="n">surface_mesh_dataset</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                <span class="n">mesh</span> <span class="o">=</span> <span class="n">TriangleMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">][</span><span class="s1">&#39;vertices&#39;</span><span class="p">],</span>
+                                                 <span class="n">sample</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">][</span><span class="s1">&#39;faces&#39;</span><span class="p">])</span>
+
+                <span class="c1"># Use cuda if available to speed up conversion</span>
+                <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+                    <span class="n">mesh</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the length of the dataset. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the item at index idx. &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">attributes</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">synset_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+
+        <span class="n">cached_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_convert</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">cached_data</span><span class="p">[</span><span class="s1">&#39;points&#39;</span><span class="p">]</span>
+        <span class="n">distances</span> <span class="o">=</span> <span class="n">cached_data</span><span class="p">[</span><span class="s1">&#39;distances&#39;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;sample_box&#39;</span><span class="p">]:</span>
+            <span class="n">bbox_values</span> <span class="o">=</span> <span class="n">kal</span><span class="o">.</span><span class="n">rep</span><span class="o">.</span><span class="n">bounding_points</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">cached_data</span><span class="p">[</span><span class="s1">&#39;bbox&#39;</span><span class="p">])</span>
+            <span class="n">points</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">bbox_values</span><span class="p">]</span>
+            <span class="n">distances</span> <span class="o">=</span> <span class="n">distances</span><span class="p">[</span><span class="n">bbox_values</span><span class="p">]</span>
+
+        <span class="n">selection</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;num_points&#39;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;occ&#39;</span><span class="p">]:</span>
+            <span class="n">data</span><span class="p">[</span><span class="s1">&#39;occ_values&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">distances</span><span class="p">[</span><span class="n">selection</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">0</span>
+            <span class="n">data</span><span class="p">[</span><span class="s1">&#39;occ_points&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">selection</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">data</span><span class="p">[</span><span class="s1">&#39;sdf_distances&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">distances</span><span class="p">[</span><span class="n">selection</span><span class="p">]</span>
+            <span class="n">data</span><span class="p">[</span><span class="s1">&#39;sdf_points&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">selection</span><span class="p">]</span>
+
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;synset&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span> <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="n">attributes</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="ShapeNet_Tags"><a class="viewcode-back" href="../../../modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Tags">[docs]</a><span class="k">class</span> <span class="nc">ShapeNet_Tags</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;ShapeNet Dataset class for tags.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dataset (kal.dataloader.shapenet.ShapeNet): One of the ShapeNet datasets</span>
+<span class="sd">        download (bool): If True will load taxonomy of objects if it is not loaded yet</span>
+<span class="sd">        transform (...) : transformation to apply to tags</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: Dictionary with key for the input tags encod and : &#39;tag_enc&#39;:</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from torch.utils.data import DataLoader</span>
+<span class="sd">        &gt;&gt;&gt; meshes = ShapeNet_Meshes(root=&#39;../data/ShapeNet/&#39;, cache_dir=&#39;cache/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; tags = ShapeNet_Tags(meshes)</span>
+<span class="sd">        &gt;&gt;&gt; train_loader = DataLoader(tags, batch_size=10, shuffle=True, num_workers=8 )</span>
+<span class="sd">        &gt;&gt;&gt; obj = next(iter(train_loader))</span>
+<span class="sd">        &gt;&gt;&gt; obj[&#39;data&#39;][&#39;tag_enc&#39;].shape</span>
+<span class="sd">        torch.Size([10, N])</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">tag_aug</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">root</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">paths</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">paths</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">synset_idxs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">synsets</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tag_aug</span> <span class="o">=</span> <span class="n">tag_aug</span>
+
+        <span class="c1"># load taxonomy</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_taxonomy</span><span class="p">()</span>
+        <span class="c1"># get the mapping of sample indexes to file names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_name_index_mapping</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_tags</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name_tag_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tag_name_map</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+
+        <span class="c1"># get labels for instances</span>
+        <span class="k">for</span> <span class="n">synset_index</span><span class="p">,</span> <span class="n">synset</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">):</span>
+            <span class="n">tag</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tags_from_taxonomy</span><span class="p">(</span><span class="n">synset</span><span class="p">)</span>
+            <span class="n">indexes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span><span class="p">)</span> <span class="o">==</span> <span class="n">synset_index</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">instances</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">ind</span><span class="p">]</span> <span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="n">indexes</span><span class="p">]</span>
+
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">instances</span><span class="p">:</span>
+                <span class="c1"># get tags from labels</span>
+                <span class="n">tag_list</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tags_from_str</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">all_tags</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">tag_list</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">name_to_index</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                    <span class="c1"># populate the mappings</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">update_name_tag_mappings</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">tag_list</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="nb">print</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="c1"># compute unique tags</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_tags</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">all_tags</span><span class="p">))</span>
+        <span class="c1"># get indexes of tags for one-hot encoding</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_tag_indexes</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">get_tag_indexes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tag_index</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">tag</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tag_name_map</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tag_index</span><span class="p">[</span><span class="n">tag</span><span class="p">]</span> <span class="o">=</span> <span class="n">index</span>
+
+    <span class="k">def</span> <span class="nf">get_taxonomy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Download the taxonomy from the web.&quot;&quot;&quot;</span>
+        <span class="n">taxonomy_location</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="s1">&#39;taxonomy.json&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">taxonomy_location</span><span class="p">):</span>
+            <span class="k">with</span> <span class="n">print_wrapper</span><span class="p">(</span><span class="s2">&quot;Downloading taxonomy ...&quot;</span><span class="p">):</span>
+                <span class="n">taxonomy_web_location</span> <span class="o">=</span> <span class="s1">&#39;http://shapenet.cs.stanford.edu/shapenet/obj-zip/ShapeNetCore.v1/taxonomy.json&#39;</span>
+                <span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlretrieve</span><span class="p">(</span><span class="n">taxonomy_web_location</span><span class="p">,</span>
+                                           <span class="n">filename</span><span class="o">=</span><span class="n">taxonomy_location</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">update_name_tag_mappings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">tag_list</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Create a mapping from the file name to its label and from each tag to a list of files with this tag.&quot;&quot;&quot;</span>
+        <span class="c1"># populate tag to file name mapping</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name_tag_map</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">tag_list</span>
+        <span class="c1"># populate inverse mapping</span>
+        <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tag_list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">tag</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag_name_map</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tag_name_map</span><span class="p">[</span><span class="n">tag</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tag_name_map</span><span class="p">[</span><span class="n">tag</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_name_index_mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Calculate the mapping between file names and the sample indices&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name_to_index</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name_to_index</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">index</span>
+
+    <span class="k">def</span> <span class="nf">get_tags_from_str</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tags_str</span><span class="p">,</span> <span class="n">inverse_order</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">forbidden_symbols</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;\*&quot;</span><span class="p">]):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Process the tag string and return a list of tags. ``Note``: The tags that contain forbidden_symbols are ignored.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            tags_str (str): string with comma separated tags.</span>
+<span class="sd">            inverse_order (bool): reverse the order of tags</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list of tags.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">output_list</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">tag</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tags_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="s2">&quot;.*(:?</span><span class="si">{}</span><span class="s2">).*&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;|&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">forbidden_symbols</span><span class="p">)),</span> <span class="n">tag</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">inverse_order</span><span class="p">:</span>
+            <span class="n">output_list</span> <span class="o">=</span> <span class="n">output_list</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">output_list</span>
+
+    <span class="k">def</span> <span class="nf">get_category_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s1">&#39;chair&#39;</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Get the list of SynSet IDs and the respective tags based on the taxonomy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            category (str): category of the object that needs to be retrieved.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            synsetIds (list): list of synsets</span>
+<span class="sd">            tags (list): list of tags for each synset</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="s1">&#39;taxonomy.json&#39;</span><span class="p">),</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">json_f</span><span class="p">:</span>
+            <span class="n">taxonomy</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">json_f</span><span class="p">)</span>
+
+        <span class="n">synsetIds</span><span class="p">,</span> <span class="n">children</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+        <span class="n">parent_tags</span><span class="p">,</span> <span class="n">tags</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">taxonomy</span><span class="p">:</span>
+            <span class="n">tag</span> <span class="o">=</span> <span class="n">c</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span>
+
+            <span class="n">matchObj</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">if</span> <span class="n">category</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">matchObj</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span>
+                    <span class="sa">r</span><span class="s1">&#39;(?&lt;![a-zA-Z0-9])&#39;</span> <span class="o">+</span> <span class="n">category</span> <span class="o">+</span> <span class="s1">&#39;(?![a-zA-Z0-9])&#39;</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span>
+                    <span class="n">re</span><span class="o">.</span><span class="n">M</span> <span class="o">|</span> <span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">matchObj</span><span class="p">:</span>
+                <span class="n">sid</span> <span class="o">=</span> <span class="n">c</span><span class="p">[</span><span class="s1">&#39;synsetId&#39;</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">sid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">synsetIds</span><span class="p">:</span>
+                    <span class="n">synsetIds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sid</span><span class="p">)</span>
+                    <span class="n">tags</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">childId</span> <span class="ow">in</span> <span class="n">c</span><span class="p">[</span><span class="s1">&#39;children&#39;</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="n">childId</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">children</span><span class="p">:</span>
+                        <span class="n">children</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">childId</span><span class="p">)</span>
+                        <span class="n">parent_tags</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">children</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">new_children</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">new_parent_tags</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">taxonomy</span><span class="p">:</span>
+                <span class="n">sid</span> <span class="o">=</span> <span class="n">c</span><span class="p">[</span><span class="s1">&#39;synsetId&#39;</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">sid</span> <span class="ow">in</span> <span class="n">children</span> <span class="ow">and</span> <span class="n">sid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">synsetIds</span><span class="p">:</span>
+                    <span class="n">synsetIds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sid</span><span class="p">)</span>
+                    <span class="n">i</span> <span class="o">=</span> <span class="n">children</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">sid</span><span class="p">)</span>
+                    <span class="n">tag</span> <span class="o">=</span> <span class="n">c</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;,&#39;</span> <span class="o">+</span> <span class="n">parent_tags</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                    <span class="n">tags</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">childId</span> <span class="ow">in</span> <span class="n">c</span><span class="p">[</span><span class="s1">&#39;children&#39;</span><span class="p">]:</span>
+                        <span class="k">if</span> <span class="n">childId</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">new_children</span><span class="p">:</span>
+                            <span class="n">new_children</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">childId</span><span class="p">)</span>
+                            <span class="n">new_parent_tags</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+
+            <span class="n">children</span> <span class="o">=</span> <span class="n">new_children</span>
+            <span class="n">parent_tags</span> <span class="o">=</span> <span class="n">new_parent_tags</span>
+
+        <span class="k">return</span> <span class="n">synsetIds</span><span class="p">,</span> <span class="n">tags</span>
+
+    <span class="k">def</span> <span class="nf">get_tags_from_taxonomy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">synset</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Load category based on the ShapeNet taxonomy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            category (str): catergory of the object that needs to be retrieved.</span>
+<span class="sd">            verbose (bool): If ``True`` - print some additional information.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            instances (list): list of object paths that contain objects from the requested category.</span>
+<span class="sd">            tags (list): list of tags for each instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">category</span> <span class="o">=</span> <span class="n">synset_to_label</span><span class="p">[</span><span class="n">synset</span><span class="p">]</span>
+        <span class="n">synsetIds</span><span class="p">,</span> <span class="n">tags</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_category_paths</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="n">category</span><span class="p">)</span>
+        <span class="n">sid</span> <span class="o">=</span> <span class="n">synsetIds</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">synset</span><span class="p">)</span>
+        <span class="n">tag</span> <span class="o">=</span> <span class="n">tags</span><span class="p">[</span><span class="n">sid</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">tag</span>
+
+    <span class="k">def</span> <span class="nf">rand_drop_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag_list</span><span class="p">):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Drop some tags from the label randomly and return the orderring number of the most specific tag.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tag_list</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tag_list</span><span class="p">,</span> <span class="mi">0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tags_to_keep</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">tag_list</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">res_tag_ind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">tag_list</span><span class="p">)),</span>
+                                           <span class="n">tags_to_keep</span><span class="p">,</span>
+                                           <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">max_ind</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">res_tag_ind</span><span class="p">)</span>
+            <span class="n">res_tag_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">tag_list</span><span class="p">[</span><span class="n">el</span><span class="p">]</span> <span class="k">for</span> <span class="n">el</span> <span class="ow">in</span> <span class="n">res_tag_ind</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">res_tag_list</span><span class="p">,</span> <span class="n">max_ind</span>
+
+    <span class="k">def</span> <span class="nf">tag_proc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tag_list</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get the embedding from the list of tags. By default this function does</span>
+<span class="sd">        one-hot encoding of the tags, but can be replaced by more complex encodings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            tag_list (list): List of textual tags that need to be encoded.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">embed</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tag_index</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">tag_list</span><span class="p">:</span>
+            <span class="n">embed</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tag_index</span><span class="p">[</span><span class="n">tag</span><span class="p">]]</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">embed</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the length of the dataset. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the item at index idx. &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">attributes</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">synset_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+
+        <span class="n">full_tag</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name_tag_map</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">index</span><span class="p">]]</span>
+
+        <span class="c1"># do tags augmentation</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag_aug</span><span class="p">:</span>
+            <span class="n">input_tags</span><span class="p">,</span> <span class="n">last_tag_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rand_drop_tag</span><span class="p">(</span><span class="n">full_tag</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">input_tags</span> <span class="o">=</span> <span class="n">full_tag</span>
+            <span class="n">last_tag_id</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">full_tag</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+
+        <span class="c1"># tag encodings</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;tag_inp&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag_proc</span><span class="p">(</span><span class="n">input_tags</span><span class="p">)</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;tag_full&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag_proc</span><span class="p">(</span><span class="n">full_tag</span><span class="p">[:(</span><span class="n">last_tag_id</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)])</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;tag_label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag_proc</span><span class="p">(</span><span class="n">full_tag</span><span class="p">)</span>
+        <span class="c1"># length of tags per</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;tag_inp_len&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">input_tags</span><span class="p">))</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;tag_full_len&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">full_tag</span><span class="p">[:(</span><span class="n">last_tag_id</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]))</span>
+        <span class="n">data</span><span class="p">[</span><span class="s1">&#39;tag_label_len&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">full_tag</span><span class="p">))</span>
+
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;synset&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="n">attributes</span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">[</span><span class="n">synset_idx</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;data&#39;</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span> <span class="s1">&#39;attributes&#39;</span><span class="p">:</span> <span class="n">attributes</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="ShapeNet_Combination"><a class="viewcode-back" href="../../../modules/datasets.shapenet.html#kaolin.datasets.shapenet.ShapeNet_Combination">[docs]</a><span class="k">class</span> <span class="nc">ShapeNet_Combination</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Dataset</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;ShapeNet Dataset class for combinations of representations.</span>
+
+<span class="sd">    Arguments:</span>
+<span class="sd">        dataset (list): List of datasets to be combined</span>
+<span class="sd">        categories (str): List of categories to load from ShapeNet. This list may</span>
+<span class="sd">                contain synset ids, class label names (for ShapeNetCore classes),</span>
+<span class="sd">                or a combination of both.</span>
+<span class="sd">        root (str): Path to the root directory of the ShapeNet dataset.</span>
+<span class="sd">        train (bool): if true use the training set, else use the test set</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: Dictionary with keys indicated by passed datasets</span>
+
+<span class="sd">    Example:</span>
+
+<span class="sd">        &gt;&gt;&gt; from torch.utils.data import DataLoader</span>
+<span class="sd">        &gt;&gt;&gt; shapenet = ShapeNet_Meshes(root=&#39;../data/ShapeNet&#39;, cache_dir=&#39;cache/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; voxels = ShapeNet_Voxels(root=&#39;../data/ShapeNet&#39;, cache_dir=&#39;cache/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; images = ShapeNet_Images(root=&#39;../data/ShapeNet&#39;, cache_dir=&#39;cache/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; points = ShapeNet_Points(root=&#39;../data/ShapeNet&#39;, cache_dir=&#39;cache/&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; dataset = ShapeNet_Combination([voxels, images, points])</span>
+<span class="sd">        &gt;&gt;&gt; train_loader = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=8)</span>
+<span class="sd">        &gt;&gt;&gt; obj = next(iter(train_loader))</span>
+<span class="sd">        &gt;&gt;&gt; for key in obj[&#39;data&#39;]:</span>
+<span class="sd">        ...     print (key)</span>
+<span class="sd">        ...</span>
+<span class="sd">        params</span>
+<span class="sd">        128</span>
+<span class="sd">        32</span>
+<span class="sd">        imgs</span>
+<span class="sd">        cam_mat</span>
+<span class="sd">        cam_pos</span>
+<span class="sd">        azi</span>
+<span class="sd">        elevation</span>
+<span class="sd">        distance</span>
+<span class="sd">        points</span>
+<span class="sd">        normals</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">datasets</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">names</span> <span class="o">=</span> <span class="n">datasets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">names</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">root</span> <span class="o">=</span> <span class="n">datasets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">root</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synset_idxs</span> <span class="o">=</span> <span class="n">datasets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">synset_idxs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">synsets</span> <span class="o">=</span> <span class="n">datasets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">synsets</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="n">datasets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">labels</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">datasets</span> <span class="o">=</span> <span class="n">datasets</span>
+
+    <span class="k">def</span> <span class="nf">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the length of the dataset. &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Returns the item at index idx. &quot;&quot;&quot;</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">datasets</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">index</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">ds</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">datasets</span><span class="p">:</span>
+            <span class="n">obj</span><span class="p">[</span><span class="s1">&#39;data&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="n">index</span><span class="p">][</span><span class="s1">&#39;data&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">obj</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

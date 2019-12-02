@@ -1,0 +1,534 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>graphics.Lighting &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+        
+      <li>graphics.Lighting</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for graphics.Lighting</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1"># </span>
+<span class="c1"># </span>
+<span class="c1"># Soft Rasterizer (SoftRas)</span>
+<span class="c1"># </span>
+<span class="c1"># Copyright (c) 2017 Hiroharu Kato</span>
+<span class="c1"># Copyright (c) 2018 Nikos Kolotouros</span>
+<span class="c1"># Copyright (c) 2019 Shichen Liu</span>
+<span class="c1"># </span>
+<span class="c1"># Permission is hereby granted, free of charge, to any person obtaining a copy</span>
+<span class="c1"># of this software and associated documentation files (the &quot;Software&quot;), to deal</span>
+<span class="c1"># in the Software without restriction, including without limitation the rights</span>
+<span class="c1"># to use, copy, modify, merge, publish, distribute, sublicense, and/or sell</span>
+<span class="c1"># copies of the Software, and to permit persons to whom the Software is</span>
+<span class="c1"># furnished to do so, subject to the following conditions:</span>
+<span class="c1">#</span>
+<span class="c1"># The above copyright notice and this permission notice shall be included in all</span>
+<span class="c1"># copies or substantial portions of the Software.</span>
+<span class="c1">#</span>
+<span class="c1"># THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR</span>
+<span class="c1"># IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,</span>
+<span class="c1"># FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE</span>
+<span class="c1"># AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER</span>
+<span class="c1"># LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,</span>
+<span class="c1"># OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE</span>
+<span class="c1"># SOFTWARE.</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+
+
+<span class="k">def</span> <span class="nf">compute_ambient_light</span><span class="p">(</span>
+        <span class="n">face_vertices</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">textures</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">ambient_intensity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.</span><span class="p">,</span>
+        <span class="n">ambient_color</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">)):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes ambient lighting to a mesh, given faces and face textures.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        face_vertices (torch.Tensor): A tensor containing a list of (per-face)</span>
+<span class="sd">            vertices of the mesh (shape: `B` :math:`\times` `num_faces`</span>
+<span class="sd">            :math:`\times 9`). Here, :math:`B` is the batchsize, `num_faces`</span>
+<span class="sd">            is the number of faces in the mesh, and since each face is assumed</span>
+<span class="sd">            to be a triangle, it has 3 vertices, and hence 9 coordinates in</span>
+<span class="sd">            total.</span>
+<span class="sd">        textures (torch.Tensor): TODO: Add docstring</span>
+<span class="sd">        ambient_intensity (float): Intensity of ambient light (in the range</span>
+<span class="sd">            :math:`\left[0, 1\right]`). If the values provided are outside</span>
+<span class="sd">            this range, we clip them so that they fall in range.</span>
+<span class="sd">        ambient_color (torch.Tensor): Color of the ambient light (R, G, B)</span>
+<span class="sd">            (shape: :math:`3`)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        light (torch.Tensor): A light tensor, which can be elementwise</span>
+<span class="sd">            multiplied with the textures, to obtain the mesh with lighting</span>
+<span class="sd">            applied (shape: `B` :math:`\times` `num_faces` :math:`\times</span>
+<span class="sd">            1 \times 1 \times 1 \times 3`)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">face_vertices</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input face_vertices to be of type &#39;</span>
+                        <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="nb">type</span><span class="p">(</span><span class="n">face_vertices</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">textures</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input textures to be of type &#39;</span>
+                        <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="nb">type</span><span class="p">(</span><span class="n">textures</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ambient_intensity</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">ambient_intensity</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input ambient_intensity to be of &#39;</span>
+                        <span class="s1">&#39;type float. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="nb">type</span><span class="p">(</span><span class="n">ambient_intensity</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">ambient_color</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input ambient_color to be of type &#39;</span>
+                        <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="nb">type</span><span class="p">(</span><span class="n">ambient_color</span><span class="p">)))</span>
+
+    <span class="c1"># if face_vertices.dim() != 3 or face_vertices.shape[-1] != 9:</span>
+    <span class="c1">#     raise ValueError(&#39;Input face_vertices must have 3 dimensions &#39;</span>
+    <span class="c1">#                      &#39;and be of shape (..., ..., 9). Got {0} dimensions &#39;</span>
+    <span class="c1">#                      &#39;and shape {1} instead.&#39;.format(face_vertices.dim(),</span>
+    <span class="c1">#                                                      face_vertices.shape))</span>
+    <span class="c1"># TODO: check texture dims</span>
+    <span class="k">if</span> <span class="n">ambient_color</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">ambient_color</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="mi">3</span><span class="p">,):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input ambient_color must have 1 dimension &#39;</span>
+                         <span class="s1">&#39;and be of shape 3. Got </span><span class="si">{0}</span><span class="s1"> dimensions and shape </span><span class="si">{1}</span><span class="s1"> &#39;</span>
+                         <span class="s1">&#39;instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ambient_color</span><span class="o">.</span><span class="n">dim</span><span class="p">(),</span> <span class="n">ambient_color</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+
+    <span class="c1"># Clip ambient_intensity to be in the range [0, 1]</span>
+    <span class="k">if</span> <span class="n">ambient_intensity</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">ambient_intensity</span> <span class="o">=</span> <span class="mf">0.</span>
+    <span class="k">if</span> <span class="n">ambient_intensity</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">ambient_intensity</span> <span class="o">=</span> <span class="mf">1.</span>
+
+    <span class="n">batchsize</span> <span class="o">=</span> <span class="n">face_vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">num_faces</span> <span class="o">=</span> <span class="n">face_vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">face_vertices</span><span class="o">.</span><span class="n">device</span>
+
+    <span class="k">if</span> <span class="n">ambient_color</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">ambient_color</span> <span class="o">=</span> <span class="n">ambient_color</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">light</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">batchsize</span><span class="p">,</span> <span class="n">num_faces</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="c1"># If the intensity of the ambient light is 0, do not</span>
+    <span class="c1"># bother computing lighting.</span>
+    <span class="k">if</span> <span class="n">ambient_intensity</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">light</span>
+
+    <span class="c1"># Ambient lighting is constant everywhere, and is given as</span>
+    <span class="c1"># I = I_a * K_a</span>
+    <span class="c1"># where,</span>
+    <span class="c1"># I: Intensity at a vertex</span>
+    <span class="c1"># I_a: Intensity of the ambient light</span>
+    <span class="c1"># K_a: Ambient reflectance of the vertex (3 channels, R, G, B)</span>
+    <span class="n">light</span> <span class="o">+=</span> <span class="n">ambient_intensity</span> <span class="o">*</span> <span class="n">ambient_color</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+
+    <span class="k">return</span> <span class="n">light</span><span class="p">[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+
+
+<div class="viewcode-block" id="apply_ambient_light"><a class="viewcode-back" href="../../modules/graphics.html#graphics.Lighting.apply_ambient_light">[docs]</a><span class="k">def</span> <span class="nf">apply_ambient_light</span><span class="p">(</span>
+        <span class="n">face_vertices</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">textures</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">ambient_intensity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.</span><span class="p">,</span>
+        <span class="n">ambient_color</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">)):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes and applies ambient lighting to a mesh, given faces and</span>
+<span class="sd">    face textures.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        face_vertices (torch.Tensor): A tensor containing a list of (per-face)</span>
+<span class="sd">            vertices of the mesh (shape: `B` :math:`\times` `num_faces`</span>
+<span class="sd">            :math:`\times 9`). Here, :math:`B` is the batchsize, `num_faces`</span>
+<span class="sd">            is the number of faces in the mesh, and since each face is assumed</span>
+<span class="sd">            to be a triangle, it has 3 vertices, and hence 9 coordinates in</span>
+<span class="sd">            total.</span>
+<span class="sd">        textures (torch.Tensor): TODO: Add docstring</span>
+<span class="sd">        ambient_intensity (float): Intensity of ambient light (in the range</span>
+<span class="sd">            :math:`\left[0, 1\right]`). If the values provided are outside</span>
+<span class="sd">            this range, we clip them so that they fall in range.</span>
+<span class="sd">        ambient_color (torch.Tensor): Color of the ambient light (R, G, B)</span>
+<span class="sd">            (shape: :math:`3`)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        textures (torch.Tensor): Updated textures, with ambient lighting</span>
+<span class="sd">            applied (shape: same as input `textures`) #TODO: Update docstring</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">light</span> <span class="o">=</span> <span class="n">compute_ambient_light</span><span class="p">(</span><span class="n">face_vertices</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span> <span class="n">ambient_intensity</span><span class="p">,</span>
+                                  <span class="n">ambient_color</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">textures</span> <span class="o">*</span> <span class="n">light</span></div>
+
+
+<span class="k">def</span> <span class="nf">compute_directional_light</span><span class="p">(</span>
+        <span class="n">face_vertices</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">textures</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">directional_intensity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.</span><span class="p">,</span>
+        <span class="n">directional_color</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+        <span class="n">direction</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes directional lighting to a mesh, given faces and face textures.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        face_vertices (torch.Tensor): A tensor containing a list of (per-face)</span>
+<span class="sd">            vertices of the mesh (shape: `B` :math:`\times` `num_faces`</span>
+<span class="sd">            :math:`\times 9`). Here, :math:`B` is the batchsize, `num_faces`</span>
+<span class="sd">            is the number of faces in the mesh, and since each face is assumed</span>
+<span class="sd">            to be a triangle, it has 3 vertices, and hence 9 coordinates in</span>
+<span class="sd">            total.</span>
+<span class="sd">        textures (torch.Tensor): TODO: Add docstring</span>
+<span class="sd">        directional_intensity (float): Intensity of directional light (in the</span>
+<span class="sd">            range :math:`\left[0, 1\right]`). If the values provided are</span>
+<span class="sd">            outside this range, we clip them so that they fall in range.</span>
+<span class="sd">        directional_color (torch.Tensor): Color of the directional light</span>
+<span class="sd">            (R, G, B) (shape: :math:`3`).</span>
+<span class="sd">        direction (torch.Tensor): Direction of light from the light source.</span>
+<span class="sd">            (default: :math:`\left( 0, 1, 0 \right)^T`)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        light (torch.Tensor): A light tensor, which can be elementwise</span>
+<span class="sd">            multiplied with the textures, to obtain the mesh with lighting</span>
+<span class="sd">            applied (shape: `B` :math:`\times` `num_faces` :math:`\times</span>
+<span class="sd">            1 \times 1 \times 1 \times 3`)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">face_vertices</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input face_vertices to be of type &#39;</span>
+                        <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="nb">type</span><span class="p">(</span><span class="n">face_vertices</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">textures</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input textures to be of type &#39;</span>
+                        <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="nb">type</span><span class="p">(</span><span class="n">textures</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">directional_intensity</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">directional_intensity</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input directional_intensity to be of &#39;</span>
+                        <span class="s1">&#39;type float. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="nb">type</span><span class="p">(</span><span class="n">directional_intensity</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">directional_color</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input directional_color to be of type &#39;</span>
+                        <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                            <span class="nb">type</span><span class="p">(</span><span class="n">directional_color</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">torch</span><span class="o">.</span><span class="n">is_tensor</span><span class="p">(</span><span class="n">direction</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Expected input direction to be of type &#39;</span>
+                        <span class="s1">&#39;torch.Tensor. Got </span><span class="si">{0}</span><span class="s1"> instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">direction</span><span class="p">)))</span>
+
+    <span class="c1"># if face_vertices.dim() != 3 or face_vertices.shape[-1] != 9:</span>
+    <span class="c1">#     raise ValueError(&#39;Input face_vertices must have 3 dimensions &#39;</span>
+    <span class="c1">#                      &#39;and be of shape (..., ..., 9). Got {0} dimensions &#39;</span>
+    <span class="c1">#                      &#39;and shape {1} instead.&#39;.format(face_vertices.dim(),</span>
+    <span class="c1">#                                                      face_vertices.shape))</span>
+    <span class="c1"># TODO: check texture dims</span>
+    <span class="k">if</span> <span class="n">directional_color</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">directional_color</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="mi">3</span><span class="p">,):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input directional_color must have 1 dimension &#39;</span>
+                         <span class="s1">&#39;and be of shape 3. Got </span><span class="si">{0}</span><span class="s1"> dimensions and shape </span><span class="si">{1}</span><span class="s1"> &#39;</span>
+                         <span class="s1">&#39;instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">directional_color</span><span class="o">.</span><span class="n">dim</span><span class="p">(),</span>
+                                           <span class="n">directional_color</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">direction</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">direction</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="mi">3</span><span class="p">,):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Input direction must have 1 dimension and be &#39;</span>
+                         <span class="s1">&#39;of shape 3. Got </span><span class="si">{0}</span><span class="s1"> dimensions and shape </span><span class="si">{1}</span><span class="s1"> &#39;</span>
+                         <span class="s1">&#39;instead.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">direction</span><span class="o">.</span><span class="n">dim</span><span class="p">(),</span> <span class="n">direction</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+
+    <span class="n">batchsize</span> <span class="o">=</span> <span class="n">face_vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">num_faces</span> <span class="o">=</span> <span class="n">face_vertices</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">face_vertices</span><span class="o">.</span><span class="n">device</span>
+
+    <span class="k">if</span> <span class="n">directional_color</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">directional_color</span> <span class="o">=</span> <span class="n">directional_color</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">direction</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">direction</span> <span class="o">=</span> <span class="n">direction</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="c1"># Clip directional intensity to be in the range [0, 1]</span>
+    <span class="k">if</span> <span class="n">directional_intensity</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">directional_intensity</span> <span class="o">=</span> <span class="mf">0.</span>
+    <span class="k">if</span> <span class="n">directional_intensity</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">directional_intensity</span> <span class="o">=</span> <span class="mf">1.</span>
+
+    <span class="c1"># Initialize light to zeros</span>
+    <span class="n">light</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">batchsize</span><span class="p">,</span> <span class="n">num_faces</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="c1"># If the intensity of the directional light is 0, do not</span>
+    <span class="c1"># bother computing lighting.</span>
+    <span class="k">if</span> <span class="n">directional_intensity</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">light</span>
+
+    <span class="c1"># Unwrap the batchsize dimension (for easier vectorization).</span>
+    <span class="n">faces</span> <span class="o">=</span> <span class="n">face_vertices</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">batchsize</span> <span class="o">*</span> <span class="n">num_faces</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="c1"># Compute face normals.</span>
+    <span class="n">v10</span> <span class="o">=</span> <span class="n">faces</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">faces</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">v12</span> <span class="o">=</span> <span class="n">faces</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">faces</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">normals</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">v10</span><span class="p">,</span> <span class="n">v12</span><span class="p">),</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-5</span><span class="p">)</span>
+    <span class="c1"># Reshape, to get back the batchsize dimension.</span>
+    <span class="n">normals</span> <span class="o">=</span> <span class="n">normals</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">batchsize</span><span class="p">,</span> <span class="n">num_faces</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+    <span class="c1"># Get direction to 3 dimensions, if not already there.</span>
+    <span class="k">if</span> <span class="n">direction</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">direction</span> <span class="o">=</span> <span class="n">direction</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+
+    <span class="n">cos</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">normals</span> <span class="o">*</span> <span class="n">direction</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+
+    <span class="n">light</span> <span class="o">+=</span> <span class="n">directional_intensity</span> <span class="o">*</span> <span class="p">(</span><span class="n">directional_color</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+                                      <span class="o">*</span> <span class="n">cos</span><span class="p">[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">light</span><span class="p">[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+
+
+<div class="viewcode-block" id="apply_directional_light"><a class="viewcode-back" href="../../modules/graphics.html#graphics.Lighting.apply_directional_light">[docs]</a><span class="k">def</span> <span class="nf">apply_directional_light</span><span class="p">(</span>
+        <span class="n">face_vertices</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">textures</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">directional_intensity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.</span><span class="p">,</span>
+        <span class="n">directional_color</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+        <span class="n">direction</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">FloatTensor</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Computes and applies directional lighting to a mesh, given faces</span>
+<span class="sd">    and face textures.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        face_vertices (torch.Tensor): A tensor containing a list of (per-face)</span>
+<span class="sd">            vertices of the mesh (shape: `B` :math:`\times` `num_faces`</span>
+<span class="sd">            :math:`\times 9`). Here, :math:`B` is the batchsize, `num_faces`</span>
+<span class="sd">            is the number of faces in the mesh, and since each face is assumed</span>
+<span class="sd">            to be a triangle, it has 3 vertices, and hence 9 coordinates in</span>
+<span class="sd">            total.</span>
+<span class="sd">        textures (torch.Tensor): TODO: Add docstring</span>
+<span class="sd">        directional_intensity (float): Intensity of directional light (in the</span>
+<span class="sd">            range :math:`\left[0, 1\right]`). If the values provided are</span>
+<span class="sd">            outside this range, we clip them so that they fall in range.</span>
+<span class="sd">        directional_color (torch.Tensor): Color of the directional light</span>
+<span class="sd">            (R, G, B) (shape: :math:`3`).</span>
+<span class="sd">        direction (torch.Tensor): Direction of light from the light source.</span>
+<span class="sd">            (default: :math:`\left( 0, 1, 0 \right)^T`)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        light (torch.Tensor): A light tensor, which can be elementwise</span>
+<span class="sd">            multiplied with the textures, to obtain the mesh with lighting</span>
+<span class="sd">            applied (shape: `B` :math:`\times` `num_faces` :math:`\times</span>
+<span class="sd">            1 \times 1 \times 1 \times 3`)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">light</span> <span class="o">=</span> <span class="n">compute_directional_light</span><span class="p">(</span><span class="n">face_vertices</span><span class="p">,</span> <span class="n">textures</span><span class="p">,</span>
+                                      <span class="n">directional_intensity</span><span class="p">,</span> <span class="n">directional_color</span><span class="p">,</span> <span class="n">direction</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">textures</span> <span class="o">*</span> <span class="n">light</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -1,0 +1,1258 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>kaolin.transforms.transforms &mdash; kaolin 0.1.0 alpha documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../../_static/language_data.js"></script>
+        <script type="text/javascript" src="../../../_static/clipboard.min.js"></script>
+        <script type="text/javascript" src="../../../_static/copybutton.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/copybutton.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home" alt="Documentation Home"> kaolin
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Notes</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/introduction.html">Kaolin: An introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/hello3d.html">Hello, 3D world!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/usd_tutorial.html">USD Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/datasets_tutorial.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/conversions_tutorial.html">Conversions across various representations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/vision_tutorial.html">Computer vision functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/graphics_tutorial.html">Graphics functionality</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/differentiable_rendering.html">Differentiable rendering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pointnet.html">PointNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/pixel2mesh.html">Pixel2Mesh</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../notes/geometrics.html">GEOMetrics</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/conversions.html">kaolin.conversions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/datasets.html">kaolin.datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/graphics.html">kaolin.graphics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/mathutils.html">kaolin.mathutils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/metrics.html">kaolin.metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/models.html">kaolin.models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/rep.html">kaolin.rep</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/transforms.html">kaolin.transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/vision.html">kaolin.vision</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../modules/visualize.html">kaolin.visualize</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">kaolin</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>kaolin.transforms.transforms</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for kaolin.transforms.transforms</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Callable</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="k">import</span> <span class="n">Path</span>
+<span class="kn">import</span> <span class="nn">hashlib</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">kaolin.rep.PointCloud</span> <span class="k">import</span> <span class="n">PointCloud</span>
+<span class="kn">from</span> <span class="nn">kaolin.rep.VoxelGrid</span> <span class="k">import</span> <span class="n">VoxelGrid</span>
+<span class="kn">from</span> <span class="nn">kaolin.rep.Mesh</span> <span class="k">import</span> <span class="n">Mesh</span>
+<span class="kn">from</span> <span class="nn">kaolin.rep.TriangleMesh</span> <span class="k">import</span> <span class="n">TriangleMesh</span>
+<span class="kn">from</span> <span class="nn">kaolin.rep.QuadMesh</span> <span class="k">import</span> <span class="n">QuadMesh</span>
+
+<span class="kn">import</span> <span class="nn">kaolin.conversions</span> <span class="k">as</span> <span class="nn">cvt</span>
+
+<span class="c1"># from kaolin.conversion import mesh as cvt_mesh</span>
+<span class="c1"># from kaolin.conversion import SDF as cvt_SDF</span>
+<span class="c1"># from kaolin.conversion import voxel as cvt_voxel</span>
+<span class="kn">from</span> <span class="nn">kaolin.transforms</span> <span class="k">import</span> <span class="n">pointcloudfunc</span> <span class="k">as</span> <span class="n">pcfunc</span>
+<span class="kn">from</span> <span class="nn">kaolin.transforms</span> <span class="k">import</span> <span class="n">meshfunc</span>
+<span class="kn">from</span> <span class="nn">kaolin.transforms</span> <span class="k">import</span> <span class="n">voxelfunc</span>
+
+
+<div class="viewcode-block" id="Compose"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.Compose">[docs]</a><span class="k">class</span> <span class="nc">Compose</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Composes (chains) multiple transforms sequentially. Identical to</span>
+<span class="sd">    `torchvision.transforms.Compose`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tforms (list): List of transforms to compose.</span>
+
+<span class="sd">    TODO: Example.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">transforms</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tforms</span> <span class="o">=</span> <span class="n">transforms</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inp</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tforms</span><span class="p">:</span>
+            <span class="n">inp</span> <span class="o">=</span> <span class="n">t</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">inp</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">fstr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(&#39;</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tforms</span><span class="p">:</span>
+            <span class="n">fstr</span> <span class="o">+=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span>
+            <span class="n">fstr</span> <span class="o">+=</span> <span class="s1">&#39; </span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="n">fstr</span> <span class="o">+=</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">)&#39;</span>
+        <span class="k">return</span> <span class="n">fstr</span></div>
+
+
+<div class="viewcode-block" id="CacheCompose"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.CacheCompose">[docs]</a><span class="k">class</span> <span class="nc">CacheCompose</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Caches the results of the provided compose pipeline to disk.</span>
+<span class="sd">    If the pipeline is already cached, data is returned from disk,</span>
+<span class="sd">    otherwise, data is converted following the provided transforms.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            transforms (Iterable): List of transforms to compose.</span>
+<span class="sd">            cache_dir (str): Directory where objects will be cached. Default</span>
+<span class="sd">                             to &#39;cache&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">transforms</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">cache_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;cache&#39;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">compose</span> <span class="o">=</span> <span class="n">Compose</span><span class="p">(</span><span class="n">transforms</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_hash</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cached_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">stem</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;*&#39;</span><span class="p">)]</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">object_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">inp</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Mesh</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Transform input. If transformed input was cached, is is read from disk</span>
+
+<span class="sd">            Args:</span>
+<span class="sd">                inp (torch.Tensor or Mesh): input tensor or Mesh object to be transformed,</span>
+<span class="sd">                name (str): object name used to write and read from disk.</span>
+
+<span class="sd">            Returns:</span>
+<span class="sd">                Union[torch.Tensor, Mesh]: Tensor or Mesh object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">fpath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_dir</span> <span class="o">/</span> <span class="s1">&#39;</span><span class="si">{0}</span><span class="s1">.npz&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">object_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">fpath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">assert</span> <span class="n">inp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="n">transformed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compose</span><span class="p">(</span><span class="n">inp</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_write</span><span class="p">(</span><span class="n">transformed</span><span class="p">,</span> <span class="n">fpath</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cached_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">object_id</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">transformed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read</span><span class="p">(</span><span class="n">fpath</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">transformed</span>
+
+    <span class="k">def</span> <span class="nf">_write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">fpath</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">Mesh</span><span class="p">):</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">savez</span><span class="p">(</span><span class="n">fpath</span><span class="p">,</span> <span class="n">vertices</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">vertices</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span>
+                     <span class="n">faces</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">faces</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">savez</span><span class="p">(</span><span class="n">fpath</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fpath</span><span class="p">):</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fpath</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s1">&#39;vertices&#39;</span> <span class="ow">in</span> <span class="n">data</span> <span class="ow">and</span> <span class="s1">&#39;faces&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">:</span>
+            <span class="n">verts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;vertices&#39;</span><span class="p">])</span>
+            <span class="n">faces</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;faces&#39;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;faces&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">QuadMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">verts</span><span class="p">,</span> <span class="n">faces</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">TriangleMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">verts</span><span class="p">,</span> <span class="n">faces</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;arr_0&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">data</span>
+
+    <span class="k">def</span> <span class="nf">get_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">md5</span><span class="p">(</span><span class="nb">bytes</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compose</span><span class="p">),</span> <span class="s1">&#39;utf-8&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="NumpyToTensor"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.NumpyToTensor">[docs]</a><span class="k">class</span> <span class="nc">NumpyToTensor</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Converts a `np.ndarray` object to a `torch.Tensor` object. &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arr</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            arr (np.ndarray): Numpy array to be converted to Tensor.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Converted array</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;()&#39;</span></div>
+
+
+<div class="viewcode-block" id="ScalePointCloud"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.ScalePointCloud">[docs]</a><span class="k">class</span> <span class="nc">ScalePointCloud</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Scale a pointcloud with a fixed scaling factor.</span>
+<span class="sd">    Given a scale factor `scf`, this transform will scale each point in the</span>
+<span class="sd">    pointcloud, i.e.,</span>
+<span class="sd">    ``cloud = scf * cloud``</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        scf (int or float or torch.Tensor): Scale factor by which input clouds</span>
+<span class="sd">            are to be scaled (Note: if passing in a torch.Tensor type, only</span>
+<span class="sd">            one-element tensors are allowed).</span>
+<span class="sd">        inplace (bool, optional): Whether or not the transformation should be</span>
+<span class="sd">            in-place (default: True).</span>
+
+<span class="sd">    TODO: Example.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scf</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+                 <span class="n">inplace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scf</span> <span class="o">=</span> <span class="n">scf</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cloud</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">PointCloud</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            cloud (torch.Tensor or PointCloud): Pointcloud to be scaled.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor or PointCloud): Scaled pointcloud.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">pcfunc</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">cloud</span><span class="p">,</span> <span class="n">scf</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scf</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(scf=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scf</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RotatePointCloud"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.RotatePointCloud">[docs]</a><span class="k">class</span> <span class="nc">RotatePointCloud</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Rotate a pointcloud with a given rotation matrix.</span>
+<span class="sd">    Given a :math:`3 \times 3` rotation matrix, this transform will rotate each</span>
+<span class="sd">    point in the cloud by the rotation matrix specified.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rotmat (torch.Tensor): Rotation matrix that specifies the rotation to</span>
+<span class="sd">            be applied to the pointcloud (shape: :math:`3 \times 3`).</span>
+<span class="sd">        inplace (bool, optional): Bool to make this operation in-place.</span>
+
+<span class="sd">    TODO: Example.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rotmat</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">inplace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rotmat</span> <span class="o">=</span> <span class="n">rotmat</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cloud</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">PointCloud</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            cloud (torch.Tensor or PointCloud): Input pointcloud to be rotated.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor or PointCloud): Rotated pointcloud.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">pcfunc</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="n">cloud</span><span class="p">,</span> <span class="n">rotmat</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">rotmat</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(rotmat=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rotmat</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RealignPointCloud"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.RealignPointCloud">[docs]</a><span class="k">class</span> <span class="nc">RealignPointCloud</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Re-align a `src` pointcloud such that it fits in an axis-aligned</span>
+<span class="sd">    bounding box whose size matches the `tgt` pointcloud.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tgt (torch.Tensor or PointCloud): Target pointcloud, to whose</span>
+<span class="sd">            dimensions the source pointcloud must be aligned.</span>
+<span class="sd">        inplace (bool, optional): Bool to make this operation in-place.</span>
+
+<span class="sd">    TODO: Example.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tgt</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">PointCloud</span><span class="p">],</span>
+                 <span class="n">inplace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tgt</span> <span class="o">=</span> <span class="n">tgt</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">PointCloud</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            src (torch.Tensor or PointCloud): Source pointcloud, which needs</span>
+<span class="sd">                to be aligned to the target pointcloud.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor or PointCloud): Source pointcloud aligned to match</span>
+<span class="sd">                the axis-aligned bounding box of the target pointcloud `tgt`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">pcfunc</span><span class="o">.</span><span class="n">realign</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tgt</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(realign)&#39;</span></div>
+
+
+<div class="viewcode-block" id="NormalizePointCloud"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.NormalizePointCloud">[docs]</a><span class="k">class</span> <span class="nc">NormalizePointCloud</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Normalize a pointcloud such that it is centered at the orgin and has</span>
+<span class="sd">    unit standard deviation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        inplace (bool, optional): Bool to make this operation in-place.</span>
+
+<span class="sd">    TODO: Example.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inplace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cloud</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">PointCloud</span><span class="p">]):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            src (torch.Tensor or PointCloud): Pointcloud to be normalized</span>
+<span class="sd">                (shape: :math:`B \times \cdots \times N \times D`, where</span>
+<span class="sd">                :math:`B` is the batchsize (optional), :math:`N` is the</span>
+<span class="sd">                number of points in the cloud, and :math:`D` is the</span>
+<span class="sd">                dimensionality of the cloud.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">pcfunc</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">cloud</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(normalize)&#39;</span></div>
+
+
+<div class="viewcode-block" id="DownsampleVoxelGrid"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.DownsampleVoxelGrid">[docs]</a><span class="k">class</span> <span class="nc">DownsampleVoxelGrid</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Downsamples a voxelgrid, given a (down)scaling factor for each</span>
+<span class="sd">    dimension.</span>
+
+<span class="sd">    .. Note::</span>
+<span class="sd">        The voxel output is not thresholded.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        scale (list): List of tensors to scale each dimension down by</span>
+<span class="sd">            (length: 3).</span>
+<span class="sd">        inplace (bool, optional): Bool to make the operation in-place.</span>
+
+<span class="sd">    TODO: Example.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scale</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">scale</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxgrid</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxgrid (torch.Tensor or VoxelGrid): Voxel grid to be downsampled</span>
+<span class="sd">                (shape: must be a tensor containing exactly 3 dimensions).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Downsampled voxel grid.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">downsample</span><span class="p">(</span><span class="n">voxgrid</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="p">,</span>
+                              <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(downsample=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scale</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="UpsampleVoxelGrid"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.UpsampleVoxelGrid">[docs]</a><span class="k">class</span> <span class="nc">UpsampleVoxelGrid</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Upsamples a voxelgrid, given a target dimensionality (this target</span>
+<span class="sd">    dimensionality is homogeneously applied to all three axes).</span>
+
+<span class="sd">    .. Note::</span>
+<span class="sd">        The output voxels are not thresholded to contain values in the range</span>
+<span class="sd">        [0, 1].</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dim (int): New dimensionality (number of voxels along each dimension</span>
+<span class="sd">            in the resulting voxel grid).</span>
+
+<span class="sd">    TODO: Example.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dim</span> <span class="o">=</span> <span class="n">dim</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxgrid</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxgrid (torch.Tensor or VoxelGrid): Voxel grid to be upsampled</span>
+<span class="sd">                (shape: must be a tensor containing exactly 3 dimensions).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Upsampled voxel grid.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">upsample</span><span class="p">(</span><span class="n">voxgrid</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(upsample=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ThresholdVoxelGrid"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.ThresholdVoxelGrid">[docs]</a><span class="k">class</span> <span class="nc">ThresholdVoxelGrid</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Binarizes the voxel array using a specified threshold.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        thresh (float): Threshold with which to binarize.</span>
+<span class="sd">        inplace (bool, optional): Bool to make the operation in-place.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thresh</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">inplace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span> <span class="o">=</span> <span class="n">thresh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxgrid</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxel (torch.Tensor): Voxel array to be binarized.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Thresholded voxel array.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">threshold</span><span class="p">(</span><span class="n">voxgrid</span><span class="p">,</span> <span class="n">thresh</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">,</span>
+            <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(threshold=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FillVoxelGrid"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.FillVoxelGrid">[docs]</a><span class="k">class</span> <span class="nc">FillVoxelGrid</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Fills the internal structures in a voxel grid. Used to fill holds</span>
+<span class="sd">    and &#39;solidify&#39; objects.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        thresh (float): Threshold to use for binarization of the grid.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thresh</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span> <span class="o">=</span> <span class="n">thresh</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxgrid</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxel (torch.Tensor or VoxelGrid): Voxel grid to be filled.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Filled-in voxel grid.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="n">voxgrid</span><span class="p">,</span> <span class="n">thresh</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(fill=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ExtractSurfaceVoxels"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.ExtractSurfaceVoxels">[docs]</a><span class="k">class</span> <span class="nc">ExtractSurfaceVoxels</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Removes any inernal structure(s) from a voxel array.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        thresh (float): threshold with which to binarize</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">thresh</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span> <span class="o">=</span> <span class="n">thresh</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxgrid</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxel (torch.Tensor): Voxel grid from which to extract surface.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Voxel grid with the internals removed (i.e.,</span>
+<span class="sd">                containing only voxels that reside on the surface of the</span>
+<span class="sd">                object).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">extract_surface</span><span class="p">(</span><span class="n">voxgrid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(extract_surface=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ExtractOdmsFromVoxelGrid"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.ExtractOdmsFromVoxelGrid">[docs]</a><span class="k">class</span> <span class="nc">ExtractOdmsFromVoxelGrid</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Extracts a set of orthographic depth maps from a voxel grid.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxgrid</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxel (torch.Tensor or VoxelGrid): Voxel grid from which ODMs are</span>
+<span class="sd">                extracted.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): 6 ODMs from the 6 primary viewing angles.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">extract_odms</span><span class="p">(</span><span class="n">voxgrid</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(extract_odms)&#39;</span></div>
+
+
+<div class="viewcode-block" id="ExtractProjectOdmsFromVoxelGrid"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.ExtractProjectOdmsFromVoxelGrid">[docs]</a><span class="k">class</span> <span class="nc">ExtractProjectOdmsFromVoxelGrid</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Extracts a set of orthographic depth maps (odms) from a voxel grid and</span>
+<span class="sd">        then projects the odms onto a voxel grid.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxel</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxel (torch.Tensor or VoxelGrid): Voxel grid from which ODMs are</span>
+<span class="sd">                extracted.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Voxel grid.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">odms</span> <span class="o">=</span> <span class="n">cvt</span><span class="o">.</span><span class="n">extract_odms</span><span class="p">(</span><span class="n">voxel</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">project_odms</span><span class="p">(</span><span class="n">odms</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span></div>
+
+
+<div class="viewcode-block" id="SampleTriangleMesh"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.SampleTriangleMesh">[docs]</a><span class="k">class</span> <span class="nc">SampleTriangleMesh</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Sample points uniformly over the surface of a triangle mesh.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        num_samples (int): Number of points to sample from the mesh.</span>
+<span class="sd">        eps (float, optional): A small number to prevent division by zero</span>
+<span class="sd">                     for small surface areas.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1e-10</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span> <span class="o">=</span> <span class="n">num_samples</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eps</span> <span class="o">=</span> <span class="n">eps</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">TriangleMesh</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (TriangleMesh): A triangle mesh object.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Uniformly sampled points over the surface of the</span>
+<span class="sd">                input mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">TriangleMesh</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Input mesh must be of type TriangleMesh. &#39;</span>
+                            <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">mesh</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="n">meshfunc</span><span class="o">.</span><span class="n">sample_triangle_mesh</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">,</span>
+                                             <span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(sample_triangle_mesh=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NormalizeMesh"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.NormalizeMesh">[docs]</a><span class="k">class</span> <span class="nc">NormalizeMesh</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Normalize a mesh such that it is centered at the orgin and has</span>
+<span class="sd">    unit standard deviation.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        inplace (bool, optional): Bool to make this operation in-place.</span>
+
+<span class="sd">    TODO: Example.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inplace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">Mesh</span><span class="p">]):</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (Mesh): Mesh to be normalized.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (Mesh): Normalized mesh (centered at origin,</span>
+<span class="sd">                unit variance along all dimensions)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">meshfunc</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(normalize)&#39;</span></div>
+
+
+<div class="viewcode-block" id="ScaleMesh"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.ScaleMesh">[docs]</a><span class="k">class</span> <span class="nc">ScaleMesh</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Scale a mesh given a specified scaling factor. A scalar scaling factor</span>
+<span class="sd">    can be provided, in which case it is applied isotropically to all dims.</span>
+<span class="sd">    Optionally, a list/tuple of anisotropic scale factors can be provided per</span>
+<span class="sd">    dimension.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        scf (float or iterable): Scaling factor per dimension. If only a single</span>
+<span class="sd">            scaling factor is provided (or a list of size 1 is provided), it is</span>
+<span class="sd">            isotropically applied to all dimensions. Else, a list/tuple of 3</span>
+<span class="sd">            scaling factors is expected, which are applied to the X, Y, and Z</span>
+<span class="sd">            directions respectively.</span>
+<span class="sd">        inplace (bool, optional): Bool to make this operation in-place.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scf</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">],</span>
+                 <span class="n">inplace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scf</span> <span class="o">=</span> <span class="n">scf</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">Mesh</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (Mesh): Mesh to be scaled.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (Mesh): Scaled mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">meshfunc</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">scf</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">scf</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(scf=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scf</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TranslateMesh"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.TranslateMesh">[docs]</a><span class="k">class</span> <span class="nc">TranslateMesh</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Translate a mesh given a (3D) translation vector.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        trans (torch.Tensor or iterable): Translation vector (shape:</span>
+<span class="sd">            torch.Tensor or iterable must have exactly 3 elements).</span>
+<span class="sd">        inplace (bool, optional): Bool to make this operation in-place.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trans</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">],</span>
+                 <span class="n">inplace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">trans</span> <span class="o">=</span> <span class="n">trans</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">Mesh</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (Mesh): Mesh to be translated.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (Mesh): Translated mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">meshfunc</span><span class="o">.</span><span class="n">translate</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">trans</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">trans</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(trans=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trans</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RotateMesh"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.RotateMesh">[docs]</a><span class="k">class</span> <span class="nc">RotateMesh</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Rotate a mesh given a 3 x 3 rotation matrix.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        rotmat (torch.Tensor): Rotation matrix (shape: :math:`3 \times 3`).</span>
+<span class="sd">        inplace (bool, optional): Bool to make this operation in-place.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rotmat</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">inplace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rotmat</span> <span class="o">=</span> <span class="n">rotmat</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">inplace</span> <span class="o">=</span> <span class="n">inplace</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">Mesh</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (Mesh): Mesh to be rotated.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (Mesh): Rotated mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">meshfunc</span><span class="o">.</span><span class="n">rotate</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">rotmat</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">rotmat</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">inplace</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(rotmat=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rotmat</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TriangleMeshToPointCloud"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.TriangleMeshToPointCloud">[docs]</a><span class="k">class</span> <span class="nc">TriangleMeshToPointCloud</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Converts a triange mesh to a pointcloud with a specified number of</span>
+<span class="sd">    points. Uniformly samples points over the surface of the mesh.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        num_samples (int): Number of points to sample from the mesh.</span>
+<span class="sd">        eps (float, optional): A small number to prevent division by zero</span>
+<span class="sd">                     for small surface areas.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">eps</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1e-10</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span> <span class="o">=</span> <span class="n">num_samples</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">eps</span> <span class="o">=</span> <span class="n">eps</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">TriangleMesh</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (TriangleMesh): A triangle mesh object.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Uniformly sampled points over the surface of the</span>
+<span class="sd">                input mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="n">TriangleMesh</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Input mesh must be of type TriangleMesh. &#39;</span>
+                            <span class="s1">&#39;Got </span><span class="si">{0}</span><span class="s1"> instead&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">mesh</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="n">meshfunc</span><span class="o">.</span><span class="n">sample_triangle_mesh</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">,</span>
+                                             <span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">eps</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(num_samples=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TriangleMeshToVoxelGrid"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.TriangleMeshToVoxelGrid">[docs]</a><span class="k">class</span> <span class="nc">TriangleMeshToVoxelGrid</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Converts a triangle mesh to a voxel grid with a specified reolution.</span>
+<span class="sd">    The resolution of the voxel grid is assumed to be homogeneous along all</span>
+<span class="sd">    three dimensions (X, Y, Z axes).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        resolution (int): Desired resolution of generated voxel grid.</span>
+<span class="sd">        normalize (bool): Determines whether to normalize vertices to a</span>
+<span class="sd">            unit cube centered at the origin.</span>
+<span class="sd">        vertex_offset (float): Offset applied to all vertices after</span>
+<span class="sd">                               normalizing.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+                 <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+                 <span class="n">vertex_offset</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span> <span class="o">=</span> <span class="n">resolution</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span> <span class="o">=</span> <span class="n">normalize</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vertex_offset</span> <span class="o">=</span> <span class="n">vertex_offset</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">TriangleMesh</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (kaolin.rep.TriangleMesh): Triangle mesh to convert to a</span>
+<span class="sd">                voxel grid.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            voxgrid (kaolin.rep.VoxelGrid): Converted voxel grid.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">voxels</span> <span class="o">=</span> <span class="n">cvt</span><span class="o">.</span><span class="n">trianglemesh_to_voxelgrid</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">,</span>
+                                               <span class="n">normalize</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">,</span>
+                                               <span class="n">vertex_offset</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">vertex_offset</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">voxels</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(resolution=</span><span class="si">{0}</span><span class="s1">, normalize=</span><span class="si">{1}</span><span class="s1">, vertex_offset=</span><span class="si">{2}</span><span class="s1">)&#39;</span><span class="o">.</span>\
+            <span class="nb">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertex_offset</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TriangleMeshToSDF"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.TriangleMeshToSDF">[docs]</a><span class="k">class</span> <span class="nc">TriangleMeshToSDF</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Converts a triangle mesh to a non-parameteric (point-based) signed</span>
+<span class="sd">    distance function (SDF).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        num_samples (int): Number of points to sample on the surface of the</span>
+<span class="sd">            triangle mesh.</span>
+<span class="sd">        noise (float): Fraction of distance from the surface from which the</span>
+<span class="sd">            SDF is sampled (Eg. a value of 0.05 samples points that are at</span>
+<span class="sd">            a 5% fraction outside/inside the surface).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10000</span><span class="p">,</span> <span class="n">noise</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span> <span class="o">=</span> <span class="n">num_samples</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">noise</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">noise</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">TriangleMesh</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (kaolin.rep.TriangleMesh): Triangle mesh to convert to a</span>
+<span class="sd">                signed distance function.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): A signed distance function.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sdf</span> <span class="o">=</span> <span class="n">cvt</span><span class="o">.</span><span class="n">trianglemesh_to_sdf</span><span class="p">(</span><span class="n">mesh</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">sdf</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">noise</span> <span class="o">*</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">device</span><span class="p">)</span> <span class="o">-</span> <span class="o">.</span><span class="mi">5</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(num_samples=</span><span class="si">{0}</span><span class="s1">, noise=</span><span class="si">{1}</span><span class="s1">)&#39;</span><span class="o">.</span>\
+            <span class="nb">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_samples</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">noise</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MeshLaplacianSmoothing"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.MeshLaplacianSmoothing">[docs]</a><span class="k">class</span> <span class="nc">MeshLaplacianSmoothing</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Applies laplacian smoothing to the mesh.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            iterations (int) : number of iterations to run the algorithm for.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterations</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">iterations</span> <span class="o">=</span> <span class="n">iterations</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">Mesh</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (Mesh): Mesh to be smoothed.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (Mesh): Rotated mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mesh</span><span class="o">.</span><span class="n">laplacian_smoothing</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iterations</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mesh</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(iterations=</span><span class="si">{0}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">iterations</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RealignMesh"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.RealignMesh">[docs]</a><span class="k">class</span> <span class="nc">RealignMesh</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Aligns the vertices to be in the same (axis-aligned) bounding</span>
+<span class="sd">    box as that of `target` vertices or point cloud.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        target (torch.Tensor or PointCloud) : Target pointcloud to which `src`is</span>
+<span class="sd">            to be transformed (The `src` cloud is transformed to the</span>
+<span class="sd">            axis-aligned bounding box that the target cloud maps to). This</span>
+<span class="sd">            cloud must have the same number of dimensions :math:`D` as in the</span>
+<span class="sd">            source cloud. (shape: :math:`\cdots \times \cdots \times D`).</span>
+<span class="sd">        inplace (bool, optional): Bool to make the transform in-place.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (torch.Tensor): Pointcloud `src` realigned to fit in the (axis-aligned)</span>
+<span class="sd">            bounding box of the `tgt` cloud.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">PointCloud</span><span class="p">]):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">target</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mesh</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">Mesh</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            mesh (Mesh): Mesh to be realigned.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (Mesh): Realigned mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="n">pcfunc</span><span class="o">.</span><span class="n">realign</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mesh</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(realign)&#39;</span></div>
+
+
+<div class="viewcode-block" id="SDFToTriangleMesh"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.SDFToTriangleMesh">[docs]</a><span class="k">class</span> <span class="nc">SDFToTriangleMesh</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Converts an SDF function to a mesh</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bbox_center (float): Center of the surface&#39;s bounding box.</span>
+<span class="sd">        bbox_dim (float): Largest dimension of the surface&#39;s bounding box.</span>
+<span class="sd">        resolution (int) : The initial resolution of the voxel, should be large enough to</span>
+<span class="sd">            properly define the surface.</span>
+<span class="sd">        upsampling_steps (int) : Number of times the initial resolution will be doubled.</span>
+<span class="sd">            The returned resolution will be resolution * (2 ^ upsampling_steps).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bbox_center</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">bbox_dim</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">upsampling_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bbox_center</span> <span class="o">=</span> <span class="n">bbox_center</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bbox_dim</span> <span class="o">=</span> <span class="n">bbox_dim</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span> <span class="o">=</span> <span class="n">resolution</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upsampling_steps</span> <span class="o">=</span> <span class="n">upsampling_steps</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sdf</span><span class="p">:</span> <span class="n">Callable</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            sdf (Callable): An object with a .eval_occ function which indicates</span>
+<span class="sd">                       which of a set of passed points is inside the surface.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (TriangleMesh): Computed triangle mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">verts</span><span class="p">,</span> <span class="n">faces</span> <span class="o">=</span> <span class="n">cvt</span><span class="o">.</span><span class="n">sdf_to_trianglemesh</span><span class="p">(</span><span class="n">sdf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox_center</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox_dim</span><span class="p">,</span>
+                                       <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">upsampling_steps</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">TriangleMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">vertices</span><span class="o">=</span><span class="n">verts</span><span class="p">,</span> <span class="n">faces</span><span class="o">=</span><span class="n">faces</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">format_string</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(bbox_center=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bbox_center</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, bbox_dim=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bbox_dim</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, resolution=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, upsampling_steps=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">upsampling_steps</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">format_string</span></div>
+
+
+<div class="viewcode-block" id="SDFToPointCloud"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.SDFToPointCloud">[docs]</a><span class="k">class</span> <span class="nc">SDFToPointCloud</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Converts an SDF fucntion to a point cloud</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bbox_center (float): Center of the surface&#39;s bounding box.</span>
+<span class="sd">        bbox_dim (float): Largest dimension of the surface&#39;s bounding box.</span>
+<span class="sd">        resolution (int) : The initial resolution of the voxel, should be large enough to</span>
+<span class="sd">            properly define the surface.</span>
+<span class="sd">        upsampling_steps (int) : Number of times the initial resolution will be doubled.</span>
+<span class="sd">            The returned resolution will be resolution * (2 ^ upsampling_steps).</span>
+<span class="sd">        num_points (int): Number of points in computed point cloud.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bbox_center</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">bbox_dim</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+                 <span class="n">upsampling_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">num_points</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bbox_center</span> <span class="o">=</span> <span class="n">bbox_center</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bbox_dim</span> <span class="o">=</span> <span class="n">bbox_dim</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span> <span class="o">=</span> <span class="n">resolution</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upsampling_steps</span> <span class="o">=</span> <span class="n">upsampling_steps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span> <span class="o">=</span> <span class="n">num_points</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sdf</span><span class="p">:</span> <span class="n">Callable</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            sdf (Callable): An object with a .eval_occ fucntion which indicates</span>
+<span class="sd">                       which of a set of passed points is inside the surface.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.FloatTensor): Computed point cloud.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">sdf_to_pointcloud</span><span class="p">(</span><span class="n">sdf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox_center</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox_dim</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">,</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">upsampling_steps</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">format_string</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(bbox_center=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bbox_center</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, bbox_dim=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bbox_dim</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, resolution=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, upsampling_steps=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">upsampling_steps</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, num_points=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">format_string</span></div>
+
+
+<div class="viewcode-block" id="SDFToVoxelGrid"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.SDFToVoxelGrid">[docs]</a><span class="k">class</span> <span class="nc">SDFToVoxelGrid</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Converts an SDF function to a to a voxel grid</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bbox_center (float): Center of the surface&#39;s bounding box.</span>
+<span class="sd">        bbox_dim (float): Largest dimension of the surface&#39;s bounding box.</span>
+<span class="sd">        resolution (int) : The initial resolution of the voxel, should be large enough to</span>
+<span class="sd">            properly define the surface.</span>
+<span class="sd">        upsampling_steps (int) : Number of times the initial resolution will be doubled.</span>
+<span class="sd">            The returned resolution will be resolution * (2 ^ upsampling_steps).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bbox_center</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">bbox_dim</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+                 <span class="n">upsampling_steps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">num_points</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bbox_center</span> <span class="o">=</span> <span class="n">bbox_center</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bbox_dim</span> <span class="o">=</span> <span class="n">bbox_dim</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span> <span class="o">=</span> <span class="n">resolution</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upsampling_steps</span> <span class="o">=</span> <span class="n">upsampling_steps</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span> <span class="o">=</span> <span class="n">num_points</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sdf</span><span class="p">:</span> <span class="n">Callable</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            sdf (Callable): An object with a .eval_occ fucntion which indicates</span>
+<span class="sd">                       which of a set of passed points is inside the surface.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.FloatTensor): Computed point cloud.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">sdf_to_voxelgrid</span><span class="p">(</span><span class="n">sdf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox_center</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bbox_dim</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">,</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">upsampling_steps</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">format_string</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(bbox_center=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bbox_center</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, bbox_dim=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bbox_dim</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, resolution=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resolution</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, upsampling_steps=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">upsampling_steps</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">format_string</span></div>
+
+
+<div class="viewcode-block" id="VoxelGridToTriangleMesh"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.VoxelGridToTriangleMesh">[docs]</a><span class="k">class</span> <span class="nc">VoxelGridToTriangleMesh</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Converts passed voxel to a mesh</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        thresh (float): threshold from which to make voxel binary</span>
+<span class="sd">        mode (str):</span>
+<span class="sd">            -&#39;exact&#39;: exect mesh conversion</span>
+<span class="sd">            -&#39;marching_cubes&#39;: marching cubes is applied to passed voxel</span>
+<span class="sd">        normalize (bool): whether to scale the array to (-.5,.5)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">normalize</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span> <span class="o">=</span> <span class="n">threshold</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span> <span class="o">=</span> <span class="n">normalize</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxel</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxel (torch.Tensor): Voxel grid.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (TriangleMesh): Converted triangle mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">verts</span><span class="p">,</span> <span class="n">faces</span> <span class="o">=</span> <span class="n">cvt</span><span class="o">.</span><span class="n">voxelgrid_to_trianglemesh</span><span class="p">(</span><span class="n">voxel</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">TriangleMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">vertices</span><span class="o">=</span><span class="n">verts</span><span class="p">,</span> <span class="n">faces</span><span class="o">=</span><span class="n">faces</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(threshold=</span><span class="si">{0}</span><span class="s1">, mode=</span><span class="si">{1}</span><span class="s1">, normalize=</span><span class="si">{2}</span><span class="s1">)&#39;</span><span class="o">.</span>\
+            <span class="nb">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="VoxelGridToQuadMesh"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.VoxelGridToQuadMesh">[docs]</a><span class="k">class</span> <span class="nc">VoxelGridToQuadMesh</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Converts passed voxel to quad mesh</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        threshold (float): Threshold from which to make voxel binary.</span>
+<span class="sd">        normalize (bool): Whether to scale the array to (-.5,.5).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span> <span class="o">=</span> <span class="n">threshold</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span> <span class="o">=</span> <span class="n">normalize</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxel</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxel (torch.Tensor): Voxel grid.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (QuadMesh): Converted triangle mesh.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">verts</span><span class="p">,</span> <span class="n">faces</span> <span class="o">=</span> <span class="n">cvt</span><span class="o">.</span><span class="n">voxelgrid_to_quadmesh</span><span class="p">(</span><span class="n">voxel</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">QuadMesh</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">vertices</span><span class="o">=</span><span class="n">verts</span><span class="p">,</span> <span class="n">faces</span><span class="o">=</span><span class="n">faces</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(threshold=</span><span class="si">{0}</span><span class="s1">, normalize=</span><span class="si">{1}</span><span class="s1">)&#39;</span><span class="o">.</span>\
+            <span class="nb">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="VoxelGridToPointCloud"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.VoxelGridToPointCloud">[docs]</a><span class="k">class</span> <span class="nc">VoxelGridToPointCloud</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Converts  passed voxel to a pointcloud</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        num_points (int): Number of points in converted point cloud.</span>
+<span class="sd">        thresh (float): Threshold from which to make voxel binary.</span>
+<span class="sd">        mode (str):</span>
+<span class="sd">            -&#39;full&#39;: Sample the whole voxel model.</span>
+<span class="sd">            -&#39;surface&#39;: Sample only the surface voxels.</span>
+<span class="sd">        normalize (bool): Whether to scale the array to (-.5,.5).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_points</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span> <span class="o">=</span> <span class="n">threshold</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span> <span class="o">=</span> <span class="n">normalize</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxel</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxel (torch.Tensor): Voxel grid.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): Converted point cloud.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">voxelgrid_to_pointcloud</span><span class="p">(</span><span class="n">voxel</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">format_string</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(num_points=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, threshold=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">threshold</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, mode=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">)</span>
+        <span class="n">format_string</span> <span class="o">+=</span> <span class="s1">&#39;, normalize=</span><span class="si">{0}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">format_string</span></div>
+
+
+<div class="viewcode-block" id="VoxelGridToSDF"><a class="viewcode-back" href="../../../modules/transforms.html#kaolin.transforms.VoxelGridToSDF">[docs]</a><span class="k">class</span> <span class="nc">VoxelGridToSDF</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot; Converts passed voxel to a signed distance fucntion.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        voxel (torch.Tensor): Voxel grid</span>
+<span class="sd">        thresh (float): threshold from which to make voxel binary</span>
+<span class="sd">        normalize (bool): whether to scale the array to (0,1)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        a signed distance fucntion</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span> <span class="o">=</span> <span class="n">threshold</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span> <span class="o">=</span> <span class="n">normalize</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">voxel</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">VoxelGrid</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Args:</span>
+<span class="sd">            voxel (torch.Tensor): Voxel grid.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (SDF): A signed distance function.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">cvt</span><span class="o">.</span><span class="n">voxelgrid_to_sdf</span><span class="p">(</span><span class="n">voxel</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s1">&#39;(threshold=</span><span class="si">{0}</span><span class="s1">, normalize=</span><span class="si">{1}</span><span class="s1">)&#39;</span><span class="o">.</span>\
+            <span class="nb">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">thresh</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, NVIDIA Development Inc.
+
+    </p>
+  </div>
+    
+    
+      Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
