@@ -25,6 +25,7 @@ from utils import setup_meshes, split_meshes, reset_meshes
 from utils import loss_surf, loss_edge, loss_lap , collate_fn
 from architectures import VGG as Encoder, G_Res_Net, MeshEncoder
 
+import kaolin as kal
 from kaolin.datasets import shapenet
 
 
@@ -42,8 +43,8 @@ parser.add_argument('--batch-size', type=int, default=5, help='batch size')
 parser.add_argument('--print-every', type=int, default=20, help='Print frequency (batches).')
 parser.add_argument('--latent-loss', action='store_true', help='indicates latent loss should be used')
 parser.add_argument('--logdir', type=str, default='log', help='Directory to log data to.')
-parser.add_argument('--save-model', action='store_true', help='Saves the model and a snapshot \
-    of the optimizer state.')
+parser.add_argument('--resume', choices=['none', 'best', 'recent'], default='none',
+                    help='Choose which weights to resume training from (none to start from random initialization.)')
 args = parser.parse_args()
 
 
@@ -59,8 +60,8 @@ if args.latent_loss:
 else: 
     train_set = shapenet.ShapeNet_Combination([points_set, images_set])
 
-dataloader_train = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn,
-                                  num_workers=8)
+dataloader_train = DataLoader(train_set, batch_size=args.batch_size, shuffle=True,
+                              num_workers=8)
 
 
 points_set_valid = shapenet.ShapeNet_Points(root=args.shapenet_root, cache_dir=args.cache_dir, categories=args.categories,
@@ -94,28 +95,32 @@ encoding_dims = [56, 28, 14, 7]
 
 
 # Create log directory, if it doesn't already exist
-args.logdir = os.path.join(args.logdir, args.expid)
-if not os.path.isdir(args.logdir):
-    os.makedirs(args.logdir)
-    print('Created dir:', args.logdir)
+logdir = os.path.join(args.logdir, args.expid)
+if not os.path.isdir(logdir):
+    os.makedirs(logdir)
+    print('Created dir:', logdir)
 
 # Log all commandline args
-with open(os.path.join(args.logdir, 'args.txt'), 'w') as f:
+with open(os.path.join(logdir, 'args.txt'), 'w') as f:
     json.dump(args.__dict__, f, indent=2)
 
 class Engine(object):
     """Engine that runs training and inference.
     Args
-        - cur_epoch (int): Current epoch.
         - print_every (int): How frequently (# batches) to print loss.
-        - validate_every (int): How frequently (# epochs) to run validation.
+        - resume_name (str): Prefix of weights from which to resume training. If 'none',
+            no weights are loaded.
     """
 
-    def __init__(self, cur_epoch=0, print_every=1, validate_every=1):
-        self.cur_epoch = cur_epoch
+    def __init__(self, print_every, resume_name='none'):
+        self.cur_epoch = 0
         self.train_loss = []
         self.val_loss = []
         self.bestval = 0
+        self.print_every = print_every
+
+        if resume_name != 'none':
+            self.load(resume_name)
 
     def train(self):
         loss_epoch = 0.
@@ -123,14 +128,15 @@ class Engine(object):
         [e.train() for e in encoders], [m.train() for m in mesh_updates]
 
         # Train loop
-        for i, data in enumerate(tqdm(dataloader_train), 0):
+        for i, sample in enumerate(tqdm(dataloader_train), 0):
+            data = sample['data']
             optimizer.zero_grad()
 
             # Data Creation
             tgt_points = data['points'].to(args.device)
-            inp_images = data['imgs'].to(args.device)
-            cam_mat = data['cam_mat'].to(args.device)
-            cam_pos = data['cam_pos'].to(args.device)
+            inp_images = data['images'].to(args.device)
+            cam_mat = data['params']['cam_mat'].to(args.device)
+            cam_pos = data['params']['cam_pos'].to(args.device)
             if (tgt_points.shape[0] != args.batch_size) and (inp_images.shape[0] != args.batch_size) \
                     and (cam_mat.shape[0] != args.batch_size) and (cam_pos.shape[0] != args.batch_size): 
                 continue
@@ -182,7 +188,7 @@ class Engine(object):
                 surf_loss += (6000 * loss_surf(meshes, tgt_points[bn]) / float(args.batch_size))
                 edge_loss += (300 * .6 * loss_edge(meshes) / float(args.batch_size))
                 lap_loss += (1500 * loss_lap(meshes) / float(args.batch_size))
-                f_loss += nvl.metrics.point.f_score(.57 * meshes['update'][2].sample(2466)[0], .57 * tgt_points[bn],
+                f_loss += kal.metrics.point.f_score(.57 * meshes['update'][2].sample(2466)[0], .57 * tgt_points[bn],
                                                     extend=False) / float(args.batch_size)
 
 
@@ -215,14 +221,15 @@ class Engine(object):
             loss_epoch = 0.
             loss_f = 0 
             # Validation loop
-            for i, data in enumerate(tqdm(dataloader_val), 0):
+            for i, sample in enumerate(tqdm(dataloader_val), 0):
+                data = sample['data']
                 optimizer.zero_grad()
 
                 # Data Creation
                 tgt_points = data['points'].to(args.device)
-                inp_images = data['imgs'].to(args.device)
-                cam_mat = data['cam_mat'].to(args.device)
-                cam_pos = data['cam_pos'].to(args.device)
+                inp_images = data['images'].to(args.device)
+                cam_mat = data['params']['cam_mat'].to(args.device)
+                cam_pos = data['params']['cam_pos'].to(args.device)
                 if (tgt_points.shape[0] != args.batch_size) and (inp_images.shape[0] != args.batch_size)  \
                         and (cam_mat.shape[0] != args.batch_size) and (cam_pos.shape[0] != args.batch_size): 
                     continue
@@ -261,8 +268,8 @@ class Engine(object):
                     pred_points, _ = meshes['update'][2].sample(10000)
 
                     # Losses
-                    surf_loss = 3000 * nvl.metrics.point.chamfer_distance(pred_points, tgt_points[bn])
-                    loss_f += (nvl.metrics.point.f_score(.57 * meshes['update'][2].sample(2466)[0], .57 * tgt_points[bn],
+                    surf_loss = 3000 * kal.metrics.point.chamfer_distance(pred_points, tgt_points[bn])
+                    loss_f += (kal.metrics.point.f_score(.57 * meshes['update'][2].sample(2466)[0], .57 * tgt_points[bn],
                                                          extend=False).item() / float(args.batch_size))
 
                     loss_epoch += (surf_loss.item() / float(args.batch_size))
@@ -280,8 +287,20 @@ class Engine(object):
 
             self.val_loss.append(out_f_loss)
 
-    def save(self):
+    def load(self, resume_name):
+        for i, e in enumerate(encoders):
+            e.load_state_dict(torch.load(os.path.join(logdir, f'{resume_name}_encoder_{i}.pth')))
+        for i, m in enumerate(mesh_updates):
+            m.load_state_dict(torch.load(os.path.join(logdir, f'{resume_name}_mesh_update_{i}.pth')))
 
+        optimizer.load_state_dict(torch.load(os.path.join(logdir, f'{resume_name}_optim.pth')))
+        # Read data corresponding to the loaded model
+        with open(os.path.join(logdir, f'{resume_name}.log'), 'r') as f:
+            run_data = json.load(f)
+        self.cur_epoch = run_data['epoch']
+        self.bestval = run_data['bestval']
+
+    def save(self):
         save_best = False
         if self.val_loss[-1] >= self.bestval:
             self.bestval = self.val_loss[-1]
@@ -297,28 +316,31 @@ class Engine(object):
 
         # Save the recent model/optimizer states
         for i, e in enumerate(encoders):
-            torch.save(e.state_dict(), os.path.join(args.logdir, 'encoder_{}.pth'.format(i)))
+            torch.save(e.state_dict(), os.path.join(logdir, f'recent_encoder_{i}.pth'))
         for i, m in enumerate(mesh_updates):
-            torch.save(m.state_dict(), os.path.join(args.logdir, 'mesh_update_{}.pth'.format(i)))
-        torch.save(optimizer.state_dict(), os.path.join(args.logdir, 'recent_optim.pth'))
+            torch.save(m.state_dict(), os.path.join(logdir, f'recent_mesh_update_{i}.pth'))
+        torch.save(optimizer.state_dict(), os.path.join(logdir, 'recent_optim.pth'))
         # Log other data corresponding to the recent model
-        with open(os.path.join(args.logdir, 'recent.log'), 'w') as f:
+        with open(os.path.join(logdir, 'recent.log'), 'w') as f:
             f.write(json.dumps(log_table))
 
         tqdm.write('====== Saved recent model ======>')
 
         if save_best:
             for i, e in enumerate(encoders):
-                torch.save(e.state_dict(), os.path.join(args.logdir, 'best_encoder_{}.pth'.format(i)))
+                torch.save(e.state_dict(), os.path.join(logdir, f'best_encoder_{i}.pth'))
             for i, m in enumerate(mesh_updates):
-                torch.save(m.state_dict(), os.path.join(args.logdir, 'best_mesh_update_{}.pth'.format(i)))
-            torch.save(optimizer.state_dict(), os.path.join(args.logdir, 'best_optim.pth'))
+                torch.save(m.state_dict(), os.path.join(logdir, f'best_mesh_update_{i}.pth'))
+            torch.save(optimizer.state_dict(), os.path.join(logdir, 'best_optim.pth'))
+            # Log other data corresponding to the best model
+            with open(os.path.join(logdir, 'best.log'), 'w') as f:
+                f.write(json.dumps(log_table))
             tqdm.write('====== Overwrote best model ======>')
 
-trainer = Engine()
+trainer = Engine(print_every=args.print_every, resume_name=args.resume)
 
 for epoch in range(args.epochs): 
     trainer.train()
-    if epoch % 4 == 0: 
+    if epoch % args.validate_every == 0:
         trainer.validate()
-        trainer.save()
+    trainer.save()
