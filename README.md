@@ -100,13 +100,25 @@ $ cd docs
 $ sphinx-build . _build
 ```
 
-### Running Unittests
+### Running unit tests (optional)
 
 To run unittests, from the root directory of the repository (i.e., the directory containing this `README` file), execute the following commands.
 
 ```bash
 $ pytest tests/
 ```
+
+## Getting started with `kaolin`
+
+Once `kaolin` is installed, the best way to get about using the package is by following our [examples](examples)
+
+* [PointCloud Classification](examples/Classification): Train a `PointNet` classifier to predict the category of a 3D pointcloud.
+* [Voxel Superresolution](examples/SuperResolution): Train a 3D convnet to super-resolve (i.e., upsample) voxel grids.
+* [3D reconstruction from a single image](examples/ImageRecon): Train a neural network to predict the 3D shape of an object given a single 3D image (Note: assumes that 3D supervision/ground-truth is available).
+* [Differentiable rendering](examples/renderers): Use differentiable renderers to predict the 3D shape/texture of an object give a single 3D image (Note: no 3D supervision/ground-truth is assumed).
+
+> **Note:** We will (very soon) host our docs online. Stay tuned for the link. Until then, please follow instructions from [above](#building-the-documentation) to build docs.
+
 
 ## Main Modules
 
@@ -143,13 +155,6 @@ $ pytest tests/
     - Point Cloud: Sided Distance, Chamfer Distance, Directed Distance
     - Voxel Grid: Intersection Over Union (3D IoU), F-Score
 
-### 
-
-## Getting Started
-
-Take a look at some of our examples!! Examples include differentiable renderers, voxel superresolution, etc. Begin [here](examples).
-
-> **Note:** We will (very soon) host our docs online. Stay tuned for the link. Until then, please follow instructions from [above](#building-the-documentation) to build docs.
 
 
 ## Contributors
