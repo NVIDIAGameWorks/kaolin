@@ -338,5 +338,5 @@ class VoxelDecoder(nn.Module):
     def forward(self, latent):
         decode = self.fully(latent).view(-1, 64, 2, 2, 2)
         decode = self.model(decode).reshape(-1, 32, 32, 32)
-        voxels = F.sigmoid(decode)
+        voxels = torch.sigmoid(decode)
         return voxels
