@@ -34,7 +34,7 @@ Now, to visualize the mesh, simply call
 
 At this point, a window should pop up, and display a (surprise, surprise!) sphere.
 
-.. image:: ../_static/img/hello3d/hello3d_trianglemesh.png
+.. image:: images/hello3d/hello3d_trianglemesh.png
 
 
 Voxel grids
@@ -54,7 +54,7 @@ To visualize the voxel grid, run
 
 You should see something like this.
 
-.. image:: ../_static/img/hello3d/  hello3d_voxelgrid.png
+.. image:: images/hello3d/  hello3d_voxelgrid.png
 
 
 Pointclouds

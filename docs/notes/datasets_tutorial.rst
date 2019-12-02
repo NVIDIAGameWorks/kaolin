@@ -12,7 +12,7 @@ for you!
 ShapeNet
 --------
 
-.. image:: /_static/img/ShapeNet.png
+.. image:: /images/ShapeNet.png
 
 `ShapeNet <https://shapenet.org/>`_ is an extremely popular (and huge!) repository 
 of objects encoded as triangle meshes, and is often used in 3D deep learning. 
@@ -36,7 +36,7 @@ how to load meshes from the ShapeNet `chair` category.
     >>> from torch.utils.data import DataLoader
     >>> meshes = shapenet.ShapeNet_Meshes(root=shapenet_dir, categories=['plane'])
 
-.. image:: /_static/img/planes_mesh.png
+.. image:: /images/planes_mesh.png
 
 
 Loading multiple categories is straightforward too.
@@ -67,9 +67,9 @@ you would for 2D data.
     >>> point_dataloader = DataLoader(points, batch_size=10, shuffle=True, num_workers=8)
 
 
-.. image:: /_static/img/planes_voxels.png
+.. image:: /images/planes_voxels.png
     :width: 49 %
-.. image:: /_static/img/planes_pc.png
+.. image:: /images/planes_pc.png
     :width: 49 %
 
 
@@ -87,7 +87,7 @@ ModelNet voxels can be loaded in a similar way:
 
 SHREC16
 -------
-.. image:: /_static/img/shrec.png
+.. image:: /images/shrec.png
 
 SHREC is a dataset that was curated for the 
 `Large-Scale 3D Retrieval From ShapeNet Core55` challenge at Eurographics 2016. 

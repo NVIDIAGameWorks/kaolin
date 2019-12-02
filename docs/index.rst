@@ -10,7 +10,7 @@ Kaolin
 
 Kaolin is a PyTorch library aimed at accelerating 3D deep learning research. Kaolin provides efficient implementations of several differentiable modules for use in neural networks. With several native functions to manipulate meshes, pointclouds, signed distance functions, and voxel grids, researchers/practitioners need not dabble with writing boilerplate code anymore. Kaolin packages several differentiable graphics, vision, and robotics modules (eg. rendering, lighting, shading, view warping, etc.). It also provides easy access to loading and pre-processing several 3D datasets. Additionally, we curate a model zoo comprising several state-of-the-art 3D deep learning architectures, to serve as a starting point for future research endeavours.
 
-.. image:: _static/img/kaolin.png
+.. image:: images/kaolin.png
 
 .. toctree::
    :glob:

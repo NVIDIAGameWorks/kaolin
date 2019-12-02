@@ -17,7 +17,7 @@ Creating a Mesh Dataset from a USD Scene
 Kaolin supports importing meshes from a provided scene file. 
 Let's use Pixar's `KitchenSet <http://graphics.pixar.com/usd/downloads.html>`_ for our example.
 
-.. image:: ../_static/img/kitchenset.png
+.. image:: images/kitchenset.png
 
 Next we will create a mesh dataset from this scene. First, we need 
 to set our environment variables:
@@ -54,7 +54,7 @@ Let's see what they look like.
 
 And opening the USD in your favourite USD viewer with a bit of styling, we get:
 
-.. image:: ../_static/img/kitchenset_meshes.png
+.. image:: images/kitchenset_meshes.png
 
 Viewing USD Files
 -----------------

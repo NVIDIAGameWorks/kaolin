@@ -19,7 +19,7 @@ As a sanity check to ensure the mesh is read in correctly, run.
     torch.Size([482, 3])
 
 
-.. image:: ../_static/img/reps.png
+.. image:: images/reps.png
 
 
 TriangleMesh to VoxelGrid
