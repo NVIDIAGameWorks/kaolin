@@ -78,10 +78,17 @@ Install PyTorch and Torchvision by following instructions from https://pytorch.o
 #### Install Kaolin
 Now, you can install the library. From the root directory of this repo (i.e., the directory containing this `README` file), run
 
+##### For General Use
 ```sh
-$ python setup.py build_ext --inplace   # optional, prevents errors when importing kaolin from kaolin root
+$ python setup.py build_ext --inplace   # optional, allows importing kaolin from the kaolin root directory
 $ python setup.py install
 ```
+
+##### For Development (modifying kaolin code)
+```sh
+$ python setup.py develop
+```
+Note, if modifying or adding Cython files, ensure that Cython is installed and set the following environment variable `USE_CYTHON=1`.
 
 During installation, the *packman* package manager will 
 download the nv-usd package to `~/packman-repo/` containing the necessary packages for reading and writing Universal Scene Description (USD) files. 
