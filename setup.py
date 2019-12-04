@@ -121,7 +121,11 @@ def get_extensions():
 
     if use_cython:
         from Cython.Build import cythonize
-        cython_extensions = cythonize(cython_extensions, language='c++')
+        from Cython.Compiler import Options
+        compiler_directives = Options.get_directive_defaults()
+        compiler_directives["emit_code_comments"] = False
+        cython_extensions = cythonize(cython_extensions, language='c++',
+                                      compiler_directives=compiler_directives)
 
     return cython_extensions + cuda_extensions
 
