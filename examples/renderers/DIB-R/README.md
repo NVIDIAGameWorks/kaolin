@@ -2,7 +2,7 @@
 
 ![example image](example.gif)
 
-This example uses the DIB-R renderer in kaolin to render a simple mesh (using random vertex colors), and output an animated GIF image of the rendered object.
+This example uses the DIB-R renderer in kaolin to render a simple mesh (using position as vertex colors), and output an animated GIF image of the rendered object.
 
 Usage:
 

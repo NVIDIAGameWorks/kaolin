@@ -23,6 +23,16 @@ import tqdm
 
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 
+###########################
+# Settings
+###########################
+
+CAMERA_DISTANCE = 2
+CAMERA_ELEVATION = 30
+MESH_SIZE = 5
+HEIGHT = 256
+WIDTH = 256
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Kaolin DIB-R Example')
@@ -39,47 +49,52 @@ def main():
     args = parse_arguments()
 
     ###########################
-    # camera settings
+    # Load mesh
     ###########################
-    camera_distance = 2
-    elevation = 30
 
-    ###########################
-    # load object
-    ###########################
     mesh = TriangleMesh.from_obj(args.mesh)
     vertices = mesh.vertices
     faces = mesh.faces.int()
-    face_textures = (faces).clone()
+
+    # Expand such that batch size = 1
 
     vertices = vertices[None, :, :].cuda()
     faces = faces[None, :, :].cuda()
-    face_textures[None, :, :].cuda()
 
     ###########################
-    # normalize verts
+    # Normalize mesh position
     ###########################
+
     vertices_max = vertices.max()
     vertices_min = vertices.min()
     vertices_middle = (vertices_max + vertices_min) / 2.
-    vertices = vertices - vertices_middle
-
-    coef = 5
-    vertices = vertices * coef
+    vertices = (vertices - vertices_middle) * MESH_SIZE
 
     ###########################
-    # DIB-Renderer
+    # Generate vertex color
     ###########################
-    renderer = Renderer(256, 256, mode='VertexColor')
-    textures = torch.rand(1, vertices.shape[1], 3).cuda()
+
+    vert_min = torch.min(vertices, dim=1, keepdims=True)[0]
+    vert_max = torch.max(vertices, dim=1, keepdims=True)[0]
+    colors = (vertices - vert_min) / (vert_max - vert_min)
+
+    ###########################
+    # Render
+    ###########################
+
+    renderer = Renderer(HEIGHT, WIDTH, mode='VertexColor')
+
     loop = tqdm.tqdm(list(range(0, 360, 4)))
-    loop.set_description('Drawing VertexColor')
+    loop.set_description('Drawing')
 
     os.makedirs(args.output_path, exist_ok=True)
-    writer = imageio.get_writer(os.path.join(args.output_path, 'vertex_color.gif'), mode='I')
+    writer = imageio.get_writer(os.path.join(args.output_path, 'example.gif'), mode='I')
     for azimuth in loop:
-        renderer.set_look_at_parameters([90 - azimuth], [elevation], [camera_distance])
-        predictions, _, _ = renderer(points=[vertices, faces[0].long()], colors=[textures])
+        renderer.set_look_at_parameters([90 - azimuth],
+                                        [CAMERA_ELEVATION],
+                                        [CAMERA_DISTANCE])
+
+        predictions, _, _ = renderer(points=[vertices, faces[0].long()], colors=[colors])
         image = predictions.detach().cpu().numpy()[0]
         writer.append_data((image * 255).astype(np.uint8))
 
