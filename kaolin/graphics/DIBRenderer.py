@@ -11,12 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# 
+#
 #
 # DIB-R
-# 
+#
 # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -36,53 +36,4 @@
 # SOFTWARE.
 
 import torch
-
-
-class DIBRenderer(torch.nn.Module):
-    r"""Placeholder class for DIB-Renderer implementation.
-
-    A differentiable renderer takes in vertex geometry, faces (usually
-    triangles), and optionally texture (and any other information
-    deemed relevant), and implements the following main steps.
-        * Lighting (ambient and optionally, directional lighting, i.e.,
-          diffuse/Lambertian reflection, and optionally specular reflection)
-        * (Vertex) Shading (Gouraud/Phong/etc.)
-        * Geometric transformation (usually, this is needed to view the
-          object to be rendered from a specific viewing angle, etc.)
-          (the geometric transformations are usually applied AFTER lighting,
-          as it is easier to perform lighting in the object frame, rather
-          than at the scene level)
-        * Projection (perspective/orthographic/weak-orthographic(affine))
-          from 3D (camera) coordinates to 2D (image) coordinates.
-        * Rasterization to convert the primitives (usually triangles) to
-          pixels, and determine texture (when available).
-
-    """
-
-    def __init__(self):
-        super(DifferentiableRenderer, self).__init__()
-
-    def forward(self, vertices, faces, textures=None):
-        # Generally, this method will call the other
-        # (already implemented) methods.
-        # self.lighting()
-        # self.shading()
-        # self.transform_to_camera_frame()
-        # self.project_to_image()
-        # self.rasterize()
-        raise NotImplementedError
-
-    def lighting(self):
-        raise NotImplementedError
-
-    def shading(self):
-        raise NotImplementedError
-
-    def transform_to_camera_frame(self):
-        raise NotImplementedError
-
-    def project_to_image(self):
-        raise NotImplementedError
-
-    def rasterize(self):
-        raise NotImplementedError
+from .dib_renderer.renderer import Renderer as DIBRenderer

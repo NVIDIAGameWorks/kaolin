@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from kaolin.graphics.dib_renderer.renderer import Renderer
+from kaolin.graphics import DIBRenderer as Renderer
 from kaolin.rep import TriangleMesh
 import argparse
 import imageio
