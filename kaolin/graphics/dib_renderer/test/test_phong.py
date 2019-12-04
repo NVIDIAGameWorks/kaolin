@@ -28,113 +28,111 @@ import cv2
 
 ######################################################
 if __name__ == '__main__':
-    
+
     from graphics.utils.utils_mesh import loadobj, face2pfmtx, loadobjtex
     from graphics.utils.utils_perspective import lookatnp, perspectiveprojectionnp
     from graphics.utils.utils_sphericalcoord import get_spherical_coords_x
-    
+
     from graphics.render.phongrender import PhongRender
-    
+
     meshfile = './data/teapot.obj'
     p, f, uv, ft = loadobjtex(meshfile)
-    print (p.shape,f.shape,uv.shape,ft.shape)
+    print(p.shape, f.shape, uv.shape, ft.shape)
     exit()
     pfmtx = face2pfmtx(f)
 
-    
     imfile = './data/banana.jpg'
     texturenp = cv2.imread(imfile)[:, :, ::-1].astype(np.float32) / 255.0
-    
+
     ##################################################################
     pmax = np.max(p, axis=0, keepdims=True)
     pmin = np.min(p, axis=0, keepdims=True)
     pmiddle = (pmax + pmin) / 2
     p = p - pmiddle
-    
+
     coef = 5
     p = p * coef
-    
+
     ##########################################################
     campos = np.array([0, 0, 1.5], dtype=np.float32)  # where camera it is
     camcenter = np.array([0, 0, 0], dtype=np.float32)  # where camra is looking at
     camup = np.array([-1, 1, 0], dtype=np.float32)  # y axis of camera view
     camviewmtx, camviewshift = lookatnp(campos.reshape(3, 1), camcenter.reshape(3, 1), camup.reshape(3, 1))
     camviewshift = -np.dot(camviewmtx.transpose(), camviewshift)
-    
+
     camfovy = 45 / 180.0 * np.pi
     camprojmtx = perspectiveprojectionnp(camfovy, 1.0 * 1.0 / 1.0)
-    
+
     #####################################################
     tfp_px3 = torch.from_numpy(p)
     tfp_px3.requires_grad = True
-    
+
     tff_fx3 = torch.from_numpy(f)
-    
+
     tfuv_tx2 = torch.from_numpy(uv)
     tfuv_tx2.requires_grad = True
     tfft_fx3 = torch.from_numpy(ft)
-    
+
     tftex_thxtwx3 = torch.from_numpy(np.ascontiguousarray(texturenp))
     tftex_thxtwx3.requires_grad = True
-    
+
     tfcamviewmtx = torch.from_numpy(camviewmtx)
     tfcamshift = torch.from_numpy(camviewshift)
     tfcamproj = torch.from_numpy(camprojmtx)
-    
+
     ##########################################################
     tfp_1xpx3 = torch.unsqueeze(tfp_px3, dim=0)
     tfuv_1xtx2 = torch.unsqueeze(tfuv_tx2, dim=0)
     tftex_1xthxtwx3 = torch.unsqueeze(tftex_thxtwx3, dim=0)
-    
+
     tfcamviewmtx_1x3x3 = torch.unsqueeze(tfcamviewmtx, dim=0)
     tfcamshift_1x3 = tfcamshift.view(-1, 3)
     tfcamproj_3x1 = tfcamproj
-    
+
     bs = 10
     tfp_bxpx3 = tfp_1xpx3.repeat([bs, 1, 1])
     tfuv_bxtx2 = tfuv_1xtx2.repeat([bs, 1, 1])
     tftex_bxthxtwx3 = tftex_1xthxtwx3.repeat([bs, 1, 1, 1])
-    
+
     tfcamviewmtx_bx3x3 = tfcamviewmtx_1x3x3.repeat([bs, 1, 1])
     tfcamshift_bx3 = tfcamshift_1x3.repeat([bs, 1])
-    tfcameras = [tfcamviewmtx_bx3x3.cuda(), \
-                 tfcamshift_bx3.cuda(), \
+    tfcameras = [tfcamviewmtx_bx3x3.cuda(),
+                 tfcamshift_bx3.cuda(),
                  tfcamproj_3x1.cuda()]
-    
-    material = np.array([[0.1, 0.1, 0.1], 
+
+    material = np.array([[0.1, 0.1, 0.1],
                          [1.0, 1.0, 1.0],
                          [0.4, 0.4, 0.4]], dtype=np.float32).reshape(-1, 3, 3)
     shininess = np.array([100], dtype=np.float32).reshape(-1, 1)
     tfmat = torch.from_numpy(material).repeat(bs, 1, 1)
     tfshi = torch.from_numpy(shininess).repeat(bs, 1)
-    
+
     lightdirect = 2 * np.random.rand(bs, 3).astype(np.float32) - 1
     lightdirect[:, 2] += 2
     tflight = torch.from_numpy(lightdirect)
     tflight_bx3 = tflight
-    
+
     # tfcameras = None
     tftex_bx3xthxtw = tftex_bxthxtwx3.permute([0, 3, 1, 2])
     renderer = PhongRender(256, 256)
     renderer.set_smooth(pfmtx)
-    tfim_bxhxwx3, _, _ = renderer.forward(points=[tfp_bxpx3.cuda(), tff_fx3.cuda()], \
-                                          cameras=tfcameras, \
-                                          colors=[tfuv_bxtx2.cuda(), tfft_fx3.cuda(), tftex_bx3xthxtw.cuda()], \
-                                          lightdirect_bx3=tflight_bx3.cuda(), \
-                                          material_bx3x3=tfmat.cuda(), \
+    tfim_bxhxwx3, _, _ = renderer.forward(points=[tfp_bxpx3.cuda(), tff_fx3.cuda()],
+                                          cameras=tfcameras,
+                                          colors=[tfuv_bxtx2.cuda(), tfft_fx3.cuda(), tftex_bx3xthxtw.cuda()],
+                                          lightdirect_bx3=tflight_bx3.cuda(),
+                                          material_bx3x3=tfmat.cuda(),
                                           shininess_bx1=tfshi.cuda())
-    
+
     loss1 = torch.sum(tfim_bxhxwx3)
     print('loss im {}', format(loss1.item()))
-    
+
     for i in range(bs):
         im_hxwx3 = tfim_bxhxwx3.detach().cpu().numpy()[i]
         cv2.imshow("", im_hxwx3[:, :, ::-1])
         cv2.waitKey()
-    
-    loss1.backward()
-    
-    print(tfp_px3.grad[tfp_px3.grad > 0])
-    
-    np.save(file='gt.npy', arr=im_hxwx3)
 
+    loss1.backward()
+
+    print(tfp_px3.grad[tfp_px3.grad > 0])
+
+    np.save(file='gt.npy', arr=im_hxwx3)
