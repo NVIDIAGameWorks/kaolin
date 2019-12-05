@@ -290,12 +290,11 @@ class ShapeNet_Images(data.Dataset):
             azimuth, elevation, distance)
 
         data['images'] = img
-        data['params'] = dict()
-        data['params']['cam_mat'] = cam_params[0]
-        data['params']['cam_pos'] = cam_params[1]
-        data['params']['azi'] = azimuth
-        data['params']['elevation'] = elevation
-        data['params']['distance'] = distance
+        data['params'] = {'cam_mat': cam_params[0],
+                          'cam_pos': cam_params[1],
+                          'azi': azimuth,
+                          'elevation':  elevation,
+                          'distance': distance}
         attributes['name'] = img_name
         attributes['synset'] = self.synsets[self.synset_idx[index]]
         attributes['label'] = self.labels[self.synset_idx[index]]
@@ -336,7 +335,7 @@ class ShapeNet_Voxels(data.Dataset):
     def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
                  split: float = .7, resolutions=[128, 32], no_progress: bool = False):
         self.root = Path(root)
-        self.cache_dir = Path(cache_dir) / 'voxels'
+        self.cache_dir = (self.root if cache_dir is None else Path(cache_dir)) / 'voxels'
         self.cache_transforms = {}
         self.params = {
             'resolutions': resolutions,
@@ -425,7 +424,7 @@ class ShapeNet_Surface_Meshes(data.Dataset):
         assert mode in ['Tri', 'Quad']
 
         self.root = Path(root)
-        self.cache_dir = Path(cache_dir) / 'surface_meshes'
+        self.cache_dir = (self.root if cache_dir is None else Path(cache_dir)) / 'surface_meshes'
         dataset_params = {
             'root': root,
             'categories': categories,
@@ -533,11 +532,11 @@ class ShapeNet_Points(data.Dataset):
 
     """
 
-    def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
+    def __init__(self, root: str, cache_dir: str = None, categories: list = ['chair'], train: bool = True,
                  split: float = .7, num_points: int = 5000, smoothing_iterations=3,
                  surface=True, resolution=100, normals=True, no_progress: bool = False):
         self.root = Path(root)
-        self.cache_dir = Path(cache_dir) / 'points'
+        self.cache_dir = (self.root if cache_dir is None else Path(cache_dir)) / 'points'
 
         dataset_params = {
             'root': root,
@@ -977,12 +976,7 @@ class ShapeNet_Combination(data.Dataset):
     r"""ShapeNet Dataset class for combinations of representations.
 
     Arguments:
-        dataset (list): List of datasets to be combined
-        categories (str): List of categories to load from ShapeNet. This list may
-                contain synset ids, class label names (for ShapeNetCore classes),
-                or a combination of both.
-        root (str): Path to the root directory of the ShapeNet dataset.
-        train (bool): if true use the training set, else use the test set
+        datasets (list): List of datasets to be combined
 
     Returns:
         dict: Dictionary with keys indicated by passed datasets

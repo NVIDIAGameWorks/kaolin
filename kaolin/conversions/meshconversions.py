@@ -73,7 +73,7 @@ def trianglemesh_to_voxelgrid(mesh: kaolin.rep.Mesh, resolution: int,
         >>> voxel.shape
 
     """
-    mesh = kal.rep.Mesh.from_tensors(mesh.vertices.clone(), mesh.faces.clone())
+    mesh = kal.rep.Mesh.from_tensors(mesh.vertices, mesh.faces)
     if normalize:
         verts_max = mesh.vertices.max()
         verts_min = mesh.vertices.min()
