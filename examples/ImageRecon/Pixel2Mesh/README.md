@@ -6,7 +6,7 @@ This example allows you to train and test the Pixel2Mesh algorithm for signle im
 
 To train the system call
 ```
-python train.py
+python train.py --shapenet-root /path/to/shapenet --shapenet-images-root /path/to/shapenet-images
 ```
 
 
@@ -14,7 +14,7 @@ python train.py
 
 To evaluate a trained model
 ```
-python eval.py
+python eval.py --shapenet-root /path/to/shapenet --shapenet-images-root /path/to/shapenet-images
 ```
 
 
