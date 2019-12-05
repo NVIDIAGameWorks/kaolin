@@ -1,6 +1,6 @@
 name: kaolin_temp
 channels:
-  - pytorch
+  - pytorch-nightly
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=main
