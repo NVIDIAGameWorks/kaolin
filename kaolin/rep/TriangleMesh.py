@@ -217,7 +217,7 @@ class TriangleMesh(Mesh):
             for face in self.faces:
                 f.write('f %d %d %d\n' % tuple(face + 1))
 
-    def sample(self, num_samples: int, eps: float = 1e-7):
+    def sample(self, num_samples: int, eps: float = 1e-10):
         r""" Uniformly samples the surface of a mesh.
 
             Args:
@@ -263,9 +263,7 @@ class TriangleMesh(Mesh):
         a = (x2 * y3 - x3 * y2) ** 2
         b = (x3 * y1 - x1 * y3) ** 2
         c = (x1 * y2 - x2 * y1) ** 2
-        Areas = torch.sqrt(a + b + c) / 2
-        # percentage of each face w.r.t. full surface area
-        Areas = Areas / (torch.sum(Areas) + eps)
+        Areas = (torch.sqrt(a + b + c) / 2) + eps
 
         # define descrete distribution w.r.t. face area ratios caluclated
         cat_dist = torch.distributions.Categorical(Areas.view(-1))
