@@ -1,0 +1,6 @@
+-f https://download.pytorch.org/whl/nightly/cpu/torch_nightly.html
+numpy
+torch_nightly
+sphinx
+Cython
+torchvision
