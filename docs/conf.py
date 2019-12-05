@@ -25,7 +25,7 @@ master_doc = 'index'
 
 project = 'kaolin'
 copyright = '2019, NVIDIA Development Inc.'
-author = 'Krishna Murthy, Edward Smith, Wenzheng Chen, Amlan Kar, Jun Gao, Huan Ling, Clement Fuji Tsang, Ankur Handa, Sanja Fidler'
+author = 'NVIDIA'
 
 # The full version, including alpha/beta/rc tags
 release = '0.1.0 alpha'
