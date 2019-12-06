@@ -12,6 +12,9 @@
 
 import os
 import sys
+
+import kaolin
+
 sys.path.append('../')
 sys.path.append(os.path.abspath(os.path.join(
     os.path.dirname(__file__), '..', 'kaolin')))
@@ -26,9 +29,9 @@ master_doc = 'index'
 project = 'kaolin'
 copyright = '2019, NVIDIA Development Inc.'
 author = 'NVIDIA'
-
+version = kaolin.__version__
 # The full version, including alpha/beta/rc tags
-release = '0.1.0 alpha'
+release = kaolin.__version__
 
 
 # -- General configuration ---------------------------------------------------
