@@ -94,7 +94,7 @@ if __name__ == '__main__':
     )
 
     import torch
-    from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+    from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
     import Cython
     from Cython.Build import cythonize
     import numpy as np
@@ -134,40 +134,40 @@ if __name__ == '__main__':
         ],
         include_dirs=[np.get_include()]
     )
-
-    cuda = [
-        CUDAExtension('kaolin.cuda.load_textures', [
-            'kaolin/cuda/load_textures_cuda.cpp',
-            'kaolin/cuda/load_textures_cuda_kernel.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.sided_distance', [
-            'kaolin/cuda/sided_distance.cpp',
-            'kaolin/cuda/sided_distance_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.furthest_point_sampling', [
-            'kaolin/cuda/furthest_point_sampling.cpp',
-            'kaolin/cuda/furthest_point_sampling_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.ball_query', [
-            'kaolin/cuda/ball_query.cpp',
-            'kaolin/cuda/ball_query_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.three_nn', [
-            'kaolin/cuda/three_nn.cpp',
-            'kaolin/cuda/three_nn_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.tri_distance', [
-            'kaolin/cuda/triangle_distance.cpp',
-            'kaolin/cuda/triangle_distance_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.mesh_intersection', [
-            'kaolin/cuda/mesh_intersection.cpp',
-            'kaolin/cuda/mesh_intersection_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
-            'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
-            'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
-        ])]
+    if CUDA_HOME:
+        cuda = [
+            CUDAExtension('kaolin.cuda.load_textures', [
+                'kaolin/cuda/load_textures_cuda.cpp',
+                'kaolin/cuda/load_textures_cuda_kernel.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.sided_distance', [
+                'kaolin/cuda/sided_distance.cpp',
+                'kaolin/cuda/sided_distance_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.furthest_point_sampling', [
+                'kaolin/cuda/furthest_point_sampling.cpp',
+                'kaolin/cuda/furthest_point_sampling_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.ball_query', [
+                'kaolin/cuda/ball_query.cpp',
+                'kaolin/cuda/ball_query_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.three_nn', [
+                'kaolin/cuda/three_nn.cpp',
+                'kaolin/cuda/three_nn_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.tri_distance', [
+                'kaolin/cuda/triangle_distance.cpp',
+                'kaolin/cuda/triangle_distance_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.mesh_intersection', [
+                'kaolin/cuda/mesh_intersection.cpp',
+                'kaolin/cuda/mesh_intersection_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
+                'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
+                'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
+            ])]
     cython = [
         triangle_hash_module,
         mise_module,
