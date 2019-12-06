@@ -13,7 +13,14 @@
 import os
 import sys
 
-import kaolin
+
+# Get version number
+version_path = os.path.join('../', 'kaolin', 'version.py')
+with open(version_path, 'r') as f:
+    for row in f:
+        if '__version__' in row:
+            kal_version = row.split("'")[-2]
+            break
 
 sys.path.append('../')
 sys.path.append(os.path.abspath(os.path.join(
@@ -29,9 +36,9 @@ master_doc = 'index'
 project = 'kaolin'
 copyright = '2019, NVIDIA Development Inc.'
 author = 'NVIDIA'
-version = kaolin.__version__
+version = kal_version
 # The full version, including alpha/beta/rc tags
-release = kaolin.__version__
+release = kal_version
 
 
 # -- General configuration ---------------------------------------------------
