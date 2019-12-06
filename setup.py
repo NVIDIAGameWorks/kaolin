@@ -178,7 +178,8 @@ if __name__ == '__main__':
 
 
     # If building with readthedocs, don't compile CUDA extensions
-    if os.getenv('READTHEDOCS'):
+    print('ENV VAR', os.getenv('READTHEDOCS'))
+    if os.getenv('READTHEDOCS') == 'True':
         ext_modules = cython_ext
     else:
         ext_modules = cython_ext + cuda_ext
