@@ -48,6 +48,7 @@ extensions = [
 
 napoleon_use_ivar = True
 
+# Mock CUDA Imports
 autodoc_mock_imports = ['kaolin.cuda.ball_query',
                         'kaolin.cuda.load_textures',
                         'kaolin.cuda.sided_distance',
