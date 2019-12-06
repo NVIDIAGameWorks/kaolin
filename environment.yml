@@ -1,6 +1,6 @@
 name: kaolin_temp
 channels:
-  - pytorch-nightly
+  - pytorch
   - defaults
 dependencies:
   - _libgcc_mutex=0.1=main
@@ -33,7 +33,6 @@ dependencies:
   - pip=19.3.1=py36_0
   - pycparser=2.19=py36_0
   - python=3.6.9=h265db76_0
-  - pytorch=1.3.1=py3.6_cuda10.1.243_cudnn7.6.3_0
   - readline=7.0=h7b6447c_5
   - setuptools=42.0.2=py36_0
   - six=1.13.0=py36_0
@@ -45,6 +44,7 @@ dependencies:
   - zlib=1.2.11=h7b6447c_3
   - zstd=1.3.7=h0b5b093_0
   - pip:
+    - https://download.pytorch.org/whl/cpu/torch-1.3.1%2Bcpu-cp36-cp36m-linux_x86_64.whl
     - alabaster==0.7.12
     - attrs==19.3.0
     - autopep8==1.4.4

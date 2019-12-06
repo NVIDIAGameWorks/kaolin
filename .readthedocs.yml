@@ -1,4 +1,10 @@
 version: 2
 
-# conda:
-#   environment: environment.yml
+conda:
+  environment: environment.yml
+
+python:
+   version: 3.7
+   install:
+      - method: setuptools
+        path: '.'
