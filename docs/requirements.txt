@@ -3,3 +3,4 @@ numpy
 torch_nightly
 sphinx
 Cython
+torchvision
