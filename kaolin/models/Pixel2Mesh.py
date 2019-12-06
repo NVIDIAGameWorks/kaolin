@@ -19,16 +19,13 @@ from torch import nn
 from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 
-import torch
-from torch.nn import Parameter
-
 
 class VGG(nn.Module):
     r"""
     .. note::
 
         If you use this code, please cite the original paper in addition to Kaolin.
-        
+
         .. code-block::
 
             @InProceedings{Simonyan15,
@@ -103,7 +100,7 @@ class G_Res_Net(nn.Module):
     .. note::
 
         If you use this code, please cite the original paper in addition to Kaolin.
-        
+
         .. code-block::
 
             @inProceedings{wang2018pixel2mesh,
@@ -117,18 +114,18 @@ class G_Res_Net(nn.Module):
         super(G_Res_Net, self).__init__()
         self.gc1 = GCN(input_features, hidden)
         self.gc2 = GCN(hidden, hidden)
-        self.gc3 = GCN(hidden , hidden)
+        self.gc3 = GCN(hidden, hidden)
         self.gc4 = GCN(hidden, hidden)
-        self.gc5 = GCN(hidden , hidden)
+        self.gc5 = GCN(hidden, hidden)
         self.gc6 = GCN(hidden, hidden)
-        self.gc7 = GCN(hidden , hidden)
+        self.gc7 = GCN(hidden, hidden)
         self.gc8 = GCN(hidden, hidden)
-        self.gc9 = GCN(hidden , hidden)
+        self.gc9 = GCN(hidden, hidden)
         self.gc10 = GCN(hidden, hidden)
-        self.gc11 = GCN(hidden , hidden)
+        self.gc11 = GCN(hidden, hidden)
         self.gc12 = GCN(hidden, hidden)
-        self.gc13 = GCN(hidden , hidden)
-        self.gc14 = GCN(hidden,  output_features)
+        self.gc13 = GCN(hidden, hidden)
+        self.gc14 = GCN(hidden, output_features)
         self.hidden = hidden
 
     def forward(self, features, adj):
@@ -174,7 +171,7 @@ class G_Res_Net(nn.Module):
         features /= 2.
 
         coords = (self.gc14(features, adj))
-        return coords.squeeze(0),features.squeeze(0)
+        return coords.squeeze(0), features.squeeze(0)
 
 
 class GCN(nn.Module):
@@ -184,7 +181,7 @@ class GCN(nn.Module):
     .. note::
 
         If you use this code, please cite the original paper in addition to Kaolin.
-        
+
         .. code-block::
 
             @article{kipf2016semi,
@@ -200,7 +197,7 @@ class GCN(nn.Module):
         self.out_features = out_features
         self.weight = Parameter(torch.Tensor(in_features, out_features))
         self.bias = Parameter(torch.Tensor(out_features))
-      
+
         self.reset_parameters()
 
     def reset_parameters(self):
