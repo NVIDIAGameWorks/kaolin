@@ -23,7 +23,7 @@ from tqdm import tqdm
 from utils import preprocess, pooling, get_pooling_index
 from utils import setup_meshes, split
 from utils import loss_surf, loss_edge, loss_lap, loss_norm
-from architectures import VGG as Encoder, G_Res_Net
+from kaolin.models.Pixel2Mesh import VGG as Encoder, G_Res_Net
 
 import kaolin as kal
 

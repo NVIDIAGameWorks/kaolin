@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader
 
 from utils import preprocess, pooling, get_pooling_index
 from utils import setup_meshes, split
-from architectures import VGG as Encoder, G_Res_Net
+from kaolin.models.Pixel2Mesh import VGG as Encoder, G_Res_Net
 import kaolin as kal
 
 parser = argparse.ArgumentParser()
