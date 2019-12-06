@@ -135,7 +135,7 @@ if __name__ == '__main__':
         include_dirs=[np.get_include()]
     )
 
-    ext_modules = [
+    cuda = [
         CUDAExtension('kaolin.cuda.load_textures', [
             'kaolin/cuda/load_textures_cuda.cpp',
             'kaolin/cuda/load_textures_cuda_kernel.cu',
@@ -167,13 +167,14 @@ if __name__ == '__main__':
         CUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
             'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
             'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
-        ]),
+        ])]
+    cython = [
         triangle_hash_module,
         mise_module,
         mcubes_module,
         nnsearch_module,
     ]
-
+    ext_modules = cython
     setup(
         # Metadata
         name=package_name,

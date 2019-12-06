@@ -48,6 +48,15 @@ extensions = [
 
 napoleon_use_ivar = True
 
+autodoc_mock_imports = ['kaolin.cuda.ball_query',
+                        'kaolin.cuda.load_textures',
+                        'kaolin.cuda.sided_distance',
+                        'kaolin.cuda.furthest_point_sampling',
+                        'kaolin.cuda.three_nn',
+                        'kaolin.cuda.tri_distance',
+                        'kaolin.cuda.mesh_intersection',
+                        'kaolin.graphics.nmr.cuda.rasterize_cuda']
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
