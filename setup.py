@@ -94,7 +94,7 @@ if __name__ == '__main__':
     )
 
     import torch
-    from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
+    from torch.utils.cpp_extension import BuildExtension, CUDAExtension
     import Cython
     from Cython.Build import cythonize
     import numpy as np
