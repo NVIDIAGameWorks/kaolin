@@ -56,7 +56,7 @@ requirements = [
     'shapely',
     'trimesh>=3.0',
     'scipy',
-    'sphinx',
+    'sphinx==2.2.0',    # pinned to resolve issue with docutils 0.16b0.dev
     # 'sphinx_rtd_theme',
     'pytest>=4.6',
     'pytest-cov>=2.7',
