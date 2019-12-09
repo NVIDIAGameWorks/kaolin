@@ -15,8 +15,7 @@ import sys
 
 
 # Get version number
-version_path = os.path.join('../', 'kaolin', 'version.py')
-with open(version_path, 'r') as f:
+with open('../kaolin/version.py', 'r') as f:
     for row in f:
         if '__version__' in row:
             kal_version = row.split("'")[-2]
