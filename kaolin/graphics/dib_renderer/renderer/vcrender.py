@@ -21,13 +21,11 @@
 from __future__ import print_function
 from __future__ import division
 
+from ..rasterizer import linear_rasterizer
+from ..utils import datanormalize
+from .vertex_shaders.perpsective import perspective_projection
 import torch
 import torch.nn as nn
-
-
-from .vertex_shaders.perpsective import perspective_projection
-from kaolin.graphics.dib_renderer.rasterizer import linear_rasterizer
-from kaolin.graphics.dib_renderer.utils import datanormalize
 
 
 ##################################################################

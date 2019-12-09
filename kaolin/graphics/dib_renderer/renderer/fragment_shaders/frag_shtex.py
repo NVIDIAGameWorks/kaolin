@@ -27,7 +27,6 @@ import torch.nn
 from .interpolation import texinterpolation
 
 
-# 33
 def fragmentshader(imnormal1_bxhxwx3,
                    lightparam_bx9,
                    imtexcoord_bxhxwx2,

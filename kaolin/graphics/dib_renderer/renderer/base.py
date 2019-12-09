@@ -21,17 +21,15 @@
 from __future__ import print_function
 from __future__ import division
 
-import torch
-import numpy as np
-import torch.nn as nn
-from kaolin.graphics.dib_renderer.utils import perspectiveprojectionnp
-
-from kaolin.mathutils.geometry.transformations import compute_camera_params
-
-from .vcrender import VCRender
-from .texrender import TexRender as Lambertian
-from .shrender import SHRender
+from ....mathutils.geometry.transformations import compute_camera_params
+from ..utils import perspectiveprojectionnp
 from .phongrender import PhongRender
+from .shrender import SHRender
+from .texrender import TexRender as Lambertian
+from .vcrender import VCRender
+import numpy as np
+import torch
+import torch.nn as nn
 
 
 renderers = {'VertexColor': VCRender, 'Lambertian': Lambertian, 'SphericalHarmonics': SHRender, 'Phong': PhongRender}

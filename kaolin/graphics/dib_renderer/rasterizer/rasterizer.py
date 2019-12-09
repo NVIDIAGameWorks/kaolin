@@ -26,7 +26,7 @@ import torch.nn
 import torch.autograd
 from torch.autograd import Function
 
-import kaolin.graphics.dib_renderer.cuda.rasterizer as cuda_rasterizer
+from ..cuda import rasterizer as cuda_rasterizer
 
 import cv2
 import numpy as np

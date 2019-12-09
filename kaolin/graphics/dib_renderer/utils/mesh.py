@@ -466,7 +466,6 @@ def saveobjscale(meshfile, scale, maxratio, shift=None):
     return
 
 
-# 3
 if __name__ == '__main__':
 
     meshjson = '1.obj'

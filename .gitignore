@@ -191,3 +191,6 @@ public/
 
 # vscode
 **/.vscode/**
+
+# Results directory for examples
+examples/renderers/DIB-R/results/
