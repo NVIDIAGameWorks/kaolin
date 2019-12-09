@@ -12,6 +12,15 @@
 
 import os
 import sys
+
+
+# Get version number
+with open('../kaolin/version.py', 'r') as f:
+    for row in f:
+        if '__version__' in row:
+            kal_version = row.split("'")[-2]
+            break
+
 sys.path.append('../')
 sys.path.append(os.path.abspath(os.path.join(
     os.path.dirname(__file__), '..', 'kaolin')))
@@ -25,10 +34,10 @@ master_doc = 'index'
 
 project = 'kaolin'
 copyright = '2019, NVIDIA Development Inc.'
-author = 'Krishna Murthy, Edward Smith, Wenzheng Chen, Amlan Kar, Jun Gao, Huan Ling, Clement Fuji Tsang, Ankur Handa, Sanja Fidler'
-
+author = 'NVIDIA'
+version = kal_version
 # The full version, including alpha/beta/rc tags
-release = '0.1.0 alpha'
+release = kal_version
 
 
 # -- General configuration ---------------------------------------------------
@@ -47,6 +56,16 @@ extensions = [
 ]
 
 napoleon_use_ivar = True
+
+# Mock CUDA Imports
+autodoc_mock_imports = ['kaolin.cuda.ball_query',
+                        'kaolin.cuda.load_textures',
+                        'kaolin.cuda.sided_distance',
+                        'kaolin.cuda.furthest_point_sampling',
+                        'kaolin.cuda.three_nn',
+                        'kaolin.cuda.tri_distance',
+                        'kaolin.cuda.mesh_intersection',
+                        'kaolin.graphics.nmr.cuda.rasterize_cuda']
 
 
 # Add any paths that contain templates here, relative to this directory.
