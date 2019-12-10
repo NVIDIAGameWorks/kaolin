@@ -6,7 +6,7 @@ This example lets you train the 3D-IWGAN method. See: https://arxiv.org/abs/1707
 
 To train run
 ```
-python train.py
+python train.py --modelnet-root path/to/modelnet --cache-dir cache/
 ```
 
 

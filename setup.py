@@ -83,41 +83,45 @@ def get_extensions():
             ],
         ),
     ]
-
-    cuda_extensions = [
-        CUDAExtension('kaolin.cuda.load_textures', [
-            'kaolin/cuda/load_textures_cuda.cpp',
-            'kaolin/cuda/load_textures_cuda_kernel.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.sided_distance', [
-            'kaolin/cuda/sided_distance.cpp',
-            'kaolin/cuda/sided_distance_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.furthest_point_sampling', [
-            'kaolin/cuda/furthest_point_sampling.cpp',
-            'kaolin/cuda/furthest_point_sampling_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.ball_query', [
-            'kaolin/cuda/ball_query.cpp',
-            'kaolin/cuda/ball_query_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.three_nn', [
-            'kaolin/cuda/three_nn.cpp',
-            'kaolin/cuda/three_nn_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.tri_distance', [
-            'kaolin/cuda/triangle_distance.cpp',
-            'kaolin/cuda/triangle_distance_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.cuda.mesh_intersection', [
-            'kaolin/cuda/mesh_intersection.cpp',
-            'kaolin/cuda/mesh_intersection_cuda.cu',
-        ]),
-        CUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
-            'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
-            'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
-        ]),
-    ]
+    
+    # If building with readthedocs, don't compile CUDA extensions
+    if os.getenv('READTHEDOCS') != 'True':
+        cuda_extensions = [
+            CUDAExtension('kaolin.cuda.load_textures', [
+                'kaolin/cuda/load_textures_cuda.cpp',
+                'kaolin/cuda/load_textures_cuda_kernel.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.sided_distance', [
+                'kaolin/cuda/sided_distance.cpp',
+                'kaolin/cuda/sided_distance_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.furthest_point_sampling', [
+                'kaolin/cuda/furthest_point_sampling.cpp',
+                'kaolin/cuda/furthest_point_sampling_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.ball_query', [
+                'kaolin/cuda/ball_query.cpp',
+                'kaolin/cuda/ball_query_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.three_nn', [
+                'kaolin/cuda/three_nn.cpp',
+                'kaolin/cuda/three_nn_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.tri_distance', [
+                'kaolin/cuda/triangle_distance.cpp',
+                'kaolin/cuda/triangle_distance_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.cuda.mesh_intersection', [
+                'kaolin/cuda/mesh_intersection.cpp',
+                'kaolin/cuda/mesh_intersection_cuda.cu',
+            ]),
+            CUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
+                'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
+                'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
+            ])]
+    else:
+        cuda_extensions = []
+      
 
     if use_cython:
         from Cython.Build import cythonize
@@ -139,7 +143,7 @@ def get_requirements():
         'shapely',
         'trimesh>=3.0',
         'scipy',
-        'sphinx',
+        'sphinx==2.2.0',    # pinned to resolve issue with docutils 0.16b0.dev
         'pytest>=4.6',
         'pytest-cov>=2.7',
         'tqdm',

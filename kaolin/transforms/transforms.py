@@ -664,13 +664,11 @@ class TriangleMeshToVoxelGrid(object):
     three dimensions (X, Y, Z axes).
 
     Args:
-        resolution (int): Desired dresolution of generated voxel grid.
-        normalization (str, optional): Desired normalization strategy
-            (choices: 'ShapeNet', 'unit') (default: 'ShapeNet'). Note that, in
-            'ShapeNet' normalization, the mesh is normalized such that it fits
-            within a unit cube centered at (0.5, 0.5, 0.5), whereas in 'unit'
-            normalization, the mesh is normalized such that it fits within a
+        resolution (int): Desired resolution of generated voxel grid.
+        normalize (bool): Determines whether to normalize vertices to a
             unit cube centered at the origin.
+        vertex_offset (float): Offset applied to all vertices after
+                               normalizing.
 
     """
 
