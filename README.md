@@ -53,31 +53,42 @@ Kaolin curates a large _model zoo_ containing reference implementations of popul
 
 > **NOTE**: The API is currently somewhat unstable, as we're making constant changes. (It's a beta release)
 
-### Supported Platforms
-Kaolin is officially supported on Linux platforms and has been built and tested on Ubuntu 18. Windows and Mac support should be considered experimental.
+### Requirements
+- Linux
+- Python >= 3.6
+- CUDA-enabled machine (i.e. with `nvcc` installed)
 
-### Install Kaolin
+Windows support is in the works and is currently considered experimental.
 
-We highly recommend installing Kaolin inside of a virtual environment (such as ones created using `conda` or `virtualenv`). Kaolin expects Python 3.6+, and currently needs a CUDA-enabled machine (i.e., with `nvcc` installed) for the build.
+### Dependencies
+- numpy >= 1.17
+- PyTorch >= 1.0 and Torchvision (see [pytorch.org](http://pytorch.org) for installation instructions)
 
-First create a virtual environment. In this example, we show how to create a `conda` virtual environment for installing kaolin.
+### Installation
+
+We highly recommend installing Kaolin inside of a virtual environment (such as ones created using `conda` or `virtualenv`). In this example, we show how to create a `conda` virtual environment for installing kaolin.
 ```sh
 $ conda create --name kaolin python=3.6
 $ conda activate kaolin
 ```
 
-Now, install the dependencies (`numpy` and `torch`). Note that the setup file does not automatically install these dependencies.
-```sh
-conda install numpy
-```
+#### Dependencies
+Install PyTorch and Torchvision by following instructions from https://pytorch.org/. Numpy will be installed as part of the Pytorch installation. Note that the setup file does not automatically install these dependencies.
 
-Install PyTorch, by following instructions from https://pytorch.org/
-
+#### Install Kaolin
 Now, you can install the library. From the root directory of this repo (i.e., the directory containing this `README` file), run
 
+##### For General Use
 ```sh
+$ python setup.py build_ext --inplace   # optional, allows importing kaolin from the kaolin root directory
 $ python setup.py install
 ```
+
+##### For Development (modifying kaolin code)
+```sh
+$ python setup.py develop
+```
+Note, if modifying or adding Cython files, ensure that Cython is installed and set the following environment variable `USE_CYTHON=1`.
 
 During installation, the *packman* package manager will 
 download the nv-usd package to `~/packman-repo/` containing the necessary packages for reading and writing Universal Scene Description (USD) files. 
