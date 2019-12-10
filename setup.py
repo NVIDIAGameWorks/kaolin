@@ -32,6 +32,7 @@ version = {}
 with open("kaolin/version.py") as fp:
     exec(fp.read(), version)
 
+
 def build_deps():
     print('Building nv-usd...')
     os.system('./buildusd.sh')
@@ -83,7 +84,7 @@ def get_extensions():
             ],
         ),
     ]
-    
+
     # If building with readthedocs, don't compile CUDA extensions
     if os.getenv('READTHEDOCS') != 'True':
         cuda_extensions = [
@@ -118,10 +119,15 @@ def get_extensions():
             CUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
                 'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
                 'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
-            ])]
+            ]),
+            CUDAExtension('kaolin.graphics.dib_renderer.cuda.rasterizer', [
+                'kaolin/graphics/dib_renderer/cuda/rasterizer.cpp',
+                'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda.cu',
+                'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda_back.cu',
+            ]),
+        ]
     else:
         cuda_extensions = []
-      
 
     if use_cython:
         from Cython.Build import cythonize
@@ -135,6 +141,7 @@ def get_extensions():
 
 
 cwd = os.path.dirname(os.path.abspath(__file__))
+
 
 def get_requirements():
     return [
