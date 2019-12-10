@@ -1,0 +1,22 @@
+pages:
+  image: "pytorch/pytorch:1.2-cuda10.0-cudnn7-devel"
+
+  tags: 
+    - kaolin
+
+  stage: deploy
+
+  artifacts:
+    paths:
+      - public
+      
+  only:
+    - master
+
+  before_script:
+    - pip install --upgrade pip>=18.0.0
+
+  script:
+    - source setenv.sh
+    - python setup.py develop
+    - pytest --cov=kaolin/ tests/
