@@ -1,21 +1,15 @@
-pages:
-  image: "pytorch/pytorch:1.2-cuda10.0-cudnn7-devel"
+image: "pytorch/pytorch:1.2-cuda10.0-cudnn7-devel"
 
+before_script:
+  - pip install --upgrade pip>=18.0.0
+
+stages:
+  - test
+
+test:
   tags: 
     - kaolin
-
-  stage: deploy
-
-  artifacts:
-    paths:
-      - public
-      
-  only:
-    - master
-
-  before_script:
-    - pip install --upgrade pip>=18.0.0
-
+  stage: test
   script:
     - source setenv.sh
     - python setup.py develop
