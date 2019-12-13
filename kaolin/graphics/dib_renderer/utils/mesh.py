@@ -19,7 +19,6 @@
 # DEALINGS IN THE SOFTWARE.
 
 import os
-import cv2
 import torch
 import numpy as np
 
@@ -356,17 +355,17 @@ def save_textured_mesh(directory,
                        vertex_pos_px3,
                        face_fx3,
                        tex_coord_px2,
-                       texture_hxwxc,
                        normalize_tex_coord=False,
                        flip_vertical=False,
                        texture_bias=0.01):
     """
     Save a textured mesh.
+    Assumes the texture is *already* saved into <directory> as <file_name>.png.
 
     Args:
         directory (str): The path to the folder containing the mesh to be saved.
         file_name (str): The name of the mesh to be saved (without extension).
-            <file_name>.obj, <file_name>.mtl, and <file_name>.png will be saved.
+            <file_name>.obj and <file_name>.mtl will be saved.
 
         vertex_pos_px3 (numpy.ndarray): An array of shape (num_points, 3).
             Denotes the vertex position.
@@ -382,9 +381,6 @@ def save_textured_mesh(directory,
             NOTE: if this array is of the same format as specified for
             torch.nn.functional.grid_sample(), set both normalize_tex_coord
             and flip_vertical to True.
-
-        texture_hxwxc (numpy.ndarray): An array of shape (height, width, channels).
-            The texture to be saved. Each channel should be in the range [0, 1].
 
         normalize_tex_coord (bool): Whether to normalize texture coordinates,
             from [-1, 1] to [0, 1].
@@ -403,7 +399,6 @@ def save_textured_mesh(directory,
 
     obj_path = os.path.join(directory, file_name + '.obj')
     mtl_path = os.path.join(directory, file_name + '.mtl')
-    texture_path = os.path.join(directory, file_name + '.png')
 
     with open(obj_path, 'w') as obj_file:
         obj_file.write('mtllib ./{}.mtl\n'.format(file_name))
@@ -432,9 +427,6 @@ Ka 0.200000 0.200000 0.200000
 Kd 1.000000 1.000000 1.000000
 Ks 1.000000 1.000000 1.000000
 map_Kd {}.png'''.format(file_name))
-
-    cv2.imwrite(texture_path, cv2.cvtColor(
-        (texture_hxwxc * 255).astype(np.float32), cv2.COLOR_RGB2BGR))
 
     return
 
@@ -467,6 +459,7 @@ def saveobjscale(meshfile, scale, maxratio, shift=None):
 
 
 if __name__ == '__main__':
+    import cv2
 
     meshjson = '1.obj'
 

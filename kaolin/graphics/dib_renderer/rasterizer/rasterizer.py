@@ -28,7 +28,6 @@ from torch.autograd import Function
 
 from ..cuda import rasterizer as cuda_rasterizer
 
-import cv2
 import numpy as np
 import datetime
 
@@ -152,25 +151,6 @@ class LinearRasterizer(Function):
 
         end = datetime.datetime.now()
         ###################################################
-
-        if debug:
-            print(end - start)
-            ims_bxhxwxd = tfims_bxhxwxd.detach().cpu().numpy()
-            improbs_bxhxwx1 = tfimprob_bxhxwx1.detach().cpu().numpy()
-            imidxs_bxhxwx1 = tfimidxs_bxhxwx1.detach().cpu().numpy()
-            imdeps_bxhxwx1 = tfimdeps_bxhxwx1.detach().cpu().numpy()
-            imweis_bxhxwx3 = tfimweis_bxhxwx3.detach().cpu().numpy()
-
-            print(ims_bxhxwxd.shape)
-            print(improbs_bxhxwx1.shape)
-            print(np.max(improbs_bxhxwx1))
-
-            cv2.imshow("0", ims_bxhxwxd[-1, :, :, :3])
-            cv2.imshow("1", improbs_bxhxwx1[-1])
-            cv2.imshow("2", imweis_bxhxwx3[-1])
-            cv2.imshow("3", imidxs_bxhxwx1[-1] / num_faces)
-            cv2.imshow("4", imdeps_bxhxwx1[-1])
-            cv2.waitKey()
 
         debug_im = torch.zeros(batch_size, height, width, 3,
                                dtype=torch.float32, device=device)
