@@ -40,9 +40,11 @@
 import torch
 
 import kaolin as kal
-from .DifferentiableRenderer import DifferentiableRenderer
-from .Lighting import compute_ambient_light
-from .Lighting import compute_directional_light
+from DifferentiableRenderer import DifferentiableRenderer
+from Lighting import compute_ambient_light
+from Lighting import compute_directional_light
+from softras.rasterizer import SoftRasterizer
+from softras.soft_rasterize import soft_rasterize
 
 
 class SoftRenderer(DifferentiableRenderer):
@@ -51,6 +53,20 @@ class SoftRenderer(DifferentiableRenderer):
         Soft Rasterizer: A differentiable renderer for image-based 3D reasoning
         Shichen Liu, Tianye Li, Weikai Chen, and Hao Li
         Link: https://arxiv.org/abs/1904.01786
+
+    .. note::
+
+        If you use this code, please cite the original paper in addition to Kaolin.
+        
+        .. code-block::
+
+            @article{liu2019softras,
+              title={Soft Rasterizer: A Differentiable Renderer for Image-based 3D Reasoning},
+              author={Liu, Shichen and Li, Tianye and Chen, Weikai and Li, Hao},
+              journal={The IEEE International Conference on Computer Vision (ICCV)},
+              month = {Oct},
+              year={2019}
+            }
 
     """
 
@@ -74,7 +90,7 @@ class SoftRenderer(DifferentiableRenderer):
             viewing_scale: float = 1.0, 
             eye: torch.Tensor = None,
             camera_direction: torch.Tensor = torch.FloatTensor([0, 0, 1]),
-            near: float = 0.1, far: float = 100,
+            near: float = 1, far: float = 100,
             light_mode: str = 'surface',
             light_intensity_ambient: float = 0.5,
             light_intensity_directional: float = 0.5,
@@ -180,7 +196,7 @@ class SoftRenderer(DifferentiableRenderer):
             # TODO: Add comments here
             self.viewing_angle = viewing_angle
             # TODO: use kal.deg2rad instead
-            self.eye = torch.FloatTensor([0, 0, -(1. / torch.tan(kal.math.pi
+            self.eye = torch.FloatTensor([0, 0, -(1. / torch.tan(kal.mathutils.pi
                                                                  * self.viewing_angle / 180) + 1)]).to(self.device)
             # Direction in which the camera's optical axis is facing
             self.camera_direction = torch.FloatTensor([0, 0, 1]).to(
@@ -189,6 +205,14 @@ class SoftRenderer(DifferentiableRenderer):
         # Near and far clipping planes.
         self.near = near
         self.far = far
+
+        self.sigma_val = sigma_val
+        self.dist_func = dist_func
+        self.dist_eps = dist_eps
+        self.gamma_val = gamma_val
+        self.aggr_func_rgb = aggr_func_rgb
+        self.aggr_func_alpha = aggr_func_alpha
+        self.texture_type = texture_type
 
         # Ambient and directional lighting parameters.
         self.light_intensity_ambient = light_intensity_ambient
@@ -200,29 +224,25 @@ class SoftRenderer(DifferentiableRenderer):
         # TODO: Add comments here.
         self.rasterizer_eps = 1e-3
 
+        # Initialize rasterizer here.
+        self.soft_rasterizer = SoftRasterizer(self.image_size, self.bg_color,
+                                              self.near, self.far,
+                                              self.anti_aliasing,
+                                              self.fill_back,
+                                              self.rasterizer_eps,
+                                              self.sigma_val,
+                                              self.dist_func,
+                                              self.dist_eps,
+                                              self.gamma_val,
+                                              self.aggr_func_rgb,
+                                              self.aggr_func_alpha,
+                                              self.texture_type)
+
     def forward(self, vertices, faces, textures=None, mode=None,
                 K=None, rmat=None, tvec=None):
 
         return self.render(vertices, faces, textures, mode, K, rmat, tvec)
 
-        if mode is None:
-            # If nothing is specified, render rgb, depth, and alpha channels
-            return self.render(vertices, faces, textures, K, rmat, tvec,
-                               dist_coeffs, orig_size)
-        elif mode is 'rgb':
-            # Render RGB channels only
-            return self.render_rgb(vertices, faces, textures, K, rmat, tvec,
-                                   dist_coeffs, orig_size)
-        elif mode is 'silhouette':
-            # Render only a silhouette, without RGB colors
-            return self.render_silhouette(vertices, faces, textures, K, rmat,
-                                          tvec, dist_coeffs, orig_size)
-        elif mode is 'depth':
-            # Render depth image
-            return self.render_depth(vertices, faces, textures, K, rmat, tvec,
-                                     dist_coeffs, orig_size)
-        else:
-            raise ValueError('Mode {0} not implemented.'.format(mode))
 
     def render(self, vertices, faces, textures=None, mode=None, K=None,
                rmat=None, tvec=None):
@@ -264,8 +284,7 @@ class SoftRenderer(DifferentiableRenderer):
         if self.fill_back:
             faces = torch.cat((faces, faces[:, :, list(reversed(range(
                 faces.shape[-1])))]), dim=1)
-            textures = torch.cat(
-                (textures, textures.permute(0, 1, 4, 3, 2, 5)), dim=1)
+            textures = torch.cat((textures, textures), dim=1)
 
         # Lighting (not needed when we are rendering only depth/silhouette
         # images)
@@ -273,10 +292,10 @@ class SoftRenderer(DifferentiableRenderer):
             textures = self.lighting(vertices, faces, textures)
 
         # Transform vertices to the camera frame
-        vertices = transform_to_camera_frame(vertices)
+        vertices = self.transform_to_camera_frame(vertices)
 
         # Project the vertices from the camera coordinate frame to the image.
-        vertices = project_to_image(vertices)
+        vertices = self.project_to_image(vertices)
 
         # Rasterization
         out = self.rasterize(vertices, faces, textures)
@@ -285,19 +304,11 @@ class SoftRenderer(DifferentiableRenderer):
 
     def lighting(self, vertices, faces, textures):
         r"""Applies ambient and directional lighting to the mesh. """
-        faces_lighting = vertices_to_faces(vertices, faces)
-        # textures = lighting(
-        #     faces_lighting,
-        #     textures,
-        #     self.light_intensity_ambient,
-        #     self.light_intensity_directional,
-        #     self.light_color_ambient,
-        #     self.light_color_directional,
-        #     self.light_direction)
-        ambient_lighting = kal.graphics.compute_ambient_lighting(
+        faces_lighting = self.vertices_to_faces(vertices, faces)
+        ambient_lighting = compute_ambient_light(
             faces_lighting, textures, self.light_intensity_ambient,
             self.light_color_ambient)
-        directional_lighting = kal.graphics.compute_directional_lighting(
+        directional_lighting = compute_directional_light(
             faces_lighting, textures, self.light_intensity_directional,
             self.light_color_directional)
         return ambient_lighting * textures + directional_lighting * textures
@@ -341,6 +352,8 @@ class SoftRenderer(DifferentiableRenderer):
                 tvec = self.tvec
             # vertices = perspective_projection(vertices, K, rmat, tvec)
 
+        return vertices
+
     def project_to_image(self, vertices):
         r"""Projects the mesh vertices from the camera coordinate frame down
         to the image.
@@ -362,15 +375,17 @@ class SoftRenderer(DifferentiableRenderer):
         # rmat, tvec combinations, based on the mode, but use a consistent
         # projection function across all modes. Helps avoid redundancy.
         if self.camera_mode == 'look_at':
-            vertices = self.perspective_distort(vertices,
+            vertices = self.perspective_distortion(vertices,
                                                 angle=self.viewing_angle)
 
         elif self.camera_mode == 'look':
-            vertices = self.perspective_distort(vertices,
+            vertices = self.perspective_distortion(vertices,
                                                 angle=self.viewing_angle)
 
         elif self.camera_mode == 'projection':
             vertices = perspective_projection(vertices, K, rmat, tvec)
+
+        return vertices
 
     def rasterize(self, vertices, faces, textures):
         r"""Performs rasterization, i.e., conversion of triangles to pixels.
@@ -387,37 +402,20 @@ class SoftRenderer(DifferentiableRenderer):
 
         """
 
-        faces = self.vertices_to_faces(vertices, faces)
+        face_vertices = self.vertices_to_faces(vertices, faces)
+        face_textures = self.vertices_to_faces(textures, faces)
+        images = soft_rasterize(face_vertices, face_textures, self.image_size,
+                                self.bg_color, self.near, self.far,
+                                self.fill_back, self.eps, self.sigma_val,
+                                self.dist_func, self.dist_eps, self.gamma_val,
+                                self.aggr_func_rgb, self.aggr_func_alpha,
+                                self.texture_type)
+        if self.anti_aliasing:
+            images = torch.nn.functional.avg_pool2d(images, kernel_size=2,
+                                                    stride=2)
+        return images
 
-        # If mode is unspecified, render rgb, depth, and alpha channels
-        if mode is None:
-            out = kal.graphics.nmr.rasterize_rgbad(faces, textures,
-                                                   self.image_size, self.anti_aliasing, self.near, self.far,
-                                                   self.rasterizer_eps, self.bg_color)
-            return out['rgb'], out['depth'], out['alpha']
-
-        # Render RGB channels only
-        elif mode == 'rgb':
-            images = kal.graphics.nmr.rasterize(faces, textures,
-                                                self.image_size, self.anti_aliasing, self.near, self.far,
-                                                self.rasterizer_eps, self.background_color)
-            return images
-
-        # Render depth image
-        elif mode == 'depth':
-            images = kal.graphics.nmr.rasterize_silhouettes(faces,
-                                                            self.image_size, self.anti_aliasing)
-
-        # Render only a silhouette, without RGB colors
-        elif mode == 'silhouette':
-            depth = kal.graphics.nmr.rasterize_depth(faces,
-                                                     self.image_size, self.anti_aliasing)
-            return depth
-
-        else:
-            raise ValueError('Mode {0} not implemented.'.format(mode))
-
-    def look_at(vertices, eye, at=torch.FloatTensor([0, 0, 0]),
+    def look_at(self, vertices, eye, at=torch.FloatTensor([0, 0, 0]),
                 up=torch.FloatTensor([0, 1, 0])):
         r"""Camera "looks at" an object whose center is at the tensor represented
         by "at". And "up" is the upwards direction.
@@ -495,11 +493,11 @@ class SoftRenderer(DifferentiableRenderer):
 
         return vertices
 
-    def perspective_distort(self, vertices, angle=30.):
+    def perspective_distortion(self, vertices, angle=30.):
         r"""Compute perspective distortion from a given viewing angle.
         """
         device = vertices.device
-        angle = torch.FloatTensor([angle * 180 / kal.math.pi]).to(device)
+        angle = torch.FloatTensor([angle * 180 / kal.mathutils.pi]).to(device)
         width = torch.tan(angle)
         width = width[:, None]
         z = vertices[:, :, 2]
@@ -522,3 +520,4 @@ class SoftRenderer(DifferentiableRenderer):
         faces = faces + (torch.arange(B).to(device) * V)[:, None, None]
         vertices = vertices.reshape(B * V, 3)
         return vertices[faces]
+        
