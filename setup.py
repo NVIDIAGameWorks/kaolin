@@ -37,7 +37,7 @@ logging.basicConfig(format='%(levelname)s - %(message)s')
 # Check that PyTorch version installed meets minimum requirements
 if torch.__version__ < '1.2.0':
     logger.warning(f'Kaolin is tested with PyTorch >= 1.2.0. Found version {torch.__version__} instead.')
-    # warnings.warn(f'Kaolin is tested with PyTorch >= 1.2.0. Found version {torch.__version__} instead.')
+
 
 # Get version number from version.py
 version = {}
