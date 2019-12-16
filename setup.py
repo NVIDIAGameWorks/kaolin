@@ -1,7 +1,10 @@
 import os
 import io
-from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CppExtension
+import logging
 from setuptools import setup, find_packages
+
+import torch
+from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CppExtension
 import numpy as np
 
 
@@ -25,6 +28,15 @@ metrics for seamless evaluation and provides visualization functionality to rend
 a comprehensive model zoo comprising many state-of-the-art 3D deep learning architectures, to serve as a starting point
 for future research endeavours.
 """
+
+
+logger = logging.getLogger()
+logging.basicConfig(format='%(levelname)s - %(message)s')
+
+
+# Check that PyTorch version installed meets minimum requirements
+if torch.__version__ < '1.2.0':
+    logger.warning(f'Kaolin is tested with PyTorch >= 1.2.0. Found version {torch.__version__} instead.')
 
 
 # Get version number from version.py

@@ -56,13 +56,14 @@ Kaolin curates a large _model zoo_ containing reference implementations of popul
 ### Requirements
 - Linux
 - Python >= 3.6
-- CUDA-enabled machine (i.e. with `nvcc` installed)
+- CUDA >= 10.0.130 (with `nvcc` installed)
+- Display Driver >= 410.48
 
 Windows support is in the works and is currently considered experimental.
 
 ### Dependencies
 - numpy >= 1.17
-- PyTorch >= 1.0 and Torchvision (see [pytorch.org](http://pytorch.org) for installation instructions)
+- PyTorch >= 1.2 and Torchvision (see [pytorch.org](http://pytorch.org) for installation instructions)
 
 ### Installation
 
