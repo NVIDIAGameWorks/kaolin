@@ -27,7 +27,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Function
 import numpy as np
-import soft_renderer.cuda.soft_rasterize as soft_rasterize_cuda
+
+from .cuda import rasterize_cuda
 
 
 class SoftRasterizeFunction(Function):
