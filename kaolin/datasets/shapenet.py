@@ -538,6 +538,9 @@ class ShapeNet_Points(data.Dataset):
                  surface=True, resolution=100, normals=True, no_progress: bool = False):
         self.root = Path(root)
         self.cache_dir = Path(cache_dir) / 'points'
+        self.num_points = num_points
+
+        cached_num_points = max(num_points, 100000)
 
         dataset_params = {
             'root': root,
@@ -547,7 +550,7 @@ class ShapeNet_Points(data.Dataset):
             'no_progress': no_progress,
         }
         self.params = {
-            'num_points': num_points,
+            'cached_num_points': cached_num_points,
             'smoothing_iterations': smoothing_iterations,
             'surface': surface,
             'resolution': resolution,
@@ -568,7 +571,7 @@ class ShapeNet_Points(data.Dataset):
         self.labels = dataset.labels
 
         def convert(mesh):
-            points, face_choices = mesh_cvt.trianglemesh_to_pointcloud(mesh, num_points)
+            points, face_choices = mesh_cvt.trianglemesh_to_pointcloud(mesh, cached_num_points)
             face_normals = mesh.compute_face_normals()
             point_normals = face_normals[face_choices]
             return {'points': points, 'normals': point_normals}
@@ -592,12 +595,13 @@ class ShapeNet_Points(data.Dataset):
 
     def __getitem__(self, index):
         """Returns the item at index idx. """
-        data = dict()
         attributes = dict()
         name = self.names[index]
         synset_idx = self.synset_idxs[index]
 
         data = self.cache_convert(name)
+        data['points'] = data['points'][:self.num_points]
+        data['normals'] = data['normals'][:self.num_points]
         attributes['name'] = name
         attributes['synset'] = self.synsets[synset_idx]
         attributes['label'] = self.labels[synset_idx]
