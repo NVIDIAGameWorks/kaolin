@@ -23,7 +23,7 @@ from __future__ import division
 
 from ..rasterizer import linear_rasterizer
 from ..utils import datanormalize
-from .fragment_shaders.frag_shtex import fragmentshader
+from .fragment_shaders.frag_phongtex import fragmentshader
 from .vertex_shaders.perpsective import perspective_projection
 import torch
 import torch.nn as nn
