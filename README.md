@@ -200,7 +200,7 @@ If you find this library useful, consider citing the following paper:
 
 ## Contributors for borrowed sources
 
-Here is a list of all authors on relevant research papers that Kaolin borrows code from. Without the efforts of these folks (and their willingness to release their implementations under permissable copyleft licenses), Kaolin would not have been possible.
+Here is a list of all authors on relevant research papers that Kaolin borrows code from. Without the efforts of these folks (and their willingness to release their implementations under permissive open-source licenses), Kaolin would not have been possible.
 
 * Kornia: Edgar Riba, Dmytro Mishkin, Daniel Ponsa, Ethan Rublee and Gary Bradski. [[Paper](https://arxiv.org/pdf/1910.02190.pdf)] [[Code](https://github.com/kornia/kornia)]
 * Occupancy Networks: Lars Mescheder, Michael Oechsle, Michael Niemeyer, Sebastian Nowozin, Andreas Geiger. [[Paper](https://avg.is.tuebingen.mpg.de/publications/occupancy-networks)] [[Code](https://github.com/autonomousvision/occupancy_networks)]
