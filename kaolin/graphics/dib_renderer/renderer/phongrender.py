@@ -86,7 +86,6 @@ class PhongRender(nn.Module):
         bnum = normal1_bxfx3.shape[0]
 
         # we have uv, normal, eye to interpolate
-        # uv_bxpx2, texture_bx3xthxtw = colors
         c0 = uv_bxpx2[:, faces_fx3[:, 0], :]
         c1 = uv_bxpx2[:, faces_fx3[:, 1], :]
         c2 = uv_bxpx2[:, faces_fx3[:, 2], :]
