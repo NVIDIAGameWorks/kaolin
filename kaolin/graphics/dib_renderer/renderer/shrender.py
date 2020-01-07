@@ -45,7 +45,8 @@ class SHRender(nn.Module):
         self.smooth = True
         self.pfmtx = pfmtx
 
-    def forward(self, points, cameras, colors, lightparam):
+    def forward(self, points, cameras, uv_bxpx2, texture_bx3xthxtw, lightparam):
+        assert lightparam is not None, 'When using the Spherical Harmonics model, light parameters must be passed'
 
         ##############################################################
         # first, MVP projection in vertexshader
@@ -82,10 +83,9 @@ class SHRender(nn.Module):
         fnum = normal1_bxfx3.shape[1]
         bnum = normal1_bxfx3.shape[0]
 
-        uv_bxpx2, ft_fx3, texture_bx3xthxtw = colors
-        c0 = uv_bxpx2[:, ft_fx3[:, 0], :]
-        c1 = uv_bxpx2[:, ft_fx3[:, 1], :]
-        c2 = uv_bxpx2[:, ft_fx3[:, 2], :]
+        c0 = uv_bxpx2[:, faces_fx3[:, 0], :]
+        c1 = uv_bxpx2[:, faces_fx3[:, 1], :]
+        c2 = uv_bxpx2[:, faces_fx3[:, 2], :]
         mask = torch.ones_like(c0[:, :, :1])
         uv_bxfx3x3 = torch.cat((c0, mask, c1, mask, c2, mask), dim=2).view(bnum, fnum, 3, -1)
 

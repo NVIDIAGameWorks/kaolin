@@ -37,7 +37,7 @@ class VCRender(nn.Module):
         self.height = height
         self.width = width
 
-    def forward(self, points, cameras, colors):
+    def forward(self, points, cameras, colors_bxpx3):
 
         ##############################################################
         # first, MVP projection in vertexshader
@@ -60,7 +60,6 @@ class VCRender(nn.Module):
 
         ############################################################
         # second, rasterization
-        colors_bxpx3 = colors[0]
         c0 = colors_bxpx3[:, faces_fx3[:, 0], :]
         c1 = colors_bxpx3[:, faces_fx3[:, 1], :]
         c2 = colors_bxpx3[:, faces_fx3[:, 2], :]

@@ -51,27 +51,15 @@ class Renderer(nn.Module):
             self.camera_fov_y = 49.13434207744484 * np.pi / 180.0
         self.camera_params = None
 
-    def forward(self, points, colors, light=None, material=None, shininess=None):
+    def forward(self, points, *args, **kwargs):
 
         if self.camera_params is None:
-            print('Camera parameters have not been set, default pespective parameters\
-			 of distance = 1, elevation = 30, azimuth = 0 are being used')
+            print('Camera parameters have not been set, default perspective parameters of distance = 1, elevation = 30, azimuth = 0 are being used')
             self.set_look_at_parameters([0], [30], [1])
 
-        assert self.camera_params[0].shape[0] == points[0].shape[0], "Set camera parameters batch size must equal\
-			batch size of passed points"
+        assert self.camera_params[0].shape[0] == points[0].shape[0], "Set camera parameters batch size must equal batch size of passed points"
 
-        if self.mode in ['Lambertian', 'VertexColor']:
-            return self.renderer(points=points, cameras=self.camera_params, colors=colors)
-        elif self.mode == 'SphericalHarmonics':
-            assert light is not None, 'When using the Spherical Harmonics model, light parameters must be passed'
-            return self.renderer(points=points, cameras=self.camera_params, colors=colors, lightparam=light)
-        elif self.mode == 'Phong':
-            assert light is not None, 'When using the Phong model, light parameters must be passed'
-            assert material is not None, 'When using the Phong model, material parameters must be passed'
-            assert shininess is not None, 'When using the Phong model, shininess parameters must be passed'
-            return self.renderer(points=points, cameras=self.camera_params, colors=colors,
-                                 lightdirect_bx3=light, material_bx3x3=material, shininess_bx1=shininess)
+        return self.renderer(points, self.camera_params, *args, **kwargs)
 
     def set_look_at_parameters(self, azimuth, elevation, distance):
 
