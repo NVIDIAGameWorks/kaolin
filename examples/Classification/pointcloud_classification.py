@@ -1,29 +1,46 @@
+import argparse
+
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
-from tqdm import tqdm, trange
 
 import kaolin as kal
+from kaolin import ClassificationEngine
+from kaolin.datasets import ModelNet
+from kaolin.models.PointNet import PointNetClassifier
+import kaolin.transforms as tfs
+from utils import visualize_batch
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--modelnet-root', type=str, help='Root directory of the ModelNet dataset.')
+parser.add_argument('--categories', type=str, nargs='+', default=['chair', 'sofa'], help='list of object classes to use.')
+parser.add_argument('--num-points', type=int, default=1024, help='Number of points to sample from meshes.')
+parser.add_argument('--epochs', type=int, default=10, help='Number of train epochs.')
+parser.add_argument('-lr', '--learning-rate', type=float, default=1e-3, help='Learning rate.')
+parser.add_argument('--batch-size', type=int, default=12, help='Batch size.')
+parser.add_argument('--device', type=str, default='cuda', help='Device to use.')
+
+args = parser.parse_args()
 
 
-epochs = 10
-lr = 1e-3
-device = 'cuda:0'
-normpc = kal.transforms.NormalizePointCloud()
-data = kal.datasets.ModelNet10('/path/to/ModelNet10',
-                               categories=['bed', 'bathtub'],
-                               split='train', rep='pointcloud',
-                               transform=normpc, device=device)
-loader = DataLoader(data, batch_size=12, shuffle=True)
-val_data = kal.datasets.ModelNet10('/path/to/ModelNet10',
-                               categories=['bed', 'bathtub'],
-                               split='test', rep='pointcloud',
-                               transform=normpc, device=device)
-val_loader = DataLoader(val_data, batch_size=10, shuffle=False)
-model = kal.models.PointNet.PointNetClassifier(num_classes=2).to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+transform = tfs.Compose([
+    tfs.TriangleMeshToPointCloud(num_samples=args.num_points),
+    tfs.NormalizePointCloud()
+])
+
+train_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories,
+                                   split='train', transform=transform, device=args.device),
+                          batch_size=args.batch_size, shuffle=True)
+
+val_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories,
+                                 split='test',transform=transform, device=args.device),
+                        batch_size=args.batch_size)
+
+model = PointNetClassifier(num_classes=len(args.categories)).to(args.device)
+optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 criterion = torch.nn.CrossEntropyLoss()
 
-for e in range(epochs):
+for e in range(args.epochs):
 
     print('###################')
     print('Epoch:', e)
@@ -36,7 +53,7 @@ for e in range(epochs):
     model.train()
 
     optimizer.zero_grad()
-    for idx, batch in enumerate(tqdm(loader)):
+    for idx, batch in enumerate(tqdm(train_loader)):
         pred = model(batch[0])
         loss = criterion(pred, batch[1].view(-1))
         train_loss += loss.item()
@@ -72,3 +89,13 @@ for e in range(epochs):
 
     print('Val loss:', val_loss / num_batches)
     print('Val accuracy:', val_accuracy / num_batches)
+
+test_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories,
+                                 split='test',transform=transform, device=args.device),
+                        shuffle=True, batch_size=15)
+
+test_batch, labels = next(iter(test_loader))
+preds = model(test_batch)
+pred_labels = torch.max(preds, axis=1)[1]
+
+visualize_batch(test_batch, pred_labels, labels, args.categories)
