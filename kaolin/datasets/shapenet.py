@@ -186,7 +186,7 @@ class ShapeNet_Meshes(data.Dataset):
 
         data['vertices'] = mesh.vertices
         data['faces'] = mesh.faces
-        attributes['name'] = self.names[index]
+        attributes['name'] = str(self.names[index])
         attributes['path'] = obj_location
         attributes['synset'] = self.synsets[synset_idx]
         attributes['label'] = self.labels[synset_idx]
@@ -296,7 +296,7 @@ class ShapeNet_Images(data.Dataset):
         data['params']['azi'] = azimuth
         data['params']['elevation'] = elevation
         data['params']['distance'] = distance
-        attributes['name'] = img_name
+        attributes['name'] = str(img_name)
         attributes['synset'] = self.synsets[self.synset_idx[index]]
         attributes['label'] = self.labels[self.synset_idx[index]]
         return {'data': data, 'attributes': attributes}
@@ -380,7 +380,7 @@ class ShapeNet_Voxels(data.Dataset):
 
         for res in self.params['resolutions']:
             data[str(res)] = self.cache_transforms[res](name)
-        attributes['name'] = name
+        attributes['name'] = str(name)
         attributes['synset'] = self.synsets[synset_idx]
         attributes['label'] = self.labels[synset_idx]
         return {'data': data, 'attributes': attributes}
@@ -491,7 +491,7 @@ class ShapeNet_Surface_Meshes(data.Dataset):
         data = self.cache_convert(name)
         mesh = TriangleMesh.from_tensors(data['vertices'], data['faces'])
         data['adj'] = mesh.compute_adjacency_matrix_sparse().coalesce()
-        attributes['name'] = name
+        attributes['name'] = str(name)
         attributes['synset'] = self.synsets[synset_idx]
         attributes['label'] = self.labels[synset_idx]
         return {'data': data, 'attributes': attributes}
@@ -598,7 +598,7 @@ class ShapeNet_Points(data.Dataset):
         synset_idx = self.synset_idxs[index]
 
         data = self.cache_convert(name)
-        attributes['name'] = name
+        attributes['name'] = str(name)
         attributes['synset'] = self.synsets[synset_idx]
         attributes['label'] = self.labels[synset_idx]
         return {'data': data, 'attributes': attributes}
@@ -724,7 +724,7 @@ class ShapeNet_SDF_Points(data.Dataset):
             data['sdf_distances'] = distances[selection]
             data['sdf_points'] = points[selection]
 
-        attributes['name'] = self.names[index]
+        attributes['name'] = str(self.names[index])
         attributes['synset'] = self.synsets[synset_idx]
         attributes['label'] = self.labels[synset_idx]
         return {'data': data, 'attributes': attributes}
@@ -967,7 +967,7 @@ class ShapeNet_Tags(data.Dataset):
         data['tag_full_len'] = torch.tensor(len(full_tag[:(last_tag_id + 1)]))
         data['tag_label_len'] = torch.tensor(len(full_tag))
 
-        attributes['name'] = name
+        attributes['name'] = str(name)
         attributes['synset'] = self.synsets[synset_idx]
         attributes['label'] = self.labels[synset_idx]
         return {'data': data, 'attributes': attributes}
