@@ -2,6 +2,7 @@ image: "pytorch/pytorch:1.2-cuda10.0-cudnn7-devel"
 
 before_script:
   - pip install --upgrade pip>=18.0.0
+  - pip install -r requirements.txt
 
 stages:
   - test
@@ -11,6 +12,7 @@ test:
     - kaolin
   stage: test
   script:
+    - flake8 --config=.flake8 .
     - source setenv.sh
     - python setup.py develop
     - pytest --cov=kaolin/ tests/

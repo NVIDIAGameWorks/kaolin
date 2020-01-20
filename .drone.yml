@@ -6,6 +6,8 @@ steps:
 - name: test
   image: pytorch/pytorch:1.2-cuda10.0-cudnn7-devel
   commands:
+  - pip install -r requirements.txt
+  - flake8 --config=.flake8 .
   - python setup.py develop
   - . ./setenv.sh
   - pytest --cov=kaolin/ tests/
