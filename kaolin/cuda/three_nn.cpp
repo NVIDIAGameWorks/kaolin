@@ -88,10 +88,10 @@ at::Tensor three_interpolate_grad(at::Tensor grad_out, at::Tensor idx,
       torch::zeros({grad_out.size(0), grad_out.size(1), m},
                    at::device(grad_out.device()).dtype(at::ScalarType::Float));
 
-  three_interpolate_kernel_launcher(grad_out.size(0), grad_out.size(1),
-                                    grad_out.size(2), m, grad_out.data<float>(),
-                                    idx.data<int>(), weight.data<float>(),
-                                    output.data<float>());
+  three_interpolate_grad_kernel_launcher(grad_out.size(0), grad_out.size(1),
+                                         grad_out.size(2), m, grad_out.data<float>(),
+                                         idx.data<int>(), weight.data<float>(),
+                                         output.data<float>());
 
   return output;
 }
