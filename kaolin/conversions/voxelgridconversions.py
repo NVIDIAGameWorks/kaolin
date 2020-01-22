@@ -336,11 +336,12 @@ def threshold(voxel: Union[torch.Tensor, VoxelGrid], thresh: float,
     """
     if isinstance(voxel, VoxelGrid):
         voxel = voxel.voxels
-    if not inplace:
         voxel = voxel.clone()
     helpers._assert_tensor(voxel)
-    voxel[voxel <= thresh] = 0
-    voxel[voxel > thresh] = 1
+    if not inplace:
+        voxel[:] = voxel > tresh
+    else:
+        voxel = (voxel > thresh).type(voxel.dtype)
     return voxel
 
 
