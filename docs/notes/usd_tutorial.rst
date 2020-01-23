@@ -15,7 +15,7 @@ Creating a Mesh Dataset from a USD Scene
 ----------------------------------------
 
 Kaolin supports importing meshes from a provided scene file. 
-Let's use Pixar's `KitchenSet <http://graphics.pixar.com/usd/downloads.html>`_ for our example.
+Let's use Pixar's `Kitchen_set <http://graphics.pixar.com/usd/downloads.html>`_ for our example.
 
 .. image:: ../_static/img/kitchenset.png
 
@@ -34,17 +34,20 @@ be addressed in future releases!). Now, we can create our dataset:
     >>> from kaolin.datasets.usdfile import USDMeshes
     >>> usd_meshes = USDMeshes(usd_filepath='./data/Kitchen_set/Kitchen_set.usd')
     >>> len(usd_meshes)
-    740
+    1169
 
-And just like that, we have a dataset of 740 diverse objects for our use!
+And just like that, we have a dataset of 1169 diverse objects for our use!
 Let's see what they look like.
 
+    >>> import math
     >>> from kaolin.visualize.vis_usd import VisUsd
+    >>> from kaolin.rep import TriangleMesh
     >>> vis = VisUsd()
     >>> vis.set_stage()
     >>> spacing = 200
     >>> for i, sample in enumerate(usd_meshes):
     >>>     attr, data = sample['attributes'], sample['data']
+    >>>     mesh = TriangleMesh.from_tensors(vertices=data['vertices'], faces=data['faces'])
     >>>     max_x = int(math.sqrt(len(usd_meshes)))
     >>>     x = (i % max_x) * spacing
     >>>     y = (i // max_x) * spacing
@@ -67,4 +70,3 @@ Some Notes
 ----------
 
 - Currently, \*.usd and \*.usda file extensions are supported. 
-- When importing meshes, any mesh that has a varying number of vertices per face cannot be imported.
