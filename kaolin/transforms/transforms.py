@@ -16,6 +16,7 @@ from typing import Iterable, List, Optional, Type, Union, Callable
 from pathlib import Path
 import hashlib
 
+import scipy
 import numpy as np
 import torch
 
@@ -107,6 +108,12 @@ class CacheCompose(object):
         if isinstance(x, Mesh):
             np.savez(fpath, vertices=x.vertices.data.cpu().numpy(),
                      faces=x.faces.data.cpu().numpy())
+        elif isinstance(x, VoxelGrid):
+            # Save voxel grid as sparse matrix for quick loading
+            res = x.voxels.size(0)
+            sparse_voxel = scipy.sparse.csc_matrix(x.voxels.reshape(res, -1).cpu().numpy())
+            # np.savez_compressed(fpath, sparse=sparse_voxel)
+            scipy.sparse.save_npz(fpath, sparse_voxel)
         else:
             np.savez(fpath, x.data.cpu().numpy())
 
@@ -119,6 +126,12 @@ class CacheCompose(object):
                 data = QuadMesh.from_tensors(verts, faces)
             else:
                 data = TriangleMesh.from_tensors(verts, faces)
+        elif 'format' in data:
+            matrix_format = data['format'].item()
+            sparse = scipy.sparse.csc_matrix((data['data'], data['indices'], data['indptr']), data['shape'])
+            data = torch.from_numpy(sparse.todense())
+            res = data.size(0)
+            data = data.reshape(res, res, res)
         else:
             data = torch.from_numpy(data['arr_0'])
 
@@ -467,7 +480,7 @@ class ExtractProjectOdmsFromVoxelGrid(object):
             (torch.Tensor): Voxel grid.
         """
         odms = cvt.extract_odms(voxel)
-        return cvt.project_odms(odms)
+        return VoxelGrid(cvt.project_odms(odms))
 
     def __repr__(self):
         return self.__class__.__name__
