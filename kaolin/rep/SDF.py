@@ -82,7 +82,7 @@ def check_sign_fast(mesh, points):
     v2 = torch.index_select(mesh.vertices, 0, mesh.faces[:, 1]).view(1, -1, 3)
     v3 = torch.index_select(mesh.vertices, 0, mesh.faces[:, 2]).view(1, -1, 3)
     contains = intersector(points.view(1, -1, 3), v1, v2, v3)
-    contains = contains > 0
+    contains = contains % 2 == 1
     return contains
 
 
