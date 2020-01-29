@@ -15,10 +15,7 @@
 from typing import Union
 
 import torch
-import os
-import torch.nn.functional as F
 import numpy as np
-import trimesh
 
 from kaolin.rep.PointCloud import PointCloud
 from kaolin.metrics.point import directed_distance
@@ -28,7 +25,7 @@ from kaolin.conversions.voxelgridconversions import voxelgrid_to_sdf
 
 
 def pointcloud_to_voxelgrid(pts: Union[torch.Tensor, PointCloud, np.ndarray],
-                        voxres: int, voxsize: float):
+                            voxres: int, voxsize: float):
     r"""Converts a pointcloud into a voxel grid.
 
     Args:
@@ -47,15 +44,14 @@ def pointcloud_to_voxelgrid(pts: Union[torch.Tensor, PointCloud, np.ndarray],
     helpers._assert_tensor(pts)
 
     # Create a voxel grid.
-    voxels= np.zeros((voxres, voxres, voxres), dtype=np.float32)
+    voxels = np.zeros((voxres, voxres, voxres), dtype=np.float32)
     # Enumerate the coordinates of each grid cell
-    gridpts = np.where(voxels==0)
-    gridpts = np.asarray([gridpts[0], gridpts[1], gridpts[2]]).T.astype(
-        np.float32)
+    gridpts = np.where(voxels == 0)
+    gridpts = np.asarray([gridpts[0], gridpts[1], gridpts[2]]).T.astype(np.float32)
     gridpts = torch.from_numpy(gridpts)
     # Scale grid coordinates appropriately. We currently have coordinated
     # denoting the corners of a voxel; modify so that we represent the center.
-    gridpts = voxsize * (gridpts - (voxres-1)/2)
+    gridpts = voxsize * (gridpts - (voxres - 1) / 2)
     # Get the distance of the closest point in the pointcloud to each grid
     # point.
     dists = directed_distance(gridpts.cuda().view(-1, 3).contiguous(),

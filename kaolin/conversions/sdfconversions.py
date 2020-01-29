@@ -36,10 +36,7 @@
 # SOFTWARE.
 
 import torch
-import os
-import torch.nn.functional as F
 import numpy as np
-import trimesh
 
 from kaolin.mise import MISE
 import kaolin
@@ -147,6 +144,6 @@ def sdf_to_pointcloud(sdf: kaolin.rep.SDF, bbox_center: float = 0.,
 
     """
     verts, faces = sdf_to_trianglemesh(sdf, bbox_center, bbox_dim,
-                                        resolution, upsampling_steps)
+                                       resolution, upsampling_steps)
     mesh = kal.rep.TriangleMesh.from_tensors(verts, faces)
     return mesh.sample(num_points)[0]
