@@ -94,6 +94,13 @@ Note, if modifying or adding Cython files, ensure that Cython is installed and s
 During installation, the *packman* package manager will 
 download the nv-usd package to `~/packman-repo/` containing the necessary packages for reading and writing Universal Scene Description (USD) files. 
 
+Note, if you are using an heterogeneous GPUs setup set the architectures for which you want to compile the cuda code using the environment variable.
+
+Example:
+```sh
+$ export TORCH_CUDA_ARCH_LIST="7.0 7.5"
+```
+
 ### Verify installation
 
 To verify that `kaolin` has been installed, fire up your python interpreter, and execute the following commands.
