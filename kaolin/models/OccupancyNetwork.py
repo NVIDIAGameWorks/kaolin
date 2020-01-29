@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,25 +33,21 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import math
 
 import torch 
 from torch import nn 
-from torch.nn.parameter import Parameter
 import torch.nn.functional as F
 from torchvision import models
 import torch.distributions as dist
 
-import torch
-from torch.nn import Parameter
 
 class Resnet18(nn.Module):
-    r''' ResNet-18 encoder network for image input.
+    r""" ResNet-18 encoder network for image input.
     Args:
         c_dim (int): output dimension of the latent embedding
         normalize (bool): whether the input images should be normalized
         use_linear (bool): whether a final linear layer should be used
-    '''
+    """
 
     def __init__(self, c_dim, normalize=True, use_linear=True):
         super().__init__()
@@ -74,10 +70,10 @@ class Resnet18(nn.Module):
         return out
 
 def normalize_imagenet(x):
-    ''' Normalize input images according to ImageNet standards.
+    """ Normalize input images according to ImageNet standards.
     Args:
         x (tensor): input images
-    '''
+    """
     x = x.clone()
     x[:, 0] = (x[:, 0] - 0.485) / 0.229
     x[:, 1] = (x[:, 1] - 0.456) / 0.224
@@ -86,7 +82,7 @@ def normalize_imagenet(x):
 
 
 class DecoderCBatchNorm(nn.Module):
-    ''' Decoder with conditional batch normalization (CBN) class.
+    """ Decoder with conditional batch normalization (CBN) class.
     Args:
         dim (int): input dimension
         z_dim (int): dimension of latent code z
@@ -94,7 +90,7 @@ class DecoderCBatchNorm(nn.Module):
         hidden_size (int): hidden size of Decoder network
         leaky (bool): whether to use leaky ReLUs
         legacy (bool): whether to use the legacy structure
-    '''
+    """
 
     def __init__(self, dim=3, z_dim=128, c_dim=128,
                  hidden_size=256, leaky=False, legacy=False):
@@ -144,27 +140,26 @@ class DecoderCBatchNorm(nn.Module):
 
 
 def get_prior_z(device):
-    ''' Returns prior distribution for latent code z.
+    """ Returns prior distribution for latent code z.
     Args:
-        cfg (dict): imported yaml config
         device (device): pytorch device
-    '''
+    """
     z_dim = 0
     p0_z = dist.Normal(
-        torch.zeros(z_dim, device = device),
-        torch.ones(z_dim, device = device)
+        torch.zeros(z_dim, device=device),
+        torch.ones(z_dim, device=device)
     )
 
     return p0_z
 
 
 class CBatchNorm1d(nn.Module):
-    ''' Conditional batch normalization layer class.
+    """ Conditional batch normalization layer class.
     Args:
         c_dim (int): dimension of latent conditioned code c
         f_dim (int): feature dimension
         norm_method (str): normalization method
-    '''
+    """
 
     def __init__(self, c_dim, f_dim, norm_method='batch_norm'):
         super().__init__()
@@ -210,7 +205,7 @@ class CBatchNorm1d(nn.Module):
 
 
 class CResnetBlockConv1d(nn.Module):
-    ''' Conditional batch normalization-based Resnet block class.
+    """ Conditional batch normalization-based Resnet block class.
     Args:
         c_dim (int): dimension of latend conditioned code c
         size_in (int): input dimension
@@ -218,7 +213,7 @@ class CResnetBlockConv1d(nn.Module):
         size_h (int): hidden dimension
         norm_method (str): normalization method
         legacy (bool): whether to use legacy blocks 
-    '''
+    """
 
     def __init__(self, c_dim, size_in, size_h=None, size_out=None,
                  norm_method='batch_norm', legacy=False):
@@ -268,7 +263,7 @@ class CResnetBlockConv1d(nn.Module):
 
 
 class OccupancyNetwork(nn.Module):
-    ''' Occupancy Network class.
+    """ Occupancy Network class.
     Args:
         decoder (nn.Module): decoder network
         encoder (nn.Module): encoder network
@@ -287,24 +282,24 @@ class OccupancyNetwork(nn.Module):
                 booktitle = {Proceedings IEEE Conf. on Computer Vision and Pattern Recognition (CVPR)},
                 year = {2019}
             }
-    '''
+    """
 
     def __init__(self, device):
         super().__init__()
         self.device = device
         self.decoder = DecoderCBatchNorm(dim=3, z_dim=0, c_dim=256,
-            hidden_size=256).to(self.device)
+                                         hidden_size=256).to(self.device)
         self.encoder = Resnet18(256, normalize=True, use_linear=True).to(self.device)
 
         self.p0_z = get_prior_z(self.device)
 
     def forward(self, p, inputs, sample=True, **kwargs):
-        ''' Performs a forward pass through the network.
+        """ Performs a forward pass through the network.
         Args:
             p (tensor): sampled points
             inputs (tensor): conditioning input
             sample (bool): whether to sample for z
-        '''
+        """
         batch_size = p.size(0)
         c = self.encode_inputs(inputs)
         z = self.get_z_from_prior((batch_size,), sample=sample)
@@ -312,12 +307,12 @@ class OccupancyNetwork(nn.Module):
         return p_r
 
     def compute_elbo(self, p, occ, inputs, **kwargs):
-        ''' Computes the expectation lower bound.
+        """ Computes the expectation lower bound.
         Args:
             p (tensor): sampled points
             occ (tensor): occupancy values for p
             inputs (tensor): conditioning input
-        '''
+        """
         c = self.encode_inputs(inputs)
         q_z = self.infer_z(p, occ, c, **kwargs)
         z = q_z.rsample()
@@ -330,35 +325,33 @@ class OccupancyNetwork(nn.Module):
         return elbo, rec_error, kl
 
     def encode_inputs(self, inputs):
-        ''' Encodes the input.
+        """ Encodes the input.
         Args:
             input (tensor): the input
-        '''
+        """
         c = self.encoder(inputs)
-       
 
         return c
 
     def decode(self, p, z, c, **kwargs):
-        ''' Returns occupancy probabilities for the sampled points.
+        """ Returns occupancy probabilities for the sampled points.
         Args:
             p (tensor): points
             z (tensor): latent code z
             c (tensor): latent conditioned code c
-        '''
+        """
 
         logits = self.decoder(p, z, c, **kwargs)
         p_r = dist.Bernoulli(logits=logits)
         return p_r
 
     def infer_z(self, p, occ, c, **kwargs):
-        ''' Infers z.
+        """ Infers z.
         Args:
             p (tensor): points tensor
             occ (tensor): occupancy values for occ
             c (tensor): latent conditioned code c
-        '''
-        
+        """
         batch_size = p.size(0)
         mean_z = torch.empty(batch_size, 0).to(self.device)
         logstd_z = torch.empty(batch_size, 0).to(self.device)
@@ -368,11 +361,11 @@ class OccupancyNetwork(nn.Module):
         return q_z
 
     def get_z_from_prior(self, size=torch.Size([]), sample=True):
-        ''' Returns z from prior distribution.
+        """ Returns z from prior distribution.
         Args:
             size (Size): size of z
             sample (bool): whether to sample
-        '''
+        """
         if sample:
             z = self.p0_z.sample(size).to(self.device)
         else:
@@ -380,4 +373,3 @@ class OccupancyNetwork(nn.Module):
             z = z.expand(*size, *z.size())
 
         return z
-        
