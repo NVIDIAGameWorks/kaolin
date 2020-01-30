@@ -1,14 +1,11 @@
 import argparse
 
-import torch
 from torch.utils.data import DataLoader
 
-import kaolin as kal
 import kaolin.transforms as tfs
 from kaolin import ClassificationEngine
 from kaolin.datasets import ModelNet
 from kaolin.models.PointNet import PointNetClassifier
-from kaolin.transforms import NormalizePointCloud
 
 
 parser = argparse.ArgumentParser()
@@ -34,7 +31,7 @@ train_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categorie
                           batch_size=args.batch_size, shuffle=True)
 
 val_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories,
-                                 split='test',transform=transform, device=args.device),
+                                 split='test', transform=transform, device=args.device),
                         batch_size=args.batch_size)
 
 model = PointNetClassifier(num_classes=len(args.categories))

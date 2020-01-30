@@ -4,8 +4,6 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 
-import kaolin as kal
-from kaolin import ClassificationEngine
 from kaolin.datasets import ModelNet
 from kaolin.models.PointNet import PointNetClassifier
 import kaolin.transforms as tfs
@@ -33,7 +31,7 @@ train_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categorie
                           batch_size=args.batch_size, shuffle=True)
 
 val_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories,
-                                 split='test',transform=transform, device=args.device),
+                                 split='test', transform=transform, device=args.device),
                         batch_size=args.batch_size)
 
 model = PointNetClassifier(num_classes=len(args.categories)).to(args.device)
@@ -62,8 +60,7 @@ for e in range(args.epochs):
 
         # Compute accuracy
         pred_label = torch.argmax(pred, dim=1)
-        train_accuracy += torch.mean((pred_label == batch[1].view(-1)).float(
-            )).detach().cpu().item()
+        train_accuracy += torch.mean((pred_label == batch[1].view(-1)).float()).detach().cpu().item()
         num_batches += 1
 
     print('Train loss:', train_loss / num_batches)
@@ -83,16 +80,15 @@ for e in range(args.epochs):
 
             # Compute accuracy
             pred_label = torch.argmax(pred, dim=1)
-            val_accuracy += torch.mean((pred_label == batch[1].view(-1)).float(
-                )).cpu().item()
+            val_accuracy += torch.mean((pred_label == batch[1].view(-1)).float()).cpu().item()
             num_batches += 1
 
     print('Val loss:', val_loss / num_batches)
     print('Val accuracy:', val_accuracy / num_batches)
 
 test_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories,
-                                 split='test',transform=transform, device=args.device),
-                        shuffle=True, batch_size=15)
+                                  split='test', transform=transform, device=args.device),
+                         shuffle=True, batch_size=15)
 
 test_batch, labels = next(iter(test_loader))
 preds = model(test_batch)
