@@ -158,17 +158,16 @@ class Mesh():
                     if '//' in data[1]:
                         data = [da.split('//') for da in data]
                         faces.append([int(d[0]) for d in data[1:]])
-                    elif '/' in data[1]:
-                        data = [da.split('/') for da in data]
-                        faces.append([int(d[0]) for d in data[1:]])
+                        face_textures.append([0 for d in data[1:]]) # vt was not specified in this format
                     else:
-                        faces.append([int(d) for d in data[1:]])
-
-                    try:
-                        face_textures.append([int(d[1]) for d in data[1:]])
-                    except BaseException:
-                        continue
-
+                        if '/' in data[1]:
+                            data = [da.split('/') for da in data]
+                            faces.append([int(d[0]) for d in data[1:]])
+                            face_textures.append([int(d[1]) for d in data[1:]]) # this format has a vt
+                        else:
+                            faces.append([int(d) for d in data[1:]])
+                            face_textures.append([0 for d in data[1:]]) # vt was not specified in this format
+                            
         vertices = torch.FloatTensor(np.array(vertices, dtype=np.float32))
         faces = torch.LongTensor(np.array(faces, dtype=np.int64) - 1)
 
