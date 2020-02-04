@@ -135,42 +135,34 @@ class Mesh():
             torch.Size([960, 3])
 
         """
-
         # run through obj file and extract obj info
         vertices = []
         faces = []
         face_textures = []
         uvs = []
         with open(filename, 'r') as mesh:
-            for line in mesh.readlines():
-                data = line.strip().split(' ')
-
-                data = [da for da in data if len(da) > 0]
+            for line in mesh:
+                data = line.split()
                 if len(data) == 0:
                     continue
                 if data[0] == 'v':
-                    vertices.append([float(d) for d in data[1:]])
-
-                if data[0] == 'vt':
-                    uvs.append([float(d) for d in data[1:3]])
-
-                if data[0] == 'f':
+                    vertices.append(data[1:])
+                elif data[0] == 'vt':
+                    uvs.append(data[1:])
+                elif data[0] == 'f':
                     if '//' in data[1]:
                         data = [da.split('//') for da in data]
                         faces.append([int(d[0]) for d in data[1:]])
+                        face_textures.append([int(d[1]) for d in data[1:]])
                     elif '/' in data[1]:
                         data = [da.split('/') for da in data]
                         faces.append([int(d[0]) for d in data[1:]])
+                        face_textures.append([int(d[1]) for d in data[1:]])
                     else:
                         faces.append([int(d) for d in data[1:]])
-
-                    try:
-                        face_textures.append([int(d[1]) for d in data[1:]])
-                    except BaseException:
                         continue
-
-        vertices = torch.FloatTensor(np.array(vertices, dtype=np.float32))
-        faces = torch.LongTensor(np.array(faces, dtype=np.int64) - 1)
+        vertices = torch.FloatTensor([float(el) for sublist in vertices for el in sublist]).view(-1, 3)
+        faces = torch.LongTensor(faces) - 1
 
         # compute texture info
         textures = None
@@ -187,12 +179,11 @@ class Mesh():
                 f.close()
 
         if len(uvs) > 0:
-            uvs = torch.FloatTensor(np.array(uvs, dtype=np.float32))
+            uvs = torch.FloatTensor([float(el) for sublist in uvs for el in sublist]).view(-1, 2)
         else:
             uvs = None
         if len(face_textures) > 0:
-            face_textures = torch.LongTensor(
-                np.array(face_textures, dtype=np.int64)) - 1
+            face_textures = torch.LongTensor(face_textures) - 1
         else:
             face_textures = None
 
@@ -206,9 +197,10 @@ class Mesh():
                 None, None, None, None, None, None, None, None, None, None, \
                 None
 
-        return self(vertices, faces, uvs, face_textures, textures, edges,
+        output = self(vertices, faces, uvs, face_textures, textures, edges,
                     edge2key, vv, vv_count, vf, vf_count, ve, ve_count, ff, ff_count,
                     ef, ef_count, ee, ee_count)
+        return output
 
     @classmethod
     def from_off(self, filename: str,

@@ -38,7 +38,6 @@
 from typing import Optional, Union, List
 
 import torch
-import os
 import torch.nn.functional as F
 import numpy as np
 import kaolin as kal
@@ -90,10 +89,10 @@ def downsample(voxel: Union[torch.Tensor, VoxelGrid], scale: List[int],
     for i in range(3):
         if scale[i] < 1:
             raise ValueError('Downsample ratio must be at least 1 along every'
-                ' dimension.')
+                             ' dimension.')
         if scale[i] >= voxel.shape[i]:
             raise ValueError('Downsample ratio must be less than voxel shape'
-                ' along every dimension.')
+                             ' along every dimension.')
         scale_filter.append(scale[i])
         scale_factor *= scale[i]
     conv_filter = torch.ones(scale_filter).to(voxel.device) / scale_factor
@@ -337,11 +336,11 @@ def threshold(voxel: Union[torch.Tensor, VoxelGrid], thresh: float,
     """
     if isinstance(voxel, VoxelGrid):
         voxel = voxel.voxels
-    if not inplace:
-        voxel = voxel.clone()
     helpers._assert_tensor(voxel)
-    voxel[voxel <= thresh] = 0
-    voxel[voxel > thresh] = 1
+    if inplace:
+        voxel[:] = voxel > thresh
+    else:
+        voxel = (voxel > thresh).type(voxel.dtype)
     return voxel
 
 

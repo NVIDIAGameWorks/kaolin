@@ -13,8 +13,6 @@
 # limitations under the License.
 
 import torch
-import os
-import torch.nn.functional as F
 import numpy as np
 import kaolin
 
