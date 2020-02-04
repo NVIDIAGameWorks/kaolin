@@ -414,11 +414,18 @@ class SoftRenderer(DifferentiableRenderer):
         """
 
         face_vertices = self.vertices_to_faces(vertices, faces)
+<<<<<<< HEAD
         # face_textures = self.vertices_to_faces(textures, faces)
         face_textures = textures
         images = soft_rasterize(face_vertices, face_textures, self.image_size,
                                 self.bg_color, self.near, self.far,
                                 self.fill_back, self.dist_eps, self.sigma_val,
+=======
+        face_textures = self.vertices_to_faces(textures, faces)
+        images = soft_rasterize(face_vertices, face_textures, self.image_size,
+                                self.bg_color, self.near, self.far,
+                                self.fill_back, self.eps, self.sigma_val,
+>>>>>>> 05ea0a0f9e97f482c0cc4d6da1f24d8889ddb3d4
                                 self.dist_func, self.dist_eps, self.gamma_val,
                                 self.aggr_func_rgb, self.aggr_func_alpha,
                                 self.texture_type)
@@ -532,3 +539,4 @@ class SoftRenderer(DifferentiableRenderer):
         faces = faces + (torch.arange(B).to(device) * V)[:, None, None]
         vertices = vertices.reshape(B * V, 3)
         return vertices[faces]
+        

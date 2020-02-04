@@ -28,7 +28,11 @@ import torch.nn.functional as F
 from torch.autograd import Function
 import numpy as np
 
+<<<<<<< HEAD:kaolin/graphics/softras/soft_rasterize.py
 from .cuda import soft_rasterize_cuda
+=======
+from .cuda import rasterize_cuda
+>>>>>>> 05ea0a0f9e97f482c0cc4d6da1f24d8889ddb3d4:kaolin/graphics/softras/soft_rasterize.py
 
 
 class SoftRasterizeFunction(Function):
