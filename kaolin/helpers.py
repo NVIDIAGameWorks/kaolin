@@ -177,9 +177,9 @@ def _get_hash(x):
 
 
 class Cache(object):
-    """Caches the results of the called function to disk.
+    """Caches the results of a function to disk.
     If already cached, data is returned from disk, otherwise,
-    the function called is executed.
+    the function is executed. Output tensors are always on CPU device.
 
         Args:
             transforms (Iterable): List of transforms to compose.
@@ -187,40 +187,37 @@ class Cache(object):
                              to 'cache'.
     """
 
-    def __init__(self, func: Callable, cache_dir: str = 'cache', cache_key: str = ''):
+    def __init__(self, func: Callable, cache_dir: [str, Path], cache_key: str):
         self.func = func
-        self.cache_dir = Path(cache_dir) / cache_key
+        self.cache_dir = Path(cache_dir) / str(cache_key)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cached_ids = [p.stem for p in self.cache_dir.glob('*')]
 
-    def __call__(self, object_id: str, **kwargs):
+    def __call__(self, unique_id: str, **kwargs):
         """Execute self.func if not cached, otherwise, read data from disk.
 
             Args:
-                object_id (str): The object id with which to name the cache file.
+                unique_id (str): The unique id with which to name the cached file.
                 **kwargs: The arguments to be passed to self.func.
 
             Returns:
                 dict of {str: torch.Tensor}: Dictionary of tensors.
         """
 
-        fpath = self.cache_dir / '{0}.npz'.format(object_id)
+        fpath = self.cache_dir / f'{unique_id}.p'
 
         if not fpath.exists():
             output = self.func(**kwargs)
             self._write(output, fpath)
-            self.cached_ids.append(object_id)
+            self.cached_ids.append(unique_id)
         else:
             output = self._read(fpath)
 
-        return output
+        # Read file to move tensors to CPU.
+        return self._read(fpath)
 
     def _write(self, x, fpath):
-        """Write dictionary of numpy arrays to disk.
-        """
-        np_out = {k: t.data.cpu().numpy() for k, t in x.items()}
-        np.savez(fpath, **np_out)
+        torch.save(x, fpath)
 
     def _read(self, fpath):
-        np_in = np.load(fpath)
-        return {k: torch.from_numpy(arr) for k, arr in np_in.items()}
+        return torch.load(fpath, map_location='cpu')

@@ -79,7 +79,7 @@ def test_Images(categories):
         assert len(images) == 30644
     for obj in images:
         assert list(obj['data']['images'].shape) == [4, 137, 137]
-        assert os.path.isfile(obj['attributes']['name'] / 'rendering/00.png')
+        assert (Path(obj['attributes']['name']) / 'rendering/00.png').is_file()
         assert list(obj['data']['params']['cam_mat'].shape) == [3, 3]
         assert list(obj['data']['params']['cam_pos'].shape) == [3]
 
@@ -91,7 +91,7 @@ def test_Surface_Meshes():
                                                       mode='Tri')
     assert len(surface_meshes) == 10
     assert surface_meshes.cache_dir.exists()
-    assert len(list(surface_meshes.cache_dir.rglob('*.npz'))) == 10
+    assert len(list(surface_meshes.cache_dir.rglob('*.p'))) == 10
     for smesh in surface_meshes:
         assert smesh['data']['vertices'].shape[0] > 0
         assert smesh['data']['faces'].shape[1] == 3
@@ -104,7 +104,7 @@ def test_Surface_Meshes():
                                                       mode='Quad')
     assert len(surface_meshes) == 10
     assert surface_meshes.cache_dir.exists()
-    assert len(list(surface_meshes.cache_dir.rglob('*.npz'))) == 10
+    assert len(list(surface_meshes.cache_dir.rglob('*.p'))) == 10
     for smesh in surface_meshes:
         assert smesh['data']['vertices'].shape[0] > 0
         assert smesh['data']['faces'].shape[1] == 4
@@ -121,7 +121,7 @@ def test_Points():
 
     assert len(points) == 10
     assert points.cache_dir.exists()
-    assert len(list(points.cache_dir.rglob('*.npz'))) == 10
+    assert len(list(points.cache_dir.rglob('*.p'))) == 10
     for obj in points:
         assert set(obj['data']['points'].shape) == set([5000, 3])
         assert set(obj['data']['normals'].shape) == set([5000, 3])
@@ -135,7 +135,7 @@ def test_Points():
 
     assert len(points) == 10
     assert points.cache_dir.exists()
-    assert len(list(points.cache_dir.rglob('*.npz'))) == 10
+    assert len(list(points.cache_dir.rglob('*.p'))) == 10
     for obj in points:
         assert set(obj['data']['points'].shape) == set([5000, 3])
         assert set(obj['data']['normals'].shape) == set([5000, 3])
@@ -154,7 +154,7 @@ def test_SDF_Points():
 
     assert len(sdf_points) == 10
     assert sdf_points.cache_dir.exists()
-    assert len(list(sdf_points.cache_dir.rglob('*.npz'))) == 10
+    assert len(list(sdf_points.cache_dir.rglob('*.p'))) == 10
     for obj in sdf_points:
         assert set(obj['data']['sdf_points'].shape) == set([5000, 3])
         assert set(obj['data']['sdf_distances'].shape) == set([5000])
@@ -168,7 +168,7 @@ def test_SDF_Points():
 
     assert len(sdf_points) == 10
     assert sdf_points.cache_dir.exists()
-    assert len(list(sdf_points.cache_dir.rglob('*.npz'))) == 10
+    assert len(list(sdf_points.cache_dir.rglob('*.p'))) == 10
     for obj in sdf_points:
         assert set(obj['data']['occ_points'].shape) == set([5000, 3])
         assert set(obj['data']['occ_values'].shape) == set([5000])
