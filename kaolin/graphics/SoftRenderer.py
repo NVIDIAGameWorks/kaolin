@@ -40,11 +40,11 @@
 import torch
 
 import kaolin as kal
-from DifferentiableRenderer import DifferentiableRenderer
-from Lighting import compute_ambient_light
-from Lighting import compute_directional_light
-from softras.rasterizer import SoftRasterizer
-from softras.soft_rasterize import soft_rasterize
+from .DifferentiableRenderer import DifferentiableRenderer
+from .Lighting import compute_ambient_light
+from .Lighting import compute_directional_light
+from .softras.rasterizer import SoftRasterizer
+from .softras.soft_rasterize import soft_rasterize
 
 
 class SoftRenderer(DifferentiableRenderer):
@@ -76,7 +76,7 @@ class SoftRenderer(DifferentiableRenderer):
             anti_aliasing: bool = True,
             bg_color: torch.Tensor = torch.zeros(3),
             fill_back: bool = True,
-            camera_mode: str = 'projection',
+            camera_mode: str = 'look_at',
             K=None, rmat=None, tvec=None,
             perspective_distort: bool = True,
             sigma_val: float = 1e-5,
@@ -299,8 +299,14 @@ class SoftRenderer(DifferentiableRenderer):
 
         # Rasterization
         out = self.rasterize(vertices, faces, textures)
+        rgb = out[:, :3, :, :]
+        depth = out[:, 3, :, :]
+        if out.shape[0] == 1:
+            depth = depth.unsqueeze(1)
+        # Creating a 'dummy' alpha variable for a potential future feature.
+        alpha = None
 
-        return out['rgb'], out['depth'], out['alpha']
+        return rgb, depth, alpha
 
     def lighting(self, vertices, faces, textures):
         r"""Applies ambient and directional lighting to the mesh. """
@@ -311,6 +317,11 @@ class SoftRenderer(DifferentiableRenderer):
         directional_lighting = compute_directional_light(
             faces_lighting, textures, self.light_intensity_directional,
             self.light_color_directional)
+        # Squeeze dimensions with indices 2 and 3 (NMR uses a 6 dimensional
+        # code, hence the lighting functions append these additional dims
+        # which are unused in softras).
+        ambient_lighting = ambient_lighting.squeeze(2).squeeze(2)
+        directional_lighting = directional_lighting.squeeze(2).squeeze(2)
         return ambient_lighting * textures + directional_lighting * textures
 
     def shading(self):
@@ -403,10 +414,11 @@ class SoftRenderer(DifferentiableRenderer):
         """
 
         face_vertices = self.vertices_to_faces(vertices, faces)
-        face_textures = self.vertices_to_faces(textures, faces)
+        # face_textures = self.vertices_to_faces(textures, faces)
+        face_textures = textures
         images = soft_rasterize(face_vertices, face_textures, self.image_size,
                                 self.bg_color, self.near, self.far,
-                                self.fill_back, self.eps, self.sigma_val,
+                                self.fill_back, self.dist_eps, self.sigma_val,
                                 self.dist_func, self.dist_eps, self.gamma_val,
                                 self.aggr_func_rgb, self.aggr_func_alpha,
                                 self.texture_type)
@@ -520,4 +532,3 @@ class SoftRenderer(DifferentiableRenderer):
         faces = faces + (torch.arange(B).to(device) * V)[:, None, None]
         vertices = vertices.reshape(B * V, 3)
         return vertices[faces]
-        
