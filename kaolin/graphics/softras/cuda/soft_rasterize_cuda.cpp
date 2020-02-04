@@ -171,7 +171,7 @@ std::vector<at::Tensor> backward_soft_rasterize(
 }
 
 
-PYBIND11_MODULE(soft_rasterize, m) {
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("forward_soft_rasterize", &forward_soft_rasterize, "FORWARD_SOFT_RASTERIZE (CUDA)");
     m.def("backward_soft_rasterize", &backward_soft_rasterize, "BACKWARD_SOFT_RASTERIZE (CUDA)");
 }

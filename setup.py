@@ -132,7 +132,7 @@ def get_extensions():
                 'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
                 'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
             ]),
-            CUDAExtension('kaolin.graphics.softras.cuda.rasterize_cuda', [
+            CUDAExtension('kaolin.graphics.softras.cuda.soft_rasterize_cuda', [
                 'kaolin/graphics/softras/cuda/soft_rasterize_cuda.cpp',
                 'kaolin/graphics/softras/cuda/soft_rasterize_cuda_kernel.cu',
             ]),
