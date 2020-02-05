@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Callable
 import numpy as np
 
-
 def _composedecorator(*decs):
     """Returns a composition of several decorators.
 
@@ -193,7 +192,7 @@ class Cache(object):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cached_ids = [p.stem for p in self.cache_dir.glob('*')]
 
-    def __call__(self, unique_id: str, **kwargs):
+    def __call__(self, unique_id: str, *args, **kwargs):
         """Execute self.func if not cached, otherwise, read data from disk.
 
             Args:
@@ -207,7 +206,7 @@ class Cache(object):
         fpath = self.cache_dir / f'{unique_id}.p'
 
         if not fpath.exists():
-            output = self.func(**kwargs)
+            output = self.func(*args, **kwargs)
             self._write(output, fpath)
             self.cached_ids.append(unique_id)
         else:
