@@ -26,7 +26,7 @@ def test_usd_meshes():
     assert len(usd_dataset) == 1
 
     # test caching
-    assert len(list(Path(cache_dir).glob('**/*.npz'))) == 1
+    assert len(list(Path(cache_dir).glob('**/*.p'))) == 1
     shutil.rmtree('tests/datasets_eval/USDMeshes')
 
 # Tests below must be run with KitchenSet dataset
