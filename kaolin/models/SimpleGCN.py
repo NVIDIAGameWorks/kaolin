@@ -60,7 +60,6 @@ class SimpleGCN(nn.Module):
         support = torch.mm(input, self.weight1)
         side_len = max(support.shape[1] // 3, 2)
         if adj.type() == 'torch.cuda.sparse.FloatTensor': 
-
             norm = torch.sparse.mm(adj, torch.ones((support.shape[0], 1)).cuda())
             normalized_support = support[:, :side_len] / norm
             side_1 = torch.sparse.mm(adj, normalized_support)

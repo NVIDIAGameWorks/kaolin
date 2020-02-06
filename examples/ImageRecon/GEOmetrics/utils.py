@@ -319,8 +319,8 @@ def loss_lap(meshes):
     loss += kal.metrics.mesh.laplacian_loss(meshes['init'][1], meshes['update'][1])
     loss += kal.metrics.mesh.laplacian_loss(meshes['init'][2], meshes['update'][2])
 
-    loss += torch.sum((meshes['init'][1].vertices - meshes['update'][1].vertices)**2, 1).mean() * .0666
-    loss += torch.sum((meshes['init'][2].vertices - meshes['update'][2].vertices)**2, 1).mean() * .0666
+    loss += torch.sum((meshes['init'][1].vertices - meshes['update'][1].vertices) ** 2, 1).mean() * .0666
+    loss += torch.sum((meshes['init'][2].vertices - meshes['update'][2].vertices) ** 2, 1).mean() * .0666
 
     return loss 
 
