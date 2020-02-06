@@ -173,8 +173,7 @@ def realign(src: Union[torch.Tensor, PointCloud],
     tgt_min, _ = tgt.min(-2, keepdim=True)
     tgt_max, _ = tgt.max(-2, keepdim=True)
 
-    src = ((tgt_max - tgt_min) / (src_max - src_min + EPS)) * src
-    src = src + (tgt_max - src.max(-2, keepdim=True)[0])
+    src = ((src - src_min) / (src_max - src_min + EPS)) * (tgt_max - tgt_min) + tgt_min
     return src
 
 
