@@ -24,7 +24,7 @@ Transforming the silhouette of the mesh to match the target image (a square by d
 
 Example target image, final mesh, and optimization process:
 
-![](example2_ref.gif)
+![](example2_ref.png)
 ![](images/example2_mesh.gif)
 ![](images/example2_optimization.gif)
 
@@ -34,7 +34,7 @@ Transforming the color of the mesh to match a target image, by optimizing the te
 
 Example target image, final mesh, and optimization process:
 
-![](example3_ref.gif)
+![](example3_ref.png)
 ![](images/example3_mesh.gif)
 ![](images/example3_optimization.gif)
 
@@ -44,7 +44,7 @@ Transform the camera position to match a target image, by optimizing it directly
 
 Example target image and final mesh:
 
-![](example4_ref.gif)
+![](example4_ref.png)
 ![](images/example4_mesh.gif)
 
 ## Citation
