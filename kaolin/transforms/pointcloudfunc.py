@@ -203,26 +203,6 @@ def normalize(cloud: Union[torch.Tensor, PointCloud],
         cloud = cloud.clone()
 
     cloud = (cloud - cloud.mean(-2).unsqueeze(-2))\
-            / (cloud.std(-2).unsqueeze(-2) + EPS)
+        / (cloud.std(-2).unsqueeze(-2) + EPS)
 
     return cloud
-
-
-
-if __name__ == '__main__':
-
-    device = 'cpu'
-    
-    # Test: realign
-    src = torch.randn(2, 3, 4, 3).to(device)
-    tgt = torch.rand(2, 3, 4, 3).to(device)
-    src_ = realign(src, tgt)
-    # After transformation, src_.mean(-2) should be equal to tgt.mean(-2)
-    print(src_.mean(-2))
-    print(tgt.mean(-2))
-
-    # Test: normalize
-    a = torch.rand(2, 10, 3)
-    a_ = normalize(a)
-    print(a_.mean(-2))
-    print(a_.std(-2))
