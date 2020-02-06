@@ -45,7 +45,7 @@ Transform the camera position to match a target image, by optimizing it directly
 Example target image and final mesh:
 
 ![](example4_ref.png)
-![](images/example4_mesh.gif)
+![](images/example4.gif)
 
 ## Citation
 
