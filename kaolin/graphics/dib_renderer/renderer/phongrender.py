@@ -43,9 +43,19 @@ class PhongRender(nn.Module):
 
     def set_smooth(self, pfmtx):
         self.smooth = True
-        self.pfmtx = torch.from_numpy(pfmtx).view(1, pfmtx.shape[0], pfmtx.shape[1]).cuda()
+        self.pfmtx = torch.from_numpy(pfmtx).view(
+            1, pfmtx.shape[0], pfmtx.shape[1]).cuda()
 
-    def forward(self, points, cameras, uv_bxpx2, texture_bx3xthxtw, lightdirect_bx3, material_bx3x3, shininess_bx1):
+    def forward(self,
+                points,
+                cameras,
+                uv_bxpx2,
+                texture_bx3xthxtw,
+                lightdirect_bx3,
+                material_bx3x3,
+                shininess_bx1,
+                ft_fx3=None):
+
         assert lightdirect_bx3 is not None, 'When using the Phong model, light parameters must be passed'
         assert material_bx3x3 is not None, 'When using the Phong model, material parameters must be passed'
         assert shininess_bx1 is not None, 'When using the Phong model, shininess parameters must be passed'
@@ -53,6 +63,10 @@ class PhongRender(nn.Module):
         ##############################################################
         # first, MVP projection in vertexshader
         points_bxpx3, faces_fx3 = points
+
+        # use faces_fx3 as ft_fx3 if not given
+        if ft_fx3 is None:
+            ft_fx3 = faces_fx3
 
         # camera_rot_bx3x3, camera_pos_bx3, camera_proj_3x1 = cameras
 
@@ -72,7 +86,8 @@ class PhongRender(nn.Module):
         ####################################################
         # smooth or not
         if self.smooth:
-            normal_bxpx3 = torch.matmul(self.pfmtx.repeat(normal_bxfx3.shape[0], 1, 1), normal_bxfx3)
+            normal_bxpx3 = torch.matmul(self.pfmtx.repeat(
+                normal_bxfx3.shape[0], 1, 1), normal_bxfx3)
             n0 = normal_bxpx3[:, faces_fx3[:, 0], :]
             n1 = normal_bxpx3[:, faces_fx3[:, 1], :]
             n2 = normal_bxpx3[:, faces_fx3[:, 2], :]
@@ -86,18 +101,20 @@ class PhongRender(nn.Module):
         bnum = normal1_bxfx3.shape[0]
 
         # we have uv, normal, eye to interpolate
-        c0 = uv_bxpx2[:, faces_fx3[:, 0], :]
-        c1 = uv_bxpx2[:, faces_fx3[:, 1], :]
-        c2 = uv_bxpx2[:, faces_fx3[:, 2], :]
+        c0 = uv_bxpx2[:, ft_fx3[:, 0], :]
+        c1 = uv_bxpx2[:, ft_fx3[:, 1], :]
+        c2 = uv_bxpx2[:, ft_fx3[:, 2], :]
         mask = torch.ones_like(c0[:, :, :1])
-        uv_bxfx3x3 = torch.cat((c0, mask, c1, mask, c2, mask), dim=2).view(bnum, fnum, 3, -1)
+        uv_bxfx3x3 = torch.cat(
+            (c0, mask, c1, mask, c2, mask), dim=2).view(bnum, fnum, 3, -1)
 
         # normal & eye direction
         normal_bxfx3x3 = normal_bxfx9.view(bnum, fnum, 3, -1)
         eyedirect_bxfx9 = -points3d_bxfx9
         eyedirect_bxfx3x3 = eyedirect_bxfx9.view(-1, fnum, 3, 3)
 
-        feat = torch.cat((normal_bxfx3x3, eyedirect_bxfx3x3, uv_bxfx3x3), dim=3)
+        feat = torch.cat(
+            (normal_bxfx3x3, eyedirect_bxfx3x3, uv_bxfx3x3), dim=3)
         feat = feat.view(bnum, fnum, -1)
         imfeature, improb_bxhxwx1 = linear_rasterizer(self.height, self.width,
                                                       points3d_bxfx9, points2d_bxfx6, normalz_bxfx1, feat)
