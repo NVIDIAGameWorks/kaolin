@@ -532,3 +532,4 @@ class SoftRenderer(DifferentiableRenderer):
         faces = faces + (torch.arange(B).to(device) * V)[:, None, None]
         vertices = vertices.reshape(B * V, 3)
         return vertices[faces]
+        
