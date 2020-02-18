@@ -39,11 +39,20 @@ class TexRender(nn.Module):
         self.width = width
         self.filtering = filtering
 
-    def forward(self, points, cameras, uv_bxpx2, texture_bx3xthxtw):
+    def forward(self,
+                points,
+                cameras,
+                uv_bxpx2,
+                texture_bx3xthxtw,
+                ft_fx3=None):
 
         ##############################################################
         # first, MVP projection in vertexshader
         points_bxpx3, faces_fx3 = points
+
+        # use faces_fx3 as ft_fx3 if not given
+        if ft_fx3 is None:
+            ft_fx3 = faces_fx3
 
         # camera_rot_bx3x3, camera_pos_bx3, camera_proj_3x1 = cameras
 
@@ -62,9 +71,9 @@ class TexRender(nn.Module):
 
         ############################################################
         # second, rasterization
-        c0 = uv_bxpx2[:, faces_fx3[:, 0], :]
-        c1 = uv_bxpx2[:, faces_fx3[:, 1], :]
-        c2 = uv_bxpx2[:, faces_fx3[:, 2], :]
+        c0 = uv_bxpx2[:, ft_fx3[:, 0], :]
+        c1 = uv_bxpx2[:, ft_fx3[:, 1], :]
+        c2 = uv_bxpx2[:, ft_fx3[:, 2], :]
         mask = torch.ones_like(c0[:, :, :1])
         uv_bxfx9 = torch.cat((c0, mask, c1, mask, c2, mask), dim=2)
 

@@ -45,12 +45,23 @@ class SHRender(nn.Module):
         self.smooth = True
         self.pfmtx = pfmtx
 
-    def forward(self, points, cameras, uv_bxpx2, texture_bx3xthxtw, lightparam):
+    def forward(self,
+                points,
+                cameras,
+                uv_bxpx2,
+                texture_bx3xthxtw,
+                lightparam,
+                ft_fx3=None):
+
         assert lightparam is not None, 'When using the Spherical Harmonics model, light parameters must be passed'
 
         ##############################################################
         # first, MVP projection in vertexshader
         points_bxpx3, faces_fx3 = points
+
+        # use faces_fx3 as ft_fx3 if not given
+        if ft_fx3 is None:
+            ft_fx3 = faces_fx3
 
         # camera_rot_bx3x3, camera_pos_bx3, camera_proj_3x1 = cameras
 
@@ -83,11 +94,12 @@ class SHRender(nn.Module):
         fnum = normal1_bxfx3.shape[1]
         bnum = normal1_bxfx3.shape[0]
 
-        c0 = uv_bxpx2[:, faces_fx3[:, 0], :]
-        c1 = uv_bxpx2[:, faces_fx3[:, 1], :]
-        c2 = uv_bxpx2[:, faces_fx3[:, 2], :]
+        c0 = uv_bxpx2[:, ft_fx3[:, 0], :]
+        c1 = uv_bxpx2[:, ft_fx3[:, 1], :]
+        c2 = uv_bxpx2[:, ft_fx3[:, 2], :]
         mask = torch.ones_like(c0[:, :, :1])
-        uv_bxfx3x3 = torch.cat((c0, mask, c1, mask, c2, mask), dim=2).view(bnum, fnum, 3, -1)
+        uv_bxfx3x3 = torch.cat(
+            (c0, mask, c1, mask, c2, mask), dim=2).view(bnum, fnum, 3, -1)
 
         # normal
         normal_bxfx3x3 = normal_bxfx9.view(bnum, fnum, 3, -1)
@@ -104,6 +116,7 @@ class SHRender(nn.Module):
         # fragrement shader
         # parallel light
         imnormal1_bxhxwx3 = datanormalize(imnormal_bxhxwx3, axis=3)
-        imrender = fragmentshader(imnormal1_bxhxwx3, lightparam, imtexcoords, texture_bx3xthxtw, hardmask)
+        imrender = fragmentshader(
+            imnormal1_bxhxwx3, lightparam, imtexcoords, texture_bx3xthxtw, hardmask)
 
         return imrender, improb_bxhxwx1, normal1_bxfx3
