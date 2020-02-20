@@ -27,8 +27,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import soft_renderer.functional as srf
-
 
 class SoftRasterizer(nn.Module):
     def __init__(self, image_size=256, background_color=[0, 0, 0], near=1, far=100, 
