@@ -1,6 +1,7 @@
-import kaolin.graphics.Lighting
-import kaolin.graphics.Transformations
-import kaolin.graphics.nmr
+from .Lighting import *
+from .Transformations import *
+from .nmr import *
+from .softras import *
 
 from .DifferentiableRenderer import DifferentiableRenderer
 from .NeuralMeshRenderer import NeuralMeshRenderer

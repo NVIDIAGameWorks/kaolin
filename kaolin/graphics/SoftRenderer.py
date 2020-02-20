@@ -37,20 +37,36 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import math
+from typing import Optional
+
 import torch
 
-import kaolin as kal
 from .DifferentiableRenderer import DifferentiableRenderer
 from .Lighting import compute_ambient_light
 from .Lighting import compute_directional_light
+from .softras.rasterizer import SoftRasterizer
+from .softras.soft_rasterize import soft_rasterize
 
 
 class SoftRenderer(DifferentiableRenderer):
     r"""A class implementing the \emph{Soft Renderer}
-    from the following ICCV 2019 paper:
-        Soft Rasterizer: A differentiable renderer for image-based 3D reasoning
-        Shichen Liu, Tianye Li, Weikai Chen, and Hao Li
-        Link: https://arxiv.org/abs/1904.01786
+        from the following ICCV 2019 paper:
+            Soft Rasterizer: A differentiable renderer for image-based 3D reasoning
+            Shichen Liu, Tianye Li, Weikai Chen, and Hao Li
+            Link: https://arxiv.org/abs/1904.01786
+
+    .. note::
+        If you use this code, please cite the original paper in addition to Kaolin.
+
+        .. code-block::
+            @article{liu2019softras,
+              title={Soft Rasterizer: A Differentiable Renderer for Image-based 3D Reasoning},
+              author={Liu, Shichen and Li, Tianye and Chen, Weikai and Li, Hao},
+              journal={The IEEE International Conference on Computer Vision (ICCV)},
+              month = {Oct},
+              year={2019}
+            }
 
     """
 
@@ -74,7 +90,7 @@ class SoftRenderer(DifferentiableRenderer):
             viewing_scale: float = 1.0, 
             eye: torch.Tensor = None,
             camera_direction: torch.Tensor = torch.FloatTensor([0, 0, 1]),
-            near: float = 0.1, far: float = 100,
+            near: float = 1, far: float = 100,
             light_mode: str = 'surface',
             light_intensity_ambient: float = 0.5,
             light_intensity_directional: float = 0.5,
@@ -177,18 +193,27 @@ class SoftRenderer(DifferentiableRenderer):
         elif self.camera_mode in ['look', 'look_at']:
             # Whether or not to perform perspective distortion.
             self.perspective_distort = perspective_distort
-            # TODO: Add comments here
+            # Set the viewing angle
             self.viewing_angle = viewing_angle
-            # TODO: use kal.deg2rad instead
-            self.eye = torch.FloatTensor([0, 0, -(1. / torch.tan(kal.math.pi
-                                                                 * self.viewing_angle / 180) + 1)]).to(self.device)
+            # Set the position of the eye
+            self.eye = torch.FloatTensor([0, 0, 
+                                         -(1. / torch.tan(torch.Tensor([math.pi]) *
+                                           self.viewing_angle / 180) + 1)]).to(self.device)
             # Direction in which the camera's optical axis is facing
-            self.camera_direction = torch.FloatTensor([0, 0, 1]).to(
-                self.device)
+            self.camera_direction = torch.FloatTensor([0, 0, 1]).to(self.device)
 
         # Near and far clipping planes.
         self.near = near
         self.far = far
+
+        # Soft renderer parameters (control the extent of influence of pixels over mesh)
+        self.sigma_val = sigma_val
+        self.dist_func = dist_func
+        self.dist_eps = dist_eps
+        self.gamma_val = gamma_val
+        self.aggr_func_rgb = aggr_func_rgb
+        self.aggr_func_alpha = aggr_func_alpha
+        self.texture_type = texture_type
 
         # Ambient and directional lighting parameters.
         self.light_intensity_ambient = light_intensity_ambient
@@ -197,34 +222,31 @@ class SoftRenderer(DifferentiableRenderer):
         self.light_color_directional = light_color_directional.to(device)
         self.light_direction = light_direction.to(device)
 
-        # TODO: Add comments here.
+        # Set rasterizer epsilon value.
         self.rasterizer_eps = 1e-3
 
-    def forward(self, vertices, faces, textures=None, mode=None,
-                K=None, rmat=None, tvec=None):
+        # Initialize rasterizer here.
+        self.soft_rasterizer = SoftRasterizer(self.image_size, self.bg_color,
+                                              self.near, self.far,
+                                              self.anti_aliasing,
+                                              self.fill_back,
+                                              self.rasterizer_eps,
+                                              self.sigma_val,
+                                              self.dist_func,
+                                              self.dist_eps,
+                                              self.gamma_val,
+                                              self.aggr_func_rgb,
+                                              self.aggr_func_alpha,
+                                              self.texture_type)
+
+    def forward(self, vertices: torch.Tensor, faces: torch.Tensor, textures: Optional[torch.Tensor] = None,
+                mode: Optional[torch.Tensor] = None, K: Optional[torch.Tensor] = None,
+                rmat: Optional[torch.Tensor] = None, tvec: Optional[torch.Tensor] = None):
 
         return self.render(vertices, faces, textures, mode, K, rmat, tvec)
 
-        if mode is None:
-            # If nothing is specified, render rgb, depth, and alpha channels
-            return self.render(vertices, faces, textures, K, rmat, tvec,
-                               dist_coeffs, orig_size)
-        elif mode is 'rgb':
-            # Render RGB channels only
-            return self.render_rgb(vertices, faces, textures, K, rmat, tvec,
-                                   dist_coeffs, orig_size)
-        elif mode is 'silhouette':
-            # Render only a silhouette, without RGB colors
-            return self.render_silhouette(vertices, faces, textures, K, rmat,
-                                          tvec, dist_coeffs, orig_size)
-        elif mode is 'depth':
-            # Render depth image
-            return self.render_depth(vertices, faces, textures, K, rmat, tvec,
-                                     dist_coeffs, orig_size)
-        else:
-            raise ValueError('Mode {0} not implemented.'.format(mode))
-
-    def render(self, vertices, faces, textures=None, mode=None, K=None,
+    def render(self, vertices: torch.Tensor, faces: torch.Tensor, textures: Optional[torch.Tensor] = None,
+               mode: Optional[torch.Tensor] = None, K: Optional[torch.Tensor] = None,
                rmat=None, tvec=None):
         r"""Renders the RGB, depth, and alpha channels.
 
@@ -262,10 +284,8 @@ class SoftRenderer(DifferentiableRenderer):
 
         # Fill the back faces of each triangle, if needed
         if self.fill_back:
-            faces = torch.cat((faces, faces[:, :, list(reversed(range(
-                faces.shape[-1])))]), dim=1)
-            textures = torch.cat(
-                (textures, textures.permute(0, 1, 4, 3, 2, 5)), dim=1)
+            faces = torch.cat((faces, faces[:, :, list(reversed(range(faces.shape[-1])))]), dim=1)
+            textures = torch.cat((textures, textures), dim=1)
 
         # Lighting (not needed when we are rendering only depth/silhouette
         # images)
@@ -273,40 +293,58 @@ class SoftRenderer(DifferentiableRenderer):
             textures = self.lighting(vertices, faces, textures)
 
         # Transform vertices to the camera frame
-        vertices = transform_to_camera_frame(vertices)
+        vertices = self.transform_to_camera_frame(vertices)
 
         # Project the vertices from the camera coordinate frame to the image.
-        vertices = project_to_image(vertices)
+        vertices = self.project_to_image(vertices)
 
         # Rasterization
-        out = self.rasterize(vertices, faces, textures)
+        out = soft_rasterize(vertices, textures)
 
-        return out['rgb'], out['depth'], out['alpha']
+        rgb = out[:, :3, :, :]
+        depth = out[:, 3, :, :]
+        if out.shape[0] == 1:
+            depth = depth.unsqueeze(1)
+        # Creating a 'dummy' alpha variable for a potential future feature.
+        alpha = None
 
-    def lighting(self, vertices, faces, textures):
-        r"""Applies ambient and directional lighting to the mesh. """
-        faces_lighting = vertices_to_faces(vertices, faces)
-        # textures = lighting(
-        #     faces_lighting,
-        #     textures,
-        #     self.light_intensity_ambient,
-        #     self.light_intensity_directional,
-        #     self.light_color_ambient,
-        #     self.light_color_directional,
-        #     self.light_direction)
-        ambient_lighting = kal.graphics.compute_ambient_lighting(
-            faces_lighting, textures, self.light_intensity_ambient,
-            self.light_color_ambient)
-        directional_lighting = kal.graphics.compute_directional_lighting(
-            faces_lighting, textures, self.light_intensity_directional,
-            self.light_color_directional)
+        return rgb, depth, alpha
+
+    def lighting(self, vertices: torch.Tensor, faces: torch.Tensor, textures: torch.Tensor):
+        r"""Applies ambient and directional lighting to the mesh.
+
+        Args:
+            vertices (torch.Tensor): Vertices of the mesh (shape: :math:`B
+                \times V \times 3`), where :math:`B` is the batchsize,
+                and :math:`V` is the number of vertices in the mesh.
+            faces (torch.Tensor): Faces of the mesh (shape: :math:`B \times
+                F \times 3`), where :math:`B` is the batchsize, and :math:`F`
+                is the number of faces in the mesh.
+            textures (torch.Tensor): Mesh texture (shape: :math:`B \times F
+                \times 4 \times 4 \times 4 \times 3`)
+
+        """
+
+        faces_lighting = self.vertices_to_faces(vertices, faces)
+        ambient_lighting = compute_ambient_light(faces_lighting, textures,
+                                                 self.light_intensity_ambient,
+                                                 self.light_color_ambient)
+        directional_lighting = compute_directional_light(faces_lighting, textures,
+                                                         self.light_intensity_directional,
+                                                         self.light_color_directional)
+        # Squeeze dimensions with indices 2 and 3 (NMR uses a 6 dimensional
+        # code, hence the lighting functions append these additional dims
+        # which are unused in softras).
+        ambient_lighting = ambient_lighting.squeeze(2).squeeze(2)
+        directional_lighting = directional_lighting.squeeze(2).squeeze(2)
+
         return ambient_lighting * textures + directional_lighting * textures
 
     def shading(self):
-        r"""Does nothing. """
+        r"""Does nothing. Placeholder for shading functionality. """
         pass
 
-    def transform_to_camera_frame(self, vertices):
+    def transform_to_camera_frame(self, vertices: torch.Tensor):
         r"""Transforms the mesh vertices to the camera frame, based on the
         camera mode to be used.
 
@@ -322,15 +360,9 @@ class SoftRenderer(DifferentiableRenderer):
         """
         if self.camera_mode == 'look_at':
             vertices = self.look_at(vertices, self.eye)
-            # # Perspective distortion
-            # if self.perspective_distort:
-            #     vertices = perspective_distort(vertices, angle=self.viewing_angle)
 
         elif self.camera_mode == 'look':
             vertices = self.look(vertices, self.eye, self.camera_direction)
-            # # Perspective distortion
-            # if self.perspective_distort:
-            #     vertices = perspective_distort(vertices, angle=self.viewing_angle)
 
         elif self.camera_mode == 'projection':
             if K is None:
@@ -339,9 +371,10 @@ class SoftRenderer(DifferentiableRenderer):
                 rmat = self.rmat
             if tvec is None:
                 tvec = self.tvec
-            # vertices = perspective_projection(vertices, K, rmat, tvec)
 
-    def project_to_image(self, vertices):
+        return vertices
+
+    def project_to_image(self, vertices: torch.Tensor):
         r"""Projects the mesh vertices from the camera coordinate frame down
         to the image.
 
@@ -362,17 +395,19 @@ class SoftRenderer(DifferentiableRenderer):
         # rmat, tvec combinations, based on the mode, but use a consistent
         # projection function across all modes. Helps avoid redundancy.
         if self.camera_mode == 'look_at':
-            vertices = self.perspective_distort(vertices,
-                                                angle=self.viewing_angle)
+            vertices = self.perspective_distortion(vertices,
+                                                   angle=self.viewing_angle)
 
         elif self.camera_mode == 'look':
-            vertices = self.perspective_distort(vertices,
-                                                angle=self.viewing_angle)
+            vertices = self.perspective_distortion(vertices,
+                                                   angle=self.viewing_angle)
 
         elif self.camera_mode == 'projection':
-            vertices = perspective_projection(vertices, K, rmat, tvec)
+            vertices = self.perspective_projection(vertices, K, rmat, tvec)
 
-    def rasterize(self, vertices, faces, textures):
+        return vertices
+
+    def rasterize(self, vertices: torch.Tensor, faces: torch.Tensor, textures: torch.Tensor):
         r"""Performs rasterization, i.e., conversion of triangles to pixels.
 
         Args:
@@ -383,44 +418,42 @@ class SoftRenderer(DifferentiableRenderer):
                 F \times 3`), where :math:`B` is the batchsize, and :math:`F`
                 is the number of faces in the mesh.
             textures (torch.Tensor): Mesh texture (shape: :math:`B \times F
-                \times 4 \times 4 \times 4 \times 3`)
+                \times 2 \times 3`)
 
         """
 
-        faces = self.vertices_to_faces(vertices, faces)
+        face_vertices = self.vertices_to_faces(vertices, faces)
+        # face_textures = self.vertices_to_faces(textures, faces)
+        images = soft_rasterize_cuda(face_vertices, textures, self.image_size,
+                                     self.bg_color, self.near, self.far,
+                                     self.fill_back, self.rasterizer_eps, self.sigma_val,
+                                     self.dist_func, self.dist_eps, self.gamma_val,
+                                     self.aggr_func_rgb, self.aggr_func_alpha,
+                                     self.texture_type)
+        if self.anti_aliasing:
+            images = torch.nn.functional.avg_pool2d(images, kernel_size=2,
+                                                    stride=2)
+        return images
 
-        # If mode is unspecified, render rgb, depth, and alpha channels
-        if mode is None:
-            out = kal.graphics.nmr.rasterize_rgbad(faces, textures,
-                                                   self.image_size, self.anti_aliasing, self.near, self.far,
-                                                   self.rasterizer_eps, self.bg_color)
-            return out['rgb'], out['depth'], out['alpha']
-
-        # Render RGB channels only
-        elif mode == 'rgb':
-            images = kal.graphics.nmr.rasterize(faces, textures,
-                                                self.image_size, self.anti_aliasing, self.near, self.far,
-                                                self.rasterizer_eps, self.background_color)
-            return images
-
-        # Render depth image
-        elif mode == 'depth':
-            images = kal.graphics.nmr.rasterize_silhouettes(faces,
-                                                            self.image_size, self.anti_aliasing)
-
-        # Render only a silhouette, without RGB colors
-        elif mode == 'silhouette':
-            depth = kal.graphics.nmr.rasterize_depth(faces,
-                                                     self.image_size, self.anti_aliasing)
-            return depth
-
-        else:
-            raise ValueError('Mode {0} not implemented.'.format(mode))
-
-    def look_at(vertices, eye, at=torch.FloatTensor([0, 0, 0]),
-                up=torch.FloatTensor([0, 1, 0])):
+    def look_at(self, vertices: torch.Tensor, eye: torch.Tensor,
+                at: Optional[torch.Tensor] = torch.FloatTensor([0, 0, 0]),
+                up: Optional[torch.Tensor] = torch.FloatTensor([0, 1, 0])):
         r"""Camera "looks at" an object whose center is at the tensor represented
         by "at". And "up" is the upwards direction.
+
+        Args:
+            vertices (torch.Tensor): Vertices of the mesh (shape: :math:`B
+                \times V \times 3`), where :math:`B` is the batchsize,
+                and :math:`V` is the number of vertices in the mesh.
+            eye (torch.Tensor): Location of the eye (camera) (shape: :math:`3`).
+            at (torch.Tensor): Location of the object to look at (shape: :math:`3`).
+            up (torch.Tensor): "Up" direction for the camera (shape: :math:`3`)
+
+        Returns:
+            vertices (torch.Tensor): Input vertices transformed to the camera coordinate
+                frame (shape: :math:`B \times V \times 3`), where :math:`B` is the batchsize,
+                and :math:`V` is the number of vertices in the mesh.
+
         """
 
         import torch.nn.functional as F
@@ -462,6 +495,11 @@ class SoftRenderer(DifferentiableRenderer):
     def look(self, vertices, eye, direction=torch.FloatTensor([0, 1, 0]),
              up=None):
         r"""Apply the "look" transformation to the vertices.
+
+        Returns:
+            vertices (torch.Tensor): Input vertices transformed to the camera coordinate
+                frame (shape: :math:`B \times V \times 3`), where :math:`B` is the batchsize,
+                and :math:`V` is the number of vertices in the mesh.
         """
 
         import torch.nn.functional as F
@@ -469,7 +507,7 @@ class SoftRenderer(DifferentiableRenderer):
         device = vertices.device
         direction = direction.to(device)
         if up is None:
-            up = torch.FloatTensor([0, 1, 0]).to(device)
+            up = torch.FloatTensor([0, 1, 0], device=device)
 
         if eye.dim() == 1:
             eye = eye[None, :]
@@ -495,11 +533,16 @@ class SoftRenderer(DifferentiableRenderer):
 
         return vertices
 
-    def perspective_distort(self, vertices, angle=30.):
+    def perspective_distortion(self, vertices, angle=30.):
         r"""Compute perspective distortion from a given viewing angle.
+
+        Returns:
+            vertices (torch.Tensor): Input vertices transformed to the camera coordinate
+                frame (shape: :math:`B \times V \times 3`), where :math:`B` is the batchsize,
+                and :math:`V` is the number of vertices in the mesh.
         """
         device = vertices.device
-        angle = torch.FloatTensor([angle * 180 / kal.math.pi]).to(device)
+        angle = torch.FloatTensor([angle * 180 / torch.FloatTensor([math.pi])]).to(device)
         width = torch.tan(angle)
         width = width[:, None]
         z = vertices[:, :, 2]
@@ -515,10 +558,22 @@ class SoftRenderer(DifferentiableRenderer):
         """
         B = vertices.shape[0]
         V = vertices.shape[1]
-        # print(vertices.dim(), faces.dim())
-        # print(vertices.shape[0], faces.shape[0])
-        # print(vertices.shape[2], faces.shape[2])
         device = vertices.device
-        faces = faces + (torch.arange(B).to(device) * V)[:, None, None]
+        faces = faces + (torch.arange(B, device=device) * V)[:, None, None]
+        vertices = vertices.reshape(B * V, 3)
+        return vertices[faces]
+
+    def textures_to_faces(self, textures, faces):
+        r"""
+        textures (torch.Tensor): shape: math:`B \times F \times 2 \times 3`
+        faces (torch.Tensor): shape: math:`B \times F \times 3`
+        """
+        B = vertices.shape[0]
+        V = vertices.shape[1]
+        # print(vertices.dim(), faces.dim())
+        # print(vertices.shape, faces.shape)
+        # print(vertices.shape, faces.shape)
+        device = vertices.device
+        faces = faces + (torch.arange(B, device=device) * V)[:, None, None]
         vertices = vertices.reshape(B * V, 3)
         return vertices[faces]
