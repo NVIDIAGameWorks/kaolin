@@ -29,8 +29,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy
 
-import soft_renderer as sr
-
 
 class Renderer(nn.Module):
     def __init__(self, image_size=256, background_color=[0,0,0], near=1, far=100, 
