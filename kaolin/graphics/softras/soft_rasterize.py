@@ -1,3 +1,18 @@
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# 
+# 
 # Soft Rasterizer (SoftRas)
 # 
 # Copyright (c) 2017 Hiroharu Kato
@@ -67,8 +82,8 @@ class SoftRasterizeFunction(Function):
         ctx.device = face_vertices.device
         ctx.batch_size, ctx.num_faces = face_vertices.shape[:2]
 
-        faces_info = torch.FloatTensor(ctx.batch_size, ctx.num_faces, 9 * 3).fill_(0.0).to(device=ctx.device)
-        aggrs_info = torch.FloatTensor(ctx.batch_size, 2, ctx.image_size, ctx.image_size).fill_(0.0).to(device=ctx.device) 
+        faces_info = torch.zeros(ctx.batch_size, ctx.num_faces, 9 * 3, device=ctx.device)
+        aggrs_info = torch.zeros(ctx.batch_size, 2, ctx.image_size, ctx.image_size, device=ctx.device)
 
         soft_colors = torch.FloatTensor(ctx.batch_size, 4, ctx.image_size, ctx.image_size).fill_(1.0).to(device=ctx.device) 
         soft_colors[:, 0, :, :] *= background_color[0]

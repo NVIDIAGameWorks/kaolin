@@ -74,7 +74,7 @@ class SoftRenderer(DifferentiableRenderer):
             self,
             image_size: int = 256,
             anti_aliasing: bool = True,
-            bg_color: torch.Tensor = torch.zeros(3),
+            bg_color: torch.Tensor = None,
             fill_back: bool = True,
             camera_mode: str = 'projection',
             K=None, rmat=None, tvec=None,
@@ -89,14 +89,14 @@ class SoftRenderer(DifferentiableRenderer):
             viewing_angle: float = 30.,
             viewing_scale: float = 1.0, 
             eye: torch.Tensor = None,
-            camera_direction: torch.Tensor = torch.FloatTensor([0, 0, 1]),
+            camera_direction: torch.Tensor = None,
             near: float = 1, far: float = 100,
             light_mode: str = 'surface',
             light_intensity_ambient: float = 0.5,
             light_intensity_directional: float = 0.5,
-            light_color_ambient: torch.Tensor = torch.ones(3),
-            light_color_directional: torch.Tensor = torch.ones(3),
-            light_direction: torch.Tensor = torch.FloatTensor([0, 1, 0]),
+            light_color_ambient: torch.Tensor = None,
+            light_color_directional: torch.Tensor = None,
+            light_direction: torch.Tensor = None,
             device: str = 'cpu'):
         r"""Initalize the SoftRenderer object.
 
@@ -137,6 +137,19 @@ class SoftRenderer(DifferentiableRenderer):
             perspective_distort (bool): Whether or not to perform perspective
                 distortion (to simulate field-of-view based distortion effects)
                 (default: True).
+            sigma_val (float): Sharpness of the probability distribution of each triangle
+                (Refer to the paper for more details) (default: 1e-5).
+            dist_func (str): Distance function to use (default: 'euclidean')
+            dist_eps (float): A tiny positive number, for numerically stable distance
+                computation (default: 1e-4).
+            gamma_val (float): Sharpness parameter for the aggregation function (Refer to
+                the paper for more details) (default: 1e-4).
+            aggr_func_rgb (str): Aggregation function to use for the RGB channels
+                (default: 'softmax').
+            aggr_func_alpha (str): Aggregation function to use for the alpha channel
+                (default: 'prod').
+            texture_type (str): Type of textures to use ('surface' vs 'vertex')
+                (default: 'surface').
             viewing_angle (float): Angle at which the object is to be viewed
                 (assumed to be in degrees!) (default: 30.)
             camera_direction (float): Direction in which the camera is facing
@@ -169,19 +182,24 @@ class SoftRenderer(DifferentiableRenderer):
         # If enabled, we render an image that is twice as large as the required
         # size, and then downsample it.
         self.anti_aliasing = anti_aliasing
+        # Device on which tensors of the class reside. At present, this function
+        # only works when the device is CUDA enabled, such as a GPU.
+        self.device = device
         # Background color of the rendered image.
-        self.bg_color = bg_color
+        if bg_color is None:
+            bg_color = torch.zeros(3, device=device)
+        else:
+            self.bg_color = bg_color
         # Whether or not to fill in color to the back faces of each triangle.
         # Usually helps, especially when some of the triangles in the mesh
         # have improper orientation specifications.
         self.fill_back = fill_back
 
-        # Device on which tensors of the class reside. At present, this function
-        # only works when the device is CUDA enabled, such as a GPU.
-        self.device = device
-
         # camera_mode specifies how the scene is to be set up.
         self.camera_mode = camera_mode
+        # Camera direction specifies the optical axis of the camera.
+        if self.camera_direction is None:
+            self.camera_direction = torch.FloatTensor([0, 0, 1])
         # If the mode is 'projection', use the input camera intrinsics and
         # extrinsics.
         if self.camera_mode == 'projection':
@@ -193,14 +211,12 @@ class SoftRenderer(DifferentiableRenderer):
         elif self.camera_mode in ['look', 'look_at']:
             # Whether or not to perform perspective distortion.
             self.perspective_distort = perspective_distort
-            # Set the viewing angle
             self.viewing_angle = viewing_angle
             # Set the position of the eye
             self.eye = torch.FloatTensor([0, 0, 
-                                         -(1. / torch.tan(torch.Tensor([math.pi]) *
-                                           self.viewing_angle / 180) + 1)]).to(self.device)
+                                         -(1. / math.tan(math.pi * self.viewing_angle / 180) + 1)]).to(self.device)
             # Direction in which the camera's optical axis is facing
-            self.camera_direction = torch.FloatTensor([0, 0, 1]).to(self.device)
+            self.camera_direction = torch.FloatTensor([0, 0, 1], device=self.device)
 
         # Near and far clipping planes.
         self.near = near
@@ -218,16 +234,27 @@ class SoftRenderer(DifferentiableRenderer):
         # Ambient and directional lighting parameters.
         self.light_intensity_ambient = light_intensity_ambient
         self.light_intensity_directional = light_intensity_directional
-        self.light_color_ambient = light_color_ambient.to(device)
-        self.light_color_directional = light_color_directional.to(device)
-        self.light_direction = light_direction.to(device)
+        if light_color_ambient is None:
+            light_color_ambient = torch.ones(3, device=device)
+        else:
+            self.light_color_ambient = light_color_ambient.to(device)
+        if light_color_directional is None:
+            light_color_directional = torch.ones(3, device=device)
+        else:
+            self.light_color_directional = light_color_directional.to(device)
+        if light_direction is None:
+            light_direction = torch.FloatTensor([0, 1, 0], device=device)
+        else:
+            self.light_direction = light_direction.to(device)
 
         # Set rasterizer epsilon value.
         self.rasterizer_eps = 1e-3
 
-        # Initialize rasterizer here.
-        self.soft_rasterizer = SoftRasterizer(self.image_size, self.bg_color,
-                                              self.near, self.far,
+        # Initialize rasterizer with parameters specified.
+        self.soft_rasterizer = SoftRasterizer(self.image_size,
+                                              self.bg_color,
+                                              self.near,
+                                              self.far,
                                               self.anti_aliasing,
                                               self.fill_back,
                                               self.rasterizer_eps,
@@ -284,7 +311,7 @@ class SoftRenderer(DifferentiableRenderer):
 
         # Fill the back faces of each triangle, if needed
         if self.fill_back:
-            faces = torch.cat((faces, faces[:, :, list(reversed(range(faces.shape[-1])))]), dim=1)
+            faces = torch.cat((faces, faces[:, :, -1]), dim=1)
             textures = torch.cat((textures, textures), dim=1)
 
         # Lighting (not needed when we are rendering only depth/silhouette
@@ -306,6 +333,7 @@ class SoftRenderer(DifferentiableRenderer):
         if out.shape[0] == 1:
             depth = depth.unsqueeze(1)
         # Creating a 'dummy' alpha variable for a potential future feature.
+        # TODO: Add 'alpha' channel rendering capability.
         alpha = None
 
         return rgb, depth, alpha
@@ -342,7 +370,7 @@ class SoftRenderer(DifferentiableRenderer):
 
     def shading(self):
         r"""Does nothing. Placeholder for shading functionality. """
-        pass
+        raise NotImplementedError
 
     def transform_to_camera_frame(self, vertices: torch.Tensor):
         r"""Transforms the mesh vertices to the camera frame, based on the
@@ -436,8 +464,7 @@ class SoftRenderer(DifferentiableRenderer):
         return images
 
     def look_at(self, vertices: torch.Tensor, eye: torch.Tensor,
-                at: Optional[torch.Tensor] = torch.FloatTensor([0, 0, 0]),
-                up: Optional[torch.Tensor] = torch.FloatTensor([0, 1, 0])):
+                at: Optional[torch.Tensor] = None, up: Optional[torch.Tensor] = None):
         r"""Camera "looks at" an object whose center is at the tensor represented
         by "at". And "up" is the upwards direction.
 
@@ -459,9 +486,16 @@ class SoftRenderer(DifferentiableRenderer):
         import torch.nn.functional as F
 
         device = vertices.device
+
         eye = eye.to(device)
-        at = at.to(device)
-        up = up.to(device)
+        if at is None:
+            at = torch.tensor([0, 0, 0], device=device)
+        else:
+            at = at.to(device)
+        if up is None:
+            up = torch.tensor([0, 0, 0], device=device)
+        else:
+            up = up.to(device)
 
         batchsize = vertices.shape[0]
 
@@ -570,9 +604,6 @@ class SoftRenderer(DifferentiableRenderer):
         """
         B = vertices.shape[0]
         V = vertices.shape[1]
-        # print(vertices.dim(), faces.dim())
-        # print(vertices.shape, faces.shape)
-        # print(vertices.shape, faces.shape)
         device = vertices.device
         faces = faces + (torch.arange(B, device=device) * V)[:, None, None]
         vertices = vertices.reshape(B * V, 3)
