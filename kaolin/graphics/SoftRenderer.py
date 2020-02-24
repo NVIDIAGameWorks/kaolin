@@ -218,7 +218,7 @@ class SoftRenderer(DifferentiableRenderer):
             self.eye = torch.FloatTensor([0, 0, 
                                          -(1. / math.tan(math.pi * self.viewing_angle / 180) + 1)]).to(self.device)
             # Direction in which the camera's optical axis is facing
-            self.camera_direction = torch.FloatTensor([0, 0, 1], device=self.device)
+            self.camera_direction = torch.FloatTensor([0, 0, 1]).to(self.device)
 
         # Near and far clipping planes.
         self.near = near
