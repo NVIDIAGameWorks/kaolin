@@ -199,7 +199,7 @@ class SoftRenderer(DifferentiableRenderer):
         self.camera_mode = camera_mode
         # Camera direction specifies the optical axis of the camera.
         if camera_direction is None:
-            self.camera_direction = torch.tensor([0, 0, 1], device=device)
+            self.camera_direction = torch.tensor([0, 0, 1.], device=device)
         else:
             self.camera_direction = camera_direction.to(device)
         # If the mode is 'projection', use the input camera intrinsics and
@@ -217,7 +217,7 @@ class SoftRenderer(DifferentiableRenderer):
             # Set the position of the eye
             self.eye = torch.tensor([0, 0, -(1. / math.tan(math.pi * self.viewing_angle / 180) + 1)], device=device)
             # Direction in which the camera's optical axis is facing
-            self.camera_direction = torch.tensor([0, 0, 1], device=self.device)
+            self.camera_direction = torch.tensor([0, 0, 1.], device=self.device)
 
         # Near and far clipping planes.
         self.near = near
@@ -236,15 +236,15 @@ class SoftRenderer(DifferentiableRenderer):
         self.light_intensity_ambient = light_intensity_ambient
         self.light_intensity_directional = light_intensity_directional
         if light_color_ambient is None:
-            light_color_ambient = torch.ones(3, device=device)
+            self.light_color_ambient = torch.ones(3, device=device)
         else:
             self.light_color_ambient = light_color_ambient.to(device)
         if light_color_directional is None:
-            light_color_directional = torch.ones(3, device=device)
+            self.light_color_directional = torch.ones(3, device=device)
         else:
             self.light_color_directional = light_color_directional.to(device)
         if light_direction is None:
-            light_direction = torch.tensor([0, 1, 0], device=device)
+            self.light_direction = torch.tensor([0, 1., 0], device=device)
         else:
             self.light_direction = light_direction.to(device)
 
@@ -312,7 +312,7 @@ class SoftRenderer(DifferentiableRenderer):
 
         # Fill the back faces of each triangle, if needed
         if self.fill_back:
-            faces = torch.cat((faces, faces[:, :, -1]), dim=1)
+            faces = torch.cat((faces, faces[:, :, list(reversed(range(faces.shape[-1])))]), dim=1)
             textures = torch.cat((textures, textures), dim=1)
 
         # Lighting (not needed when we are rendering only depth/silhouette
@@ -490,11 +490,11 @@ class SoftRenderer(DifferentiableRenderer):
 
         eye = eye.to(device)
         if at is None:
-            at = torch.tensor([0, 0, 0], device=device)
+            at = torch.tensor([0., 0., 0.], device=device)
         else:
             at = at.to(device)
         if up is None:
-            up = torch.tensor([0, 0, 0], device=device)
+            up = torch.tensor([0., 0., 0.], device=device)
         else:
             up = up.to(device)
 
@@ -541,11 +541,11 @@ class SoftRenderer(DifferentiableRenderer):
 
         device = vertices.device
         if direction is None:
-            direction = torch.tensor([0, 1, 0], device=self.device)
+            direction = torch.tensor([0, 1., 0], device=self.device)
         else:
             direction = direction.to(device)
         if up is None:
-            up = torch.FloatTensor([0, 1, 0], device=device)
+            up = torch.FloatTensor([0, 1., 0], device=device)
         else:
             up = up.to(device)
 

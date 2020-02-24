@@ -31,5 +31,4 @@ def test_softras(device='cuda:0'):
     textures = torch.ones(1, faces.shape[1], 2, 3, dtype=torch.float32).cuda()
 
     rgb, d, _, = renderer.forward(vertices, faces, textures)
-    print(rgb.shape, d.shape)
     assert rgb.shape == (1, 3, 256, 256) and d.shape == (1, 1, 256, 256)
