@@ -198,8 +198,10 @@ class SoftRenderer(DifferentiableRenderer):
         # camera_mode specifies how the scene is to be set up.
         self.camera_mode = camera_mode
         # Camera direction specifies the optical axis of the camera.
-        if self.camera_direction is None:
+        if camera_direction is None:
             self.camera_direction = torch.FloatTensor([0, 0, 1])
+        else:
+            self.camera_direction = camera_direction.to(self.device)
         # If the mode is 'projection', use the input camera intrinsics and
         # extrinsics.
         if self.camera_mode == 'projection':
@@ -222,7 +224,7 @@ class SoftRenderer(DifferentiableRenderer):
         self.near = near
         self.far = far
 
-        # Soft renderer parameters (control the extent of influence of pixels over mesh)
+        # Render quality parameters. Refer to the SoftRas paper for more details.
         self.sigma_val = sigma_val
         self.dist_func = dist_func
         self.dist_eps = dist_eps
