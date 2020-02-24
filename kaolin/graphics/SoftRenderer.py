@@ -187,7 +187,7 @@ class SoftRenderer(DifferentiableRenderer):
         self.device = device
         # Background color of the rendered image.
         if bg_color is None:
-            bg_color = torch.zeros(3, device=device)
+            self.bg_color = torch.zeros(3, device=device)
         else:
             self.bg_color = bg_color
         # Whether or not to fill in color to the back faces of each triangle.
