@@ -248,7 +248,6 @@ class SoftRenderer(DifferentiableRenderer):
         else:
             self.light_direction = light_direction.to(device)
 
-        # Set rasterizer epsilon value.
         self.rasterizer_eps = 1e-3
 
         # Initialize rasterizer with parameters specified.
@@ -582,7 +581,7 @@ class SoftRenderer(DifferentiableRenderer):
                 and :math:`V` is the number of vertices in the mesh.
         """
         device = vertices.device
-        angle = torch.FloatTensor([angle * 180 / torch.FloatTensor([math.pi])]).to(device)
+        angle = torch.tensor([angle * 180 / math.pi], device=self.device)
         width = torch.tan(angle)
         width = width[:, None]
         z = vertices[:, :, 2]
