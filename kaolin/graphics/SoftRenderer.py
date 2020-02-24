@@ -199,9 +199,9 @@ class SoftRenderer(DifferentiableRenderer):
         self.camera_mode = camera_mode
         # Camera direction specifies the optical axis of the camera.
         if camera_direction is None:
-            self.camera_direction = torch.FloatTensor([0, 0, 1])
+            self.camera_direction = torch.tensor([0, 0, 1], device=device)
         else:
-            self.camera_direction = camera_direction.to(self.device)
+            self.camera_direction = camera_direction.to(device)
         # If the mode is 'projection', use the input camera intrinsics and
         # extrinsics.
         if self.camera_mode == 'projection':
@@ -215,10 +215,9 @@ class SoftRenderer(DifferentiableRenderer):
             self.perspective_distort = perspective_distort
             self.viewing_angle = viewing_angle
             # Set the position of the eye
-            self.eye = torch.FloatTensor([0, 0, 
-                                         -(1. / math.tan(math.pi * self.viewing_angle / 180) + 1)]).to(self.device)
+            self.eye = torch.tensor([0, 0, -(1. / math.tan(math.pi * self.viewing_angle / 180) + 1)], device=device)
             # Direction in which the camera's optical axis is facing
-            self.camera_direction = torch.FloatTensor([0, 0, 1]).to(self.device)
+            self.camera_direction = torch.tensor([0, 0, 1], device=self.device)
 
         # Near and far clipping planes.
         self.near = near
@@ -245,7 +244,7 @@ class SoftRenderer(DifferentiableRenderer):
         else:
             self.light_color_directional = light_color_directional.to(device)
         if light_direction is None:
-            light_direction = torch.FloatTensor([0, 1, 0], device=device)
+            light_direction = torch.tensor([0, 1, 0], device=device)
         else:
             self.light_direction = light_direction.to(device)
 
@@ -528,8 +527,8 @@ class SoftRenderer(DifferentiableRenderer):
 
         return vertices
 
-    def look(self, vertices, eye, direction=torch.FloatTensor([0, 1, 0]),
-             up=None):
+    def look(self, vertices: torch.Tensor, eye: torch.Tensor, direction: Optional[torch.Tensor] = None,
+             up: Optional[torch.Tensor] = None):
         r"""Apply the "look" transformation to the vertices.
 
         Returns:
@@ -541,9 +540,14 @@ class SoftRenderer(DifferentiableRenderer):
         import torch.nn.functional as F
 
         device = vertices.device
-        direction = direction.to(device)
+        if direction is None:
+            direction = torch.tensor([0, 1, 0], device=self.device)
+        else:
+            direction = direction.to(device)
         if up is None:
             up = torch.FloatTensor([0, 1, 0], device=device)
+        else:
+            up = up.to(device)
 
         if eye.dim() == 1:
             eye = eye[None, :]
