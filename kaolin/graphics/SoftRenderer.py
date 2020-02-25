@@ -482,8 +482,10 @@ class SoftRenderer(DifferentiableRenderer):
                 \times V \times 3`), where :math:`B` is the batchsize,
                 and :math:`V` is the number of vertices in the mesh.
             eye (torch.Tensor): Location of the eye (camera) (shape: :math:`3`).
-            at (torch.Tensor): Location of the object to look at (shape: :math:`3`).
+            at (torch.Tensor): Location of the object to look at (shape: :math:`3`)
+                (default: None).
             up (torch.Tensor): "Up" direction for the camera (shape: :math:`3`)
+                (default: None).
 
         Returns:
             vertices (torch.Tensor): Input vertices transformed to the camera coordinate
@@ -539,6 +541,16 @@ class SoftRenderer(DifferentiableRenderer):
              up: Optional[torch.Tensor] = None):
         r"""Apply the "look" transformation to the vertices.
 
+        Args:
+            vertices (torch.Tensor): Vertices of the mesh (shape: :math:`B
+                \times V \times 3`), where :math:`B` is the batchsize,
+                and :math:`V` is the number of vertices in the mesh.
+            eye (torch.Tensor): Location of the eye (camera) (shape: :math:`3`).
+            direction (torch.Tensor): Direction along which the eye looks at (shape: :math:`3`)
+                (default: None).
+            up (torch.Tensor): "Up" direction for the camera (shape: :math:`3`)
+                (default: None).
+
         Returns:
             vertices (torch.Tensor): Input vertices transformed to the camera coordinate
                 frame (shape: :math:`B \times V \times 3`), where :math:`B` is the batchsize,
@@ -581,8 +593,13 @@ class SoftRenderer(DifferentiableRenderer):
 
         return vertices
 
-    def perspective_distortion(self, vertices, angle=30.):
+    def perspective_distortion(self, vertices: torch.Tensor, angle: Optional[float] = 30.):
         r"""Compute perspective distortion from a given viewing angle.
+
+        Args:
+            vertices (torch.Tensor): Input vertices of the mesh (shape: :math:`B \times V \times 3`),
+                where :math:`B` is the batchsize, and :math:`V` is the number of vertices in the mesh.
+            angle (float): Angle to use for perspective distortion (default: 30 degrees).
 
         Returns:
             vertices (torch.Tensor): Input vertices transformed to the camera coordinate
@@ -599,10 +616,17 @@ class SoftRenderer(DifferentiableRenderer):
         vertices = torch.stack((x, y, z), dim=2)
         return vertices
 
-    def vertices_to_faces(self, vertices, faces):
-        r"""
-        vertices (torch.Tensor): shape: math:`B \times V \times 3`
-        faces (torch.Tensor): shape: math:`B \times F \times 3`
+    def vertices_to_faces(self, vertices: torch.Tensor, faces: torch.Tensor):
+        r"""Expand vertices in the layout defined by faces.
+
+        Args:
+            vertices (torch.Tensor): Mesh vertices (shape: math:`B \times V \times 3`).
+            faces (torch.Tensor): Mesh faces (shape: math:`B \times F \times 3`)
+
+        Returns:
+            (torch.Tensor): Input vertices transformed to the camera coordinate
+                frame (shape: :math:`B \times V \times 3`), where :math:`B` is the batchsize,
+                and :math:`V` is the number of vertices in the mesh.
         """
         B = vertices.shape[0]
         V = vertices.shape[1]
@@ -612,13 +636,20 @@ class SoftRenderer(DifferentiableRenderer):
         return vertices[faces]
 
     def textures_to_faces(self, textures, faces):
-        r"""
-        textures (torch.Tensor): shape: math:`B \times F \times 2 \times 3`
-        faces (torch.Tensor): shape: math:`B \times F \times 3`
+        r"""Expand textures in the layout defined by faces.
+
+        Args:
+            textures (torch.Tensor): shape: math:`B \times F \times 2 \times 3`
+            faces (torch.Tensor): shape: math:`B \times F \times 3`
+
+        Returns:
+            (torch.Tensor): Input textures transformed to the camera coordinate
+                frame (shape: :math:`B \times F \times 2 \times 3`), where :math:`B`
+                is the batchsize, and :math:`F` is the number of faces in the mesh.
         """
-        B = vertices.shape[0]
-        V = vertices.shape[1]
+        B = textures.shape[0]
+        F = textures.shape[1]
         device = vertices.device
-        faces = faces + (torch.arange(B, device=device) * V)[:, None, None]
-        vertices = vertices.reshape(B * V, 3)
-        return vertices[faces]
+        faces = faces + (torch.arange(B, device=device) * F)[:, None, None]
+        textures = textures.reshape(B * F, 2, 3)
+        return textures[faces]
