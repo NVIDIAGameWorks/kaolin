@@ -549,7 +549,7 @@ class SoftRenderer(DifferentiableRenderer):
             direction (torch.Tensor): Direction along which the eye looks at (shape: :math:`3`)
                 (default: :math:`[0., 0., 0.]`).
             up (torch.Tensor): "Up" direction for the camera (shape: :math:`3`)
-                (default: :math:`[0., 0., 0.]`).
+                (default: :math:`[0., 1., 0.]`).
 
         Returns:
             vertices (torch.Tensor): Input vertices transformed to the camera coordinate
