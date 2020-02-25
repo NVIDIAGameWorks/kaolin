@@ -72,41 +72,41 @@ class SoftRenderer(DifferentiableRenderer):
 
     def __init__(
             self,
-            image_size: Optional[int] = 256,
-            anti_aliasing: Optional[bool] = True,
-            bg_color: Optional[torch.Tensor] = None,
-            fill_back: Optional[bool] = True,
-            camera_mode: Optional[str] = 'look_at',
-            K: Optional[torch.Tensor] = None,
-            rmat: Optional[torch.Tensor] = None,
-            tvec: Optional[torch.Tensor] = None,
+            image_size: int = 256,
+            anti_aliasing: bool = True,
+            bg_color: torch.Tensor = None,
+            fill_back: bool = True,
+            camera_mode: str = 'look_at',
+            K: torch.Tensor = None,
+            rmat: torch.Tensor = None,
+            tvec: torch.Tensor = None,
             perspective_distort: bool = True,
-            sigma_val: Optional[float] = 1e-5,
-            dist_func: Optional[str] = 'euclidean',
-            dist_eps: Optional[float] = 1e-4,
-            gamma_val: Optional[float] = 1e-4,
-            aggr_func_rgb: Optional[str] = 'softmax',
-            aggr_func_alpha: Optional[str] = 'prod',
-            texture_type: Optional[str] = 'surface',
-            viewing_angle: Optional[float] = 30.,
-            viewing_scale: Optional[float] = 1.0, 
-            eye: Optional[torch.Tensor] = None,
-            camera_direction: Optional[torch.Tensor] = None,
-            near: Optional[float] = 1,
-            far: Optional[float] = 100,
-            light_mode: Optional[str] = 'surface',
-            light_intensity_ambient: Optional[float] = 0.5,
-            light_intensity_directional: Optional[float] = 0.5,
-            light_color_ambient: Optional[torch.Tensor] = None,
-            light_color_directional: Optional[torch.Tensor] = None,
-            light_direction: Optional[torch.Tensor] = None,
-            device: Optional[str] = 'cpu'):
+            sigma_val: float = 1e-5,
+            dist_func: str = 'euclidean',
+            dist_eps: float = 1e-4,
+            gamma_val: float = 1e-4,
+            aggr_func_rgb: str = 'softmax',
+            aggr_func_alpha: str = 'prod',
+            texture_type: str = 'surface',
+            viewing_angle: float = 30.,
+            viewing_scale: float = 1.0, 
+            eye: torch.Tensor = None,
+            camera_direction: torch.Tensor = None,
+            near: float = 1,
+            far: float = 100,
+            light_mode: str = 'surface',
+            light_intensity_ambient: float = 0.5,
+            light_intensity_directional: float = 0.5,
+            light_color_ambient: torch.Tensor = None,
+            light_color_directional: torch.Tensor = None,
+            light_direction: torch.Tensor = None,
+            device: str = 'cpu'):
         r"""Initalize the SoftRenderer object.
 
         NOTE: SoftRenderer works only in GPU mode!
 
         Args:
-            image_size (int): Size of the (square) image to be rendered.
+            image_size (int): Size of the (square) image to be rendered (default: 256).
             anti_aliasing (bool): Whether or not to perform anti-aliasing
                 (default: True)
             bg_color (torch.Tensor): Background color of rendered image
@@ -131,12 +131,12 @@ class SoftRenderer(DifferentiableRenderer):
                 row and last column drawn from the 4 x 4 identity matrix)
                 (default: None)
             rmat (torch.Tensor): Rotation matrix (again, 4 x 4, as opposed
-                to the usual 3 x 3 convention).
+                to the usual 3 x 3 convention) (default: None).
             tvec (torch.Tensor): Translation vector (3 x 1). Note that the
                 (negative of the) tranlation is applied before rotation,
                 to be consistent with the projective geometry convention
                 of transforming a 3D point X by doing
-                torch.matmul(R.transpose(), X - t) (default: None)
+                torch.matmul(R.transpose(), X - t) (default: None).
             perspective_distort (bool): Whether or not to perform perspective
                 distortion (to simulate field-of-view based distortion effects)
                 (default: True).
@@ -302,7 +302,7 @@ class SoftRenderer(DifferentiableRenderer):
                 mode, only a silhouette image is rendered. In the depth mode,
                 only a depth image is rendered.
             K (torch.Tensor): Camera intrinsics (default: None) (shape:
-                :math:`B \times 4 \times 4` or :math:`4 \times 4`)
+                :math:`B \times 4 \times 4` or :math:`4 \times 4`) (default: None).
             rmat (torch.Tensor): Rotation matrix (default: None) (shape:
                 :math:`B \times 4 \times 4` or :math:`4 \times 4`)
             tvec (torch.Tensor): Translation vector (default: None)
@@ -483,9 +483,9 @@ class SoftRenderer(DifferentiableRenderer):
                 and :math:`V` is the number of vertices in the mesh.
             eye (torch.Tensor): Location of the eye (camera) (shape: :math:`3`).
             at (torch.Tensor): Location of the object to look at (shape: :math:`3`)
-                (default: None).
+                (default: :math:`[0., 0., 0.]`).
             up (torch.Tensor): "Up" direction for the camera (shape: :math:`3`)
-                (default: None).
+                (default: :math:`[0., 1., 0.]`).
 
         Returns:
             vertices (torch.Tensor): Input vertices transformed to the camera coordinate
@@ -504,7 +504,7 @@ class SoftRenderer(DifferentiableRenderer):
         else:
             at = at.to(device)
         if up is None:
-            up = torch.tensor([0., 0., 0.], device=device)
+            up = torch.tensor([0., 1., 0.], device=device)
         else:
             up = up.to(device)
 
@@ -547,9 +547,9 @@ class SoftRenderer(DifferentiableRenderer):
                 and :math:`V` is the number of vertices in the mesh.
             eye (torch.Tensor): Location of the eye (camera) (shape: :math:`3`).
             direction (torch.Tensor): Direction along which the eye looks at (shape: :math:`3`)
-                (default: None).
+                (default: :math:`[0., 0., 0.]`).
             up (torch.Tensor): "Up" direction for the camera (shape: :math:`3`)
-                (default: None).
+                (default: :math:`[0., 0., 0.]`).
 
         Returns:
             vertices (torch.Tensor): Input vertices transformed to the camera coordinate
