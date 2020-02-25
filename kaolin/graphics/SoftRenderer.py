@@ -72,32 +72,35 @@ class SoftRenderer(DifferentiableRenderer):
 
     def __init__(
             self,
-            image_size: int = 256,
-            anti_aliasing: bool = True,
-            bg_color: torch.Tensor = None,
-            fill_back: bool = True,
-            camera_mode: str = 'projection',
-            K=None, rmat=None, tvec=None,
+            image_size: Optional[int] = 256,
+            anti_aliasing: Optional[bool] = True,
+            bg_color: Optional[torch.Tensor] = None,
+            fill_back: Optional[bool] = True,
+            camera_mode: Optional[str] = 'look_at',
+            K: Optional[torch.Tensor] = None,
+            rmat: Optional[torch.Tensor] = None,
+            tvec: Optional[torch.Tensor] = None,
             perspective_distort: bool = True,
-            sigma_val: float = 1e-5,
-            dist_func: str = 'euclidean',
-            dist_eps: float = 1e-4,
-            gamma_val: float = 1e-4,
-            aggr_func_rgb: str = 'softmax',
-            aggr_func_alpha: str = 'prod',
-            texture_type: str = 'surface',
-            viewing_angle: float = 30.,
-            viewing_scale: float = 1.0, 
-            eye: torch.Tensor = None,
-            camera_direction: torch.Tensor = None,
-            near: float = 1, far: float = 100,
-            light_mode: str = 'surface',
-            light_intensity_ambient: float = 0.5,
-            light_intensity_directional: float = 0.5,
-            light_color_ambient: torch.Tensor = None,
-            light_color_directional: torch.Tensor = None,
-            light_direction: torch.Tensor = None,
-            device: str = 'cpu'):
+            sigma_val: Optional[float] = 1e-5,
+            dist_func: Optional[str] = 'euclidean',
+            dist_eps: Optional[float] = 1e-4,
+            gamma_val: Optional[float] = 1e-4,
+            aggr_func_rgb: Optional[str] = 'softmax',
+            aggr_func_alpha: Optional[str] = 'prod',
+            texture_type: Optional[str] = 'surface',
+            viewing_angle: Optional[float] = 30.,
+            viewing_scale: Optional[float] = 1.0, 
+            eye: Optional[torch.Tensor] = None,
+            camera_direction: Optional[torch.Tensor] = None,
+            near: Optional[float] = 1,
+            far: Optional[float] = 100,
+            light_mode: Optional[str] = 'surface',
+            light_intensity_ambient: Optional[float] = 0.5,
+            light_intensity_directional: Optional[float] = 0.5,
+            light_color_ambient: Optional[torch.Tensor] = None,
+            light_color_directional: Optional[torch.Tensor] = None,
+            light_direction: Optional[torch.Tensor] = None,
+            device: Optional[str] = 'cpu'):
         r"""Initalize the SoftRenderer object.
 
         NOTE: SoftRenderer works only in GPU mode!
@@ -122,7 +125,7 @@ class SoftRenderer(DifferentiableRenderer):
                 the `look` mode, only the direction in which the camera
                 needs to look is specified. It does not necessarily look
                 towards the origin, as it allows the specification of a
-                custom "upwards" direction (default: 'projection').
+                custom "upwards" direction (default: 'look_at').
             K (torch.Tensor): Camera intrinsics matrix. Note that, unlike
                 standard notation, K here is a 4 x 4 matrix (with the last
                 row and last column drawn from the 4 x 4 identity matrix)
@@ -152,19 +155,25 @@ class SoftRenderer(DifferentiableRenderer):
                 (default: 'surface').
             viewing_angle (float): Angle at which the object is to be viewed
                 (assumed to be in degrees!) (default: 30.)
+            viewing_scale (float): Scale at which the object is to be viewed
+                (default: 1).
+            eye (torch.Tensor): Location of the "eye" (of the camera). Used in the `look`
+                and `look_at` modes (default: None).
             camera_direction (float): Direction in which the camera is facing
                 (used only in the `look` and `look_at` modes) (default:
                 :math:`[0, 0, 1]`)
-            near (float): Near clipping plane (for depth values) (default: 0.1)
-            far (float): Far clipping plane (for depth values) (default: 100)
+            near (float): Near clipping plane (for depth values) (default: 1).
+            far (float): Far clipping plane (for depth values) (default: 100).
+            light_mode (str): Mode of lighting up the mesh (choices: 'surface', 'vertex')
+                (default: 'surface').
             light_intensity_ambient (float): Intensity of ambient light (in the
                 range :math:`\left[ 0, 1 \right]`) (default: 0.5).
             light_intensity_directional (float): Intensity of directional light
                 (in the range :math:`\left[ 0, 1 \right]`) (default: 0.5).
             light_color_ambient (torch.Tensor): Color of ambient light
-                (default: :math:`\left[ 0, 0, 0 \right]`)
+                (default: :math:`\left[ 1, 1, 1 \right]`)
             light_color_directional (torch.Tensor): Color of directional light
-                (default: :math:`\left[ 0, 0, 0 \right]`)
+                (default: :math:`\left[ 1, 1, 1 \right]`)
             light_direction (torch.Tensor): Light direction, for directional
                 light (default: :math:`\left[ 0, 1, 0 \right]`)
             device (torch.Tensor): Device on which all tensors are stored.
@@ -311,7 +320,7 @@ class SoftRenderer(DifferentiableRenderer):
 
         # Fill the back faces of each triangle, if needed
         if self.fill_back:
-            faces = torch.cat((faces, faces[:, :, list(reversed(range(faces.shape[-1])))]), dim=1)
+            faces = torch.cat((faces, torch.flip(faces, [0, 1])), dim=1)
             textures = torch.cat((textures, textures), dim=1)
 
         # Lighting (not needed when we are rendering only depth/silhouette
