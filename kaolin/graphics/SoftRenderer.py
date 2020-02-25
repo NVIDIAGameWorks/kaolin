@@ -159,7 +159,7 @@ class SoftRenderer(DifferentiableRenderer):
                 (default: 1).
             eye (torch.Tensor): Location of the "eye" (of the camera). Used in the `look`
                 and `look_at` modes (default: None).
-            camera_direction (float): Direction in which the camera is facing
+            camera_direction (torch.Tensor): Direction in which the camera is facing
                 (used only in the `look` and `look_at` modes) (default:
                 :math:`[0, 0, 1]`)
             near (float): Near clipping plane (for depth values) (default: 1).
@@ -224,7 +224,10 @@ class SoftRenderer(DifferentiableRenderer):
             self.perspective_distort = perspective_distort
             self.viewing_angle = viewing_angle
             # Set the position of the eye
-            self.eye = torch.tensor([0, 0, -(1. / math.tan(math.pi * self.viewing_angle / 180) + 1)], device=device)
+            if eye is None:
+                self.eye = torch.tensor([0, 0, -(1. / math.tan(math.pi * self.viewing_angle / 180) + 1)], device=device)
+            else:
+                self.eye = eye.to(device)
             # Direction in which the camera's optical axis is facing
             self.camera_direction = torch.tensor([0, 0, 1.], device=self.device)
 
@@ -320,7 +323,7 @@ class SoftRenderer(DifferentiableRenderer):
 
         # Fill the back faces of each triangle, if needed
         if self.fill_back:
-            faces = torch.cat((faces, torch.flip(faces, [0, 1])), dim=1)
+            faces = torch.cat((faces, torch.flip(faces, [2])), dim=1)
             textures = torch.cat((textures, textures), dim=1)
 
         # Lighting (not needed when we are rendering only depth/silhouette
@@ -565,7 +568,7 @@ class SoftRenderer(DifferentiableRenderer):
         else:
             direction = direction.to(device)
         if up is None:
-            up = torch.FloatTensor([0, 1., 0], device=device)
+            up = torch.tensor([0, 1., 0], device=device)
         else:
             up = up.to(device)
 
