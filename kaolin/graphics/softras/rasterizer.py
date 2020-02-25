@@ -27,10 +27,20 @@ import torch.nn.functional as F
 
 
 class SoftRasterizer(nn.Module):
-    def __init__(self, image_size=256, background_color=[0, 0, 0], near=1, far=100, 
-                 anti_aliasing=False, fill_back=False, eps=1e-3, 
-                 sigma_val=1e-5, dist_func='euclidean', dist_eps=1e-4,
-                 gamma_val=1e-4, aggr_func_rgb='softmax', aggr_func_alpha='prod',
+    def __init__(self,
+                 image_size=256,
+                 background_color=None,
+                 near=1,
+                 far=100, 
+                 anti_aliasing=False,
+                 fill_back=False,
+                 eps=1e-3, 
+                 sigma_val=1e-5,
+                 dist_func='euclidean',
+                 dist_eps=1e-4,
+                 gamma_val=1e-4,
+                 aggr_func_rgb='softmax',
+                 aggr_func_alpha='prod',
                  texture_type='surface'):
         super(SoftRasterizer, self).__init__()
 
@@ -44,6 +54,8 @@ class SoftRasterizer(nn.Module):
             raise ValueError('Texture type only support surface and vertex')
 
         self.image_size = image_size
+        if background_color is None:
+            background_color = [0, 0, 0]
         self.background_color = background_color
         self.near = near
         self.far = far

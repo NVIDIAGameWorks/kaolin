@@ -47,11 +47,21 @@ from . import soft_rasterize_cuda
 class SoftRasterizeFunction(Function):
 
     @staticmethod
-    def forward(ctx, face_vertices, textures, image_size=256, 
-                background_color=[0, 0, 0], near=1, far=100, 
-                fill_back=True, eps=1e-3,
-                sigma_val=1e-5, dist_func='euclidean', dist_eps=1e-4,
-                gamma_val=1e-4, aggr_func_rgb='softmax', aggr_func_alpha='prod',
+    def forward(ctx,
+                face_vertices,
+                textures,
+                image_size=256, 
+                background_color=None,
+                near=1,
+                far=100, 
+                fill_back=True,
+                eps=1e-3,
+                sigma_val=1e-5,
+                dist_func='euclidean',
+                dist_eps=1e-4,
+                gamma_val=1e-4,
+                aggr_func_rgb='softmax',
+                aggr_func_alpha='prod',
                 texture_type='surface'):
 
         # face_vertices: [nb, nf, 9]
@@ -63,7 +73,10 @@ class SoftRasterizeFunction(Function):
         func_map_sample = {'surface': 0, 'vertex': 1}
 
         ctx.image_size = image_size
-        ctx.background_color = background_color
+        if background_color is None:
+            ctx.background_color = [0, 0, 0]
+        else:
+            ctx.background_color = background_color
         ctx.near = near
         ctx.far = far
         ctx.eps = eps
@@ -136,14 +149,26 @@ class SoftRasterizeFunction(Function):
         return grad_faces, grad_textures, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 
-def soft_rasterize(face_vertices, textures, image_size=256, 
-                   background_color=[0, 0, 0], near=1, far=100, 
-                   fill_back=True, eps=1e-3,
-                   sigma_val=1e-5, dist_func='euclidean', dist_eps=1e-4,
-                   gamma_val=1e-4, aggr_func_rgb='softmax', aggr_func_alpha='prod',
+def soft_rasterize(face_vertices,
+                   textures,
+                   image_size=256, 
+                   background_color=None,
+                   near=1,
+                   far=100, 
+                   fill_back=True,
+                   eps=1e-3,
+                   sigma_val=1e-5,
+                   dist_func='euclidean',
+                   dist_eps=1e-4,
+                   gamma_val=1e-4,
+                   aggr_func_rgb='softmax',
+                   aggr_func_alpha='prod',
                    texture_type='surface'):
     if face_vertices.device == "cpu":
         raise TypeError('Rasterize module supports only cuda Tensors')
+
+    if background_color is None:
+        background_color = [0, 0, 0]
 
     return SoftRasterizeFunction.apply(face_vertices, textures, image_size, 
                                        background_color, near, far,
