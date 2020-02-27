@@ -22,8 +22,8 @@ exclude = .git, tests/, build/,
           kaolin/graphics/dib_renderer,
           kaolin/graphics/DIBRenderer.py,
           kaolin/graphics/NeuralMeshRenderer.py,
-          kaolin/graphics/nmr
-          kaolin/helpers.py
+          kaolin/graphics/nmr,
+          kaolin/helpers.py,
           kaolin/mathutils,
           kaolin/metrics,
           kaolin/models,

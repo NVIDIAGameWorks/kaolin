@@ -158,7 +158,7 @@ class SoftRenderer(DifferentiableRenderer):
             viewing_scale (float): Scale at which the object is to be viewed
                 (default: 1).
             eye (torch.Tensor): Location of the "eye" (of the camera). Used in the `look`
-                and `look_at` modes (default: None).
+                and `look_at` modes (default: computed using `viewing_angle`).
             camera_direction (torch.Tensor): Direction in which the camera is facing
                 (used only in the `look` and `look_at` modes) (default:
                 :math:`[0, 0, 1]`)
@@ -214,9 +214,21 @@ class SoftRenderer(DifferentiableRenderer):
         # If the mode is 'projection', use the input camera intrinsics and
         # extrinsics.
         if self.camera_mode == 'projection':
-            self.K = K
-            self.rmat = rmat
-            self.tvec = tvec
+            if K is None:
+                self.K = torch.eye(3).unsqueeze(0).to(device)
+            else:
+                self.K = K.to(device)
+            if rmat is none:
+                self.rmat = torch.eye(3).unsqueeze(0).to(device)
+            else:
+                self.rmat = rmat
+            if tvec is none:
+                self.tvec = torch.zeros(1, 3)
+                # Translate sufficiently along negative Z, to ensure most points have positive depths.
+                self.tvec[0, 2] = -5
+                self.tvec = self.tvec.to(device)
+            else:
+                self.tvec = tvec.to(device)
         # If the mode is 'look' or 'look_at', use the viewing angle to determine
         # perspective distortion and camera position and orientation.
         elif self.camera_mode in ['look', 'look_at']:
