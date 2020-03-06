@@ -111,7 +111,7 @@ class Model(nn.Module):
         ###########################
 
         image_ref = torch.from_numpy(imread(image_path).astype(
-            'float32') / 255.).permute(2, 0, 1)[None, ::]
+            'float32') / 255.).permute(2, 0, 1)[:3, ...][None, ::]
         self.register_buffer('image_ref', image_ref)
 
         ###########################

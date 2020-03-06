@@ -10,6 +10,8 @@ To run each example, simply execute `python <example-script>`, where `<example-s
 
 To see the command line arguments of each example, run `python <example-script> --help`.
 
+(Note: for Python 3, you might need to use `python3` instead.)
+
 ## Example 1
 
 Renders the mesh from multiple viewpoints.
@@ -21,6 +23,8 @@ Example output:
 ## Example 2
 
 Transforming the silhouette of the mesh to match the target image (a square by default), by optimizing the vertices.
+
+You can try different target images in this folder as well, such as `python <example-script> --image ./example2_moon.png` or `./example2_circle.png`.
 
 Example target image, final mesh, and optimization process:
 
