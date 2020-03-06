@@ -168,19 +168,13 @@ def realign(src: Union[torch.Tensor, PointCloud],
         src = src.clone()
 
     # Compute the relative scaling factor and scale the src cloud.
-    src_min, _ = src.min(-2)
-    src_max, _ = src.max(-2)
-    tgt_min, _ = tgt.min(-2)
-    tgt_max, _ = tgt.max(-2)
-    src_min = src_min.unsqueeze(-2)
-    src_max = src_max.unsqueeze(-2)
-    tgt_min = tgt_min.unsqueeze(-2)
-    tgt_max = tgt_max.unsqueeze(-2)
-    # Center the pointclouds.
-    src = src - src.mean(-2).unsqueeze(-2)
-    src = ( (tgt_max - tgt_min) / (src_max - src_min + EPS) ) * src
-    # Undo the centering translation, and return the result.
-    return src + tgt.mean(-2).unsqueeze(-2)
+    src_min, _ = src.min(-2, keepdim=True)
+    src_max, _ = src.max(-2, keepdim=True)
+    tgt_min, _ = tgt.min(-2, keepdim=True)
+    tgt_max, _ = tgt.max(-2, keepdim=True)
+
+    src = ((src - src_min) / (src_max - src_min + EPS)) * (tgt_max - tgt_min) + tgt_min
+    return src
 
 
 def normalize(cloud: Union[torch.Tensor, PointCloud],
@@ -209,26 +203,6 @@ def normalize(cloud: Union[torch.Tensor, PointCloud],
         cloud = cloud.clone()
 
     cloud = (cloud - cloud.mean(-2).unsqueeze(-2))\
-            / (cloud.std(-2).unsqueeze(-2) + EPS)
+        / (cloud.std(-2).unsqueeze(-2) + EPS)
 
     return cloud
-
-
-
-if __name__ == '__main__':
-
-    device = 'cpu'
-    
-    # Test: realign
-    src = torch.randn(2, 3, 4, 3).to(device)
-    tgt = torch.rand(2, 3, 4, 3).to(device)
-    src_ = realign(src, tgt)
-    # After transformation, src_.mean(-2) should be equal to tgt.mean(-2)
-    print(src_.mean(-2))
-    print(tgt.mean(-2))
-
-    # Test: normalize
-    a = torch.rand(2, 10, 3)
-    a_ = normalize(a)
-    print(a_.mean(-2))
-    print(a_.std(-2))

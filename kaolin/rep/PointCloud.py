@@ -18,6 +18,7 @@ import numpy as np
 import torch
 
 from kaolin import helpers
+import kaolin as kal
 
 
 class PointCloud(object):
@@ -58,6 +59,9 @@ class PointCloud(object):
                 helpers._assert_shape_eq(normals, (points.shape[-2], 3))
             self.normals = normals.clone() if copy else normals
             self.normals = self.normals.to(device)
+
+    def show(self):
+        kal.visualize.show_pointcloud(self.points)
 
 
 def bounding_points(points: torch.Tensor, bbox: list, padding: float = .05):
