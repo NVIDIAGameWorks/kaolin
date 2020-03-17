@@ -41,7 +41,7 @@ Download pre-trained models [here](https://drive.google.com/a/polytechnique.org/
 
 ```bash
 # To evaluate the auto-encoder
-python eval_auto_encoder.py --shapenet-root <path_to_ShapeNetCore.v1>
+python eval_auto_encoder.py --shapenet-root <path_to_ShapeNetCore.v1> --expid AtlasNet_AE
 # Output
 Chamfer Loss over validation set is 0.000838079037599338
 F-score over validation set is 0.23783030159928953
@@ -49,7 +49,7 @@ F-score over validation set is 0.23783030159928953
 ```bash
 # To evaluate a trained model
 python eval.py --shapenet-root <path_to_ShapeNetCore.v1> \
-    --shapenet-images-root <path_to_ShapeNetRendering>ß
+    --shapenet-images-root <path_to_ShapeNetRendering> --expid AtlasNet_SVR
 # Output
 Chamfer Loss over validation set is 0.003955722602290667
 F-score over validation set is 0.09235857071979071
