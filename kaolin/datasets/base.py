@@ -31,7 +31,7 @@ def _preprocess_task(args):
             cache_transform(name, *data)
 
 class KaolinDatasetMeta(type):
-    def __new__(cls, cls_name, base_cls, class_dict):
+    def __new__(metacls, cls_name, base_cls, class_dict):
         if cls_name != "KaolinDataset":
             class_dict['__doc__'] += \
                 """Additional args:
@@ -43,7 +43,7 @@ class KaolinDatasetMeta(type):
                                             the preprocessed outputs are then cached to 'cache_dir'.
         transform (Callable): Called on the preprocessed data at __getitem__.
         no_progress (bool): disable tqdm progress bar for preprocessing."""
-        return type.__new__(cls, cls_name, base_cls, class_dict)
+        return type.__new__(metacls, cls_name, base_cls, class_dict)
 
 class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
     """
@@ -99,7 +99,7 @@ class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
                     [(idx, self._get_data, self._get_attributes, self.cache_convert)
                      for idx in range(len(self))])
                 for i in tqdm(range(len(self)), desc=desc, disable=no_progress):
-                    iterator.next()
+                    next(iterator)
         else:
             self.cache_convert = None
         self.transform = transform
