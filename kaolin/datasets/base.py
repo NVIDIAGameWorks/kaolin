@@ -12,41 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
-import sys
-import os
-from pathlib import Path
-import torch
-import torch.utils.data as data
-from torch.multiprocessing import Pool
-import warnings
-import urllib.request
-import zipfile
-import json
-import re
-from collections import OrderedDict
-from glob import glob
-import numpy as np
-import random
-
+from abc import abstractmethod
 from tqdm import tqdm
-import scipy.sparse
-import tarfile
-from PIL import Image
 
-import kaolin as kal
-from kaolin.rep.TriangleMesh import TriangleMesh
-from kaolin.rep.QuadMesh import QuadMesh
+import torch
+from torch.multiprocessing import Pool
+from torch.utils.data import Dataset
 
-from kaolin.transforms import pointcloudfunc as pcfunc
-from kaolin.transforms import meshfunc
-from kaolin.transforms import voxelfunc
-from kaolin.transforms import transforms as tfs
 from kaolin import helpers
-import kaolin.conversions.meshconversions as mesh_cvt
-
-import functools
-import inspect
 
 def _preprocess_task(args):
     torch.set_num_threads(1)
@@ -72,7 +45,7 @@ class KaolinDatasetMeta(type):
         no_progress (bool): disable tqdm progress bar for preprocessing."""
         return type.__new__(cls, cls_name, base_cls, class_dict)
 
-class KaolinDataset(data.Dataset, metaclass=KaolinDatasetMeta):
+class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
     """
     Abstract class for dataset with handling of multiprocess or cuda preprocessing.
 
@@ -124,7 +97,7 @@ class KaolinDataset(data.Dataset, metaclass=KaolinDatasetMeta):
                 iterator = p.imap_unordered(
                     _preprocess_task,
                     [(idx, self._get_data, self._get_attributes, self.cache_convert)
-                    for idx in range(len(self))])
+                     for idx in range(len(self))])
                 for i in tqdm(range(len(self)), desc=desc, disable=no_progress):
                     iterator.next()
         else:
@@ -134,8 +107,8 @@ class KaolinDataset(data.Dataset, metaclass=KaolinDatasetMeta):
     def __getitem__(self, index):
         """Returns the item at index idx. """
         attributes = self._get_attributes(index)
-        data = self.cache_convert(attributes['name']) if self.cache_convert is not None else \
-               self._get_data(index)
+        data = (self.cache_convert(attributes['name']) if self.cache_convert is not None else
+                self._get_data(index))
         if self.transform is not None:
             data = self.transform(data)
         return {'data': data, 'attributes': attributes}
