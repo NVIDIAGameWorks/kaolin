@@ -93,15 +93,16 @@ class ShapeNet_Meshes(data.Dataset):
         categories (str): List of categories to load from ShapeNet. This list may
                 contain synset ids, class label names (for ShapeNetCore classes),
                 or a combination of both.
-        train (bool): return the training set else the test set
-        split (float): amount of dataset that is training out of 1
+        train (bool): If True, return the training set, otherwise the test set
+        split (float): fraction of the dataset to be used for training (>=0 and <=1)
         no_progress (bool): if True, disables progress bar
     Returns:
         .. code-block::
-        dict: {
-            attributes: {name: str, path: str, synset: str, label: str},
-            data: {vertices: torch.Tensor, faces: torch.Tensor}
-        }
+
+           dict: {
+               attributes: {name: str, path: str, synset: str, label: str},
+               data: {vertices: torch.Tensor, faces: torch.Tensor}
+           }
     Example:
         >>> meshes = ShapeNet_Meshes(root='../data/ShapeNet/')
         >>> obj = next(iter(meshes))
@@ -110,7 +111,6 @@ class ShapeNet_Meshes(data.Dataset):
         >>> obj['data']['faces'].shape
         torch.Size([1910, 3])
     """
-
     def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
                  split: float = .7, no_progress: bool = False):
         self.root = Path(root)
@@ -167,8 +167,8 @@ class ShapeNet(KaolinDataset):
         categories (list): List of categories to load from ShapeNet. This list may
                            contain synset ids, class label names (for ShapeNetCore classes),
                            or a combination of both.
-        train (bool): is using training split (default: True)
-        split (float): proportion of the dataset to split to the training datase
+        train (bool): If True, return the training set, otherwise the test set
+        split (float): fraction of the dataset to be used for training (>=0 and <=1)
     Returns:
         .. code-block::
         dict: {
@@ -186,13 +186,13 @@ class ShapeNet(KaolinDataset):
 
     def initialize(self, root: str, categories: list, train: bool = True, split: float = .7):
         """Initialize the dataset
-           Args:
-               root (str): path to ShapeNet root directory
-               categories (list): List of categories to load from ShapeNet. This list may
-                                  contain synset ids, class label names (for ShapeNetCore classes),
-                                  or a combination of both.
-               train (bool): is using training split (default: True)
-               split (float): proportion of the dataset to split to the training dataset"""
+        Args:
+            root (str): path to ShapeNet root directory
+            categories (list): List of categories to load from ShapeNet. This list may
+                               contain synset ids, class label names (for ShapeNetCore classes),
+                               or a combination of both.
+            train (bool): If True, return the training set, otherwise the test set
+            split (float): fraction of the dataset to be used for training (>=0 and <=1)"""
         self.root = Path(root)
         self.paths = []
         self.synset_idxs = []
