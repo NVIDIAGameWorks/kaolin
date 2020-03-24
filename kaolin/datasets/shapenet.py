@@ -160,7 +160,7 @@ class ShapeNet_Meshes(data.Dataset):
 
 
 class ShapeNet(KaolinDataset):
-    r"""ShapeNet Dataset class for meshes.
+    r"""ShapeNetV1 Dataset class for meshes.
     Args:
         root (str): path to ShapeNet root directory
         categories (list): List of categories to load from ShapeNet. This list may

@@ -130,7 +130,8 @@ class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
         pass
 
 class CombinationDataset(KaolinDataset):
-    """Dataset combining multiple list of datasets outputs as inputs
+    """Dataset combining a list of datasets into a unified dataset object.
+    Useful when multiple output representations are needed from a common base representation (Eg. when a mesh is to be served as both a pointcloud and a voxelgrid, etc.)
     the output of _get_attributes will be a tuple of all the _get_attributes of the dataset list
     the output of _get_data wiil be a tuple of all the 'data' of the __getitem__ of the dataset list
 
