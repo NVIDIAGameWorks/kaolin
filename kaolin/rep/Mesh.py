@@ -967,3 +967,24 @@ class Mesh():
 
     def compute_dihedral_angles_per_edge(self):
         raise NotImplementedError
+
+    def __getstate__(self):
+        outputs = {'vertices': self.vertices,
+                   'faces': self.faces}
+        if self.uvs is not None:
+            outputs['uvs'] = self.uvs
+        if self.face_textures is not None:
+            outputs['face_textures'] = self.face_textures
+        if self.textures is not None:
+            outputs['textures'] = self.textures
+        return outputs
+
+    def __setstate__(self, args):
+        self.vertices = args['vertices']
+        self.faces = args['faces']
+        if 'uvs' in args:
+            self.uvs = args['uvs']
+        if 'face_textures' in args:
+            self.face_textures = args['face_textures']
+        if 'textures' in args:
+            self.textures = args['textures']
