@@ -171,10 +171,11 @@ class ShapeNet(KaolinDataset):
         split (float): fraction of the dataset to be used for training (>=0 and <=1)
     Returns:
         .. code-block::
-        dict: {
-            attributes: {name: str, path: str, synset: str, label: str},
-            data: {vertices: torch.Tensor, faces: torch.Tensor}
-        }
+
+           dict: {
+                attributes: {name: str, path: str, synset: str, label: str},
+                data: {vertices: torch.Tensor, faces: torch.Tensor}
+           }
     Example:
         >>> meshes = ShapeNet(root='../data/ShapeNet/')
         >>> obj = meshes[0]
