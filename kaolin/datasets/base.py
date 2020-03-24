@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -141,7 +141,7 @@ class CombinationDataset(KaolinDataset):
         self.len = len(datasets[0])
         for i, d in enumerate(datasets):
             assert len(d) == self.len, \
-                "dataset {} have different length ({})than the first dataset ({})".format(i, len(d), self.len)
+                f"All datasets must have the same length. Invalid length at index {i} (expected: {self.len}, got: {len(d)})"
         self.datasets = datasets
 
     def __len__(self):
