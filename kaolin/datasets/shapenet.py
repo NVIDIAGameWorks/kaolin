@@ -17,7 +17,6 @@ import os
 from pathlib import Path
 import torch
 import torch.utils.data as data
-from torch.multiprocessing import Pool
 import warnings
 import urllib.request
 import zipfile
