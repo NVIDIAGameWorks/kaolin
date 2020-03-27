@@ -21,6 +21,7 @@ from torch.utils.data import Dataset
 
 from kaolin import helpers
 
+
 def _preprocess_task(args):
     torch.set_num_threads(1)
     with torch.no_grad():
@@ -28,7 +29,8 @@ def _preprocess_task(args):
         name = get_attributes(idx)['name']
         if name not in cache_transform.cached_ids:
             data = get_data(idx)
-            cache_transform(name, *data)
+            cache_transform(name, data)
+
 
 class KaolinDatasetMeta(type):
     def __new__(metacls, cls_name, base_cls, class_dict):
@@ -45,12 +47,13 @@ class KaolinDatasetMeta(type):
         no_progress (bool): disable tqdm progress bar for preprocessing."""
         return type.__new__(metacls, cls_name, base_cls, class_dict)
 
+
 class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
     """
     Abstract class for dataset with handling of multiprocess or cuda preprocessing.
 
     A KaolinDataset children class will need the above implementation:
-       1) _initialize:
+       1) initialize:
            Initialization function called at the beginning of the constructor.
        2) _get_data:
            Data getter that will be preprocessed => cached => transformed, take an index as input.
@@ -59,6 +62,7 @@ class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
        4) __len__:
            Return the size of the dataset
     """
+
     def __init__(self, *args, preprocessing_transform=None, preprocessing_params: dict = None,
                  transform=None, no_progress: bool = False, **kwargs):
         """
@@ -75,42 +79,55 @@ class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
         """
         self.initialize(*args, **kwargs)
         if preprocessing_transform is not None:
-            desc = 'applying preprocessing'
+            desc = 'Applying preprocessing'
             if preprocessing_params is None:
                 preprocessing_params = {}
-            assert preprocessing_params.get('cache_dir') is not None
+
+            cache_dir = preprocessing_params.get('cache_dir')
+            assert cache_dir is not None, 'Cache directory is not given'
+
             self.cache_convert = helpers.Cache(
-                preprocessing_transform, preprocessing_params['cache_dir'],
-                cache_key=helpers._get_hash(repr(preprocessing_transform)))
-            if preprocessing_params.get('use_cuda') is None:
-                preprocessing_params['use_cuda'] = False
+                preprocessing_transform,
+                cache_dir=cache_dir,
+                cache_key=helpers._get_hash(repr(preprocessing_transform))
+            )
+
+            use_cuda = preprocessing_params.get('use_cuda', False)
+
             num_workers = preprocessing_params.get('num_workers')
+
             if num_workers == 0:
                 with torch.no_grad():
                     for idx in tqdm(range(len(self)), desc=desc, disable=no_progress):
                         name = self._get_attributes(idx)['name']
                         if name not in self.cache_convert.cached_ids:
                             data = self._get_data(idx)
-                            self.cache_convert(name, *data)
+                            self.cache_convert(name, data)
+
             else:
                 p = Pool(num_workers)
                 iterator = p.imap_unordered(
                     _preprocess_task,
                     [(idx, self._get_data, self._get_attributes, self.cache_convert)
                      for idx in range(len(self))])
+
                 for i in tqdm(range(len(self)), desc=desc, disable=no_progress):
                     next(iterator)
+
         else:
             self.cache_convert = None
+
         self.transform = transform
 
     def __getitem__(self, index):
         """Returns the item at index idx. """
         attributes = self._get_attributes(index)
-        data = (self.cache_convert(attributes['name']) if self.cache_convert is not None else
-                self._get_data(index))
+        data = (self._get_data(index) if self.cache_convert is None else
+                self.cache_convert(attributes['name']))
+
         if self.transform is not None:
             data = self.transform(data)
+
         return {'data': data, 'attributes': attributes}
 
     @abstractmethod
@@ -129,6 +146,7 @@ class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
     def __len__(self):
         pass
 
+
 class CombinationDataset(KaolinDataset):
     """Dataset combining a list of datasets into a unified dataset object.
     Useful when multiple output representations are needed from a common base representation
@@ -139,7 +157,8 @@ class CombinationDataset(KaolinDataset):
     Args:
         datasets: list or tuple of KaolinDataset
     """
-    def _initialize(self, datasets):
+
+    def initialize(self, datasets):
         self.len = len(datasets[0])
         for i, d in enumerate(datasets):
             assert len(d) == self.len, \

@@ -110,6 +110,7 @@ class ShapeNet_Meshes(data.Dataset):
         >>> obj['data']['faces'].shape
         torch.Size([1910, 3])
     """
+
     def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
                  split: float = .7, no_progress: bool = False):
         self.root = Path(root)
@@ -227,7 +228,7 @@ class ShapeNet(KaolinDataset):
         synset_idx = self.synset_idxs[index]
         obj_location = self.paths[index] / 'model.obj'
         mesh = TriangleMesh.from_obj(str(obj_location))
-        return (mesh,)
+        return mesh
 
     def _get_attributes(self, index):
         synset_idx = self.synset_idxs[index]
@@ -238,6 +239,7 @@ class ShapeNet(KaolinDataset):
             'label': self.labels[synset_idx]
         }
         return attributes
+
 
 class ShapeNet_Images(data.Dataset):
     r"""ShapeNet Dataset class for images.
@@ -278,8 +280,8 @@ class ShapeNet_Images(data.Dataset):
         torch.Size([10, 4, 137, 137])
     """
 
-    def __init__(self, root: str, categories: list=['chair'], train: bool=True,
-                 split: float=.7, views: int=24, transform=None):
+    def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
+                 split: float = .7, views: int = 24, transform=None):
         self.root = Path(root)
         self.synsets = _convert_categories(categories)
         self.labels = [synset_to_label[s] for s in self.synsets]
@@ -379,6 +381,7 @@ class ShapeNet_Voxels(data.Dataset):
         torch.Size([10, 128, 128, 128])
 
     """
+
     def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
                  split: float = .7, resolutions=[128, 32], no_progress: bool = False):
         self.root = Path(root)
@@ -504,7 +507,7 @@ class ShapeNet_Surface_Meshes(data.Dataset):
 
         def convert(og_mesh, voxel):
             transforms = tfs.Compose([mesh_conversion,
-                                     tfs.MeshLaplacianSmoothing(smoothing_iterations)])
+                                      tfs.MeshLaplacianSmoothing(smoothing_iterations)])
 
             new_mesh = transforms(voxel)
             new_mesh.vertices = pcfunc.realign(new_mesh.vertices, og_mesh.vertices)
@@ -797,6 +800,7 @@ class ShapeNet_Tags(data.Dataset):
         torch.Size([10, N])
 
     """
+
     def __init__(self, dataset, tag_aug=True):
         self.root = dataset.root
         self.paths = dataset.paths
