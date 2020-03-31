@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -613,6 +613,32 @@ class Mesh():
         edges, edges_ids = torch.unique(edges, sorted=True, return_inverse=True, dim=0)
         nb_edges = edges.shape[0]
 
+        # EDGE2EDGES
+        _edges_ids = edges_ids.reshape(facesize, nb_faces)
+        edges2edges = torch.cat([
+            torch.stack([_edges_ids[1:], _edges_ids[:-1]], dim=-1).reshape(-1, 2),
+            torch.stack([_edges_ids[-1:], _edges_ids[:1]], dim=-1).reshape(-1, 2)
+        ], dim=0)
+
+        double_edges2edges = torch.cat([edges2edges, torch.flip(edges2edges, dims=(1,))], dim=0)
+        double_edges2edges = torch.cat(
+            [double_edges2edges, torch.arange(double_edges2edges.shape[0], device=device, dtype=torch.long).reshape(-1, 1)], dim=1)
+        double_edges2edges = torch.unique(double_edges2edges, sorted=True, dim=0)[:,:2]
+        idx_first = torch.where(
+            torch.nn.functional.pad(double_edges2edges[1:,0] != double_edges2edges[:-1,0],
+                                    (1, 0), value=1))[0]
+        nb_edges_per_edge = idx_first[1:] - idx_first[:-1]
+        offsets = torch.zeros(double_edges2edges.shape[0], device=device, dtype=torch.long)
+        offsets[idx_first[1:]] = nb_edges_per_edge
+        sub_idx = (torch.arange(double_edges2edges.shape[0], device=device,dtype=torch.long) -
+                   torch.cumsum(offsets, dim=0))
+        nb_edges_per_edge = torch.cat([nb_edges_per_edge,
+                                       double_edges2edges.shape[0] - idx_first[-1:]],
+                                      dim=0)
+        max_sub_idx = torch.max(nb_edges_per_edge)
+        ee = torch.full((nb_edges, max_sub_idx), device=device, dtype=torch.long, fill_value=-1)
+        ee[double_edges2edges[:,0], sub_idx] = double_edges2edges[:,1]
+
         # EDGE2FACE
         sorted_edges_ids, order_edges_ids = torch.sort(edges_ids)
         sorted_faces_ids = face_ids[order_edges_ids]
@@ -636,7 +662,7 @@ class Mesh():
                                        sorted_edges_ids.shape[0] - idx_first[-1:]],
                                       dim=0)
         max_sub_idx = torch.max(nb_faces_per_edge)
-        ef = torch.zeros((nb_edges, max_sub_idx), device=device, dtype=torch.long) - 1
+        ef = torch.full((nb_edges, max_sub_idx), device=device, dtype=torch.long, fill_value=-1)
         ef[sorted_edges_ids, sub_idx] = sorted_faces_ids
         # FACE2FACES
         nb_faces_per_face = torch.stack([nb_faces_per_edge[edges_ids[i*nb_faces:(i+1)*nb_faces]]
@@ -676,17 +702,11 @@ class Mesh():
         nb_edges_per_vertex = torch.cat([nb_edges_per_vertex,
                                          nb_double_edges - idx_first[-1:]], dim=0)
         max_sub_idx = torch.max(nb_edges_per_vertex)
-        vv = torch.zeros((nb_vertices, max_sub_idx), device=device, dtype=torch.long) - 1
+        vv = torch.full((nb_vertices, max_sub_idx), device=device, dtype=torch.long, fill_value=-1)
         vv[double_edges[:,0], sub_idx] = double_edges[:,1]
-        ve = torch.zeros((nb_vertices, max_sub_idx), device=device, dtype=torch.long) - 1
+        ve = torch.full((nb_vertices, max_sub_idx), device=device, dtype=torch.long, fill_value=-1)
         ve[double_edges[:,0], sub_idx] = double_edges[:,2]
-        # EDGE2EDGES
-        ee = torch.cat([ve[edges[:,0],:], ve[edges[:,1],:]], dim=1)
-        nb_edges_per_edge = nb_edges_per_vertex[edges[:,0]] + nb_edges_per_vertex[edges[:,1]] - 2
-        max_sub_idx = torch.max(nb_edges_per_edge)
-        # remove self occurences
-        ee[ee == torch.arange(nb_edges, device=device, dtype=torch.long).view(-1,1)] = -1
-        ee = torch.sort(ee, dim=-1, descending=True)[0][:,:max_sub_idx]
+
         # VERTEX2FACES
         vertex_ordered, order_vertex = torch.sort(faces.view(-1))
         face_ids_in_vertex_order = order_vertex / facesize
@@ -703,7 +723,7 @@ class Mesh():
         nb_faces_per_vertex = torch.cat([nb_faces_per_vertex,
                                          vertex_ordered.shape[0] - idx_first[-1:]], dim=0)
         max_sub_idx = torch.max(nb_faces_per_vertex)
-        vf = torch.zeros((nb_vertices, max_sub_idx), device=device, dtype=torch.long) - 1
+        vf = torch.full((nb_vertices, max_sub_idx), device=device, dtype=torch.long, fill_value=-1)
         vf[vertex_ordered, sub_idx] = face_ids_in_vertex_order
 
         return edge2key, edges, vv, nb_edges_per_vertex, ve, nb_edges_per_vertex, vf, \
@@ -764,8 +784,8 @@ class Mesh():
                     q = edge2key[face_edges[(idx + j) % facesize]]
                     common_vtx, first_nbr, second_nbr = Mesh.get_common_vertex(
                         edges[k], edges[q])
+                    edge_edge_nbd[k].append(q)
                     if common_vtx:
-                        edge_edge_nbd[k].append(q)
                         vertex_vertex_nbd[common_vtx].add(first_nbr)
                         vertex_vertex_nbd[common_vtx].add(second_nbr)
                         vertex_vertex_nbd[first_nbr].add(common_vtx)
