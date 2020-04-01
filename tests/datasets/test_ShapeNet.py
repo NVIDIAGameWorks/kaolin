@@ -29,10 +29,11 @@ SHAPENET_RENDERING_ROOT = '/data/ShapeNetRendering'
 CACHE_DIR = 'tests/datasets/cache'
 
 
-# Tests below can only be run is a ShapeNet dataset is available
+# Tests below can only be run if a ShapeNet dataset is available
 SHAPENET_NOT_FOUND = 'ShapeNet not found at default location: {}'.format(SHAPENET_ROOT)
 SHAPENET_RENDERING_NOT_FOUND = 'ShapeNetRendering not found at default location: {}'.format(
     SHAPENET_RENDERING_ROOT)
+
 
 @pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=SHAPENET_NOT_FOUND)
 def test_Meshes():
@@ -65,6 +66,7 @@ def test_Voxels():
 
     shutil.rmtree('tests/datasets/cache/voxels')
 
+
 @pytest.mark.parametrize('categories', [['chair'], ['plane', 'bench', 'cabinet', 'car', 'chair',
                                                     'monitor', 'lamp', 'speaker', 'rifle',
                                                     'sofa', 'table', 'phone', 'watercraft']])
@@ -82,6 +84,7 @@ def test_Images(categories):
         assert (Path(obj['attributes']['name']) / 'rendering/00.png').is_file()
         assert list(obj['data']['params']['cam_mat'].shape) == [3, 3]
         assert list(obj['data']['params']['cam_pos'].shape) == [3]
+
 
 @pytest.mark.skipif(not Path(SHAPENET_ROOT).exists(), reason=SHAPENET_NOT_FOUND)
 def test_Surface_Meshes():
