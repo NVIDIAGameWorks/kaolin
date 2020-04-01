@@ -27,10 +27,8 @@ def _preprocess_task(args):
     with torch.no_grad():
         idx, get_data, get_attributes, cache_transform = args
         name = get_attributes(idx)['name']
-        if name not in cache_transform.cached_ids:
-            data = get_data(idx)
-            cache_transform(name, data)
-
+        data = get_data(idx)
+        cache_transform(name, *data)
 
 class KaolinDatasetMeta(type):
     def __new__(metacls, cls_name, base_cls, class_dict):
@@ -95,25 +93,22 @@ class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
             use_cuda = preprocessing_params.get('use_cuda', False)
 
             num_workers = preprocessing_params.get('num_workers')
-
-            if num_workers == 0:
-                with torch.no_grad():
-                    for idx in tqdm(range(len(self)), desc=desc, disable=no_progress):
-                        name = self._get_attributes(idx)['name']
-                        if name not in self.cache_convert.cached_ids:
+            uncached = [idx for idx in range(len(self)) if self._get_attributes(idx)['name'] not in self.cache_convert.cached_ids]
+            if len(uncached) > 0:
+                if num_workers == 0:
+                    with torch.no_grad():
+                        for idx in tqdm(range(len(self)), desc=desc, disable=no_progress):
+                            name = self._get_attributes(idx)['name']
                             data = self._get_data(idx)
-                            self.cache_convert(name, data)
-
-            else:
-                p = Pool(num_workers)
-                iterator = p.imap_unordered(
-                    _preprocess_task,
-                    [(idx, self._get_data, self._get_attributes, self.cache_convert)
-                     for idx in range(len(self))])
-
-                for i in tqdm(range(len(self)), desc=desc, disable=no_progress):
-                    next(iterator)
-
+                            self.cache_convert(name, *data)
+                else:
+                    p = Pool(num_workers)
+                    iterator = p.imap_unordered(
+                        _preprocess_task,
+                        [(idx, self._get_data, self._get_attributes, self.cache_convert)
+                            for idx in uncached])
+                    for i in tqdm(range(len(uncached)), desc=desc, disable=no_progress):
+                        next(iterator)
         else:
             self.cache_convert = None
 
