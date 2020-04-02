@@ -19,9 +19,10 @@ import os
 from glob import glob
 
 from kaolin.rep.TriangleMesh import TriangleMesh
+from .base import KaolinDataset
 
 
-class ModelNet(object):
+class ModelNet(KaolinDataset):
     r"""Dataset class for the ModelNet dataset.
 
     Args:
@@ -39,7 +40,7 @@ class ModelNet(object):
 
     def initialize(self, root: str,
                    split: Optional[str] = 'train',
-                   categories: Optional[Iterable] = ['bed']):
+                   categories: Optional[Iterable] = None):
         """Initialize the dataset.
 
         Args:
@@ -51,6 +52,9 @@ class ModelNet(object):
         """
 
         assert split.lower() in ['train', 'test']
+
+        if categories is None:
+            categories = ['chair']
 
         self.root = root
         self.categories = categories
