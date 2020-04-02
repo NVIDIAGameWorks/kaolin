@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Iterable, Optional
+from typing import Iterable
 
-import torch
 import os
 import glob
-from torch.utils.data import Dataset
 
-
-from kaolin.rep import TriangleMesh
+from ..rep import TriangleMesh
 
 from .base import KaolinDataset
 
@@ -72,6 +69,38 @@ class SHREC16(KaolinDataset):
         torch.Size([500, 3])
 
     """
+    _VALID_CATEGORIES = [
+        "alien",
+        "ants",
+        "armadillo",
+        "bird1",
+        "bird2",
+        "camel",
+        "cat",
+        "centaur",
+        "dinosaur",
+        "dino_ske",
+        "dog1",
+        "dog2",
+        "flamingo",
+        "glasses",
+        "gorilla",
+        "hand",
+        "horse",
+        "lamp",
+        "laptop",
+        "man",
+        "myScissor",
+        "octopus",
+        "pliers",
+        "rabbit",
+        "santa",
+        "shark",
+        "snake",
+        "spiders",
+        "two_balls",
+        "woman",
+    ]
 
     def initialize(
         self,
@@ -80,46 +109,13 @@ class SHREC16(KaolinDataset):
         train: bool = True,
     ):
 
-        VALID_CATEGORIES = [
-            "alien",
-            "ants",
-            "armadillo",
-            "bird1",
-            "bird2",
-            "camel",
-            "cat",
-            "centaur",
-            "dinosaur",
-            "dino_ske",
-            "dog1",
-            "dog2",
-            "flamingo",
-            "glasses",
-            "gorilla",
-            "hand",
-            "horse",
-            "lamp",
-            "laptop",
-            "man",
-            "myScissor",
-            "octopus",
-            "pliers",
-            "rabbit",
-            "santa",
-            "shark",
-            "snake",
-            "spiders",
-            "two_balls",
-            "woman",
-        ]
-
         if not categories:
-            categories = VALID_CATEGORIES
+            categories = SHREC16._VALID_CATEGORIES
         for category in categories:
-            if category not in VALID_CATEGORIES:
+            if category not in SHREC16._VALID_CATEGORIES:
                 raise ValueError(
                     f"Specified category {category} is not valid. "
-                    "Valid categories are {VALID_CATEGORIES}"
+                    f"Valid categories are {SHREC16._VALID_CATEGORIES}"
                 )
 
         self.root = root
