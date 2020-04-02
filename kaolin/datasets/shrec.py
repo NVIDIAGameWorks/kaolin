@@ -36,15 +36,16 @@ class SHREC16(KaolinDataset):
         root (str): Path to the root directory of the dataset.
         categories (list): List of categories to load (each class is
             specified as a string, and must be a valid `SHREC16`
-            category).
-        train (optional, bool): If True, return the train split, else return the test
+            category). If this argument is not specified, all categories
+            are loaded by default.
+        train (bool): If True, return the train split, else return the test
             split (default: True).
     Returns:
         .. code-block::
 
            dict: {
                 attributes: {path: str, category: str, label: int},
-                data: {vertices: torch.Tensor, faces: torch.Tensor}
+                data: kaolin.rep.TriangleMesh
            }
 
         path: The filepath to the .obj file on disk.
@@ -75,8 +76,8 @@ class SHREC16(KaolinDataset):
     def initialize(
         self,
         root: str,
-        categories: Optional[Iterable] = None,
-        train: Optional[bool] = True,
+        categories: Iterable = None,
+        train: bool = True,
     ):
 
         VALID_CATEGORIES = [
@@ -113,7 +114,7 @@ class SHREC16(KaolinDataset):
         ]
 
         if not categories:
-            categories = ["alien"]
+            categories = VALID_CATEGORIES
         for category in categories:
             if category not in VALID_CATEGORIES:
                 raise ValueError(
