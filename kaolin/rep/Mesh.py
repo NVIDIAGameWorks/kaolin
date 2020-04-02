@@ -148,7 +148,7 @@ class Mesh():
                 if data[0] == 'v':
                     vertices.append(data[1:])
                 elif data[0] == 'vt':
-                    uvs.append(data[1:])
+                    uvs.append(data[1:3])
                 elif data[0] == 'f':
                     if '//' in data[1]:
                         data = [da.split('//') for da in data]
