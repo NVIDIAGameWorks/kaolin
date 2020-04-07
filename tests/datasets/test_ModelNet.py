@@ -32,7 +32,7 @@ REASON = 'ModelNet not found at default location: {}'.format(MODELNET_ROOT)
 @pytest.mark.parametrize('device', ['cpu', 'cuda'])
 @pytest.mark.skipif(not os.path.exists(MODELNET_ROOT), reason=REASON)
 def test_ModelNet(device):
-    models = kal.datasets.ModelNet(basedir=MODELNET_ROOT, categories=['bathtub'], split='test')
+    models = kal.datasets.ModelNet(root=MODELNET_ROOT, categories=['bathtub'], split='test')
 
     assert len(models) == 50
     for item in models:

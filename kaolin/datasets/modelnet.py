@@ -82,14 +82,10 @@ class ModelNet(KaolinDataset):
 
     def _get_data(self, index):
         data = TriangleMesh.from_off(self.filepaths[index])
-        data.to(self.device)
-        if self.transform:
-            data = self.transform(data)
-
         return data
 
     def _get_attributes(self, index):
-        category = torch.tensor(self.cat_idxs[index], dtype=torch.long, device=self.device)
+        category = torch.tensor(self.cat_idxs[index], dtype=torch.long)
         return {
             'category': category,
         }
