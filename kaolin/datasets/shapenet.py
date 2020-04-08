@@ -162,6 +162,7 @@ class ShapeNet_Meshes(data.Dataset):
 
 class ShapeNet(KaolinDataset):
     r"""ShapeNetV1 Dataset class for meshes.
+
     Args:
         root (str): path to ShapeNet root directory
         categories (list): List of categories to load from ShapeNet. This list may
@@ -176,6 +177,7 @@ class ShapeNet(KaolinDataset):
                 attributes: {name: str, path: str, synset: str, label: str},
                 data: {vertices: torch.Tensor, faces: torch.Tensor}
            }
+
     Example:
         >>> meshes = ShapeNet(root='../data/ShapeNet/')
         >>> obj = meshes[0]
@@ -186,7 +188,8 @@ class ShapeNet(KaolinDataset):
     """
 
     def initialize(self, root: str, categories: list, train: bool = True, split: float = .7):
-        """Initialize the dataset
+        """Initialize the dataset.
+
         Args:
             root (str): path to ShapeNet root directory
             categories (list): List of categories to load from ShapeNet. This list may
