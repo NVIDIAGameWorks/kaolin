@@ -46,7 +46,7 @@
 #include <stdio.h>
 
 // for the older gpus atomicAdd with double arguments does not exist
-#if  __CUDA_ARCH__ < 600 and defined(__CUDA_ARCH__)
+#if  __CUDA_ARCH__ < 600 && defined(__CUDA_ARCH__)
 static __inline__ __device__ double atomicAdd(double* address, double val) {
     unsigned long long int* address_as_ull = (unsigned long long int*)address;
     unsigned long long int old = *address_as_ull, assumed;
