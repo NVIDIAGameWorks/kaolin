@@ -129,6 +129,7 @@ $ sphinx-build . _build
 To run unittests, from the root directory of the repository (i.e., the directory containing this `README` file), execute the following commands.
 
 ```bash
+$ . setenv.sh
 $ pytest tests/
 ```
 
