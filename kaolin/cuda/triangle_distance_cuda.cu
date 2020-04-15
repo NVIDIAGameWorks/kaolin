@@ -135,7 +135,6 @@ void TriangleDistanceKernel(
 			int best_i=0;
 			int best_t=0;
 			float best=0;
-			int end_ka=end_k-(end_k&3);
 			for (int k=0;k<end_k;k++){
 						
 				float3 v1 = make_float3(buf_1[k*3+0], buf_1[k*3+1], buf_1[k*3+2] );

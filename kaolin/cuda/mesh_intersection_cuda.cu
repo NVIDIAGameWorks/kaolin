@@ -104,8 +104,6 @@ void MeshIntersectionKernel(
 			
 			float3 q1 = make_float3(points[ j *3+0], points[ j *3+1], points[ j *3+2]);
 			float3 q2 = make_float3(points[ j *3+0] + 10., points[ j *3+1], points[ j *3+2]);
-			int intersections=0;
-			int end_ka=end_k-(end_k&3);
 			for (int k=0;k<end_k;k++){
 				{		
 
