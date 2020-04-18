@@ -18,7 +18,7 @@ import pytest
 
 import kaolin as kal
 
-SHREC16_ROOT = "data/shrec_16/"
+SHREC16_ROOT = "/data/SHREC16/"
 CACHE_DIR = "tests/datasets/cache"
 
 # Tests below can only be run is a ShapeNet dataset is available
