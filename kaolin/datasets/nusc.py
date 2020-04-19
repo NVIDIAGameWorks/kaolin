@@ -12,16 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
-import numpy as np
-from pyquaternion import Quaternion
 import os
 from functools import reduce
-from nuscenes.utils.geometry_utils import transform_matrix
-from nuscenes.utils.splits import create_splits_scenes
-from nuscenes.utils.data_classes import LidarPointCloud
-from nuscenes.nuscenes import NuScenes
-from nuscenes.utils.data_classes import Box
+
+import torch
+import numpy as np
+
+try:
+    from nuscenes.utils.geometry_utils import transform_matrix
+    from nuscenes.utils.splits import create_splits_scenes
+    from nuscenes.utils.data_classes import LidarPointCloud
+    from nuscenes.nuscenes import NuScenes
+    from nuscenes.utils.data_classes import Box
+    from pyquaternion import Quaternion
+except ImportError as err:
+    import_error = err
+else:
+    import_error = None
 
 from .base import KaolinDataset
 from kaolin.rep import PointCloud
@@ -51,6 +58,8 @@ class NuscDetection(KaolinDataset):
 
     def initialize(self, nusc: NuScenes, train: bool, nsweeps: int, min_distance: float = 2.2):
         assert(nsweeps >= 1), f'nsweeps {nsweeps} should be 1 or greater'
+        if import_error is not None:
+            raise import_error
 
         self.nusc = nusc
         self.train = train
