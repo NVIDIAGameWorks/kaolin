@@ -12,25 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import pytest
 
-import torch
-import sys
-import os
-import shutil
-
 import kaolin as kal
-from torch.utils.data import DataLoader
 
+SHREC16_ROOT = "/data/SHREC16/"
+CACHE_DIR = "tests/datasets/cache"
 
 # Tests below can only be run is a ShapeNet dataset is available
-
-# def test_SHREC16(): 
-	
-# 	shreck = kal.dataloader.SHREC16(root = 'tests/datasets_eval/shrec_16/', categories = ['alien', 'ants'], mode = 'train')
-# 	for obj in shreck: 
-# 		assert obj['verts'].shape[0] > 0  
-# 		assert obj['faces'].shape[0] > 0 
+REASON = "SHREC16 not found at default location: {}".format(SHREC16_ROOT)
 
 
-# test_SHREC16()
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+@pytest.mark.skipif(not os.path.exists(SHREC16_ROOT), reason=REASON)
+def test_SHREC16(device):
+    models = kal.datasets.SHREC16(
+        root=SHREC16_ROOT, categories=["ants"], train=False
+    )
+    assert len(models) == 4
