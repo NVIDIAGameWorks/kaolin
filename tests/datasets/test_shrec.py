@@ -29,6 +29,6 @@ REASON = "SHREC16 not found at default location: {}".format(SHREC16_ROOT)
 @pytest.mark.skipif(not os.path.exists(SHREC16_ROOT), reason=REASON)
 def test_SHREC16(device):
     models = kal.datasets.SHREC16(
-        basedir=SHREC16_ROOT, categories=["ants"], split="test"
+        root=SHREC16_ROOT, categories=["ants"], train=False
     )
     assert len(models) == 4
