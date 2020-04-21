@@ -220,8 +220,6 @@ dr_cuda_forward_prob_batch(const scalar_t *__restrict__ points2d_bxfx6,
     scalar_t x0 = 1.0 * multiplier / width * (2 * wididx + 1 - width);
     scalar_t y0 = 1.0 * multiplier / height * (height - 2 * heiidx - 1);
 
-    int fidxcover = fidxint;
-
     int kid = 0;
 
     for (int fidxint = 0; fidxint < fnum; fidxint++) {

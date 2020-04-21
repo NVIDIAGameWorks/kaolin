@@ -2,6 +2,7 @@ import os
 import io
 import logging
 from setuptools import setup, find_packages
+import copy
 
 import torch
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CppExtension
@@ -70,6 +71,24 @@ def read(*names, **kwargs):
         return fp.read()
 
 
+def KaolinCUDAExtension(*args, **kwargs):
+    FLAGS = ['-Wno-deprecated-declarations']
+    kwargs = copy.deepcopy(kwargs)
+    if 'extra_compile_args' in kwargs:
+        kwargs['extra_compile_args'] += FLAGS
+    else:
+        kwargs['extra_compile_args'] = FLAGS
+    return CUDAExtension(*args, **kwargs)
+
+
+class KaolinBuildExtension(BuildExtension):
+    def build_extensions(self):
+        FLAG_BLACKLIST = ['-Wstrict-prototypes']
+        FLAGS = ['-Wno-deprecated-declarations']
+        self.compiler.compiler_so = [x for x in self.compiler.compiler_so if x not in FLAG_BLACKLIST] + FLAGS  # Covers non-cuda
+        super().build_extensions()
+
+
 def get_extensions():
     use_cython = os.getenv('USE_CYTHON')
     ext = '.pyx' if use_cython else '.cpp'
@@ -112,43 +131,43 @@ def get_extensions():
     # If building with readthedocs, don't compile CUDA extensions
     if os.getenv('READTHEDOCS') != 'True':
         cuda_extensions = [
-            CUDAExtension('kaolin.cuda.load_textures', [
+            KaolinCUDAExtension('kaolin.cuda.load_textures', [
                 'kaolin/cuda/load_textures_cuda.cpp',
                 'kaolin/cuda/load_textures_cuda_kernel.cu',
             ]),
-            CUDAExtension('kaolin.cuda.sided_distance', [
+            KaolinCUDAExtension('kaolin.cuda.sided_distance', [
                 'kaolin/cuda/sided_distance.cpp',
                 'kaolin/cuda/sided_distance_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.furthest_point_sampling', [
+            KaolinCUDAExtension('kaolin.cuda.furthest_point_sampling', [
                 'kaolin/cuda/furthest_point_sampling.cpp',
                 'kaolin/cuda/furthest_point_sampling_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.ball_query', [
+            KaolinCUDAExtension('kaolin.cuda.ball_query', [
                 'kaolin/cuda/ball_query.cpp',
                 'kaolin/cuda/ball_query_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.three_nn', [
+            KaolinCUDAExtension('kaolin.cuda.three_nn', [
                 'kaolin/cuda/three_nn.cpp',
                 'kaolin/cuda/three_nn_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.tri_distance', [
+            KaolinCUDAExtension('kaolin.cuda.tri_distance', [
                 'kaolin/cuda/triangle_distance.cpp',
                 'kaolin/cuda/triangle_distance_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.mesh_intersection', [
+            KaolinCUDAExtension('kaolin.cuda.mesh_intersection', [
                 'kaolin/cuda/mesh_intersection.cpp',
                 'kaolin/cuda/mesh_intersection_cuda.cu',
             ]),
-            CUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
+            KaolinCUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
                 'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
                 'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
             ]),
-            CUDAExtension('kaolin.graphics.softras.soft_rasterize_cuda', [
+            KaolinCUDAExtension('kaolin.graphics.softras.soft_rasterize_cuda', [
                 'kaolin/graphics/softras/cuda/soft_rasterize_cuda.cpp',
                 'kaolin/graphics/softras/cuda/soft_rasterize_cuda_kernel.cu',
             ]),
-            CUDAExtension('kaolin.graphics.dib_renderer.cuda.rasterizer', [
+            KaolinCUDAExtension('kaolin.graphics.dib_renderer.cuda.rasterizer', [
                 'kaolin/graphics/dib_renderer/cuda/rasterizer.cpp',
                 'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda.cu',
                 'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda_back.cu',
@@ -208,5 +227,5 @@ if __name__ == '__main__':
         zip_safe=True,
         ext_modules=get_extensions(),
         include_dirs=[np.get_include()],
-        cmdclass={'build_ext': BuildExtension}
+        cmdclass={'build_ext': KaolinBuildExtension}
     )
