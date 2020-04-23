@@ -196,7 +196,7 @@ def get_requirements():
         'scikit-image',
         'shapely',
         'trimesh>=3.0',
-        'scipy',
+        'scipy==1.4.1',
         'sphinx==2.2.0',    # pinned to resolve issue with docutils 0.16b0.dev
         'pytest>=4.6',
         'pytest-cov>=2.7',
@@ -205,6 +205,7 @@ def get_requirements():
         'pptk',
         'autopep8',
         'flake8',
+        'pillow<7.0.0',
     ]
 
 
@@ -219,7 +220,7 @@ if __name__ == '__main__':
         url=URL,
         long_description=LONG_DESCRIPTION,
         license=LICENSE,
-        python_requires='>3.6',
+        python_requires='~=3.6',
 
         # Package info
         packages=find_packages(exclude=('docs', 'test', 'examples')),

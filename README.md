@@ -1,3 +1,8 @@
+.. image:: https://www.repostatus.org/badges/latest/wip.svg
+  :target: https://www.repostatus.org/#wip
+.. image:: https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg
+  :target: https://github.com/NVIDIAGameWorks/kaolin/blob/master/COPYRIGHT
+
 <p align="center">
     <img src="assets/kaolin.png">
 </p>
@@ -7,8 +12,10 @@
 
 **[Documentation](https://kaolin.readthedocs.io/en/latest/)** | **[Paper](https://arxiv.org/abs/1911.05063)**
 
+_Kaolin is an active work-in-progress, we are working toward a stable beta release. Please Watch our github repository for releases to be notified. To start trying our code today see instructions below._
 
 Kaolin is a PyTorch library aiming to accelerate 3D deep learning research. Kaolin provides efficient implementations of differentiable 3D modules for use in deep learning systems. With functionality to load and preprocess several popular 3D datasets, and native functions to manipulate meshes, pointclouds, signed distance functions, and voxel grids, Kaolin mitigates the need to write wasteful boilerplate code. Kaolin packages together several differentiable graphics modules including rendering, lighting, shading, and view warping. Kaolin also supports an array of loss functions and evaluation metrics for seamless evaluation and provides visualization functionality to render the 3D results. Importantly, we curate a comprehensive model zoo comprising many state-of-the-art 3D deep learning architectures, to serve as a starting point for future research endeavours.
+
 
 > *Fun fact*: The name _Kaolin_, it’s from Kaolinite, a form of plasticine (clay) that is sometimes used in 3D modeling.
 
@@ -55,7 +62,7 @@ Kaolin curates a large _model zoo_ containing reference implementations of popul
 
 ### Requirements
 - Linux
-- Python >= 3.6
+- Python == 3.6
 - CUDA >= 10.0.130 (with `nvcc` installed)
 - Display Driver >= 410.48
 
@@ -63,7 +70,7 @@ Windows support is in the works and is currently considered experimental.
 
 ### Dependencies
 - numpy >= 1.17
-- PyTorch >= 1.2 and Torchvision (see [pytorch.org](http://pytorch.org) for installation instructions)
+- PyTorch 1.2 / 1.3 / 1.4 and Torchvision 0.5.0 (see [pytorch.org](http://pytorch.org) for installation instructions)
 
 ### Installation
 
