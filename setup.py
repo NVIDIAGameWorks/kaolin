@@ -2,10 +2,12 @@ import os
 import io
 import logging
 from setuptools import setup, find_packages
+from pkg_resources import parse_version
 import copy
 
 import torch
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CppExtension
+import torchvision
 import numpy as np
 
 
@@ -48,9 +50,14 @@ logging.basicConfig(format='%(levelname)s - %(message)s')
 
 
 # Check that PyTorch version installed meets minimum requirements
-if torch.__version__ < '1.2.0':
-    logger.warning(f'Kaolin is tested with PyTorch >= 1.2.0. Found version {torch.__version__} instead.')
+torch_ver = parse_version(torch.__version__)
+if torch_ver >= parse_version('1.2.0') and torch_ver < parse_version('1.5.0'):
+    logger.warning(f'Kaolin is tested with PyTorch >=1.2.0, <1.5.0 Found version {torch.__version__} instead.')
 
+# Check that torchvision version installed meets minimum requirements
+torchvision_ver = parse_version(torchvision.__version__)
+if torchvision_ver >= parse_version('0.4.0') and torchvision_ver < parse_version('0.6.0'):
+    logger.warning(f'Kaolin is tested with torchvision >=0.4.0, <0.6.0 Found version (torchvision.__version__) instead.')
 
 # Get version number from version.py
 version = {}
@@ -196,7 +203,7 @@ def get_requirements():
         'scikit-image',
         'shapely',
         'trimesh>=3.0',
-        'scipy',
+        'scipy==1.4.1',
         'sphinx==2.2.0',    # pinned to resolve issue with docutils 0.16b0.dev
         'pytest>=4.6',
         'pytest-cov>=2.7',
@@ -205,6 +212,7 @@ def get_requirements():
         'pptk',
         'autopep8',
         'flake8',
+        'pillow<7.0.0',
     ]
 
 
@@ -219,7 +227,7 @@ if __name__ == '__main__':
         url=URL,
         long_description=LONG_DESCRIPTION,
         license=LICENSE,
-        python_requires='>3.6',
+        python_requires='~=3.6',
 
         # Package info
         packages=find_packages(exclude=('docs', 'test', 'examples')),
