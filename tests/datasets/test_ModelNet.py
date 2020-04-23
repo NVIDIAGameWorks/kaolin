@@ -35,6 +35,6 @@ def test_ModelNet(device):
     models = kal.datasets.ModelNet(root=MODELNET_ROOT, categories=['bathtub'], split='test')
 
     assert len(models) == 50
-    for item in models:
-        assert item['attributes']['category'].item() == 0
-        assert isinstance(item['data'], kal.rep.Mesh)
+    for data, attributes in models:
+        assert attributes['category'].item() == 0
+        assert isinstance(data, kal.rep.Mesh)

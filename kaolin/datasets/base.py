@@ -21,6 +21,8 @@ from torch.utils.data import Dataset
 
 from kaolin import helpers
 
+from collections import namedtuple
+
 
 def _preprocess_task(args):
     torch.set_num_threads(1)
@@ -29,6 +31,10 @@ def _preprocess_task(args):
         name = get_attributes(idx)['name']
         data = get_data(idx)
         cache_transform(name, *data)
+
+
+KaolinDatasetItem = namedtuple('KaolinDatasetItem', ['data', 'attributes'])
+
 
 class KaolinDatasetMeta(type):
     def __new__(metacls, cls_name, base_cls, class_dict):
@@ -59,6 +65,13 @@ class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
            Attributes getter that will be preprocess / transform independent.
        4) __len__:
            Return the size of the dataset
+
+    When iterated, a KaolinDataset produces item in the format of KaolinDatasetItem.
+    KaolinDatasetItem is a named tuple with two properties: "data" and "attributes".
+    They can be accessed through "item.data" and "item.attributes", as well as by unpacking:
+    "data, attributes = item".
+
+    The preferred way to iterate is to use the "for data, attributes in dataloader" syntax.
     """
 
     def __init__(self, *args, preprocessing_transform=None, preprocessing_params: dict = None,
@@ -93,7 +106,8 @@ class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
             use_cuda = preprocessing_params.get('use_cuda', False)
 
             num_workers = preprocessing_params.get('num_workers')
-            uncached = [idx for idx in range(len(self)) if self._get_attributes(idx)['name'] not in self.cache_convert.cached_ids]
+            uncached = [idx for idx in range(len(self)) if self._get_attributes(idx)[
+                'name'] not in self.cache_convert.cached_ids]
             if len(uncached) > 0:
                 if num_workers == 0:
                     with torch.no_grad():
@@ -123,7 +137,7 @@ class KaolinDataset(Dataset, metaclass=KaolinDatasetMeta):
         if self.transform is not None:
             data = self.transform(data)
 
-        return {'data': data, 'attributes': attributes}
+        return KaolinDatasetItem(data=data, attributes=attributes)
 
     @abstractmethod
     def initialize(self, *args, **kwargs):
@@ -167,4 +181,4 @@ class CombinationDataset(KaolinDataset):
         return (d._get_attributes(index) for d in self.datasets)
 
     def _get_data(self, index):
-        return (d[index]['data'] for d in self.datasets)
+        return (d[index].data for d in self.datasets)
