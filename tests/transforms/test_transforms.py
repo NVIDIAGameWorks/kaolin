@@ -56,12 +56,12 @@ def test_normalize_pointcloud(device='cpu'):
 
 def test_downsample_voxelgrid(device='cpu'):
     voxel = torch.ones([32, 32, 32]).to(device)
-    down = kal.transforms.DownsampleVoxelGrid([2,2,2], inplace=False)
-    helpers._assert_shape_eq(down(voxel), (16,16,16))
-    down = kal.transforms.DownsampleVoxelGrid([3,3,3], inplace=False)
-    helpers._assert_shape_eq(down(voxel), (10,10,10))
-    down = kal.transforms.DownsampleVoxelGrid([3,2,1], inplace=False)
-    helpers._assert_shape_eq(down(voxel), (10,16,32))
+    down = kal.transforms.DownsampleVoxelGrid([2, 2, 2], inplace=False)
+    helpers._assert_shape_eq(down(voxel), (16, 16, 16))
+    down = kal.transforms.DownsampleVoxelGrid([3, 3, 3], inplace=False)
+    helpers._assert_shape_eq(down(voxel), (10, 10, 10))
+    down = kal.transforms.DownsampleVoxelGrid([3, 2, 1], inplace=False)
+    helpers._assert_shape_eq(down(voxel), (10, 16, 32))
 
 
 def test_upsample_voxelgrid(device='cpu'):
@@ -73,11 +73,12 @@ def test_upsample_voxelgrid(device='cpu'):
 
 
 def test_triangle_mesh_to_pointcloud(device='cpu'):
-    mesh = TriangleMesh.from_obj('tests/model.obj') 
+    mesh = TriangleMesh.from_obj('tests/model.obj')
     mesh.to(device)
     mesh2cloud = kal.transforms.TriangleMeshToPointCloud(10000)
     pts = mesh2cloud(mesh)
     helpers._assert_shape_eq(pts, (10000, 3))
+
 
 def test_triangle_mesh_to_voxelgrid(device='cpu'):
     mesh = TriangleMesh.from_obj('tests/model.obj')
