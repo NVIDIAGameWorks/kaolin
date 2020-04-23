@@ -199,6 +199,8 @@ cwd = os.path.dirname(os.path.abspath(__file__))
 
 def get_requirements():
     return [
+        'torch>=1.2, <1.5',
+        'torchvision>=0.4.0, <0.6.0',
         'matplotlib<3.0.0',
         'scikit-image',
         'shapely',
