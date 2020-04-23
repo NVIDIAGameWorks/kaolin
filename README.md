@@ -70,7 +70,7 @@ Windows support is in the works and is currently considered experimental.
 
 ### Dependencies
 - numpy >= 1.17
-- PyTorch 1.2 / 1.3 / 1.4 and Torchvision 0.5.0 (see [pytorch.org](http://pytorch.org) for installation instructions)
+- PyTorch >=1.2, <1.5 and Torchvision >=0.4.0, <0.6.0 (see [pytorch.org](http://pytorch.org) for installation instructions)
 
 ### Installation
 
