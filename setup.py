@@ -12,17 +12,20 @@ import numpy as np
 
 
 cwd = os.path.dirname(os.path.abspath(__file__))
+logger = logging.getLogger()
+logging.basicConfig(format='%(levelname)s - %(message)s')
+
 
 if not torch.cuda.is_available():
     # From: https://github.com/NVIDIA/apex/blob/b66ffc1d952d0b20d6706ada783ae5b23e4ee734/setup.py
     # Extension builds after https://github.com/pytorch/pytorch/pull/23408 attempt to query torch.cuda.get_device_capability(),
     # which will fail if you are compiling in an environment without visible GPUs (e.g. during an nvidia-docker build command).
-    print('\nWarning: Torch did not find available GPUs on this system.\n',
-          'If your intention is to cross-compile, this is not an error.\n'
-          'By default, Kaolin will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n'
-          'Volta (compute capability 7.0), and Turing (compute capability 7.5).\n'
-          'If you wish to cross-compile for a single specific architecture,\n'
-          'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n')
+    logging.warning('\nWarning: Torch did not find available GPUs on this system.\n'
+                    'If your intention is to cross-compile, this is not an error.\n'
+                    'By default, Kaolin will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n'
+                    'Volta (compute capability 7.0), and Turing (compute capability 7.5).\n'
+                    'If you wish to cross-compile for a single specific architecture,\n'
+                    'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n')
     if os.environ.get("TORCH_CUDA_ARCH_LIST", None) is None:
         os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5"
 
@@ -45,18 +48,15 @@ for future research endeavours.
 """
 
 
-logger = logging.getLogger()
-logging.basicConfig(format='%(levelname)s - %(message)s')
-
 
 # Check that PyTorch version installed meets minimum requirements
 torch_ver = parse_version(torch.__version__)
-if torch_ver >= parse_version('1.2.0') and torch_ver < parse_version('1.5.0'):
+if torch_ver < parse_version('1.2.0') or torch_ver >= parse_version('1.5.0'):
     logger.warning(f'Kaolin is tested with PyTorch >=1.2.0, <1.5.0 Found version {torch.__version__} instead.')
 
 # Check that torchvision version installed meets minimum requirements
 torchvision_ver = parse_version(torchvision.__version__)
-if torchvision_ver >= parse_version('0.4.0') and torchvision_ver < parse_version('0.6.0'):
+if torchvision_ver < parse_version('0.4.0') or torchvision_ver >= parse_version('0.6.0'):
     logger.warning(f'Kaolin is tested with torchvision >=0.4.0, <0.6.0 Found version (torchvision.__version__) instead.')
 
 # Get version number from version.py
