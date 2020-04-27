@@ -66,7 +66,6 @@ for e in range(args.epochs):
 
     model.train()
 
-    optimizer.zero_grad()
     for idx, batch in enumerate(tqdm(train_loader)):
         category = batch['attributes']['category'].cuda()
         pred = model(batch['data'].cuda())
@@ -74,6 +73,7 @@ for e in range(args.epochs):
         train_loss += loss.item()
         loss.backward()
         optimizer.step()
+        optimizer.zero_grad()
 
         # Compute accuracy
         pred_label = torch.argmax(pred, dim=1)
