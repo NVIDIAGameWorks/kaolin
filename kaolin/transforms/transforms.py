@@ -672,7 +672,7 @@ class TriangleMeshToPointCloud(object):
 
 
 class TriangleMeshToVoxelGrid(object):
-    r"""Converts a triangle mesh to a voxel grid with a specified reolution.
+    r"""Converts a triangle mesh to a voxel grid with a specified resolution.
     The resolution of the voxel grid is assumed to be homogeneous along all
     three dimensions (X, Y, Z axes).
 
@@ -682,7 +682,6 @@ class TriangleMeshToVoxelGrid(object):
             unit cube centered at the origin.
         vertex_offset (float): Offset applied to all vertices after
                                normalizing.
-
     """
 
     def __init__(self, resolution: int,

@@ -260,12 +260,10 @@ class TriangleMesh(Mesh):
         y1, y2, y3 = torch.split(torch.index_select(
             self.vertices, 0, self.faces[:, 1]) - torch.index_select(
             self.vertices, 0, self.faces[:, 2]), 1, dim=1)
-        a = (x2 * y3 - x3 * y2)**2
-        b = (x3 * y1 - x1 * y3)**2
-        c = (x1 * y2 - x2 * y1)**2
-        Areas = torch.sqrt(a + b + c) / 2
-        # percentage of each face w.r.t. full surface area
-        Areas = Areas / (torch.sum(Areas) + eps)
+        a = (x2 * y3 - x3 * y2) ** 2
+        b = (x3 * y1 - x1 * y3) ** 2
+        c = (x1 * y2 - x2 * y1) ** 2
+        Areas = (torch.sqrt(a + b + c) / 2) + eps
 
         # define descrete distribution w.r.t. face area ratios caluclated
         cat_dist = torch.distributions.Categorical(Areas.view(-1))
