@@ -53,17 +53,36 @@ __all__ = [
 
 def compute_face_normals_for_mesh(mesh):
     r"""Compute face normals for an input kaolin.rep.TriangleMesh object.
+
+    Args:
+        mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+
+    Returns:
+        face_normals (torch.Tensor): Tensor containing face normals for
+            each triangle in the mesh (shape: :math:`(M, 3)`), where :math:`N`
+            is the number of faces (triangles) in the mesh.
     """
     face_normals = torch.cross(
         mesh.vertices[mesh.faces[:, 1]] - mesh.vertices[mesh.faces[:, 0]],
         mesh.vertices[mesh.faces[:, 2]] - mesh.vertices[mesh.faces[:, 1]],
     )
-    face_normals = face_normals / face_normals.norm(p=2, dim=-1).unsqueeze(-1)
+    face_normals = face_normals / face_normals.norm(p=2, dim=-1)[..., None]
     return face_normals
 
 
 def compute_face_normals_and_areas(mesh):
     r"""Compute face normals and areas for an input kaolin.rep.TriangleMesh object.
+
+    Args:
+       mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+
+    Returns:
+        face_normals (torch.Tensor): Tensor containing face normals for
+            each triangle in the mesh (shape: :math:`(M, 3)`), where :math:`M`
+            is the number of faces (triangles) in the mesh.
+        face_areas (torch.Tensor): Tensor containing areas for each triangle
+            in the mesh (shape: :math:`(M, 1)`), where :math:`M` is the number
+            of faces (triangles) in the mesh.
     """
     face_normals = torch.cross(
         mesh.vertices[mesh.faces[:, 1]] - mesh.vertices[mesh.faces[:, 0]],
@@ -77,8 +96,13 @@ def compute_face_normals_and_areas(mesh):
 
 
 def is_two_manifold(mesh):
-    r"""Returns whether the current mesh is 2-manifold. Assumes that adjacency info
-    for the mesh is enabled."""
+    """Returns whether the current mesh is 2-manifold. Assumes that adjacency info
+    for the mesh is enabled.
+
+    Args:
+        mesh (kaolin.rep.TriangleMesh): A triangle mesh object (assumes adjacency
+            info is enabled).
+    """
     return (mesh.ef.shape[-1] == 2) and (mesh.ef.min() >= 0)
 
 
@@ -119,6 +143,14 @@ def build_gemm_representation(mesh, face_areas):
 def get_edge_points_vectorized(mesh):
     r"""Get the edge points (a, b, c, d, e) as defined in Fig. 4 of the MeshCNN
     paper: https://arxiv.org/pdf/1809.05910.pdf.
+
+    Args:
+        mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+
+    Returns:
+        (torch.Tensor): Tensor containing "edge points" of the mesh, as per
+            MeshCNN convention (shape: :math:`(E, 4)`), where :math:`E` is the
+            total number of edges in the mesh.
     """
 
     a = mesh.edges
@@ -152,14 +184,37 @@ def get_edge_points_vectorized(mesh):
 
 
 def set_edge_lengths(mesh, edge_points):
-    r"""Set edge lengths for each of the edge points. """
+    r"""Set edge lengths for each of the edge points. 
+
+    Args:
+       mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+       edge_points (torch.Tensor): Tensor containing "edge points" of the mesh,
+            as per MeshCNN convention (shape: :math:`(E, 4)`), where :math:`E`
+            is the total number of edges in the mesh.
+    """
     mesh.edge_lengths = (
         mesh.vertices[edge_points[:, 0]] - mesh.vertices[edge_points[:, 1]]
     ).norm(p=2, dim=1)
 
 
 def compute_normals_from_gemm(mesh, edge_points, side, eps=1e-1):
-    r"""Compute vertex normals from the GeMM representation. """
+    r"""Compute vertex normals from the GeMM representation.
+
+    Args:
+        mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+        edge_points (torch.Tensor): Tensor containing "edge points" of the mesh,
+            as per MeshCNN convention (shape: :math:`(E, 4)`), where :math:`E`
+            is the total number of edges in the mesh.
+        side (int): Side of the edge used in computing normals (0, 1, 2, or 3
+            following MeshCNN convention).
+        eps (float): A small number, for numerical stability (default: 1e-1,
+            following MeshCNN implementation).
+
+    Returns:
+        (torch.Tensor): Face normals for each vertex on the chosen side of the
+            edge (shape: :math:`(E, 2)`, where :math:`E` is the number of edges
+            in the mesh).
+    """
     a = (
         mesh.vertices[edge_points[:, side // 2 + 2]]
         - mesh.vertices[edge_points[:, side // 2]]
@@ -173,7 +228,19 @@ def compute_normals_from_gemm(mesh, edge_points, side, eps=1e-1):
 
 
 def compute_dihedral_angles(mesh, edge_points):
-    r"""Compute dihedral angle features for each edge. """
+    r"""Compute dihedral angle features for each edge. 
+
+    Args:
+        mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+        edge_points (torch.Tensor): Tensor containing "edge points" of the mesh,
+            as per MeshCNN convention (shape: :math:`(E, 4)`), where :math:`E`
+            is the total number of edges in the mesh.
+
+    Returns:
+        (torch.Tensor): Dihedral angle features for each edge in the mesh
+            (shape: :math:`(E, 4)`, where :math:`E` is the number of edges
+            in the mesh).
+    """
     a = compute_normals_from_gemm(mesh, edge_points, 0)
     b = compute_normals_from_gemm(mesh, edge_points, 3)
     dot = (a * b).sum(dim=-1).clamp(-1, 1)
@@ -181,7 +248,23 @@ def compute_dihedral_angles(mesh, edge_points):
 
 
 def compute_opposite_angles(mesh, edge_points, side, eps=1e-1):
-    r"""Compute opposite angle features for each edge. """
+    r"""Compute opposite angle features for each edge.
+
+    Args:
+        mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+        edge_points (torch.Tensor): Tensor containing "edge points" of the mesh,
+            as per MeshCNN convention (shape: :math:`(E, 4)`), where :math:`E`
+            is the total number of edges in the mesh.
+        side (int): Side of the edge used in computing normals (0, 1, 2, or 3
+            following MeshCNN convention).
+        eps (float): A small number, for numerical stability (default: 1e-1,
+            following MeshCNN implementation).
+
+    Returns:
+        (torch.Tensor): Opposite angle features on the chosen side of the
+            edge (shape: :math:`(E, 2)`, where :math:`E` is the number of edges
+            in the mesh).
+    """
     a = (
         mesh.vertices[edge_points[:, side // 2]]
         - mesh.vertices[edge_points[:, side // 2 + 2]]
@@ -197,7 +280,19 @@ def compute_opposite_angles(mesh, edge_points, side, eps=1e-1):
 
 
 def compute_symmetric_opposite_angles(mesh, edge_points):
-    r"""Compute symmetric opposite angle features for each edge. """
+    r"""Compute symmetric opposite angle features for each edge.
+
+    Args:
+        mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+        edge_points (torch.Tensor): Tensor containing "edge points" of the mesh,
+            as per MeshCNN convention (shape: :math:`(E, 4)`), where :math:`E`
+            is the total number of edges in the mesh.
+
+    Returns:
+        (torch.Tensor): Symmetric opposite angle features for each edge in the mesh
+            (shape: :math:`(E, 4)`, where :math:`E` is the number of edges
+            in the mesh).
+    """
     a = compute_opposite_angles(mesh, edge_points, 0)
     b = compute_opposite_angles(mesh, edge_points, 3)
     angles = torch.stack((a, b), dim=0)
@@ -206,7 +301,23 @@ def compute_symmetric_opposite_angles(mesh, edge_points):
 
 
 def compute_edgelength_ratios(mesh, edge_points, side, eps=1e-1):
-    r"""Compute edge-length ratio features for each edge. """
+    r"""Compute edge-length ratio features for each edge.
+
+    Args:
+        mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+        edge_points (torch.Tensor): Tensor containing "edge points" of the mesh,
+            as per MeshCNN convention (shape: :math:`(E, 4)`), where :math:`E`
+            is the total number of edges in the mesh.
+        side (int): Side of the edge used in computing normals (0, 1, 2, or 3
+            following MeshCNN convention).
+        eps (float): A small number, for numerical stability (default: 1e-1,
+            following MeshCNN implementation).
+
+    Returns:
+        (torch.Tensor): Edge-length ratio features on the chosen side of the
+            edge (shape: :math:`(E, 2)`, where :math:`E` is the number of edges
+            in the mesh).
+    """
     edge_lengths = (
         mesh.vertices[edge_points[:, side // 2]]
         - mesh.vertices[edge_points[:, 1 - side // 2]]
@@ -222,7 +333,19 @@ def compute_edgelength_ratios(mesh, edge_points, side, eps=1e-1):
 
 
 def compute_symmetric_edgelength_ratios(mesh, edge_points):
-    r"""Compute symmetric edge-length ratio features for each edge. """
+    r"""Compute symmetric edge-length ratio features for each edge.
+
+    Args:
+        mesh (kaolin.rep.TriangleMesh): A triangle mesh object.
+        edge_points (torch.Tensor): Tensor containing "edge points" of the mesh,
+            as per MeshCNN convention (shape: :math:`(E, 4)`), where :math:`E`
+            is the total number of edges in the mesh.
+
+    Returns:
+        (torch.Tensor): Symmetric edge-length ratio features for each edge in the mesh
+            (shape: :math:`(E, 4)`, where :math:`E` is the number of edges
+            in the mesh).
+    """
     ratios_a = compute_edgelength_ratios(mesh, edge_points, 0)
     ratios_b = compute_edgelength_ratios(mesh, edge_points, 3)
     ratios = torch.stack((ratios_a, ratios_b), dim=0)
