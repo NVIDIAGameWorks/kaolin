@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 
 import torch
 
@@ -22,26 +23,34 @@ from kaolin.datasets import SHREC16
 from kaolin.models import MeshCNNClassifier
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--shrec-root", type=str, required=True,
+                    help="Path to root directory of SHREC16 data.")
+parser.add_argument("--categories", type=str, nargs="+", default=["ants", "cat"],
+                    help="List of categories to train on.")
+parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
+parser.add_argument("--device", type=str, default="cuda",
+                    help="Device to run training/evaluation on.")
+parser.add_argument("--epochs", type=int, default=1,
+                    help="Number of epochs to train for.")
+args = parser.parse_args()
+
+# Seed RNG, for repeatability.
 torch.manual_seed(1234)
 
-category1 = "ants"
-category2 = "cat"
-
 model = MeshCNNClassifier(5, 2, [16, 32, 32], [1140, 780, 580], 100, 0, 750)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+model = model.to(args.device)
+optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 lossfn = torch.nn.functional.nll_loss
 dataset_train = SHREC16(
-    "/home/jatavalk/data/shrec_16", categories=[category1, category2], mode="train"
+    args.shrec_root, categories=args.categories, train=True
 )
 dataset_test = SHREC16(
-    "/home/jatavalk/data/shrec_16", categories=[category1, category2], mode="test"
+    args.shrec_root, categories=args.categories, train=False
 )
 
-epochs = 10
 
-
-def prepare_mesh(obj_path):
-    mesh = kal.rep.TriangleMesh.from_obj(obj_path)
+def prepare_mesh(mesh):
     mesh.vertex_mask = torch.ones(mesh.vertices.shape[0]).to(mesh.vertices)
     _, face_areas = kal.models.meshcnn.compute_face_normals_and_areas(mesh)
     (
@@ -85,7 +94,7 @@ def prepare_mesh(obj_path):
 
 
 model.train()
-for e in trange(epochs):
+for e in trange(args.epochs):
 
     # Shuffle the dataset_train
     randperm = torch.randperm(len(dataset_train))
@@ -96,7 +105,7 @@ for e in trange(epochs):
         i = randperm[idx]
         item = dataset_train[i]
 
-        mesh = prepare_mesh(item["attributes"]["name"])
+        mesh = prepare_mesh(item["data"])
 
         # Some SHREC meshes are ill-behaved (roughly 8% of the dataset_train). We ignore them.
         x = None
@@ -106,8 +115,8 @@ for e in trange(epochs):
             pass
             # print("Skipping mesh:", idx)
 
-        label = 0 if item["attributes"]["class"] == category1 else 1
-        label = torch.tensor([label], dtype=torch.long, device=mesh.vertices.device)
+        label = item["attributes"]["label"]
+        label = torch.tensor([label], dtype=torch.long, device=args.device)
         if x is not None:
             loss = lossfn(x, label)
             tqdm.write(f"Loss: {loss.item():.6}")
@@ -124,18 +133,18 @@ model.eval()
 for i in range(len(dataset_test)):
 
     item = dataset_test[i]
-    mesh = prepare_mesh(item["attributes"]["name"])
+    mesh = prepare_mesh(item["data"])
     x = None
     try:
         x = model(mesh.features.unsqueeze(0), [mesh])
     except Exception:
         pass
-    label = 0 if item["attributes"]["class"] == category1 else 1
-    label = torch.tensor([label], dtype=torch.long, device=mesh.vertices.device)
+    label = item["attributes"]["label"]
+    label = torch.tensor([label], dtype=torch.long, device=args.device)
     if x is not None:
         loss = lossfn(x, label)
         pred = x.argmax()
         if pred == label:
             correct += 1
         total += 1
-print("Accuracy:", correct * 100 / total, "(%)")
+print("Accuracy:", (correct * 100) / (total + 1e-6), "(%)")
