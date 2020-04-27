@@ -11,7 +11,8 @@ import kaolin.transforms as tfs
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--modelnet-root', type=str, help='Root directory of the ModelNet dataset.')
-parser.add_argument('--categories', type=str, nargs='+', default=['chair', 'sofa'], help='list of object classes to use.')
+parser.add_argument('--categories', type=str, nargs='+',
+                    default=['chair', 'sofa'], help='list of object classes to use.')
 parser.add_argument('--num-points', type=int, default=1024, help='Number of points to sample from meshes.')
 parser.add_argument('--epochs', type=int, default=10, help='Number of train epochs.')
 parser.add_argument('-lr', '--learning-rate', type=float, default=1e-3, help='Learning rate.')
@@ -26,6 +27,7 @@ args = parser.parse_args()
 def to_device(inp):
     inp.to(args.transforms_device)
     return inp
+
 
 transform = tfs.Compose([
     to_device,
@@ -66,9 +68,9 @@ for e in range(args.epochs):
 
     model.train()
 
-    for idx, batch in enumerate(tqdm(train_loader)):
-        category = batch['attributes']['category'].cuda()
-        pred = model(batch['data'].cuda())
+    for idx, (data, attributes) in enumerate(tqdm(train_loader)):
+        category = attributes['category'].cuda()
+        pred = model(data.cuda())
         loss = criterion(pred, category.view(-1))
         train_loss += loss.item()
         loss.backward()
@@ -90,9 +92,9 @@ for e in range(args.epochs):
     model.eval()
 
     with torch.no_grad():
-        for idx, batch in enumerate(tqdm(val_loader)):
-            category = batch['attributes']['category'].cuda()
-            pred = model(batch['data'].cuda())
+        for idx, (data, attributes) in enumerate(tqdm(val_loader)):
+            category = attributes['category'].cuda()
+            pred = model(data.cuda())
             loss = criterion(pred, category.view(-1))
             val_loss += loss.item()
 
@@ -110,9 +112,9 @@ test_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories
                          shuffle=True, batch_size=15, num_workers=num_workers, pin_memory=pin_memory)
 
 test_batch = next(iter(test_loader))
-preds = model(test_batch['data'].cuda())
+preds = model(test_batch.data.cuda())
 pred_labels = torch.max(preds, axis=1)[1]
 
 if args.viz_test:
     from utils import visualize_batch
-    visualize_batch(test_batch, pred_labels, labels, args.categories)
+    visualize_batch(test_batch.data, pred_labels, labels, args.categories)
