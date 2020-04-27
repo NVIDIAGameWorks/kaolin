@@ -4,7 +4,6 @@ import time
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
-from torch.multiprocessing import cpu_count
 
 from kaolin.datasets import ModelNet
 from kaolin.models.PointNet import PointNetClassifier
@@ -18,7 +17,8 @@ parser.add_argument('--epochs', type=int, default=10, help='Number of train epoc
 parser.add_argument('-lr', '--learning-rate', type=float, default=1e-3, help='Learning rate.')
 parser.add_argument('--batch-size', type=int, default=12, help='Batch size.')
 parser.add_argument('--viz-test', action='store_true', help='Visualize an output of a test sample')
-parser.add_argument('--transforms-device', type=str, default='cuda', help='Device to use.')
+parser.add_argument('--transforms-device', type=str, default='cuda', help='Device to use for data preprocessing.')
+parser.add_argument('--workers', type=int, default=4, help='number of workers used for each Dataloader')
 
 args = parser.parse_args()
 
@@ -37,7 +37,7 @@ if args.transforms_device == 'cuda':
     num_workers = 0
     pin_memory = False
 else:
-    num_workers = cpu_count()
+    num_workers = args.workers
     pin_memory = True
 
 train_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories,
