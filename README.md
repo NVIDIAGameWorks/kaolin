@@ -1,7 +1,5 @@
-.. image:: https://www.repostatus.org/badges/latest/wip.svg
-  :target: https://www.repostatus.org/#wip
-.. image:: https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg
-  :target: https://github.com/NVIDIAGameWorks/kaolin/blob/master/COPYRIGHT
+[![WIP](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
+[![License](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg)](https://github.com/NVIDIAGameWorks/kaolin/blob/master/LICENSE)
 
 <p align="center">
     <img src="assets/kaolin.png">
