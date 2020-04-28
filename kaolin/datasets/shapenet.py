@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -874,7 +874,7 @@ class ShapeNet_Tags(data.Dataset):
         for index, name in enumerate(self.names):
             self.name_to_index[name] = index
 
-    def get_tags_from_str(self, tags_str, inverse_order=True, forbidden_symbols=[" ", "/", "-", "\*"]):
+    def get_tags_from_str(self, tags_str, inverse_order=True, forbidden_symbols=[" ", "/", "-", "\\*"]):
         r"""Process the tag string and return a list of tags. ``Note``: The tags that contain forbidden_symbols are ignored.
 
         Args:

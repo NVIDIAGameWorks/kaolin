@@ -2,8 +2,9 @@ image: "pytorch/pytorch:1.2-cuda10.0-cudnn7-devel"
 
 before_script:
   - pip install --upgrade pip>=18.0.0
-  - pip install -r requirements.txt
   - apt-get update && apt-get -y install libgtk2.0-dev
+  - pip install --no-dependencies nuscenes-devkit opencv-python scikit-learn joblib pyquaternion cachetools
+  - pip install -r requirements.txt
 
 stages:
   - build
