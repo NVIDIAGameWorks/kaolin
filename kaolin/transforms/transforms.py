@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +36,56 @@ from kaolin.transforms import meshfunc
 from kaolin.transforms import voxelfunc
 
 
-class Compose(object):
+def _get_repr(obj):
+    # TODO: Improve hashing of tensors such that shape matters
+    if isinstance(obj, np.ndarray):
+        return hashlib.sha1(obj).hexdigest()
+
+    if isinstance(obj, torch.Tensor):
+        return hashlib.sha1(obj.cpu().numpy()).hexdigest()
+
+    return repr(obj)
+
+
+class Transform(object):
+    """Base class for all Kaolin transforms.
+
+    This class generates __repr__ string automatically. Given that all attributes
+    have valid __repr__, it generates a string with the following format:
+    .. code-block::
+       MyClass(a=1, b=2, ...)
+
+    The attributes are sorted alphabetically to ensure determinism.
+
+    To exclude certain attributes from appearing in the __repr__, define a list
+    "__ignored_params__" in the subclass (not the instance). Example:
+    .. code-block::
+       class MyClass(Transform):
+           __ignored_params__ = ['a', 'b']
+
+    NOTE:
+    - Since the __repr__ generation depends on the __repr__ of attributes,
+      objects that have incorrect (such as arbitrary objects that output
+      their memory address by default) or indeterministic (such as
+      dictionaries) __repr__ should not be assigned as attribute.
+      If unavoidable, override __repr__ manually.
+    """
+
+    def __repr__(self):
+        ignored = set(getattr(self, '__ignored_params__', []))
+        names = [
+            k for k in self.__dict__.keys()
+            if k not in ignored
+        ]
+        names.sort()
+        params = ', '.join([
+            '{}={}'.format(name, _get_repr(self.__dict__[name]))
+            for name in names
+        ])
+        return '{}({})'.format(self.__class__.__name__, params)
+
+
+class Compose(Transform):
     """Composes (chains) multiple transforms sequentially. Identical to
     `torchvision.transforms.Compose`.
 
@@ -48,23 +97,15 @@ class Compose(object):
     """
 
     def __init__(self, transforms: Iterable):
-        self.tforms = transforms
+        self.transforms = transforms
 
-    def __call__(self, inp: torch.Tensor):
-        for t in self.tforms:
-            inp = t(inp)
-        return inp
-
-    def __repr__(self):
-        fstr = self.__class__.__name__ + '('
-        for t in self.tforms:
-            fstr += '\n'
-            fstr += ' {0}'.format(t)
-        fstr += '\n)'
-        return fstr
+    def __call__(self, value: torch.Tensor):
+        for t in self.transforms:
+            value = t(value)
+        return value
 
 
-class CacheCompose(object):
+class CacheCompose(Transform):
     """Caches the results of the provided compose pipeline to disk.
     If the pipeline is already cached, data is returned from disk,
     otherwise, data is converted following the provided transforms.
@@ -74,6 +115,8 @@ class CacheCompose(object):
             cache_dir (str): Directory where objects will be cached. Default
                              to 'cache'.
     """
+
+    __ignored_params__ = ['cache_dir', 'cached_ids']
 
     def __init__(self, transforms: Iterable, cache_dir: str = 'cache'):
         self.compose = Compose(transforms)
@@ -138,10 +181,10 @@ class CacheCompose(object):
         return data
 
     def get_hash(self):
-        return hashlib.md5(bytes(str(self.compose), 'utf-8')).hexdigest()
+        return hashlib.md5(bytes(repr(self.compose), 'utf-8')).hexdigest()
 
 
-class NumpyToTensor(object):
+class NumpyToTensor(Transform):
     """Converts a `np.ndarray` object to a `torch.Tensor` object. """
 
     def __call__(self, arr: np.ndarray):
@@ -154,11 +197,8 @@ class NumpyToTensor(object):
         """
         return torch.from_numpy(arr)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '()'
 
-
-class ScalePointCloud(object):
+class ScalePointCloud(Transform):
     """Scale a pointcloud with a fixed scaling factor.
     Given a scale factor `scf`, this transform will scale each point in the
     pointcloud, i.e.,
@@ -190,11 +230,8 @@ class ScalePointCloud(object):
         """
         return pcfunc.scale(cloud, scf=self.scf, inplace=self.inplace)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(scf={0})'.format(self.scf)
 
-
-class RotatePointCloud(object):
+class RotatePointCloud(Transform):
     r"""Rotate a pointcloud with a given rotation matrix.
     Given a :math:`3 \times 3` rotation matrix, this transform will rotate each
     point in the cloud by the rotation matrix specified.
@@ -222,11 +259,8 @@ class RotatePointCloud(object):
         """
         return pcfunc.rotate(cloud, rotmat=self.rotmat, inplace=self.inplace)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(rotmat={0})'.format(self.rotmat)
 
-
-class RealignPointCloud(object):
+class RealignPointCloud(Transform):
     r"""Re-align a `src` pointcloud such that it fits in an axis-aligned
     bounding box whose size matches the `tgt` pointcloud.
 
@@ -256,11 +290,8 @@ class RealignPointCloud(object):
         """
         return pcfunc.realign(src, self.tgt, inplace=self.inplace)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(realign)'
 
-
-class NormalizePointCloud(object):
+class NormalizePointCloud(Transform):
     r"""Normalize a pointcloud such that it is centered at the orgin and has
     unit standard deviation.
 
@@ -285,11 +316,8 @@ class NormalizePointCloud(object):
         """
         return pcfunc.normalize(cloud, inplace=self.inplace)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(normalize)'
 
-
-class DownsampleVoxelGrid(object):
+class DownsampleVoxelGrid(Transform):
     r"""Downsamples a voxelgrid, given a (down)scaling factor for each
     dimension.
 
@@ -321,11 +349,8 @@ class DownsampleVoxelGrid(object):
         return cvt.downsample(voxgrid, scale=self.scale,
                               inplace=self.inplace)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(downsample={0})'.format(self.scale)
 
-
-class UpsampleVoxelGrid(object):
+class UpsampleVoxelGrid(Transform):
     r"""Upsamples a voxelgrid, given a target dimensionality (this target
     dimensionality is homogeneously applied to all three axes).
 
@@ -355,11 +380,8 @@ class UpsampleVoxelGrid(object):
         """
         return cvt.upsample(voxgrid, dim=self.dim)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(upsample={0})'.format(self.dim)
 
-
-class ThresholdVoxelGrid(object):
+class ThresholdVoxelGrid(Transform):
     r"""Binarizes the voxel array using a specified threshold.
 
     Args:
@@ -381,13 +403,10 @@ class ThresholdVoxelGrid(object):
             (torch.Tensor): Thresholded voxel array.
         """
         return cvt.threshold(voxgrid, thresh=self.thresh,
-            inplace=self.inplace)
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(threshold={0})'.format(self.thresh)
+                             inplace=self.inplace)
 
 
-class FillVoxelGrid(object):
+class FillVoxelGrid(Transform):
     r"""Fills the internal structures in a voxel grid. Used to fill holds
     and 'solidify' objects.
 
@@ -409,11 +428,8 @@ class FillVoxelGrid(object):
         """
         return cvt.fill(voxgrid, thresh=self.thresh)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(fill={0})'.format(self.thresh)
 
-
-class ExtractSurfaceVoxels(object):
+class ExtractSurfaceVoxels(Transform):
     r"""Removes any inernal structure(s) from a voxel array.
 
     Args:
@@ -435,17 +451,10 @@ class ExtractSurfaceVoxels(object):
         """
         return cvt.extract_surface(voxgrid, self.thresh)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(extract_surface={0})'.format(
-            self.thresh)
 
-
-class ExtractOdmsFromVoxelGrid(object):
+class ExtractOdmsFromVoxelGrid(Transform):
     r"""Extracts a set of orthographic depth maps from a voxel grid.
     """
-
-    def __init__(self):
-        pass
 
     def __call__(self, voxgrid: Union[torch.Tensor, VoxelGrid]):
         """
@@ -458,17 +467,11 @@ class ExtractOdmsFromVoxelGrid(object):
         """
         return cvt.extract_odms(voxgrid)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(extract_odms)'
 
-
-class ExtractProjectOdmsFromVoxelGrid(object):
+class ExtractProjectOdmsFromVoxelGrid(Transform):
     r"""Extracts a set of orthographic depth maps (odms) from a voxel grid and
         then projects the odms onto a voxel grid.
     """
-
-    def __init__(self):
-        pass
 
     def __call__(self, voxel: Union[torch.Tensor, VoxelGrid]):
         """
@@ -482,11 +485,8 @@ class ExtractProjectOdmsFromVoxelGrid(object):
         odms = cvt.extract_odms(voxel)
         return VoxelGrid(cvt.project_odms(odms))
 
-    def __repr__(self):
-        return self.__class__.__name__
 
-
-class SampleTriangleMesh(object):
+class SampleTriangleMesh(Transform):
     r"""Sample points uniformly over the surface of a triangle mesh.
 
     Args:
@@ -514,12 +514,8 @@ class SampleTriangleMesh(object):
         return meshfunc.sample_triangle_mesh(mesh.vertices, mesh.faces,
                                              self.num_samples, eps=self.eps)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(sample_triangle_mesh={0})'.format(
-            self.num_samples)
 
-
-class NormalizeMesh(object):
+class NormalizeMesh(Transform):
     r"""Normalize a mesh such that it is centered at the orgin and has
     unit standard deviation.
 
@@ -544,11 +540,8 @@ class NormalizeMesh(object):
         """
         return meshfunc.normalize(mesh, inplace=self.inplace)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(normalize)'
 
-
-class ScaleMesh(object):
+class ScaleMesh(Transform):
     r"""Scale a mesh given a specified scaling factor. A scalar scaling factor
     can be provided, in which case it is applied isotropically to all dims.
     Optionally, a list/tuple of anisotropic scale factors can be provided per
@@ -579,11 +572,8 @@ class ScaleMesh(object):
         """
         return meshfunc.scale(mesh, scf=self.scf, inplace=self.inplace)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(scf={0})'.format(self.scf)
 
-
-class TranslateMesh(object):
+class TranslateMesh(Transform):
     r"""Translate a mesh given a (3D) translation vector.
 
     Args:
@@ -607,11 +597,8 @@ class TranslateMesh(object):
         """
         return meshfunc.translate(mesh, trans=self.trans, inplace=self.inplace)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(trans={0})'.format(self.trans)
 
-
-class RotateMesh(object):
+class RotateMesh(Transform):
     r"""Rotate a mesh given a 3 x 3 rotation matrix.
 
     Args:
@@ -633,11 +620,8 @@ class RotateMesh(object):
         """
         return meshfunc.rotate(mesh, rotmat=self.rotmat, inplace=self.inplace)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(rotmat={0})'.format(self.rotmat)
 
-
-class TriangleMeshToPointCloud(object):
+class TriangleMeshToPointCloud(Transform):
     r"""Converts a triange mesh to a pointcloud with a specified number of
     points. Uniformly samples points over the surface of the mesh.
 
@@ -666,12 +650,8 @@ class TriangleMeshToPointCloud(object):
         return meshfunc.sample_triangle_mesh(mesh.vertices, mesh.faces,
                                              self.num_samples, eps=self.eps)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(num_samples={0})'.format(
-            self.num_samples)
 
-
-class TriangleMeshToVoxelGrid(object):
+class TriangleMeshToVoxelGrid(Transform):
     r"""Converts a triangle mesh to a voxel grid with a specified reolution.
     The resolution of the voxel grid is assumed to be homogeneous along all
     three dimensions (X, Y, Z axes).
@@ -707,12 +687,8 @@ class TriangleMeshToVoxelGrid(object):
                                                vertex_offset=self.vertex_offset)
         return voxels
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(resolution={0}, normalize={1}, vertex_offset={2})'.\
-            format(self.resolution, self.normalize, self.vertex_offset)
 
-
-class TriangleMeshToSDF(object):
+class TriangleMeshToSDF(Transform):
     r"""Converts a triangle mesh to a non-parameteric (point-based) signed
     distance function (SDF).
 
@@ -741,12 +717,8 @@ class TriangleMeshToSDF(object):
         sdf = cvt.trianglemesh_to_sdf(mesh, self.num_samples)
         return sdf(self.noise * (torch.rand(self.num_samples, 3).to(mesh.device) - .5))
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(num_samples={0}, noise={1})'.\
-            format(self.num_samples, self.noise)
 
-
-class MeshLaplacianSmoothing(object):
+class MeshLaplacianSmoothing(Transform):
     r""" Applies laplacian smoothing to the mesh.
 
         Args:
@@ -767,11 +739,8 @@ class MeshLaplacianSmoothing(object):
         mesh.laplacian_smoothing(self.iterations)
         return mesh
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(iterations={0})'.format(self.iterations)
 
-
-class RealignMesh(object):
+class RealignMesh(Transform):
     r""" Aligns the vertices to be in the same (axis-aligned) bounding
     box as that of `target` vertices or point cloud.
 
@@ -781,11 +750,11 @@ class RealignMesh(object):
             axis-aligned bounding box that the target cloud maps to). This
             cloud must have the same number of dimensions :math:`D` as in the
             source cloud. (shape: :math:`\cdots \times \cdots \times D`).
-        inplace (bool, optional): Bool to make the transform in-place.
 
     Returns:
         (torch.Tensor): Pointcloud `src` realigned to fit in the (axis-aligned)
             bounding box of the `tgt` cloud.
+
     """
 
     def __init__(self, target: Union[torch.Tensor, PointCloud]):
@@ -802,11 +771,8 @@ class RealignMesh(object):
         mesh.vertices = pcfunc.realign(mesh.vertices, self.target)
         return mesh
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(realign)'
 
-
-class SDFToTriangleMesh(object):
+class SDFToTriangleMesh(Transform):
     r""" Converts an SDF function to a mesh
 
     Args:
@@ -834,18 +800,11 @@ class SDFToTriangleMesh(object):
             (TriangleMesh): Computed triangle mesh.
         """
         verts, faces = cvt.sdf_to_trianglemesh(sdf, self.bbox_center, self.bbox_dim,
-                                       self.resolution, self.upsampling_steps)
+                                               self.resolution, self.upsampling_steps)
         return TriangleMesh.from_tensors(vertices=verts, faces=faces)
 
-    def __repr__(self):
-        format_string = self.__class__.__name__ + '(bbox_center={0}'.format(self.bbox_center)
-        format_string += ', bbox_dim={0}'.format(self.bbox_dim)
-        format_string += ', resolution={0}'.format(self.resolution)
-        format_string += ', upsampling_steps={0}'.format(self.upsampling_steps)
-        return format_string
 
-
-class SDFToPointCloud(object):
+class SDFToPointCloud(Transform):
     r""" Converts an SDF fucntion to a point cloud
 
     Args:
@@ -876,18 +835,10 @@ class SDFToPointCloud(object):
             (torch.FloatTensor): Computed point cloud.
         """
         return cvt.sdf_to_pointcloud(sdf, self.bbox_center, self.bbox_dim, self.resolution,
-                                self.upsampling_steps, self.num_points)
-
-    def __repr__(self):
-        format_string = self.__class__.__name__ + '(bbox_center={0}'.format(self.bbox_center)
-        format_string += ', bbox_dim={0}'.format(self.bbox_dim)
-        format_string += ', resolution={0}'.format(self.resolution)
-        format_string += ', upsampling_steps={0}'.format(self.upsampling_steps)
-        format_string += ', num_points={0}'.format(self.num_points)
-        return format_string
+                                     self.upsampling_steps, self.num_points)
 
 
-class SDFToVoxelGrid(object):
+class SDFToVoxelGrid(Transform):
     r""" Converts an SDF function to a to a voxel grid
 
     Args:
@@ -900,12 +851,11 @@ class SDFToVoxelGrid(object):
     """
 
     def __init__(self, bbox_center: float, bbox_dim: float, resolution: int,
-                 upsampling_steps: int, num_points: int):
+                 upsampling_steps: int):
         self.bbox_center = bbox_center
         self.bbox_dim = bbox_dim
         self.resolution = resolution
         self.upsampling_steps = upsampling_steps
-        self.num_points = num_points
 
     def __call__(self, sdf: Callable):
         """
@@ -917,17 +867,10 @@ class SDFToVoxelGrid(object):
             (torch.FloatTensor): Computed point cloud.
         """
         return cvt.sdf_to_voxelgrid(sdf, self.bbox_center, self.bbox_dim, self.resolution,
-                            self.upsampling_steps, self.num_points)
-
-    def __repr__(self):
-        format_string = self.__class__.__name__ + '(bbox_center={0}'.format(self.bbox_center)
-        format_string += ', bbox_dim={0}'.format(self.bbox_dim)
-        format_string += ', resolution={0}'.format(self.resolution)
-        format_string += ', upsampling_steps={0}'.format(self.upsampling_steps)
-        return format_string
+                                    self.upsampling_steps)
 
 
-class VoxelGridToTriangleMesh(object):
+class VoxelGridToTriangleMesh(Transform):
     r""" Converts passed voxel to a mesh
 
     Args:
@@ -937,6 +880,7 @@ class VoxelGridToTriangleMesh(object):
             -'marching_cubes': marching cubes is applied to passed voxel
         normalize (bool): whether to scale the array to (-.5,.5)
     """
+
     def __init__(self, threshold, mode, normalize):
         self.thresh = threshold
         self.mode = mode
@@ -953,18 +897,15 @@ class VoxelGridToTriangleMesh(object):
         verts, faces = cvt.voxelgrid_to_trianglemesh(voxel, self.thresh, self.mode, self.normalize)
         return TriangleMesh.from_tensors(vertices=verts, faces=faces)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(threshold={0}, mode={1}, normalize={2})'.\
-            format(self.thresh, self.mode, self.normalize)
 
-
-class VoxelGridToQuadMesh(object):
+class VoxelGridToQuadMesh(Transform):
     r""" Converts passed voxel to quad mesh
 
     Args:
         threshold (float): Threshold from which to make voxel binary.
         normalize (bool): Whether to scale the array to (-.5,.5).
     """
+
     def __init__(self, threshold: float, normalize: bool):
         self.thresh = threshold
         self.normalize = normalize
@@ -980,12 +921,8 @@ class VoxelGridToQuadMesh(object):
         verts, faces = cvt.voxelgrid_to_quadmesh(voxel, self.thresh, self.normalize)
         return QuadMesh.from_tensors(vertices=verts, faces=faces)
 
-    def __repr__(self):
-        return self.__class__.__name__ + '(threshold={0}, normalize={1})'.\
-            format(self.thresh, self.normalize)
 
-
-class VoxelGridToPointCloud(object):
+class VoxelGridToPointCloud(Transform):
     r""" Converts  passed voxel to a pointcloud
 
     Args:
@@ -1013,15 +950,8 @@ class VoxelGridToPointCloud(object):
         """
         return cvt.voxelgrid_to_pointcloud(voxel, self.num_points, self.thresh, self.mode, self.normalize)
 
-    def __repr__(self):
-        format_string = self.__class__.__name__ + '(num_points={0}'.format(self.num_points)
-        format_string += ', threshold={0}'.format(self.threshold)
-        format_string += ', mode={0}'.format(self.mode)
-        format_string += ', normalize={0}'.format(self.normalize)
-        return format_string
 
-
-class VoxelGridToSDF(object):
+class VoxelGridToSDF(Transform):
     r""" Converts passed voxel to a signed distance fucntion.
 
     Args:
@@ -1032,6 +962,7 @@ class VoxelGridToSDF(object):
     Returns:
         a signed distance fucntion
     """
+
     def __init__(self, threshold: float, normalize: bool):
         self.thresh = threshold
         self.normalize = normalize
@@ -1045,7 +976,3 @@ class VoxelGridToSDF(object):
             (SDF): A signed distance function.
         """
         return cvt.voxelgrid_to_sdf(voxel, self.thresh, self.normalize)
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(threshold={0}, normalize={1})'.\
-            format(self.thresh, self.normalize)
