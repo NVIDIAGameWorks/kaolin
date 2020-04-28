@@ -36,6 +36,17 @@ from kaolin.transforms import meshfunc
 from kaolin.transforms import voxelfunc
 
 
+def _get_repr(obj):
+    # TODO: Improve hashing of tensors such that shape matters
+    if isinstance(obj, np.ndarray):
+        return hashlib.sha1(obj).hexdigest()
+
+    if isinstance(obj, torch.Tensor):
+        return hashlib.sha1(obj.cpu().numpy()).hexdigest()
+
+    return repr(obj)
+
+
 class Transform(object):
     """Base class for all Kaolin transforms.
 
@@ -61,14 +72,14 @@ class Transform(object):
     """
 
     def __repr__(self):
-        ignored = set(getattr(self.__class__, '__ignored_params__', []))
+        ignored = set(getattr(self, '__ignored_params__', []))
         names = [
             k for k in self.__dict__.keys()
             if k not in ignored
         ]
         names.sort()
         params = ', '.join([
-            '{}={}'.format(name, repr(self.__dict__[name]))
+            '{}={}'.format(name, _get_repr(self.__dict__[name]))
             for name in names
         ])
         return '{}({})'.format(self.__class__.__name__, params)
@@ -204,8 +215,6 @@ class ScalePointCloud(Transform):
 
     """
 
-    __ignored_params__ = ['inplace']
-
     def __init__(self, scf: Union[int, float, torch.Tensor],
                  inplace: Optional[bool] = True):
         self.scf = scf
@@ -236,8 +245,6 @@ class RotatePointCloud(Transform):
 
     """
 
-    __ignored_params__ = ['inplace']
-
     def __init__(self, rotmat: torch.Tensor, inplace: Optional[bool] = True):
         self.rotmat = rotmat
         self.inplace = inplace
@@ -264,12 +271,7 @@ class RealignPointCloud(Transform):
 
     TODO: Example.
 
-    TODO: This transform's repr is incorrect:
-    changing tgt will not cause caches to recompute.
-
     """
-
-    __ignored_params__ = ['tgt', 'inplace']
 
     def __init__(self, tgt: Union[torch.Tensor, PointCloud],
                  inplace: Optional[bool] = True):
@@ -299,8 +301,6 @@ class NormalizePointCloud(Transform):
     TODO: Example.
 
     """
-
-    __ignored_params__ = ['inplace']
 
     def __init__(self, inplace: Optional[bool] = True):
         self.inplace = inplace
@@ -332,8 +332,6 @@ class DownsampleVoxelGrid(Transform):
     TODO: Example.
 
     """
-
-    __ignored_params__ = ['inplace']
 
     def __init__(self, scale: List[int], inplace=True):
         self.scale = scale
@@ -391,8 +389,6 @@ class ThresholdVoxelGrid(Transform):
         inplace (bool, optional): Bool to make the operation in-place.
 
     """
-
-    __ignored_params__ = ['inplace']
 
     def __init__(self, thresh: float, inplace: Optional[bool] = True):
         self.thresh = thresh
@@ -499,8 +495,6 @@ class SampleTriangleMesh(Transform):
                      for small surface areas.
     """
 
-    __ignored_params__ = ['eps']
-
     def __init__(self, num_samples: int, eps: Optional[float] = 1e-10):
         self.num_samples = num_samples
         self.eps = eps
@@ -531,8 +525,6 @@ class NormalizeMesh(Transform):
     TODO: Example.
 
     """
-
-    __ignored_params__ = ['inplace']
 
     def __init__(self, inplace: Optional[bool] = True):
         self.inplace = inplace
@@ -565,8 +557,6 @@ class ScaleMesh(Transform):
 
     """
 
-    __ignored_params__ = ['inplace']
-
     def __init__(self, scf: Union[float, int, Iterable],
                  inplace: Optional[bool] = True):
         self.scf = scf
@@ -592,8 +582,6 @@ class TranslateMesh(Transform):
         inplace (bool, optional): Bool to make this operation in-place.
     """
 
-    __ignored_params__ = ['inplace']
-
     def __init__(self, trans: Union[torch.Tensor, Iterable],
                  inplace: Optional[bool] = True):
         self.trans = trans
@@ -617,8 +605,6 @@ class RotateMesh(Transform):
         rotmat (torch.Tensor): Rotation matrix (shape: :math:`3 \times 3`).
         inplace (bool, optional): Bool to make this operation in-place.
     """
-
-    __ignored_params__ = ['inplace']
 
     def __init__(self, rotmat: torch.Tensor, inplace: Optional[bool] = True):
         self.rotmat = rotmat
@@ -644,8 +630,6 @@ class TriangleMeshToPointCloud(Transform):
         eps (float, optional): A small number to prevent division by zero
                      for small surface areas.
     """
-
-    __ignored_params__ = ['eps']
 
     def __init__(self, num_samples: int, eps: Optional[float] = 1e-10):
         self.num_samples = num_samples
@@ -771,12 +755,7 @@ class RealignMesh(Transform):
         (torch.Tensor): Pointcloud `src` realigned to fit in the (axis-aligned)
             bounding box of the `tgt` cloud.
 
-    TODO: This transform's repr is incorrect:
-    changing target will not cause caches to recompute.
-
     """
-
-    __ignored_params__ = ['target']
 
     def __init__(self, target: Union[torch.Tensor, PointCloud]):
         self.target = target
