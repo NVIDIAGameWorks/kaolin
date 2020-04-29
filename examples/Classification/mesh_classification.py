@@ -105,7 +105,7 @@ for e in trange(args.epochs):
         i = randperm[idx]
         item = dataset_train[i]
 
-        mesh = prepare_mesh(item["data"])
+        mesh = prepare_mesh(item.data)
 
         # Some SHREC meshes are ill-behaved (roughly 8% of the dataset_train). We ignore them.
         x = None
@@ -115,7 +115,7 @@ for e in trange(args.epochs):
             pass
             # print("Skipping mesh:", idx)
 
-        label = item["attributes"]["label"]
+        label = item.attributes["label"]
         label = torch.tensor([label], dtype=torch.long, device=args.device)
         if x is not None:
             loss = lossfn(x, label)
@@ -133,13 +133,13 @@ model.eval()
 for i in range(len(dataset_test)):
 
     item = dataset_test[i]
-    mesh = prepare_mesh(item["data"])
+    mesh = prepare_mesh(item.data)
     x = None
     try:
         x = model(mesh.features.unsqueeze(0), [mesh])
     except Exception:
         pass
-    label = item["attributes"]["label"]
+    label = item.attributes["label"]
     label = torch.tensor([label], dtype=torch.long, device=args.device)
     if x is not None:
         loss = lossfn(x, label)
