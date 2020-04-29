@@ -44,14 +44,14 @@ def test_nusc():
     assert len(valdata) == 81
 
     inst = traindata[10]
-    assert isinstance(inst['data']['pc'], PointCloud)
+    assert isinstance(inst.data['pc'], PointCloud)
 
     # check dimension of point cloud for 5 lidar sweeps
-    N, D = inst['data']['pc'].points.shape
+    N, D = inst.data['pc'].points.shape
     assert N == 129427
     assert D == 5
 
     # check dimension of point cloud for 10 lidar sweeps
-    N, D = traindata_large[10]['data']['pc'].points.shape
+    N, D = traindata_large[10].data['pc'].points.shape
     assert N == 258188
     assert D == 5
