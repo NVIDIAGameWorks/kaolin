@@ -63,7 +63,6 @@ INITIAL_CAMERA_POS = [6, 10, -14]
 CAMERA_DISTANCE = 2.732
 ELEVATION = 0
 TEXTURE_SIZE = 2
-NUM_EPOCHS = 300
 
 
 def parse_arguments():
@@ -76,6 +75,8 @@ def parse_arguments():
                         help='Path to the target image file to optimize to')
     parser.add_argument('--output_path', type=str, default=os.path.join(ROOT_DIR, 'results'),
                         help='Path to the output directory')
+    parser.add_argument('--epochs', type=int, default=300,
+                        help='Number of epochs to optimize')
 
     return parser.parse_args()
 
@@ -159,7 +160,7 @@ def main():
     # Optimize
     ###########################
 
-    loop = tqdm.tqdm(range(NUM_EPOCHS))
+    loop = tqdm.tqdm(range(args.epochs))
     loop.set_description('Optimizing')
 
     optimizer = torch.optim.Adam(
