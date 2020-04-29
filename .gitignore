@@ -180,6 +180,8 @@ docs/_build
 # Test generated files (dataloader tests create temporary dirs)
 tests/datasets_eval/
 
+tests/visualize/results/
+
 # Default data directory
 data/
 
