@@ -45,7 +45,7 @@ def compute_ambient_light(
         face_vertices: torch.Tensor,
         textures: torch.Tensor,
         ambient_intensity: float = 1.,
-        ambient_color: torch.Tensor = torch.ones(3)):
+        ambient_color: torch.Tensor = None):
     r"""Computes ambient lighting to a mesh, given faces and face textures.
 
     Args:
@@ -83,6 +83,9 @@ def compute_ambient_light(
         raise TypeError('Expected input ambient_intensity to be of '
                         'type float. Got {0} instead.'.format(
                             type(ambient_intensity)))
+    if ambient_color is None:
+        ambient_color = torch.ones(3, dtype=face_vertices.dtype,
+                                   device=face_vertices.device)
     if not torch.is_tensor(ambient_color):
         raise TypeError('Expected input ambient_color to be of type '
                         'torch.Tensor. Got {0} instead.'.format(
@@ -127,7 +130,7 @@ def compute_ambient_light(
     # K_a: Ambient reflectance of the vertex (3 channels, R, G, B)
     light += ambient_intensity * ambient_color[:, None, :]
 
-    return light[:, :, None, None, None, :]
+    return light[:, :, None, :]
 
 
 def apply_ambient_light(
@@ -167,8 +170,8 @@ def compute_directional_light(
         face_vertices: torch.Tensor,
         textures: torch.Tensor,
         directional_intensity: float = 1.,
-        directional_color: torch.Tensor = torch.ones(3),
-        direction: torch.Tensor = torch.FloatTensor([0, 1, 0])):
+        directional_color: torch.Tensor = None,
+        direction: torch.Tensor = None):
     r"""Computes directional lighting to a mesh, given faces and face textures.
 
     Args:
@@ -208,10 +211,16 @@ def compute_directional_light(
         raise TypeError('Expected input directional_intensity to be of '
                         'type float. Got {0} instead.'.format(
                             type(directional_intensity)))
+    if directional_color is None:
+        directional_color = torch.ones(3, dtype=face_vertices.dtype,
+                                       device=face_vertices.device)
     if not torch.is_tensor(directional_color):
         raise TypeError('Expected input directional_color to be of type '
                         'torch.Tensor. Got {0} instead.'.format(
                             type(directional_color)))
+    if direction is None:
+        direction = torch.tensor([0., 1., 0.], dtype=face_vertices.dtype,
+                                 device=face_vertices.device)
     if not torch.is_tensor(direction):
         raise TypeError('Expected input direction to be of type '
                         'torch.Tensor. Got {0} instead.'.format(type(direction)))
@@ -255,12 +264,10 @@ def compute_directional_light(
     if directional_intensity == 0:
         return light
 
-    # Unwrap the batchsize dimension (for easier vectorization).
-    faces = face_vertices.reshape(batchsize * num_faces, 3, 3)
     # Compute face normals.
-    v10 = faces[:, 0] - faces[:, 1]
-    v12 = faces[:, 2] - faces[:, 1]
-    normals = F.normalize(torch.cross(v10, v12), eps=1e-5)
+    v10 = face_vertices[:, :, 0] - face_vertices[:, :, 1]
+    v12 = face_vertices[:, :, 2] - face_vertices[:, :, 1]
+    normals = F.normalize(torch.cross(v12, v10), p=2, dim=2, eps=1e-6)
     # Reshape, to get back the batchsize dimension.
     normals = normals.reshape(batchsize, num_faces, 3)
 
@@ -273,7 +280,7 @@ def compute_directional_light(
     light += directional_intensity * (directional_color[:, None, :]
                                       * cos[:, :, None])
 
-    return light[:, :, None, None, None, :]
+    return light[:, :, None, :]
 
 
 def apply_directional_light(
