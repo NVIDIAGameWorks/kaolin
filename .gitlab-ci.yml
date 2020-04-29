@@ -28,6 +28,6 @@ full test:
     - source setenv.sh
     - python setup.py develop
     - pytest --cov=kaolin/ tests/
-    - ./tests/examples/run/test_classification.sh
-    - ./tests/examples/run/test_nmr.sh
-    - ./tests/examples/run/test_softras_examples.sh
+    - tests/examples/run/test_classification.sh
+    - tests/examples/run/test_nmr.sh
+    - tests/examples/run/test_softras_examples.sh
