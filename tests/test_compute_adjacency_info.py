@@ -72,52 +72,11 @@ assert (torch.sort(vf, dim=1)[0] == torch.sort(_vf, dim=1)[0]).all()
 assert (ef_count[_key2key_arr] == _ef_count).all()
 assert (torch.sort(ef[_key2key_arr, :], dim=1)[0] == torch.sort(_ef, dim=1)[0]).all()
 
+tmp_ee = torch.full(_ee.shape, fill_value=-1, dtype=torch.long)
+for i in range(_ee.shape[0]):
+    for j in range(_ee.shape[1]):
+        tmp_ee[i, j] = _key2key_arr[_ee[i, j]]
+assert (torch.sort(ee[_key2key_arr], dim=1)[0] == torch.sort(tmp_ee, dim=1)[0]).all()
+
 assert (ff_count == _ff_count).all()
 assert (torch.sort(ff, dim=1)[0] == torch.sort(_ff, dim=1)[0]).all()
-
-vertices = torch.Tensor(np.array([[0., 0., 0.],
-                                  [1., 0., 0.],
-                                  [0., 1., 0.],
-                                  [1., 1., 0.],
-                                  [0., 0., 1.],
-                                  [1., 0., 1.],
-                                  [1., 1., 1.],
-                                  [0., 1., 1.]])).cuda()
-faces = torch.LongTensor([[0, 1, 2],
-                          [1, 2, 3],
-                          [0, 4, 5],
-                          [0, 2, 5],
-                          [2, 3, 5],
-                          [3, 5, 6],
-                          [0, 1, 4],
-                          [1, 4, 7],
-                          [1, 7, 6],
-                          [1, 3, 6],
-                          [4, 7, 6],
-                          [4, 5, 6]]).cuda()
-
-edge2key, edges, vv, vv_count, ve, ve_count, vf, vf_count, ff, ff_count, ee, ee_count, \
-    ef, ef_count = Mesh.compute_adjacency_info(vertices, faces)
-
-_ee = torch.zeros((edges.shape[0], edges.shape[0]), device="cuda", dtype=torch.long) - 1
-max_pos = 0
-for i in range(8):
-    for j in range(i+1, 8):
-        if (i, j) in edge2key:
-            orig_key = edge2key[(i, j)]
-            pos = 0
-            for u in range(8):
-                ed = (u, i) if u < i else (i, u)
-                if u != j and ed in edge2key:
-                    _ee[orig_key, pos] = edge2key[ed]
-                    pos += 1
-            for u in range(8):
-                ed = (u, j) if u < j else (j, u)
-                if u != i and ed in edge2key:
-                    _ee[orig_key, pos] = edge2key[ed]
-                    pos += 1
-            assert pos == ee_count[orig_key]
-assert torch.max(ee_count) == ee.shape[1]
-assert (torch.sort(_ee[:,:torch.max(ee_count)], dim=-1, descending=True)[0] ==
-        torch.sort(ee, dim=-1, descending=True)[0]).all()
-#torch.sort(_ee, dim=-1, descending=True)[0]

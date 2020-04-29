@@ -65,8 +65,8 @@ def sample_triangle_mesh(vertices: torch.Tensor, faces: torch.Tensor,
     # We want the last dimension of vertices to be of shape 3.
     helpers._assert_shape_eq(vertices, (-1, 3), dim=-1)
 
-    dist_uni = torch.distributions.Uniform(torch.tensor([0.]).to(
-        vertices.device), torch.tensor([1.]).to(vertices.device))
+    dist_uni = torch.distributions.Uniform(torch.zeros((1,), device=vertices.device),
+                                           1.)
 
     # calculate area of each face
     x1, x2, x3 = torch.split(torch.index_select(
@@ -75,9 +75,9 @@ def sample_triangle_mesh(vertices: torch.Tensor, faces: torch.Tensor,
     y1, y2, y3 = torch.split(torch.index_select(
         vertices, 0, faces[:, 1]) - torch.index_select(
         vertices, 0, faces[:, 2]), 1, dim=1)
-    a = (x2 * y3 - x3 * y2)**2
-    b = (x3 * y1 - x1 * y3)**2
-    c = (x1 * y2 - x2 * y1)**2
+    a = (x2 * y3 - x3 * y2) ** 2
+    b = (x3 * y1 - x1 * y3) ** 2
+    c = (x1 * y2 - x2 * y1) ** 2
     Areas = torch.sqrt(a + b + c) / 2
     # percentage of each face w.r.t. full surface area
     Areas = Areas / (torch.sum(Areas) + eps)

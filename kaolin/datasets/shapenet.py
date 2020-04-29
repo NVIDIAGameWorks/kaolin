@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ from kaolin.transforms import transforms as tfs
 from kaolin import helpers
 import kaolin.conversions.meshconversions as mesh_cvt
 
+from .base import KaolinDataset
 
 # Synset to Label mapping (for ShapeNet core classes)
 synset_to_label = {'04379243': 'table', '03211117': 'monitor', '04401088': 'phone',
@@ -73,37 +74,6 @@ class print_wrapper(object):
         self.logger("\t[done]\n")
 
 
-def tqdm_hook(t, timeout=1):
-    """Taken from https://github.com/tqdm/tqdm/blob/master/examples/tqdm_wget.py
-
-    Wraps tqdm instance.
-    Don't forget to close() or __exit__()
-    the tqdm instance once you're done with it (easiest using `with` syntax).
-    Example
-    -------
-    >>> with tqdm(...) as t:
-    ...     reporthook = my_hook(t)
-    ...     urllib.request.urlretrieve(..., reporthook=reporthook)
-    """
-    last_b = [0]
-
-    def update_to(b=1, bsize=1, tsize=None):
-        """
-        b  : int, optional
-            Number of blocks transferred so far [default: 1].
-        bsize  : int, optional
-            Size of each block (in tqdm units) [default: 1].
-        tsize  : int, optional
-            Total size (in tqdm units). If [default: None] remains unchanged.
-        """
-        if tsize is not None:
-            t.total = tsize
-        t.update((b - last_b[0]) * bsize)
-        last_b[0] = b
-
-    return update_to
-
-
 def _convert_categories(categories):
     assert categories is not None, 'List of categories cannot be empty!'
     if not (c in synset_to_label.keys() + label_to_synset.keys()
@@ -117,24 +87,21 @@ def _convert_categories(categories):
 
 class ShapeNet_Meshes(data.Dataset):
     r"""ShapeNet Dataset class for meshes.
-
     Args:
         root (str): Path to the root directory of the ShapeNet dataset.
         categories (str): List of categories to load from ShapeNet. This list may
                 contain synset ids, class label names (for ShapeNetCore classes),
                 or a combination of both.
-        train (bool): return the training set else the test set
-        split (float): amount of dataset that is training out of 1
+        train (bool): If True, return the training set, otherwise the test set
+        split (float): fraction of the dataset to be used for training (>=0 and <=1)
         no_progress (bool): if True, disables progress bar
-
     Returns:
         .. code-block::
 
-        dict: {
-            attributes: {name: str, path: str, synset: str, label: str},
-            data: {vertices: torch.Tensor, faces: torch.Tensor}
-        }
-
+           dict: {
+               attributes: {name: str, path: str, synset: str, label: str},
+               data: {vertices: torch.Tensor, faces: torch.Tensor}
+           }
     Example:
         >>> meshes = ShapeNet_Meshes(root='../data/ShapeNet/')
         >>> obj = next(iter(meshes))
@@ -193,6 +160,90 @@ class ShapeNet_Meshes(data.Dataset):
         return {'data': data, 'attributes': attributes}
 
 
+class ShapeNet(KaolinDataset):
+    r"""ShapeNetV1 Dataset class for meshes.
+
+    Args:
+        root (str): path to ShapeNet root directory
+        categories (list): List of categories to load from ShapeNet. This list may
+                           contain synset ids, class label names (for ShapeNetCore classes),
+                           or a combination of both.
+        train (bool): If True, return the training set, otherwise the test set
+        split (float): fraction of the dataset to be used for training (>=0 and <=1)
+    Returns:
+        .. code-block::
+
+           dict: {
+                attributes: {name: str, path: str, synset: str, label: str},
+                data: {vertices: torch.Tensor, faces: torch.Tensor}
+           }
+
+    Example:
+        >>> meshes = ShapeNet(root='../data/ShapeNet/')
+        >>> obj = meshes[0]
+        >>> obj['data'].vertices.shape
+        torch.Size([2133, 3])
+        >>> obj['data'].faces.shape
+        torch.Size([1910, 3])
+    """
+
+    def initialize(self, root: str, categories: list, train: bool = True, split: float = .7):
+        """Initialize the dataset.
+
+        Args:
+            root (str): path to ShapeNet root directory
+            categories (list): List of categories to load from ShapeNet. This list may
+                               contain synset ids, class label names (for ShapeNetCore classes),
+                               or a combination of both.
+            train (bool): If True, return the training set, otherwise the test set
+            split (float): fraction of the dataset to be used for training (>=0 and <=1)"""
+        self.root = Path(root)
+        self.paths = []
+        self.synset_idxs = []
+        self.synsets = _convert_categories(categories)
+        self.labels = [synset_to_label[s] for s in self.synsets]
+
+        # loops through desired classes
+        for i in range(len(self.synsets)):
+            syn = self.synsets[i]
+            class_target = self.root / syn
+            if not class_target.exists():
+                raise ValueError('Class {0} ({1}) was not found at location {2}.'.format(
+                    syn, self.labels[i], str(class_target)))
+
+            # find all objects in the class
+            models = sorted(class_target.glob('*'))
+            stop = int(len(models) * split)
+            if train:
+                models = models[:stop]
+            else:
+                models = models[stop:]
+            self.paths += models
+            self.synset_idxs += [i] * len(models)
+
+        self.names = [p.name for p in self.paths]
+
+    def __len__(self):
+        """Returns the length of the dataset. """
+        return len(self.paths)
+
+    def _get_data(self, index):
+        synset_idx = self.synset_idxs[index]
+        obj_location = self.paths[index] / 'model.obj'
+        mesh = TriangleMesh.from_obj(str(obj_location))
+        return mesh
+
+    def _get_attributes(self, index):
+        synset_idx = self.synset_idxs[index]
+        attributes = {
+            'name': self.names[index],
+            'path': self.paths[index] / 'model.obj',
+            'synset': self.synsets[synset_idx],
+            'label': self.labels[synset_idx]
+        }
+        return attributes
+
+
 class ShapeNet_Images(data.Dataset):
     r"""ShapeNet Dataset class for images.
 
@@ -232,8 +283,8 @@ class ShapeNet_Images(data.Dataset):
         torch.Size([10, 4, 137, 137])
     """
 
-    def __init__(self, root: str, categories: list=['chair'], train: bool=True,
-                 split: float=.7, views: int=24, transform=None):
+    def __init__(self, root: str, categories: list = ['chair'], train: bool = True,
+                 split: float = .7, views: int = 24, transform=None):
         self.root = Path(root)
         self.synsets = _convert_categories(categories)
         self.labels = [synset_to_label[s] for s in self.synsets]
@@ -333,6 +384,7 @@ class ShapeNet_Voxels(data.Dataset):
         torch.Size([10, 128, 128, 128])
 
     """
+
     def __init__(self, root: str, cache_dir: str, categories: list = ['chair'], train: bool = True,
                  split: float = .7, resolutions=[128, 32], no_progress: bool = False):
         self.root = Path(root)
@@ -458,7 +510,7 @@ class ShapeNet_Surface_Meshes(data.Dataset):
 
         def convert(og_mesh, voxel):
             transforms = tfs.Compose([mesh_conversion,
-                                     tfs.MeshLaplacianSmoothing(smoothing_iterations)])
+                                      tfs.MeshLaplacianSmoothing(smoothing_iterations)])
 
             new_mesh = transforms(voxel)
             new_mesh.vertices = pcfunc.realign(new_mesh.vertices, og_mesh.vertices)
@@ -751,6 +803,7 @@ class ShapeNet_Tags(data.Dataset):
         torch.Size([10, N])
 
     """
+
     def __init__(self, dataset, tag_aug=True):
         self.root = dataset.root
         self.paths = dataset.paths
@@ -821,7 +874,7 @@ class ShapeNet_Tags(data.Dataset):
         for index, name in enumerate(self.names):
             self.name_to_index[name] = index
 
-    def get_tags_from_str(self, tags_str, inverse_order=True, forbidden_symbols=[" ", "/", "-", "\*"]):
+    def get_tags_from_str(self, tags_str, inverse_order=True, forbidden_symbols=[" ", "/", "-", "\\*"]):
         r"""Process the tag string and return a list of tags. ``Note``: The tags that contain forbidden_symbols are ignored.
 
         Args:

@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,6 +100,7 @@ def _assert_dim_lt(inp, tgt):
         raise ValueError('Expected input to contain less than {0} dims. '
                          'Got {1} instead.'.format(tgt, inp.dim()))
 
+
 def _assert_dim_ge(inp, tgt):
     """Asserts that the number of dims in inp is greater than or equal to the
     value sepecified in tgt. 
@@ -151,12 +152,12 @@ def _assert_shape_eq(inp, tgt_shape, dim=None):
         if inp.shape != tgt_shape:
             raise ValueError('Size mismatch. Input and target have different '
                              'shapes: {0} vs {1}.'.format(inp.shape,
-                                tgt_shape))
+                                                          tgt_shape))
     else:
         if inp.shape[dim] != tgt_shape[dim]:
             raise ValueError('Size mismatch. Input and target have different '
                              'shapes at dimension {2}: {0} vs {1}.'.format(
-                                inp.shape[dim], tgt_shape[dim], dim))
+                                 inp.shape[dim], tgt_shape[dim], dim))
 
 
 def _assert_gt(inp, val):
@@ -173,7 +174,7 @@ def _get_hash(x):
     if isinstance(x, dict):
         x = tuple(sorted(pair for pair in x.items()))
 
-    return hashlib.md5(bytes(str(x), 'utf-8')).hexdigest()
+    return hashlib.md5(bytes(repr(x), 'utf-8')).hexdigest()
 
 
 class Cache(object):
@@ -193,7 +194,7 @@ class Cache(object):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.cached_ids = [p.stem for p in self.cache_dir.glob('*')]
 
-    def __call__(self, unique_id: str, **kwargs):
+    def __call__(self, unique_id: str, *args, **kwargs):
         """Execute self.func if not cached, otherwise, read data from disk.
 
             Args:
@@ -207,7 +208,7 @@ class Cache(object):
         fpath = self.cache_dir / f'{unique_id}.p'
 
         if not fpath.exists():
-            output = self.func(**kwargs)
+            output = self.func(*args, **kwargs)
             self._write(output, fpath)
             self.cached_ids.append(unique_id)
         else:

@@ -2,24 +2,30 @@ import os
 import io
 import logging
 from setuptools import setup, find_packages
+from pkg_resources import parse_version
+import copy
 
 import torch
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CppExtension
+import torchvision
 import numpy as np
 
 
 cwd = os.path.dirname(os.path.abspath(__file__))
+logger = logging.getLogger()
+logging.basicConfig(format='%(levelname)s - %(message)s')
+
 
 if not torch.cuda.is_available():
     # From: https://github.com/NVIDIA/apex/blob/b66ffc1d952d0b20d6706ada783ae5b23e4ee734/setup.py
     # Extension builds after https://github.com/pytorch/pytorch/pull/23408 attempt to query torch.cuda.get_device_capability(),
     # which will fail if you are compiling in an environment without visible GPUs (e.g. during an nvidia-docker build command).
-    print('\nWarning: Torch did not find available GPUs on this system.\n',
-          'If your intention is to cross-compile, this is not an error.\n'
-          'By default, Kaolin will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n'
-          'Volta (compute capability 7.0), and Turing (compute capability 7.5).\n'
-          'If you wish to cross-compile for a single specific architecture,\n'
-          'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n')
+    logging.warning('\nWarning: Torch did not find available GPUs on this system.\n'
+                    'If your intention is to cross-compile, this is not an error.\n'
+                    'By default, Kaolin will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n'
+                    'Volta (compute capability 7.0), and Turing (compute capability 7.5).\n'
+                    'If you wish to cross-compile for a single specific architecture,\n'
+                    'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n')
     if os.environ.get("TORCH_CUDA_ARCH_LIST", None) is None:
         os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5"
 
@@ -42,14 +48,16 @@ for future research endeavours.
 """
 
 
-logger = logging.getLogger()
-logging.basicConfig(format='%(levelname)s - %(message)s')
-
 
 # Check that PyTorch version installed meets minimum requirements
-if torch.__version__ < '1.2.0':
-    logger.warning(f'Kaolin is tested with PyTorch >= 1.2.0. Found version {torch.__version__} instead.')
+torch_ver = parse_version(torch.__version__)
+if torch_ver < parse_version('1.2.0') or torch_ver >= parse_version('1.5.0'):
+    logger.warning(f'Kaolin is tested with PyTorch >=1.2.0, <1.5.0 Found version {torch.__version__} instead.')
 
+# Check that torchvision version installed meets minimum requirements
+torchvision_ver = parse_version(torchvision.__version__)
+if torchvision_ver < parse_version('0.4.0') or torchvision_ver >= parse_version('0.6.0'):
+    logger.warning(f'Kaolin is tested with torchvision >=0.4.0, <0.6.0 Found version (torchvision.__version__) instead.')
 
 # Get version number from version.py
 version = {}
@@ -68,6 +76,24 @@ def read(*names, **kwargs):
             encoding=kwargs.get('encoding', 'utf8')
     ) as fp:
         return fp.read()
+
+
+def KaolinCUDAExtension(*args, **kwargs):
+    FLAGS = ['-Wno-deprecated-declarations']
+    kwargs = copy.deepcopy(kwargs)
+    if 'extra_compile_args' in kwargs:
+        kwargs['extra_compile_args'] += FLAGS
+    else:
+        kwargs['extra_compile_args'] = FLAGS
+    return CUDAExtension(*args, **kwargs)
+
+
+class KaolinBuildExtension(BuildExtension):
+    def build_extensions(self):
+        FLAG_BLACKLIST = ['-Wstrict-prototypes']
+        FLAGS = ['-Wno-deprecated-declarations']
+        self.compiler.compiler_so = [x for x in self.compiler.compiler_so if x not in FLAG_BLACKLIST] + FLAGS  # Covers non-cuda
+        super().build_extensions()
 
 
 def get_extensions():
@@ -112,43 +138,43 @@ def get_extensions():
     # If building with readthedocs, don't compile CUDA extensions
     if os.getenv('READTHEDOCS') != 'True':
         cuda_extensions = [
-            CUDAExtension('kaolin.cuda.load_textures', [
+            KaolinCUDAExtension('kaolin.cuda.load_textures', [
                 'kaolin/cuda/load_textures_cuda.cpp',
                 'kaolin/cuda/load_textures_cuda_kernel.cu',
             ]),
-            CUDAExtension('kaolin.cuda.sided_distance', [
+            KaolinCUDAExtension('kaolin.cuda.sided_distance', [
                 'kaolin/cuda/sided_distance.cpp',
                 'kaolin/cuda/sided_distance_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.furthest_point_sampling', [
+            KaolinCUDAExtension('kaolin.cuda.furthest_point_sampling', [
                 'kaolin/cuda/furthest_point_sampling.cpp',
                 'kaolin/cuda/furthest_point_sampling_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.ball_query', [
+            KaolinCUDAExtension('kaolin.cuda.ball_query', [
                 'kaolin/cuda/ball_query.cpp',
                 'kaolin/cuda/ball_query_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.three_nn', [
+            KaolinCUDAExtension('kaolin.cuda.three_nn', [
                 'kaolin/cuda/three_nn.cpp',
                 'kaolin/cuda/three_nn_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.tri_distance', [
+            KaolinCUDAExtension('kaolin.cuda.tri_distance', [
                 'kaolin/cuda/triangle_distance.cpp',
                 'kaolin/cuda/triangle_distance_cuda.cu',
             ]),
-            CUDAExtension('kaolin.cuda.mesh_intersection', [
+            KaolinCUDAExtension('kaolin.cuda.mesh_intersection', [
                 'kaolin/cuda/mesh_intersection.cpp',
                 'kaolin/cuda/mesh_intersection_cuda.cu',
             ]),
-            CUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
+            KaolinCUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
                 'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
                 'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
             ]),
-            CUDAExtension('kaolin.graphics.softras.soft_rasterize_cuda', [
+            KaolinCUDAExtension('kaolin.graphics.softras.soft_rasterize_cuda', [
                 'kaolin/graphics/softras/cuda/soft_rasterize_cuda.cpp',
                 'kaolin/graphics/softras/cuda/soft_rasterize_cuda_kernel.cu',
             ]),
-            CUDAExtension('kaolin.graphics.dib_renderer.cuda.rasterizer', [
+            KaolinCUDAExtension('kaolin.graphics.dib_renderer.cuda.rasterizer', [
                 'kaolin/graphics/dib_renderer/cuda/rasterizer.cpp',
                 'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda.cu',
                 'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda_back.cu',
@@ -177,7 +203,7 @@ def get_requirements():
         'scikit-image',
         'shapely',
         'trimesh>=3.0',
-        'scipy',
+        'scipy==1.4.1',
         'sphinx==2.2.0',    # pinned to resolve issue with docutils 0.16b0.dev
         'pytest>=4.6',
         'pytest-cov>=2.7',
@@ -186,6 +212,7 @@ def get_requirements():
         'pptk',
         'autopep8',
         'flake8',
+        'pillow<7.0.0',
     ]
 
 
@@ -200,7 +227,7 @@ if __name__ == '__main__':
         url=URL,
         long_description=LONG_DESCRIPTION,
         license=LICENSE,
-        python_requires='>3.6',
+        python_requires='~=3.6',
 
         # Package info
         packages=find_packages(exclude=('docs', 'test', 'examples')),
@@ -208,5 +235,5 @@ if __name__ == '__main__':
         zip_safe=True,
         ext_modules=get_extensions(),
         include_dirs=[np.get_include()],
-        cmdclass={'build_ext': BuildExtension}
+        cmdclass={'build_ext': KaolinBuildExtension}
     )

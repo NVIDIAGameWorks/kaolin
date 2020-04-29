@@ -35,6 +35,9 @@ import kaolin.models.GEOMetrics
 # Image2MeshReconstructionBaseline
 import kaolin.models.Image2MeshReconstructionBaseline
 
+# MeshCNN
+from .meshcnn import MeshCNNClassifier
+
 # MeshEncoder
 import kaolin.models.MeshEncoder
 
