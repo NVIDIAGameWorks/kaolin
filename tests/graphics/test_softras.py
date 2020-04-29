@@ -22,7 +22,7 @@ def test_softras(device='cuda:0'):
 
     renderer = kaolin.graphics.SoftRenderer(camera_mode="look_at", device=device)
     filename_input = "tests/graphics/banana.obj"
-    
+
     mesh = kaolin.rep.TriangleMesh.from_obj(filename_input)
 
     vertices = mesh.vertices
@@ -33,7 +33,7 @@ def test_softras(device='cuda:0'):
     face_textures[None, :, :].cuda()
     vertices_max = vertices.max()
     vertices_min = vertices.min()
-    vertices_middle = (vertices_max + vertices_min)/2.
+    vertices_middle = (vertices_max + vertices_min) / 2.
     vertices = vertices - vertices_middle
     coef = 5
     vertices = vertices * coef
