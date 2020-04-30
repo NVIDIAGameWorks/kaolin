@@ -26,7 +26,7 @@ def test_softras(device='cuda:0'):
     mesh = kaolin.rep.TriangleMesh.from_obj(filename_input)
 
     vertices = mesh.vertices
-    faces = mesh.faces.int()
+    faces = mesh.faces.long()
     face_textures = (faces).clone()
     vertices = vertices[None, :, :].cuda()  
     faces = faces[None, :, :].cuda()
