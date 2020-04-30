@@ -153,15 +153,32 @@ class NeuralMeshRenderer(nn.Module):
             self.K = K
             self.R = R
             self.t = t
+            self.dist_coeffs = dist_coeffs
+
             if isinstance(self.K, numpy.ndarray):
                 self.K = torch.cuda.FloatTensor(self.K)
+
+            else:
+                self.K = self.K.cuda()
+
             if isinstance(self.R, numpy.ndarray):
                 self.R = torch.cuda.FloatTensor(self.R)
+
+            else:
+                self.R = self.R.cuda()
+
             if isinstance(self.t, numpy.ndarray):
                 self.t = torch.cuda.FloatTensor(self.t)
-            self.dist_coeffs = dist_coeffs
+
+            else:
+                self.t = self.t.cuda()
+
             if dist_coeffs is None:
                 self.dist_coeffs = torch.zeros(1, 5, device='cuda')
+
+            else:
+                self.dist_coeffs = self.dist_coeffs.cuda()
+
             self.orig_size = orig_size
         elif self.camera_mode in ['look', 'look_at']:
             self.perspective = perspective
