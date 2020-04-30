@@ -42,7 +42,6 @@ import os
 import imageio
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 import tqdm
 
 import kaolin
@@ -58,12 +57,15 @@ if __name__ == "__main__":
     camera_distance = 2.  # Distance of the camera from the origin (i.e., center of the object).
     elevation = 30.       # Angle of elevation
 
+    # Infer the base path of the kaolin repo
+    KAOLIN_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
+
     # Read in the input mesh.
-    infile = os.path.join("tests", "graphics", "banana.obj")
+    infile = os.path.join(KAOLIN_ROOT, "tests", "graphics", "banana.obj")
     mesh = kaolin.rep.TriangleMesh.from_obj(infile)
 
     # Output filename (to write out a rendered .gif to).
-    outfile = os.path.join("examples", "renderers", "softras_render.gif")
+    outfile = os.path.join(KAOLIN_ROOT, "examples", "renderers", "softras_render.gif")
 
     # Extract the vertices, faces, and texture the mesh (currently color with white).
     vertices = mesh.vertices.float()
@@ -88,6 +90,7 @@ if __name__ == "__main__":
     vertices_middle = (vertices_max + vertices_min) / 2.
     vertices = vertices - vertices_middle
     # Scale the vertices slightly (so that they occupy a sizeable image area).
+    # Skip if using models other than the banana.obj file.
     coef = 5
     vertices = vertices * coef
 
@@ -100,5 +103,5 @@ if __name__ == "__main__":
         # Render an image.
         rgba = renderer.forward(vertices, faces, textures)
         img = rgba[0].permute(1, 2, 0).detach().cpu().numpy()
-        writer.append_data((255*img).astype(np.uint8))
+        writer.append_data((255 * img).astype(np.uint8))
     writer.close()
