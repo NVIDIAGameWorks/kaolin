@@ -70,27 +70,25 @@ if __name__ == "__main__":
     elevation = 30.       # Angle of elevation
     azimuth = 0.          # Azimuth angle
 
-    # Infer the base path of the kaolin repo
-    KAOLIN_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
+    # Directory in which sample data is located.
+    DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "sampledata")
 
     # Read in the input mesh. TODO: Add filepath as argument.
-    mesh = kaolin.rep.TriangleMesh.from_obj(os.path.join(KAOLIN_ROOT, "tests", "graphics", "banana.obj"))
+    mesh = kaolin.rep.TriangleMesh.from_obj(os.path.join(DATA_DIR, "banana.obj"))
 
     # Output filename to write out a rendered .gif to, showing the progress of optimization.
-    progressfile = os.path.join(KAOLIN_ROOT, "examples", "renderers", "texture_optimization_progress.gif")
+    progressfile = "texture_optimization_progress.gif"
     # Output filename to write out a rendered .gif file to, rendering the optimized mesh.
-    outfile = os.path.join(KAOLIN_ROOT, "examples", "renderers", "texture_optimization_output.gif")
+    outfile = "texture_optimization_output.gif"
 
     # Extract the vertices, faces, and texture the mesh (currently color with white).
-    vertices = mesh.vertices.float()
-    faces = mesh.faces.long()
-    face_textures = faces.clone()
+    vertices = mesh.vertices
+    faces = mesh.faces
     vertices = vertices[None, :, :].cuda()
     faces = faces[None, :, :].cuda()
-    face_textures = face_textures[None, :, :].cuda()
     textures = torch.ones(1, faces.shape[1], 2, 3, dtype=torch.float32, device="cuda:0")
 
-    # Normalize vertices
+    # Translate the mesh such that its centered at the origin.
     vertices_max = vertices.max()
     vertices_min = vertices.min()
     vertices_middle = (vertices_max + vertices_min) / 2.
@@ -101,9 +99,7 @@ if __name__ == "__main__":
     vertices = vertices * coef
 
     img_target = torch.from_numpy(
-        imageio.imread(
-            os.path.join(KAOLIN_ROOT, "examples", "renderers", "banana.png")
-        ).astype(np.float32) / 255,
+        imageio.imread(os.path.join(DATA_DIR, "banana.png")).astype(np.float32) / 255
     ).cuda()
     img_target = img_target[None, ...].permute(0, 3, 1, 2)
 
@@ -127,14 +123,14 @@ if __name__ == "__main__":
         optimizer.step()
         if i % 5 == 0:
             # TODO: Add functionality to write to gif output file.
-            tqdm.write("Loss: " + str(loss.item()) + "\n")
+            tqdm.write(f"Loss: {loss.item():.5}")
             img = rgba[0].permute(1, 2, 0).detach().cpu().numpy()
             writer.append_data((255 * img).astype(np.uint8))
     writer.close()
 
     # Write optimized mesh to output file.
     writer = imageio.get_writer(outfile, mode="I")
-    for azimuth in tqdm(list(range(0, 360, 6))):
+    for azimuth in trange(0, 360, 6):
         renderer.set_eye_from_angles(camera_distance, elevation, azimuth)
         rgba = renderer.forward(vertices, faces, model())
         img = rgba[0].permute(1, 2, 0).detach().cpu().numpy()

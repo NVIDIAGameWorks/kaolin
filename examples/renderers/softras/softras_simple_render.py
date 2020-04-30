@@ -42,7 +42,7 @@ import os
 import imageio
 import numpy as np
 import torch
-import tqdm
+from tqdm import trange
 
 import kaolin
 
@@ -57,23 +57,20 @@ if __name__ == "__main__":
     camera_distance = 2.  # Distance of the camera from the origin (i.e., center of the object).
     elevation = 30.       # Angle of elevation
 
-    # Infer the base path of the kaolin repo
-    KAOLIN_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
+    # Directory in which sample data is located.
+    DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "sampledata")
 
     # Read in the input mesh.
-    infile = os.path.join(KAOLIN_ROOT, "tests", "graphics", "banana.obj")
-    mesh = kaolin.rep.TriangleMesh.from_obj(infile)
+    mesh = kaolin.rep.TriangleMesh.from_obj(os.path.join(DATA_DIR, "banana.obj"))
 
     # Output filename (to write out a rendered .gif to).
-    outfile = os.path.join(KAOLIN_ROOT, "examples", "renderers", "softras_render.gif")
+    outfile = "softras_render.gif"
 
     # Extract the vertices, faces, and texture the mesh (currently color with white).
-    vertices = mesh.vertices.float()
-    faces = mesh.faces.long()
-    face_textures = faces.clone()
+    vertices = mesh.vertices
+    faces = mesh.faces
     vertices = vertices[None, :, :].cuda()
     faces = faces[None, :, :].cuda()
-    face_textures = face_textures[None, :, :].cuda()
     # Initialize all faces to yellow (to color the banana)!
     textures = torch.cat(
         (
@@ -84,7 +81,7 @@ if __name__ == "__main__":
         dim=-1,
     )
 
-    # Normalize vertices
+    # Translate the mesh such that its centered at the origin.
     vertices_max = vertices.max()
     vertices_min = vertices.min()
     vertices_middle = (vertices_max + vertices_min) / 2.
@@ -95,10 +92,9 @@ if __name__ == "__main__":
     vertices = vertices * coef
 
     # Loop over a set of azimuth angles, and render the image.
-    loop = loop = tqdm.tqdm(list(range(0, 360, 6)))
-    loop.set_description("Rendering using softras...")
+    print("Rendering using softras...")
     writer = imageio.get_writer(outfile, mode="I")
-    for azimuth in loop:
+    for azimuth in trange(0, 360, 6):
         renderer.set_eye_from_angles(camera_distance, elevation, azimuth)
         # Render an image.
         rgba = renderer.forward(vertices, faces, textures)

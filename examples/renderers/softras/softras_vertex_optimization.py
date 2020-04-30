@@ -72,24 +72,22 @@ if __name__ == "__main__":
     elevation = 30.       # Angle of elevation
     azimuth = 0.          # Azimuth angle
 
-    # Infer the base path of the kaolin repo
-    KAOLIN_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
+    # Directory in which sample data is located.
+    DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "sampledata")
 
     # Read in the input mesh. TODO: Add filepath as argument.
-    mesh = kaolin.rep.TriangleMesh.from_obj(os.path.join(KAOLIN_ROOT, "tests", "model.obj"))
+    mesh = kaolin.rep.TriangleMesh.from_obj(os.path.join(DATA_DIR, "sphere.obj"))
 
     # Output filename to write out a rendered .gif to, showing the progress of optimization.
-    progressfile = os.path.join(KAOLIN_ROOT, "examples", "renderers", "vertex_optimization_progress.gif")
+    progressfile = "vertex_optimization_progress.gif"
     # Output filename to write out a rendered .gif file to, rendering the optimized mesh.
-    outfile = os.path.join(KAOLIN_ROOT, "examples", "renderers", "vertex_optimization_output.gif")
+    outfile = "vertex_optimization_output.gif"
 
     # Extract the vertices, faces, and texture the mesh (currently color with white).
-    vertices = mesh.vertices.float()
-    faces = mesh.faces.long()
-    face_textures = faces.clone()
+    vertices = mesh.vertices
+    faces = mesh.faces
     vertices = vertices[None, :, :].cuda()
     faces = faces[None, :, :].cuda()
-    face_textures = face_textures[None, :, :].cuda()
     # Initialize all faces to yellow (to color the banana)!
     textures = torch.cat(
         (
@@ -104,9 +102,7 @@ if __name__ == "__main__":
     # vertices = vertices - 0.5 * (vertices.max() - vertices.min())
 
     img_target = torch.from_numpy(
-        imageio.imread(
-            os.path.join(KAOLIN_ROOT, "examples", "renderers", "banana.png")
-        ).astype(np.float32) / 255,
+        imageio.imread(os.path.join(DATA_DIR, "banana.png")).astype(np.float32) / 255
     ).cuda()
     img_target = img_target[None, ...].permute(0, 3, 1, 2)
 
@@ -136,7 +132,7 @@ if __name__ == "__main__":
 
     # Write optimized mesh to output file.
     writer = imageio.get_writer(outfile, mode="I")
-    for azimuth in tqdm(list(range(0, 360, 6))):
+    for azimuth in trange(0, 360, 6):
         renderer.set_eye_from_angles(camera_distance, elevation, azimuth)
         rgba = renderer.forward(model(), faces, textures)
         img = rgba[0].permute(1, 2, 0).detach().cpu().numpy()
