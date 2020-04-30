@@ -120,7 +120,7 @@ if __name__ == "__main__":
 
     # Perform vertex optimization.
     writer = imageio.get_writer(progressfile, mode="I")
-    for i in trange(20):
+    for i in trange(2000):
         optimizer.zero_grad()
         new_vertices = model()
         rgba = renderer(new_vertices, faces, textures)
