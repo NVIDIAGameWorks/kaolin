@@ -10,8 +10,6 @@ To run each example, simply execute `python <example-script>`, where `<example-s
 
 To see the command line arguments of each example, run `python <example-script> --help`.
 
-(Note: for Python 3, you might need to use `python3` instead.)
-
 ## Example 1
 
 Renders the mesh from multiple viewpoints.

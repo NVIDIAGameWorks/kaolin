@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,9 +60,6 @@ ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 ###########################
 
 INITIAL_CAMERA_POS = [6, 10, -14]
-CAMERA_DISTANCE = 2.732
-ELEVATION = 0
-TEXTURE_SIZE = 2
 
 
 def parse_arguments():
@@ -77,20 +74,25 @@ def parse_arguments():
                         help='Path to the output directory')
     parser.add_argument('--epochs', type=int, default=300,
                         help='Number of epochs to optimize')
+    parser.add_argument('--texture_size', type=int, default=2,
+                        help='Dimension of texture')
 
     return parser.parse_args()
 
 
 class Model(nn.Module):
 
-    def __init__(self, mesh_path, image_path):
+    def __init__(self, mesh_path, image_path, args):
         super(Model, self).__init__()
+
+        self.args = args
 
         ###########################
         # Load mesh
         ###########################
 
         mesh = TriangleMesh.from_obj(mesh_path)
+        mesh.cuda()
         # Normalize into unit cube, and expand such that batch size = 1
         vertices = normalize_vertices(mesh.vertices).unsqueeze(0)
         faces = mesh.faces.unsqueeze(0)
@@ -103,8 +105,9 @@ class Model(nn.Module):
         ###########################
 
         textures = torch.ones(
-            1, self.faces.shape[1], TEXTURE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE,
-            3, dtype=torch.float32
+            1, self.faces.shape[1], self.args.texture_size, self.args.texture_size, self.args.texture_size,
+            3, dtype=torch.float32,
+            device='cuda'
         )
         self.register_buffer('textures', textures)
 
@@ -153,7 +156,7 @@ def main():
     # Setup model
     ###########################
 
-    model = Model(args.mesh, args.image)
+    model = Model(args.mesh, args.image, args)
     model.cuda()
 
     ###########################
@@ -164,7 +167,7 @@ def main():
     loop.set_description('Optimizing')
 
     optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()),
+        [p for p in model.parameters() if p.requires_grad],
         lr=0.1
     )
 
@@ -185,8 +188,7 @@ def main():
             model.textures
         )
 
-        image = images.detach().cpu().numpy()[0].transpose(
-            (1, 2, 0))
+        image = images.detach()[0].permute(1, 2, 0).cpu().numpy()
         writer.append_data((255 * image).astype(np.uint8))
 
     writer.close()

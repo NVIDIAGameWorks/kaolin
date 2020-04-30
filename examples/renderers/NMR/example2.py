@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,15 +55,6 @@ import tqdm
 
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 
-###########################
-# Settings
-###########################
-
-CAMERA_DISTANCE = 2.732
-ELEVATION = 0
-AZIMUTH = 90
-TEXTURE_SIZE = 2
-
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -77,20 +68,31 @@ def parse_arguments():
                         help='Path to the output directory')
     parser.add_argument('--epochs', type=int, default=300,
                         help='Number of epochs to optimize')
+    parser.add_argument('--camera_distance', type=float, default=2.732,
+                        help='Distance from camera to object center')
+    parser.add_argument('--elevation', type=float, default=0,
+                        help='Camera elevation')
+    parser.add_argument('--azimuth', type=float, default=90,
+                        help='Camera azimuth')
+    parser.add_argument('--texture_size', type=int, default=2,
+                        help='Dimension of texture')
 
     return parser.parse_args()
 
 
 class Model(nn.Module):
 
-    def __init__(self, mesh_path, image_path):
+    def __init__(self, mesh_path, image_path, args):
         super(Model, self).__init__()
+
+        self.args = args
 
         ###########################
         # Load mesh
         ###########################
 
         mesh = TriangleMesh.from_obj(mesh_path)
+        mesh.cuda()
         # Normalize into unit cube, and expand such that batch size = 1
         vertices = normalize_vertices(mesh.vertices).unsqueeze(0)
         faces = mesh.faces.unsqueeze(0)
@@ -103,8 +105,9 @@ class Model(nn.Module):
         ###########################
 
         textures = torch.ones(
-            1, self.faces.shape[1], TEXTURE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE,
-            3, dtype=torch.float32
+            1, self.faces.shape[1], self.args.texture_size, self.args.texture_size, self.args.texture_size,
+            3, dtype=torch.float32,
+            device='cuda'
         )
         self.register_buffer('textures', textures)
 
@@ -129,7 +132,7 @@ class Model(nn.Module):
         ###########################
 
         self.renderer.eye = get_points_from_angles(
-            CAMERA_DISTANCE, ELEVATION, AZIMUTH)
+            self.args.camera_distance, self.args.elevation, self.args.azimuth)
         image = self.renderer(self.vertices, self.faces, mode='silhouettes')
         loss = torch.sum((image - self.image_ref[None, :, :]) ** 2)
 
@@ -143,7 +146,7 @@ def main():
     # Setup model
     ###########################
 
-    model = Model(args.mesh, args.image)
+    model = Model(args.mesh, args.image, args)
     model.cuda()
 
     ###########################
@@ -154,7 +157,7 @@ def main():
     loop.set_description('Optimizing')
 
     optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, model.parameters()))
+        [p for p in model.parameters() if p.requires_grad])
 
     os.makedirs(args.output_path, exist_ok=True)
     writer = imageio.get_writer(os.path.join(
@@ -170,8 +173,7 @@ def main():
         images, _, _ = model.renderer(
             model.vertices, model.faces, model.textures)
 
-        image = images.detach().cpu().numpy()[0].transpose(
-            (1, 2, 0))
+        image = images.detach()[0].permute(1, 2, 0).cpu().numpy()
         writer.append_data((255 * image).astype(np.uint8))
 
     writer.close()
@@ -188,13 +190,12 @@ def main():
         args.output_path, 'example2_mesh.gif'), mode='I')
     for azimuth in loop:
         model.renderer.eye = get_points_from_angles(
-            CAMERA_DISTANCE, ELEVATION, azimuth)
+            args.camera_distance, args.elevation, args.azimuth)
 
         images, _, _ = model.renderer(
             model.vertices, model.faces, model.textures)
 
-        image = images.detach().cpu().numpy()[0].transpose(
-            (1, 2, 0))
+        image = images.detach()[0].permute(1, 2, 0).cpu().numpy()
         writer.append_data((255 * image).astype(np.uint8))
 
     writer.close()
