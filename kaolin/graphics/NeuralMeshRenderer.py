@@ -48,15 +48,99 @@ from .nmr import rasterizer
 
 
 class NeuralMeshRenderer(nn.Module):
-    def __init__(self, image_size=256, anti_aliasing=True, background_color=[0, 0, 0],
-                 fill_back=True, camera_mode='projection',
-                 K=None, R=None, t=None, dist_coeffs=None, orig_size=1024,
-                 perspective=True, viewing_angle=30, camera_direction=[0, 0, 1],
-                 near=0.1, far=100,
-                 light_intensity_ambient=0.5, light_intensity_directional=0.5,
-                 light_color_ambient=[1, 1, 1], light_color_directional=[1, 1, 1],
-                 light_direction=[0, 1, 0]):
+    def __init__(self,
+                 image_size=256,
+                 anti_aliasing=True,
+                 background_color=None,
+                 fill_back=True,
+                 camera_mode='projection',
+                 K=None,
+                 R=None,
+                 t=None,
+                 dist_coeffs=None,
+                 orig_size=1024,
+                 perspective=True,
+                 viewing_angle=30,
+                 camera_direction=None,
+                 near=0.1,
+                 far=100,
+                 light_intensity_ambient=0.5,
+                 light_intensity_directional=0.5,
+                 light_color_ambient=None,
+                 light_color_directional=None,
+                 light_direction=None):
+        """Initialize the NeuralMeshRenderer.
+
+        NOTE: NeuralMeshRenderer works only in GPU mode!
+
+        Args:
+            image_size (int): Size of the (square) image to be rendered.
+            anti_aliasing (bool): Whether or not to perform anti-aliasing
+                (default: True)
+            background_color (torch.Tensor): Background color of rendered image
+                (size: math:`3`, default: :math:`\left[0, 0, 0\right]`)
+            fill_back (bool): Whether or not to fill color to the back
+                side of each triangle as well (sometimes helps, when
+                the triangles in the mesh are not properly oriented.)
+                (default: True)
+            camera_mode (str): Choose from among `projection`, `look`, and
+                `look_at`. In the `projection` mode, the camera is at the
+                origin, and its optical axis is aligned with the positive
+                Z-axis. In the `look_at` mode, the object (not the camera)
+                is placed at the origin. The camera "looks at" the object
+                from a predefined "eye" location, which is computed from
+                the `viewing_angle` (another input to this function). In
+                the `look` mode, only the direction in which the camera
+                needs to look is specified. It does not necessarily look
+                towards the origin, as it allows the specification of a
+                custom "upwards" direction (default: 'projection').
+            K (torch.Tensor): Camera intrinsics matrix. Note that, unlike
+                standard notation, K here is a 4 x 4 matrix (with the last
+                row and last column drawn from the 4 x 4 identity matrix)
+                (default: None)
+            R (torch.Tensor): Rotation matrix (again, 4 x 4, as opposed
+                to the usual 3 x 3 convention).
+            t (torch.Tensor): Translation vector (3 x 1). Note that the
+                (negative of the) tranlation is applied before rotation,
+                to be consistent with the projective geometry convention
+                of transforming a 3D point X by doing
+                torch.matmul(R.transpose(), X - t) (default: None)
+            viewing_angle (float): Angle at which the object is to be viewed
+                (assumed to be in degrees!) (default: 30.)
+            camera_direction (float): Direction in which the camera is facing
+                (used only in the `look` and `look_at` modes) (default:
+                :math:`[0, 0, 1]`)
+            near (float): Near clipping plane (for depth values) (default: 0.1)
+            far (float): Far clipping plane (for depth values) (default: 100)
+            light_intensity_ambient (float): Intensity of ambient light (in the
+                range :math:`\left[ 0, 1 \right]`) (default: 0.5).
+            light_intensity_directional (float): Intensity of directional light
+                (in the range :math:`\left[ 0, 1 \right]`) (default: 0.5).
+            light_color_ambient (torch.Tensor): Color of ambient light
+                (default: :math:`\left[ 1, 1, 1 \right]`)
+            light_color_directional (torch.Tensor): Color of directional light
+                (default: :math:`\left[ 1, 1, 1 \right]`)
+            light_direction (torch.Tensor): Light direction, for directional
+                light (default: :math:`\left[ 0, 1, 0 \right]`)
+        """
         super(NeuralMeshRenderer, self).__init__()
+
+        # default arguments
+        if background_color is None:
+            background_color = [0, 0, 0]
+
+        if camera_direction is None:
+            camera_direction = [0, 0, 1]
+
+        if light_color_ambient is None:
+            light_color_ambient = [1, 1, 1]
+
+        if light_color_directional is None:
+            light_color_directional = [1, 1, 1]
+
+        if light_direction is None:
+            light_direction = [0, 1, 0]
+
         # rendering
         self.image_size = image_size
         self.anti_aliasing = anti_aliasing
@@ -77,8 +161,7 @@ class NeuralMeshRenderer(nn.Module):
                 self.t = torch.cuda.FloatTensor(self.t)
             self.dist_coeffs = dist_coeffs
             if dist_coeffs is None:
-                self.dist_coeffs = torch.cuda.FloatTensor(
-                    [[0., 0., 0., 0., 0.]])
+                self.dist_coeffs = torch.zeros(1, 5, device='cuda')
             self.orig_size = orig_size
         elif self.camera_mode in ['look', 'look_at']:
             self.perspective = perspective
@@ -249,6 +332,24 @@ class NeuralMeshRenderer(nn.Module):
         return images
 
     def render(self, vertices, faces, textures, K=None, R=None, t=None, dist_coeffs=None, orig_size=None):
+        """Renders the RGB, depth, and alpha channels.
+
+        Args:
+            vertices (torch.Tensor): Vertices of the mesh (shape: :math:`B
+                \times V \times 3`), where :math:`B` is the batchsize,
+                and :math:`V` is the number of vertices in the mesh.
+            faces (torch.Tensor): Faces of the mesh (shape: :math:`B \times
+                F \times 3`), where :math:`B` is the batchsize, and :math:`F`
+                is the number of faces in the mesh.
+            textures (torch.Tensor): Mesh texture (shape: :math:`B \times F
+                \times 4 \times 4 \times 4 \times 3`)
+            K (torch.Tensor): Camera intrinsics (default: None) (shape:
+                :math:`B \times 4 \times 4` or :math:`4 \times 4`)
+            R (torch.Tensor): Rotation matrix (default: None) (shape:
+                :math:`B \times 4 \times 4` or :math:`4 \times 4`)
+            t (torch.Tensor): Translation vector (default: None)
+                (shape: :math:`B \times 3` or :math:`3`)
+        """
         # fill back
         if self.fill_back:
             faces = torch.cat(
