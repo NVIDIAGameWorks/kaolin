@@ -17,7 +17,7 @@ import torch
 import kaolin
 
 
-@pytest.mark.skipif(not torch.cuda.is_available())
+@pytest.mark.skipif("not torch.cuda.is_available()", reason="softras needs GPU")
 def test_softras(device='cuda:0'):
 
     renderer = kaolin.graphics.SoftRenderer(camera_mode="look_at", device=device)
