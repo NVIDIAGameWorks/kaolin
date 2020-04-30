@@ -190,7 +190,7 @@ def main():
         args.output_path, 'example2_mesh.gif'), mode='I')
     for azimuth in loop:
         model.renderer.eye = get_points_from_angles(
-            args.camera_distance, args.elevation, args.azimuth)
+            args.camera_distance, args.elevation, azimuth)
 
         images, _, _ = model.renderer(
             model.vertices, model.faces, model.textures)
