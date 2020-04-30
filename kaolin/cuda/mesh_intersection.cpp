@@ -17,7 +17,7 @@
 using namespace std;
 
 // CUDA forward declarations
-int MeshIntersectionKernelLauncher(
+void MeshIntersectionKernelLauncher(
     const float* points,
     const float* verts_1,
     const float* verts_2,
