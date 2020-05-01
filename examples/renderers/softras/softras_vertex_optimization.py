@@ -37,6 +37,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import argparse
 import os
 
 import imageio
@@ -63,6 +64,13 @@ class Model(torch.nn.Module):
 
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--iters", type=int, default=2000,
+                        help="Number of iterations to run optimization for.")
+    parser.add_argument("--no-viz", action="store_true",
+                        help="Skip visualization steps.")
+    args = parser.parse_args()
 
     # Initialize the soft rasterizer.
     renderer = kaolin.graphics.SoftRenderer(camera_mode="look_at", device="cuda:0")
@@ -115,8 +123,9 @@ if __name__ == "__main__":
     mseloss = torch.nn.MSELoss()
 
     # Perform vertex optimization.
-    writer = imageio.get_writer(progressfile, mode="I")
-    for i in trange(2000):
+    if not args.no_viz:
+        writer = imageio.get_writer(progressfile, mode="I")
+    for i in trange(args.iters):
         optimizer.zero_grad()
         new_vertices = model()
         rgba = renderer(new_vertices, faces, textures)
@@ -126,15 +135,17 @@ if __name__ == "__main__":
         if i % 20 == 0:
             # TODO: Add functionality to write to gif output file.
             tqdm.write(f"Loss: {loss.item():.5}")
+            if not args.no_viz:
+                img = rgba[0].permute(1, 2, 0).detach().cpu().numpy()
+                writer.append_data((255 * img).astype(np.uint8))
+    if not args.no_viz:
+        writer.close()
+
+        # Write optimized mesh to output file.
+        writer = imageio.get_writer(outfile, mode="I")
+        for azimuth in trange(0, 360, 6):
+            renderer.set_eye_from_angles(camera_distance, elevation, azimuth)
+            rgba = renderer.forward(model(), faces, textures)
             img = rgba[0].permute(1, 2, 0).detach().cpu().numpy()
             writer.append_data((255 * img).astype(np.uint8))
-    writer.close()
-
-    # Write optimized mesh to output file.
-    writer = imageio.get_writer(outfile, mode="I")
-    for azimuth in trange(0, 360, 6):
-        renderer.set_eye_from_angles(camera_distance, elevation, azimuth)
-        rgba = renderer.forward(model(), faces, textures)
-        img = rgba[0].permute(1, 2, 0).detach().cpu().numpy()
-        writer.append_data((255 * img).astype(np.uint8))
-    writer.close()
+        writer.close()

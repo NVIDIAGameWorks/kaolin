@@ -37,6 +37,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import argparse
 import os
 
 import imageio
@@ -49,6 +50,13 @@ import kaolin
 # Example script that uses SoftRas to render an image, given a mesh input
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--stride", type=int, default=6,
+                        help="Rotation (in degrees) between successive render azimuth angles.")
+    parser.add_argument("--no-viz", action="store_true",
+                        help="Skip visualization steps.")
+    args = parser.parse_args()
 
     # Initialize the soft rasterizer.
     renderer = kaolin.graphics.SoftRenderer(camera_mode="look_at", device="cuda:0")
@@ -93,11 +101,14 @@ if __name__ == "__main__":
 
     # Loop over a set of azimuth angles, and render the image.
     print("Rendering using softras...")
-    writer = imageio.get_writer(outfile, mode="I")
-    for azimuth in trange(0, 360, 6):
+    if not args.no_viz:
+        writer = imageio.get_writer(outfile, mode="I")
+    for azimuth in trange(0, 360, args.stride):
         renderer.set_eye_from_angles(camera_distance, elevation, azimuth)
         # Render an image.
         rgba = renderer.forward(vertices, faces, textures)
-        img = rgba[0].permute(1, 2, 0).detach().cpu().numpy()
-        writer.append_data((255 * img).astype(np.uint8))
-    writer.close()
+        if not args.no_viz:
+            img = rgba[0].permute(1, 2, 0).detach().cpu().numpy()
+            writer.append_data((255 * img).astype(np.uint8))
+    if not args.no_viz:
+        writer.close()
