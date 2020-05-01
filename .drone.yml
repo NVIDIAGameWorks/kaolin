@@ -6,7 +6,8 @@ steps:
 - name: test
   image: pytorch/pytorch:1.2-cuda10.0-cudnn7-devel
   commands:
-  - apt-get install lsb-core
+  - apt-get -y update
+  - apt-get -y install lsb-core
   - cat /proc/cpuinfo
   - nvidia-smi
   - free -m
