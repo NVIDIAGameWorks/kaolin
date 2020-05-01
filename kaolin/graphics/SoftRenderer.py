@@ -653,9 +653,9 @@ class SoftRenderer(DifferentiableRenderer):
         and the distance of the camera from the origin (i.e., spherical coordinates).
 
         Args:
-            distance (int, float, or torch.Tensor): Distance of the camera from the origin.
-            azimuth (int, float, or torch.Tensor): Azimuth angle.
-            elevation (int, float, or torch.Tensor): Elevation angle.
+            distance (float, or torch.Tensor): Distance of the camera from the origin.
+            azimuth (float, or torch.Tensor): Azimuth angle.
+            elevation (float, or torch.Tensor): Elevation angle.
             degrees (optional, bool): Whether the azimuth and elevation angles are specified
                 in degrees (if True) or radians (if False) (default: True).
         """
