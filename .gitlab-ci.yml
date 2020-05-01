@@ -29,3 +29,4 @@ full test:
     - python setup.py develop
     - pytest --cov=kaolin/ tests/
     - ./tests/examples/run/test_classification.sh
+    - ./tests/examples/run/test_nmr.sh
