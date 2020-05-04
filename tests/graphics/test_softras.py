@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,19 +16,32 @@ import pytest
 import torch
 import kaolin
 
+
+@pytest.mark.skipif("not torch.cuda.is_available()", reason="softras needs GPU")
 def test_softras(device='cuda:0'):
 
-    renderer = kaolin.graphics.SoftRenderer(camera_mode='look_at', device=device)
-    filename_input = 'tests/model.obj'
-    
-    mesh = kaolin.rep.TriangleMesh.from_obj(filename_input)
-    vertices = mesh.vertices.float()
-    faces = mesh.faces.long()
-    face_textures = faces.clone()
-    vertices = vertices[None, :, :].cuda()
-    faces = faces[None, :, :].cuda()
-    face_textures = face_textures[None, :, :].cuda()
-    textures = torch.ones(1, faces.shape[1], 2, 3, dtype=torch.float32).cuda()
+    renderer = kaolin.graphics.SoftRenderer(camera_mode="look_at", device=device)
+    filename_input = "tests/graphics/banana.obj"
 
-    rgb, d, _, = renderer.forward(vertices, faces, textures)
-    assert rgb.shape == (1, 3, 256, 256) and d.shape == (1, 1, 256, 256)
+    mesh = kaolin.rep.TriangleMesh.from_obj(filename_input)
+
+    vertices = mesh.vertices
+    faces = mesh.faces
+    vertices = vertices[None, :, :].cuda()  
+    faces = faces[None, :, :].cuda()
+    vertices_max = vertices.max()
+    vertices_min = vertices.min()
+    vertices_middle = (vertices_max + vertices_min) / 2.
+    vertices = vertices - vertices_middle
+    coef = 5
+    vertices = vertices * coef
+    textures = torch.ones(1, faces.shape[1], 2, 3, dtype=torch.float32).cuda()
+    renderer.set_eye_from_angles(2., 30., 0.)
+
+    rgba = renderer.forward(vertices, faces, textures)
+    assert rgba.shape == (1, 4, 256, 256)
+
+    # Compare correctness with a reference softras output
+    target = torch.load("tests/graphics/softras_reference_render.pt").to(device)
+    avgmse = (rgba - target).abs().mean()
+    assert avgmse <= 0.0002

@@ -39,26 +39,8 @@ DIB-Renderer
 }
 ```
 
-## Building
+# SoftRasterizer
 
-Before running the examples in the `test` directory, ensure that you step into the `DIB-R`, the `NMR`, and the `SoftRas` directories respectively, and install the renderers following the steps outlined in their respective `README` files.
+This popular renderer is based on the 2019 ICCV paper by Schichen Liu, Tianye Li, Weikai Chen, and Hao Li. Softras is a differentiable _rasterization-based_ renderer that can provide gradient with respect to the vertex positions and texture (color) of a Mesh. The following examples demonstrate a typical use cases, and can be repurposed to suit your needs.
 
-
-## Testing
-
-Then, navigate into the `test` directory, and run any of the tests. For example, test Neural Mesh Renderer by running
-
-```
-python test_nmr.py
-```
-
-or, for SoftRasterizer
-
-```
-python test_softras.py
-```
-
-or, for DIB-Renderer
-```
-python test_dibr.py
-```
+Refer to our [examples](softras) for details on how to use this differentiable rendering module for inverse graphics tasks.

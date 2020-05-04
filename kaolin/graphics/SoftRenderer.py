@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,14 +38,13 @@
 # SOFTWARE.
 
 import math
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 
 from .DifferentiableRenderer import DifferentiableRenderer
 from .Lighting import compute_ambient_light
 from .Lighting import compute_directional_light
-from .softras.rasterizer import SoftRasterizer
 from .softras.soft_rasterize import soft_rasterize
 
 
@@ -237,7 +236,7 @@ class SoftRenderer(DifferentiableRenderer):
             self.viewing_angle = viewing_angle
             # Set the position of the eye
             if eye is None:
-                self.eye = torch.tensor([0, 0, -(1. / math.tan(math.pi * self.viewing_angle / 180) + 1)], device=device)
+                self.eye = torch.tensor([0, 0, -(1. / math.tan(math.radians(self.viewing_angle)) + 1)], device=device)
             else:
                 self.eye = eye.to(device)
             # Direction in which the camera's optical axis is facing
@@ -273,22 +272,6 @@ class SoftRenderer(DifferentiableRenderer):
             self.light_direction = light_direction.to(device)
 
         self.rasterizer_eps = 1e-3
-
-        # Initialize rasterizer with parameters specified.
-        self.soft_rasterizer = SoftRasterizer(self.image_size,
-                                              self.bg_color,
-                                              self.near,
-                                              self.far,
-                                              self.anti_aliasing,
-                                              self.fill_back,
-                                              self.rasterizer_eps,
-                                              self.sigma_val,
-                                              self.dist_func,
-                                              self.dist_eps,
-                                              self.gamma_val,
-                                              self.aggr_func_rgb,
-                                              self.aggr_func_alpha,
-                                              self.texture_type)
 
     def forward(self, vertices: torch.Tensor, faces: torch.Tensor, textures: Optional[torch.Tensor] = None,
                 mode: Optional[torch.Tensor] = None, K: Optional[torch.Tensor] = None,
@@ -333,11 +316,6 @@ class SoftRenderer(DifferentiableRenderer):
 
         """
 
-        # Fill the back faces of each triangle, if needed
-        if self.fill_back:
-            faces = torch.cat((faces, torch.flip(faces, [2])), dim=1)
-            textures = torch.cat((textures, textures), dim=1)
-
         # Lighting (not needed when we are rendering only depth/silhouette
         # images)
         if mode not in ['depth', 'silhouette']:
@@ -350,17 +328,9 @@ class SoftRenderer(DifferentiableRenderer):
         vertices = self.project_to_image(vertices)
 
         # Rasterization
-        out = soft_rasterize(vertices, textures)
+        images = self.rasterize(vertices, faces, textures)
 
-        rgb = out[:, :3, :, :]
-        depth = out[:, 3, :, :]
-        if out.shape[0] == 1:
-            depth = depth.unsqueeze(1)
-        # Creating a 'dummy' alpha variable for a potential future feature.
-        # TODO: Add 'alpha' channel rendering capability.
-        alpha = None
-
-        return rgb, depth, alpha
+        return images
 
     def lighting(self, vertices: torch.Tensor, faces: torch.Tensor, textures: torch.Tensor):
         r"""Applies ambient and directional lighting to the mesh.
@@ -384,13 +354,8 @@ class SoftRenderer(DifferentiableRenderer):
         directional_lighting = compute_directional_light(faces_lighting, textures,
                                                          self.light_intensity_directional,
                                                          self.light_color_directional)
-        # Squeeze dimensions with indices 2 and 3 (NMR uses a 6 dimensional
-        # code, hence the lighting functions append these additional dims
-        # which are unused in softras).
-        ambient_lighting = ambient_lighting.squeeze(2).squeeze(2)
-        directional_lighting = directional_lighting.squeeze(2).squeeze(2)
 
-        return ambient_lighting * textures + directional_lighting * textures
+        return (ambient_lighting + directional_lighting) * textures
 
     def shading(self):
         r"""Does nothing. Placeholder for shading functionality. """
@@ -475,17 +440,30 @@ class SoftRenderer(DifferentiableRenderer):
         """
 
         face_vertices = self.vertices_to_faces(vertices, faces)
-        # face_textures = self.vertices_to_faces(textures, faces)
-        images = soft_rasterize_cuda(face_vertices, textures, self.image_size,
-                                     self.bg_color, self.near, self.far,
-                                     self.fill_back, self.rasterizer_eps, self.sigma_val,
-                                     self.dist_func, self.dist_eps, self.gamma_val,
-                                     self.aggr_func_rgb, self.aggr_func_alpha,
-                                     self.texture_type)
+        face_textures = textures
+        if self.texture_type == "vertex":
+            face_textures = self.textures_to_faces(textures, faces)
+
+        image_size = self.image_size * (2 if self.anti_aliasing else 1)
+        out = soft_rasterize(face_vertices,
+                             face_textures,
+                             image_size,
+                             self.bg_color,
+                             self.near,
+                             self.far,
+                             self.fill_back,
+                             self.rasterizer_eps,
+                             self.sigma_val,
+                             self.dist_func,
+                             self.dist_eps,
+                             self.gamma_val,
+                             self.aggr_func_rgb,
+                             self.aggr_func_alpha,
+                             self.texture_type)
         if self.anti_aliasing:
-            images = torch.nn.functional.avg_pool2d(images, kernel_size=2,
-                                                    stride=2)
-        return images
+            out = torch.nn.functional.avg_pool2d(out, kernel_size=2, stride=2)
+
+        return out
 
     def look_at(self, vertices: torch.Tensor, eye: torch.Tensor,
                 at: Optional[torch.Tensor] = None, up: Optional[torch.Tensor] = None):
@@ -622,14 +600,12 @@ class SoftRenderer(DifferentiableRenderer):
                 and :math:`V` is the number of vertices in the mesh.
         """
         device = vertices.device
-        angle = torch.tensor([angle * 180 / math.pi], device=self.device)
+        angle = torch.tensor([angle / 180 * math.pi], device=self.device)
         width = torch.tan(angle)
         width = width[:, None]
-        z = vertices[:, :, 2]
-        x = vertices[:, :, 0] / (z * width)
-        y = vertices[:, :, 1] / (z * width)
-        vertices = torch.stack((x, y, z), dim=2)
-        return vertices
+        z = vertices[..., 2]
+        xy = vertices[..., :2] / (z * width).unsqueeze(-1)
+        return torch.cat((xy, z.unsqueeze(-1)), dim=2)
 
     def vertices_to_faces(self, vertices: torch.Tensor, faces: torch.Tensor):
         r"""Expand vertices in the layout defined by faces.
@@ -646,7 +622,7 @@ class SoftRenderer(DifferentiableRenderer):
         B = vertices.shape[0]
         V = vertices.shape[1]
         device = vertices.device
-        faces = faces + (torch.arange(B, device=device) * V)[:, None, None]
+        faces = faces + (torch.arange(B, dtype=torch.long, device=device) * V)[:, None, None]
         vertices = vertices.reshape(B * V, 3)
         return vertices[faces]
 
@@ -664,7 +640,37 @@ class SoftRenderer(DifferentiableRenderer):
         """
         B = textures.shape[0]
         F = textures.shape[1]
-        device = vertices.device
+        device = textures.device
         faces = faces + (torch.arange(B, device=device) * F)[:, None, None]
         textures = textures.reshape(B * F, 2, 3)
         return textures[faces]
+
+    def set_eye_from_angles(self, distance: Union[int, float, torch.Tensor],
+                            elevation: Union[int, float, torch.Tensor],
+                            azimuth: Union[int, float, torch.Tensor],
+                            degrees: bool = True):
+        r"""Compute the position of the camera given azimuth and elevation angles,
+        and the distance of the camera from the origin (i.e., spherical coordinates).
+
+        Args:
+            distance (float, or torch.Tensor): Distance of the camera from the origin.
+            azimuth (float, or torch.Tensor): Azimuth angle.
+            elevation (float, or torch.Tensor): Elevation angle.
+            degrees (optional, bool): Whether the azimuth and elevation angles are specified
+                in degrees (if True) or radians (if False) (default: True).
+        """
+        if isinstance(distance, float) or isinstance(distance, int):
+            if degrees:
+                elevation = (math.pi / 180.) * elevation
+                azimuth = (math.pi / 180.) * azimuth
+            if not torch.is_tensor(distance):
+                distance = torch.tensor([distance], dtype=torch.float32)
+            if not torch.is_tensor(elevation):
+                elevation = torch.tensor([elevation], dtype=torch.float32)
+            if not torch.is_tensor(azimuth):
+                azimuth = torch.tensor([azimuth], dtype=torch.float32)
+            self.eye = torch.tensor([
+                distance * torch.cos(elevation) * torch.sin(azimuth),
+                distance * torch.sin(elevation),
+                -distance * torch.cos(elevation) * torch.cos(azimuth),
+            ], device=self.device)
