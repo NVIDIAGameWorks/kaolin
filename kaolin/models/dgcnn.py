@@ -173,7 +173,7 @@ class DGCNN(nn.Module):
         feature = feature.view(batch_size, num_points, k, num_dims)
         x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
 
-        feature = torch.cat((feature - x, x), dim=3).permute(0, 3, 1, 2)
+        feature = torch.cat((feature - x, x), dim=3).permute(0, 3, 1, 2).contiguous()
 
         return feature
 
