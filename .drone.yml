@@ -6,9 +6,9 @@ steps:
 - name: test
   image: pytorch/pytorch:1.2-cuda10.0-cudnn7-devel
   commands:
-  - apt-get update && apt-get -y install libgtk2.0-dev
-  - pip install --no-dependencies nuscenes-devkit opencv-python scikit-learn joblib pyquaternion cachetools
+  - pip install --no-dependencies nuscenes-devkit opencv-python-headless scikit-learn joblib pyquaternion cachetools
   - pip install -r requirements.txt
+  - apt-get update && apt-get -y install libglib2.0-0  # needed by opencv
   - flake8 --config=.flake8 .
   - python setup.py develop
   - . ./setenv.sh

@@ -91,6 +91,11 @@ def KaolinCUDAExtension(*args, **kwargs):
 
 
 class KaolinBuildExtension(BuildExtension):
+    def __init__(self, *args, **kwargs):
+        kwargs = copy.deepcopy(kwargs)
+        kwargs['use_ninja'] = False  # ninja is interfering with compiling separate extensions in parallel
+        super().__init__(*args, **kwargs)
+
     def build_extensions(self):
         if not os.name == 'nt':
             FLAG_BLACKLIST = ['-Wstrict-prototypes']
