@@ -25,6 +25,9 @@ import kaolin.models.VoxelSuperresODM
 
 # DGCNN
 import kaolin.models.dgcnn
+#from .dgcnn import DGCNN_CLS
+#from .dgcnn import DGCNN_PARTSEG
+#from .dgcnn import DGCNN_SEMSEG
 
 # DIBREncoder
 import kaolin.models.DIBREncoder
