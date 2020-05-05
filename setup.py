@@ -79,20 +79,24 @@ def read(*names, **kwargs):
 
 
 def KaolinCUDAExtension(*args, **kwargs):
-    FLAGS = ['-Wno-deprecated-declarations']
-    kwargs = copy.deepcopy(kwargs)
-    if 'extra_compile_args' in kwargs:
-        kwargs['extra_compile_args'] += FLAGS
-    else:
-        kwargs['extra_compile_args'] = FLAGS
+    if not os.name == 'nt':
+        FLAGS = ['-Wno-deprecated-declarations']
+        kwargs = copy.deepcopy(kwargs)
+        if 'extra_compile_args' in kwargs:
+            kwargs['extra_compile_args'] += FLAGS
+        else:
+            kwargs['extra_compile_args'] = FLAGS
+
     return CUDAExtension(*args, **kwargs)
 
 
 class KaolinBuildExtension(BuildExtension):
     def build_extensions(self):
-        FLAG_BLACKLIST = ['-Wstrict-prototypes']
-        FLAGS = ['-Wno-deprecated-declarations']
-        self.compiler.compiler_so = [x for x in self.compiler.compiler_so if x not in FLAG_BLACKLIST] + FLAGS  # Covers non-cuda
+        if not os.name == 'nt':
+            FLAG_BLACKLIST = ['-Wstrict-prototypes']
+            FLAGS = ['-Wno-deprecated-declarations']
+            self.compiler.compiler_so = [x for x in self.compiler.compiler_so if x not in FLAG_BLACKLIST] + FLAGS  # Covers non-cuda
+
         super().build_extensions()
 
 
