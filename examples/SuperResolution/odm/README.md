@@ -8,7 +8,7 @@ There are two training schemes, one which directly predicts superresolves ODMs (
 ### Training
 
 ```
-python train.py --mode ODM \
+python train.py --mode Direct \
     --shapenet-root <path/to/ShapeNet> \
     --categories <category list> \
     --cache-dir <cache dir>
@@ -18,7 +18,7 @@ python train.py --mode ODM \
 ### Evaluating
 
 ```
-python eval.py --mode ODM \
+python eval.py --mode Direct \
     --shapenet-root <path/to/ShapeNet> \
     --categories <category list> \
     --cache-dir <cache dir>

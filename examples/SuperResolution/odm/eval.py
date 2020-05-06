@@ -68,17 +68,18 @@ with torch.no_grad():
         inp_odms = data[32]['odms'].to(args.device)
         inp_voxels = data[32]['voxels'].to(args.device)
 
-        # inference
-        if args.mode == 'Direct':
-            pred_odms = model(inp_odms)
-        elif args.mode == 'MVD':
+        # Inference
+        pred_odms = model(inp_odms)
+        if args.mode == 'MVD':
             initial_odms = upsample_odm(inp_odms) * 4
             distance = 128 - initial_odms
-            pred_odms = model(inp_odms) * distance
+            pred_odms_update = pred_odms * distance
+            pred_odms = initial_odms + pred_odms_update
 
+        # Calculate IoU
         if args.mode == 'Direct':
-            pred_odms[pred_odms > .5] = pred_odms.shape[-1]
-            pred_odms[pred_odms <= .5] = 0
+            pred_odms = to_occupancy_map(pred_odms, threshold=0.5)
+            pred_odms = pred_odms * pred_odms.shape[-1]
         elif args.mode == 'MVD':
             pred_odms = pred_odms.int()
 

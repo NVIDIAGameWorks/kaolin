@@ -63,12 +63,7 @@ def up_sample(inp):
 def to_occupancy_map(inp, threshold=None):
     if threshold is None: 
         threshold = inp.shape[-1]
-    zeros = inp < threshold
-    ones = inp >= threshold
-    inp = inp.clone()
-    inp[ones] = 1 
-    inp[zeros] = 0 
-    return inp
+    return (inp >= threshold).type(inp.dtype)
 
 
 def upsample_odm(inp): 
