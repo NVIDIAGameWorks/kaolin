@@ -240,25 +240,19 @@ class Transform_Net(nn.Module):
     def __init__(
         self,
         input_dim=3,
-        conv_2d_dims=[64, 128],
-        conv_1d_dims=[1024],
-        fc_dims=[512, 256],
         output_channels=9,
-        use_cuda=True
     ):
         super(Transform_Net, self).__init__()
 
-        self.conv1 = conv("Conv2d", input_dim*2, conv_2d_dims[0])
-        self.conv2 = conv("Conv2d", conv_2d_dims[0], conv_2d_dims[1])
-        self.conv3 = conv("Conv1d", conv_2d_dims[-1], conv_1d_dims[0])
-        self.fc1 = fc(conv_1d_dims[-1], fc[0], batch_norm=True, leaky_relu=True) 
-        self.fc2 = fc(fc[0], fc[1], batch_norm=True, leaky_relu=True)
-        self.transform = fc(fc_dims[-1],output_channels)
+        self.conv1 = conv("Conv2d", input_dim*2, 64)
+        self.conv2 = conv("Conv2d", 64, 128)
+        self.conv3 = conv("Conv1d", 128, 1024)
+        self.fc1 = fc(1024, 512, batch_norm=True, leaky_relu=True) 
+        self.fc2 = fc(512, 256, batch_norm=True, leaky_relu=True)
+        self.transform = fc(256,output_channels)
         
         init.constant_(self.transform.weight, 0)
         init.eye_(self.transform.bias.view(3, 3))
-        if use_cuda:
-            self.cuda()
     
     def forward(self, x):
         batch_size = x.size(0)
@@ -275,16 +269,15 @@ class Transform_Net(nn.Module):
         return x.view(batch_size, 3, 3)
 
 
-class DGCNN_PARTSEG(nn.Module):
+class DGCNNPartSegmentation(nn.Module):
     def __init__(
         self,
         input_dim=3,
-        emb_dims=1,
-        output_dims=1,
+        emb_dim=1024,
+        output_dim=128,
         k=20,
-        use_cuda=True
     ):
-        super(DGCNN_PARTSEG, self).__init__()
+        super(DGCNNPartSegmentation, self).__init__()
         self.transform_net = Transform_Net()
         self.k = k
         
@@ -302,8 +295,6 @@ class DGCNN_PARTSEG(nn.Module):
             "Conv1d", 128, output_dim,
             batch_norm=False, leaky_relu=False
         )
-        if use_cuda:
-            self.cuda()
 
     def forward(self, x, l):
         batch_size = x.size(0)
@@ -347,15 +338,16 @@ class DGCNN_PARTSEG(nn.Module):
         x = self.conv11(x)
     
 
-class DGCNN_SEMSEG(nn.Module):
+class DGCNNSemanticSegmentation(nn.Module):
     def __init__(
         self,
         input_dim=3,
-        emb_dims=1,
-        output_dim=None,
+        emb_dim=128,
+        output_dim=13,
         k=20,
         use_cuda=True
     ):
+        super(DGCNNSemanticSegmentation, self).__init__()
         self.k = k
         self.conv1 = conv("Conv2d", 18, 64)
         self.conv2 = conv("Conv2d", 64, 64)
@@ -366,7 +358,7 @@ class DGCNN_SEMSEG(nn.Module):
         self.conv7 = conv("Conv1d", 1216, 512)
         self.conv8 = conv("Conv1d", 512, 256, dropout=True)
         self.conv9 = conv(
-            "Conv1d", 256, 13,
+            "Conv1d", 256, output_dim,
             batch_norm=False, leaky_relu=False, dropout=False
         )
     
