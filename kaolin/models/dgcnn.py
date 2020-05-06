@@ -54,18 +54,19 @@ def conv(
     leaky_relu=True,
     dropout=False
 ):
-    layer = nn.Sequential()
-    if type="Conv1d":
-        layer.add_module(nn.Conv1d(input_dim, output_dim, kernel_size=1, bias=False))
-    elif type="Conv2d":
-        layer.add_module(nn.Conv2d(input_dim, output_dim, kernel_size=1, bias=False))
+    modules = []
+    if type=="Conv1d":
+        modules.append(nn.Conv1d(input_dim, output_dim, kernel_size=1, bias=False))
+    elif type=="Conv2d":
+        modules.append(nn.Conv2d(input_dim, output_dim, kernel_size=1, bias=False))
 
     if batch_norm:
-        layer.add_module(nn.BatchNorm2d(output_dim))
+        modules.append(nn.BatchNorm2d(output_dim))
     if leaky_relu:
-        layer.add_module(nn.LeakyReLU(negative_slope=0.2))
+        modules.append(nn.LeakyReLU(negative_slope=0.2))
     if dropout:
-        layer.add_module(nn.Dropout(p=0.5))
+        modules.append(nn.Dropout(p=0.5))
+    layer = nn.Sequential(*modules)
     return layer
 
 
@@ -76,15 +77,14 @@ def fc(
     leaky_relu=False,
     dropout=False
 ):
-    layer = nn.Sequential(
-        nn.Linear(input_dim, output_dim, bias=False)
-    )
+    modules = [nn.Linear(input_dim, output_dim, bias=False)]
     if batch_norm:
-        layer.add_module(nn.BatchNorm1d(output_dim))
+        modules.append(nn.BatchNorm1d(output_dim))
     if leaky_relu:
-        layer.add_module(nn.LeakyReLU(negative_slope=0.2))
+        modules.append(nn.LeakyReLU(negative_slope=0.2))
     if dropout:
-        layer.add_module(nn.Dropout(p=0.5))
+        modules.append(nn.Dropout(p=0.5))
+    layer = nn.Sequential(*modules)
     return layer
 
 
@@ -92,15 +92,14 @@ def knn(x, k):
     inner = -2 * torch.matmul(x.transpose(2, 1), x)
     xx = torch.sum(x**2, dim=1, keepdim=True)
     pairwise_distance = -xx - inner - xx.transpose(2, 1)
-
     idx = pairwise_distance.topk(k=k, dim=-1)[1]  # (batch_size, num_points, k)
     return idx
 
-def get_graph_feature(self, x, k=20, idx=None):
+def get_graph_feature(x, k=20, idx=None):
     """Compute Graph feature.
 
     Args:
-        x (torch.tensor): torch tensor
+        x (torch.tensor): input to the network in the format: [B, N_feat, N_points]
         k (int): number of nearest neighbors
     """
     batch_size = x.size(0)
@@ -108,30 +107,25 @@ def get_graph_feature(self, x, k=20, idx=None):
     x = x.view(batch_size, -1, num_points)
     if idx is None:
         idx = knn(x, k=k)  # (batch_size, num_points, k)
-    if self.use_cuda:
-        device = torch.device('cuda')
-    else:
-        device = torch.device('cpu')
 
-    idx_base = torch.arange(0, batch_size, device=device).view(
-        -1, 1, 1) * num_points
+    idx_base = torch.arange(0, batch_size).view(-1, 1, 1) * num_points
     idx = idx + idx_base
     idx = idx.view(-1)
 
     _, num_dims, _ = x.size()
 
-    x = x.transpose(2, 1).contiguous(
-    )  # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
+    x = x.transpose(2, 1).contiguous()  
+    # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
     feature = x.view(batch_size * num_points, -1)[idx, :]
     feature = feature.view(batch_size, num_points, k, num_dims)
     x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
 
-    feature = torch.cat((feature - x, x), dim=3).permute(0, 3, 1, 2)
+    feature = torch.cat((feature - x, x), dim=3).permute(0, 3, 1, 2).contiguous()
 
     return feature
 
 
-class DGCNN_CLS(nn.Module):
+class DGCNNClassifier(nn.Module):
     """Implementation of the DGCNN for pointcloud classificaiton.
     
     Args:
@@ -142,7 +136,6 @@ class DGCNN_CLS(nn.Module):
         output_channels (int): number of output channels. Default: ``64``.
         dropout (float): dropout probability (applied to fully connected layers only). Default: ``0.5``.
         k (int): number of nearest neighbors.
-        use_cuda (bool): if ``True`` will move the model to GPU
 
     .. note::
 
@@ -167,9 +160,8 @@ class DGCNN_CLS(nn.Module):
             output_channels=64,
             dropout=0.5,  # dropout probability
             k=20,  # number of nearest neighbors
-            use_cuda=True,  # use CUDA or not
     ):
-        super(DGCNN, self).__init__()
+        super(DGCNNClassifier, self).__init__()
         self.k = k
         emb_input_dim = sum(conv_dims)
 
@@ -179,58 +171,49 @@ class DGCNN_CLS(nn.Module):
             # self.conv_layers.append(
             self.__setattr__(
                 f'conv_layers_{it}',
-                get_layer(
-                    conv(
-                        "Conv2d",
-                        self.conv_dims[it] * 2,
-                        self.conv_dims[it + 1],
-                    )
+                conv(
+                    "Conv2d",
+                    self.conv_dims[it] * 2,
+                    self.conv_dims[it + 1],
                 )
             )
-        
         # create intermediate embedding
         
-        self.embedding_layer = get_layer(
-            conv(
-                "Conv1d",
-                emb_input_dim,
-                emb_dims
-            )
+        self.embedding_layer = conv(
+            "Conv1d",
+            emb_input_dim,
+            emb_dims
         )
 
         # fully connected layers
         self.fc_dims = [emb_dims * 2] + fc_dims
         for it in range(len(self.fc_dims) - 1):
             self.__setattr__(f'fc_layers_{it}',
-                get_layer(
-                    fc(
-                        self.fc_dims[it], 
-                        self.fc_dims[it + 1],
-                        batch_norm=True,
-                        leaky_relu=True,
-                        dropout=True
-                    )
+                fc(
+                    self.fc_dims[it], 
+                    self.fc_dims[it + 1],
+                    batch_norm=True,
+                    leaky_relu=True,
+                    dropout=True
                 )
             )
 
         # final output projection
         self.final_layer = fc(self.fc_dims[-1], output_channels)
 
-        if use_cuda:
-            self.cuda()
-
     def forward(self, x):
         """Forward pass of the DGCNN model.
 
         Args:
-            x (torch.tensor): input to the network in the format: [B, N_feat, N_points]
+            x (torch.tensor): input to the network in the format: [B, N_points, N_feat]
         """
+        x = x.permute(0,2,1) #[B, N_points, N_feat] -> [B, N_feat, N_points] 
         batch_size = x.size(0)
         x_list = []
 
         # convolutional layers
         for it in range(len(self.conv_dims) - 1):
-            x = self.get_graph_feature(x, k=self.k)
+            x = get_graph_feature(x, k=self.k)
             x = self.__getattr__(f'conv_layers_{it}')(x)
             x = x.max(dim=-1, keepdim=False)[0]
             x_list.append(x)
@@ -296,8 +279,8 @@ class DGCNN_PARTSEG(nn.Module):
     def __init__(
         self,
         input_dim=3,
-        emb_dims=
-        output_dim=None,
+        emb_dims=1,
+        output_dims=1,
         k=20,
         use_cuda=True
     ):
@@ -368,7 +351,7 @@ class DGCNN_SEMSEG(nn.Module):
     def __init__(
         self,
         input_dim=3,
-        emb_dims=
+        emb_dims=1,
         output_dim=None,
         k=20,
         use_cuda=True
