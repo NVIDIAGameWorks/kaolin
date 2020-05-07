@@ -196,6 +196,8 @@ def normalize(cloud: Union[torch.Tensor, PointCloud],
 
     if isinstance(cloud, np.ndarray):
         cloud = torch.from_numpy(cloud)
+    if isinstance(cloud, PointCloud):
+        cloud = cloud.points
 
     helpers._assert_tensor(cloud)
     helpers._assert_dim_ge(cloud, 2)
