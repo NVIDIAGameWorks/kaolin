@@ -61,7 +61,10 @@ def conv(
         modules.append(nn.Conv2d(input_dim, output_dim, kernel_size=1, bias=False))
 
     if batch_norm:
-        modules.append(nn.BatchNorm2d(output_dim))
+        if type=="Conv1d":
+            modules.append(nn.BatchNorm1d(output_dim))
+        else:
+            modules.append(nn.BatchNorm2d(output_dim))
     if leaky_relu:
         modules.append(nn.LeakyReLU(negative_slope=0.2))
     if dropout:
@@ -164,9 +167,11 @@ class DGCNNClassifier(nn.Module):
             output_channels=64,
             dropout=0.5,  # dropout probability
             k=20,  # number of nearest neighbors
+            device=None
     ):
         super(DGCNNClassifier, self).__init__()
         self.k = k
+        self.device = device
         emb_input_dim = sum(conv_dims)
 
         self.conv_dims = [input_dim] + conv_dims
@@ -204,6 +209,9 @@ class DGCNNClassifier(nn.Module):
 
         # final output projection
         self.final_layer = fc(self.fc_dims[-1], output_channels)
+
+        if self.device:
+            self.to(self.device)
 
     def forward(self, x):
         """Forward pass of the DGCNN model.
