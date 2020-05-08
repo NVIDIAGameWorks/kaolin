@@ -13,10 +13,11 @@
 # limitations under the License.
 
 
+from kaolin.transforms import Transform
 from kaolin.transforms import transforms as tfs
 
 
-class VoxelODMs:
+class VoxelODMs(Transform):
     def __init__(self, resolutions: list = [32, 128], normalize: bool = True,
                  vertex_offset: float = 0.5, single_view: bool = True):
         self.transforms = {
@@ -41,6 +42,3 @@ class VoxelODMs:
                 'odms': odms,
             }
         return data
-
-    def __repr__(self):
-        return str(self.transforms)
