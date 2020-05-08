@@ -209,6 +209,7 @@ cwd = os.path.dirname(os.path.abspath(__file__))
 def get_requirements():
     return [
         'matplotlib<3.0.0',
+        'nuscenes-devkit',
         'scikit-image',
         'shapely',
         'trimesh>=3.0',
