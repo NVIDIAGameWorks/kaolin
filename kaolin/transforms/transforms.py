@@ -198,6 +198,35 @@ class NumpyToTensor(Transform):
         return torch.from_numpy(arr)
 
 
+class ShiftPointCloud(Transform):
+    r"""Shift a pointcloud with respect a fixed shift factor.
+    Given a shift factor `shf`, this transform will shift each point in the 
+    pointcloud, i.e.,
+    ``cloud = shf + cloud``
+
+    Args:
+        shf (int or float or torch.Tensor): Shift pofactorint by which input
+            clouds are to be shifted.
+        inplace (bool, optional): Whether or not the transformation should be
+            in-place (default: True).
+    """
+
+    def __init__(self, shf: Union[int, float, torch.Tensor],
+                 inplace: Optional[bool] = True):
+        self.shf = shf
+        self.inplace = inplace
+    
+    def __call__(self, cloud: Union[torch.Tensor, PointCloud]):
+        """
+        Args:
+            cloud (torch.Tensor or PointCloud): Pointcloud to be shifted.
+        
+        Returns:
+            (torch.Tensor or PointCloud): Shifted pointcloud.
+        """
+        return pcfunc.shift(cloud, shf=self.shf, inplace=self.inplace)
+
+
 class ScalePointCloud(Transform):
     """Scale a pointcloud with a fixed scaling factor.
     Given a scale factor `scf`, this transform will scale each point in the
@@ -229,6 +258,35 @@ class ScalePointCloud(Transform):
             (torch.Tensor or PointCloud): Scaled pointcloud.
         """
         return pcfunc.scale(cloud, scf=self.scf, inplace=self.inplace)
+
+
+class TranslatePointCloud(Transform):
+    r"""Translate a pointcloud with a given translation matrix.
+    Given a :math:`1 \times 3` translation matrix, this transform will 
+    translate each point in the cloud by the translation matrix specified.
+
+    Args:
+        tranmat (torch.Tensor): Translation matrix that specifies the translation 
+            to be applied to the pointcloud (shape: :math:`1 \times 3`).
+        inplace (bool, optional): Bool to make this operation in-place.
+
+    TODO: Example.
+
+    """
+
+    def __init__(self, tranmat: torch.Tensor, inplace: Optional[bool] = True):
+        self.tranmat = tranmat
+        self.inplace = inplace
+
+    def __call__(self, cloud: Union[torch.Tensor, PointCloud]):
+        """
+        Args:
+            cloud (torch.Tensor or PointCloud): Input pointcloud to be translated.
+
+        Returns:
+            (torch.Tensor or PointCloud): Translated pointcloud.
+        """
+        return pcfunc.translate(cloud, tranmat=self.tranmat, inplace=self.inplace)
 
 
 class RotatePointCloud(Transform):

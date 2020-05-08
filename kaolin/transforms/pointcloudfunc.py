@@ -25,6 +25,53 @@ from kaolin import helpers
 EPS = 1e-6
 
 
+def shift(cloud: Union[torch.Tensor, PointCloud],
+          shf: Union[float, int, torch.Tensor],
+          inplace: Optional[bool] = True):
+    """Shift the input pointcloud by a shift factor.
+
+    Args:
+        cloud (torch.Tensor or kaolin.rep.PointCloud): pointcloud (ndims >= 2).
+        shf (float, int, torch.Tensor): shift factor (scaler, or tensor).
+        inplace (bool, optional): Bool to make the transform in-place
+    
+    Returns:
+        (torch.Tensor): shifted pointcloud pf the same shape as input.
+    
+    Shape:
+        - cloud: :math:`(B x N x D)` (or) :math:`(N x D)`, where :math:`(B)`
+            is the batchsize, :math:`(N)` is the number of points per cloud,
+            and :math:`(D)` is the dimensionality of each cloud.
+        - shf: :math:`(1)` or :math:`(B)`.
+
+    Example:
+        >>> points = torch.rand(1000,3)
+        >>> points2 = shift(points, torch.FloatTensor([3]))
+    """
+
+    if isinstance(cloud, np.ndarray):
+        cloud = torch.from_numpy(cloud)
+    
+    if isinstance(shf, np.ndarray):
+        shf = torch.from_numpy(shf)
+    
+    if isinstance(cloud, PointCloud):
+        cloud = cloud.points
+    
+    if isinstance(shf, int) or isinstance(shf, float):
+        shf = torch.Tensor([shf]).to(cloud.device)
+    
+    helpers._assert_tensor(cloud)
+    helpers._assert_tensor(shf)
+    helpers._assert_dim_ge(cloud, 2)
+    helpers._assert_gt(shf, 0.)
+
+    if not inplace:
+        cloud = cloud.clone()
+
+    return shf + cloud
+
+
 def scale(cloud: Union[torch.Tensor, PointCloud],
           scf: Union[float, int, torch.Tensor],
           inplace: Optional[bool] = True):
@@ -73,6 +120,56 @@ def scale(cloud: Union[torch.Tensor, PointCloud],
 
     return scf * cloud
 
+
+def translate(cloud: Union[torch.Tensor, PointCloud], tranmat: torch.Tensor,
+              inplace: Optional[bool] = True):
+    """Translate the input pointcloud by a translation matrix.
+
+    Args:
+        cloud (Tensor or np.array): pointcloud (ndims = 2 or 3)
+        tranmat (Tensor or np.array): translation matrix (1 x 3, 1 per cloud).
+
+    Returns:
+        cloud_tran (Tensor): Translated pointcloud of the same shape as input.
+
+    Shape:
+        - cloud: :math:`(B x N x 3)` (or) :math:`(N x 3)`, where :math:`(B)`
+            is the batchsize, :math:`(N)` is the number of points per cloud,
+            and :math:`(3)` is the dimensionality of each cloud.
+        - tranmat: :math:`(1, 3)` or :math:`(B, 1, 3)`.
+
+    Example:
+        >>> points = torch.rand(1000,3)
+        >>> t_mat = torch.rand(1,3)
+        >>> points2 = translate(points, t_mat)
+
+    """
+    if isinstance(cloud, np.ndarray):
+        cloud = torch.from_numpy(cloud)
+    if isinstance(cloud, PointCloud):
+        cloud = cloud.points
+    if isinstance(tranmat, np.ndarray):
+        trainmat = torch.from_numpy(tranmat)
+    
+    helpers._assert_tensor(cloud)
+    helpers._assert_tensor(tranmat)
+    helpers._assert_dim_ge(cloud, 2)
+    helpers._assert_dim_ge(tranmat, 2)
+    # Rotation matrix must have last two dimensions of shape 3.
+    helpers._assert_shape_eq(tranmat, (1, 3), dim=-1)
+    helpers._assert_shape_eq(tranmat, (1, 3), dim=-2)
+
+    if not inplace:
+        cloud = cloud.clone()
+
+    if tranmat.dim() == 2 and cloud.dim() == 2:
+        cloud = torch.add(tranmat, cloud)
+    else:
+        if tranmat.dim() == 2:
+            tranmat = tranmat.expand(cloud.shape[0], 1, 3)
+        cloud = torch.add(tranmat, cloud)
+
+    return cloud
 
 def rotate(cloud: Union[torch.Tensor, PointCloud], rotmat: torch.Tensor,
            inplace: Optional[bool] = True):
