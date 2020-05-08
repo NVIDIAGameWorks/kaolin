@@ -30,12 +30,27 @@ def test_numpy_to_tensor(device='cpu'):
     assert torch.is_tensor(ten)
 
 
+def test_shift_pointcloud(device='cpu'):
+    unit_shift = kal.transforms.ShiftPointCloud(-1)
+    pc = torch.ones(4, 3)
+    pc_ = unit_shift(pc)
+    assert_allclose(pc_, torch.zeros(4, 3))
+
+
 def test_scale_pointcloud(device='cpu'):
     twice = kal.transforms.ScalePointCloud(2)
     halve = kal.transforms.ScalePointCloud(0.5)
     pc = torch.ones(4, 3)
     pc_ = halve(twice(pc))
     assert_allclose(pc_, torch.ones(4, 3))
+
+
+def test_translate_pointcloud(device='cpu'):
+    pc = torch.ones(4, 3)
+    tmat = torch.tensor([[-1,-1,-1]])
+    translate = kal.transforms.TranslatePointCloud(tmat)
+    pc_ = translate(pc)
+    assert_allclose(pc_, torch.zeros(4, 3))
 
 
 def test_rotate_pointcloud(device='cpu'):

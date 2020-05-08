@@ -64,7 +64,6 @@ def shift(cloud: Union[torch.Tensor, PointCloud],
     helpers._assert_tensor(cloud)
     helpers._assert_tensor(shf)
     helpers._assert_dim_ge(cloud, 2)
-    helpers._assert_gt(shf, 0.)
 
     if not inplace:
         cloud = cloud.clone()
