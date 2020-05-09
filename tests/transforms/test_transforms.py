@@ -47,7 +47,7 @@ def test_scale_pointcloud(device='cpu'):
 
 def test_translate_pointcloud(device='cpu'):
     pc = torch.ones(4, 3)
-    tmat = torch.tensor([[-1,-1,-1]])
+    tmat = torch.tensor([[-1.0,-1.0,-1.0]])
     translate = kal.transforms.TranslatePointCloud(tmat)
     pc_ = translate(pc)
     assert_allclose(pc_, torch.zeros(4, 3))
