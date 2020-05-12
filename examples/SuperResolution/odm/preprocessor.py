@@ -18,7 +18,7 @@ from kaolin.transforms import transforms as tfs
 
 
 class VoxelODMs(Transform):
-    def __init__(self, resolutions: list = [32, 128], normalize: bool = True,
+    def __init__(self, resolutions: list = (32, 128), normalize: bool = True,
                  vertex_offset: float = 0.5, single_view: bool = True):
         self.transforms = {
             resolution: {
