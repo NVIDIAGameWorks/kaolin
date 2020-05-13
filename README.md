@@ -67,7 +67,7 @@ Kaolin curates a large _model zoo_ containing reference implementations of popul
 Windows support is in the works and is currently considered experimental.
 
 ### Dependencies
-- numpy >= 1.17
+- numpy >= 1.17, <1.18.4
 - PyTorch >=1.2, <1.5 and Torchvision >=0.4.0, <0.6.0 (see [pytorch.org](http://pytorch.org) for installation instructions)
 
 ### Installation

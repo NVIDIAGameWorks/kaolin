@@ -209,18 +209,11 @@ cwd = os.path.dirname(os.path.abspath(__file__))
 def get_requirements():
     return [
         'matplotlib<3.0.0',
-        'scikit-image',
-        'shapely',
+        'scikit-image==0.16.2',
         'trimesh>=3.0',
         'scipy==1.4.1',
-        'sphinx==2.2.0',    # pinned to resolve issue with docutils 0.16b0.dev
-        'pytest>=4.6',
-        'pytest-cov>=2.7',
-        'tqdm',
-        'pytest',
-        'pptk',
-        'autopep8',
-        'flake8',
+        'tqdm==4.32.1',
+        'pptk==0.1.0',
         'pillow<7.0.0',
     ]
 
