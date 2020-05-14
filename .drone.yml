@@ -13,7 +13,7 @@ steps:
                 flake8-mypy==17.8.0 \
                 flake8-pyi==19.3.0 \
                 pytest==5.4.2 \
-                pycov==2.8.1
+                pytest-cov==2.8.1
   - pip install --no-dependencies -r requirements.txt
   - apt-get update && apt-get -y install libglib2.0-0  # needed by opencv
   - flake8 --config=.flake8 .
