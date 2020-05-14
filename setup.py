@@ -57,7 +57,7 @@ if torch_ver < parse_version('1.2.0') or torch_ver >= parse_version('1.5.0'):
 # Check that torchvision version installed meets minimum requirements
 torchvision_ver = parse_version(torchvision.__version__)
 if torchvision_ver < parse_version('0.4.0') or torchvision_ver >= parse_version('0.6.0'):
-    logger.warning(f'Kaolin is tested with torchvision >=0.4.0, <0.6.0 Found version (torchvision.__version__) instead.')
+    logger.warning(f'Kaolin is tested with torchvision >=0.4.0, <0.6.0 Found version {torchvision.__version__} instead.')
 
 # Get version number from version.py
 version = {}
