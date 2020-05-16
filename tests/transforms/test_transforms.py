@@ -51,6 +51,11 @@ def test_translate_pointcloud(device='cpu'):
     translate = kal.transforms.TranslatePointCloud(tmat)
     pc_ = translate(pc)
     assert_allclose(pc_, torch.zeros(4, 3))
+    pc = torch.ones(4, 2)
+    tmat = torch.tensor([[-1.0,-1.0]])
+    translate = kal.transforms.TranslatePointCloud(tmat)
+    pc_ = translate(pc)
+    assert_allclose(pc_, torch.zeros(4, 2))
 
 
 def test_rotate_pointcloud(device='cpu'):

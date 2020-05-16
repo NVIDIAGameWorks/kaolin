@@ -207,14 +207,10 @@ class ShiftPointCloud(Transform):
     Args:
         shf (int or float or torch.Tensor): Shift pofactorint by which input
             clouds are to be shifted.
-        inplace (bool, optional): Whether or not the transformation should be
-            in-place (default: True).
     """
 
-    def __init__(self, shf: Union[int, float, torch.Tensor],
-                 inplace: Optional[bool] = True):
+    def __init__(self, shf: Union[int, float, torch.Tensor]):
         self.shf = shf
-        self.inplace = inplace
     
     def __call__(self, cloud: Union[torch.Tensor, PointCloud]):
         """
@@ -224,7 +220,7 @@ class ShiftPointCloud(Transform):
         Returns:
             (torch.Tensor or PointCloud): Shifted pointcloud.
         """
-        return pcfunc.shift(cloud, shf=self.shf, inplace=self.inplace)
+        return pcfunc.shift(cloud, shf=self.shf)
 
 
 class ScalePointCloud(Transform):
@@ -268,25 +264,28 @@ class TranslatePointCloud(Transform):
     Args:
         tranmat (torch.Tensor): Translation matrix that specifies the translation 
             to be applied to the pointcloud (shape: :math:`1 \times 3`).
-        inplace (bool, optional): Bool to make this operation in-place.
 
-    TODO: Example.
-
+    Example:
+        import kaolin.transforms as tfs
+        tranmat = torch.ones(1,3)
+        translate_fn = tfs.TranslatePointCloud(tranmat)
+        pc = torch.rand(1000,3)
+        translated_pc = translate_fn(pc)
     """
 
-    def __init__(self, tranmat: torch.Tensor, inplace: Optional[bool] = True):
+    def __init__(self, tranmat: torch.Tensor):
         self.tranmat = tranmat
-        self.inplace = inplace
 
     def __call__(self, cloud: Union[torch.Tensor, PointCloud]):
         """
         Args:
-            cloud (torch.Tensor or PointCloud): Input pointcloud to be translated.
+            cloud (torch.Tensor or kaolin.rep.PointCloud): Input pointcloud 
+            to be translated.
 
         Returns:
-            (torch.Tensor or PointCloud): Translated pointcloud.
+            (torch.Tensor or kaolin.rep.PointCloud): Translated pointcloud.
         """
-        return pcfunc.translate(cloud, tranmat=self.tranmat, inplace=self.inplace)
+        return pcfunc.translate(cloud, tranmat=self.tranmat)
 
 
 class RotatePointCloud(Transform):

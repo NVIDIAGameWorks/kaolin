@@ -26,17 +26,16 @@ EPS = 1e-6
 
 
 def shift(cloud: Union[torch.Tensor, PointCloud],
-          shf: Union[float, int, torch.Tensor],
-          inplace: Optional[bool] = True):
+          shf: Union[float, int, torch.Tensor]):
     """Shift the input pointcloud by a shift factor.
 
     Args:
         cloud (torch.Tensor or kaolin.rep.PointCloud): pointcloud (ndims >= 2).
-        shf (float, int, torch.Tensor): shift factor (scaler, or tensor).
+        shf (float, int, torch.Tensor): shift factor (scalar, or tensor).
         inplace (bool, optional): Bool to make the transform in-place
     
     Returns:
-        (torch.Tensor): shifted pointcloud pf the same shape as input.
+        (torch.Tensor): shifted pointcloud of the same shape as input.
     
     Shape:
         - cloud: :math:`(B x N x D)` (or) :math:`(N x D)`, where :math:`(B)`
@@ -48,25 +47,15 @@ def shift(cloud: Union[torch.Tensor, PointCloud],
         >>> points = torch.rand(1000,3)
         >>> points2 = shift(points, torch.FloatTensor([3]))
     """
-
-    if isinstance(cloud, np.ndarray):
-        cloud = torch.from_numpy(cloud)
-    
-    if isinstance(shf, np.ndarray):
-        shf = torch.from_numpy(shf)
-    
     if isinstance(cloud, PointCloud):
         cloud = cloud.points
     
     if isinstance(shf, int) or isinstance(shf, float):
-        shf = torch.Tensor([shf]).to(cloud.device)
+        shf = torch.Tensor([shf], device=cloud.device)
     
     helpers._assert_tensor(cloud)
     helpers._assert_tensor(shf)
     helpers._assert_dim_ge(cloud, 2)
-
-    if not inplace:
-        cloud = cloud.clone()
 
     return shf + cloud
 
@@ -96,18 +85,11 @@ def scale(cloud: Union[torch.Tensor, PointCloud],
         >>> points2 = scale(points, torch.FloatTensor([3]))
 
     """
-
-    if isinstance(cloud, np.ndarray):
-        cloud = torch.from_numpy(cloud)
-
-    if isinstance(scf, np.ndarray):
-        scf = torch.from_numpy(scf)
-
     if isinstance(cloud, PointCloud):
         cloud = cloud.points
 
     if isinstance(scf, int) or isinstance(scf, float):
-        scf = torch.Tensor([scf]).to(cloud.device)
+        scf = torch.Tensor([scf], device=cloud.device)
 
     helpers._assert_tensor(cloud)
     helpers._assert_tensor(scf)
@@ -120,16 +102,15 @@ def scale(cloud: Union[torch.Tensor, PointCloud],
     return scf * cloud
 
 
-def translate(cloud: Union[torch.Tensor, PointCloud], tranmat: torch.Tensor,
-              inplace: Optional[bool] = True):
+def translate(cloud: Union[torch.Tensor, PointCloud], tranmat: torch.Tensor):
     """Translate the input pointcloud by a translation matrix.
 
     Args:
-        cloud (Tensor or np.array): pointcloud (ndims = 2 or 3)
-        tranmat (Tensor or np.array): translation matrix (1 x 3, 1 per cloud).
+        cloud (torch.Tensor or kaolin.rep.PointCloud): pointcloud (ndims = 2 or 3)
+        tranmat (torch.Tensor or np.array): translation matrix (1 x 3, 1 per cloud).
 
     Returns:
-        cloud_tran (Tensor): Translated pointcloud of the same shape as input.
+        (torch.Tensor): Translated pointcloud of the same shape as input.
 
     Shape:
         - cloud: :math:`(B x N x 3)` (or) :math:`(N x 3)`, where :math:`(B)`
@@ -143,8 +124,6 @@ def translate(cloud: Union[torch.Tensor, PointCloud], tranmat: torch.Tensor,
         >>> points2 = translate(points, t_mat)
 
     """
-    if isinstance(cloud, np.ndarray):
-        cloud = torch.from_numpy(cloud)
     if isinstance(cloud, PointCloud):
         cloud = cloud.points
     if isinstance(tranmat, np.ndarray):
@@ -154,33 +133,24 @@ def translate(cloud: Union[torch.Tensor, PointCloud], tranmat: torch.Tensor,
     helpers._assert_tensor(tranmat)
     helpers._assert_dim_ge(cloud, 2)
     helpers._assert_dim_ge(tranmat, 2)
-    # Rotation matrix must have last two dimensions of shape 3.
-    helpers._assert_shape_eq(tranmat, (1, 3), dim=-1)
-    helpers._assert_shape_eq(tranmat, (1, 3), dim=-2)
+    helpers._assert_dim_le(cloud, 3)
+    helpers._assert_dim_le(tranmat, 3)
+    # Translation matrix and cloud last dimension must be equal
+    helpers._assert_shape_eq(tranmat, cloud.shape, dim=-1)
 
-    if not inplace:
-        cloud = cloud.clone()
-
-    if tranmat.dim() == 2 and cloud.dim() == 2:
-        cloud = torch.add(tranmat, cloud)
-    else:
-        if tranmat.dim() == 2:
-            tranmat = tranmat.expand(cloud.shape[0], 1, 3)
-        cloud = torch.add(tranmat, cloud)
-
-    return cloud
+    return torch.add(tranmat, cloud)
 
 def rotate(cloud: Union[torch.Tensor, PointCloud], rotmat: torch.Tensor,
            inplace: Optional[bool] = True):
     """Rotates the the input pointcloud by a rotation matrix.
 
     Args:
-        cloud (Tensor or np.array): pointcloud (ndims = 2 or 3)
-        rotmat (Tensor or np.array): rotation matrix (3 x 3, 1 per cloud).
+        cloud (torch.Tensor or kaolin.rep.PointCloud): pointcloud (ndims = 2 or 3)
+        rotmat (torch.Tensor or np.array): rotation matrix (3 x 3, 1 per cloud).
         inplace (bool, optional): Bool to make the transform in-place.
 
     Returns:
-        cloud_rot (Tensor): rotated pointcloud of the same shape as input
+        (torch.Tensor): rotated pointcloud of the same shape as input
 
     Shape:
         - cloud: :math:`(B x N x 3)` (or) :math:`(N x 3)`, where :math:`(B)`
@@ -194,8 +164,6 @@ def rotate(cloud: Union[torch.Tensor, PointCloud], rotmat: torch.Tensor,
         >>> points2 = rotate(points, r_mat)
 
     """
-    if isinstance(cloud, np.ndarray):
-        cloud = torch.from_numpy(cloud)
     if isinstance(cloud, PointCloud):
         cloud = cloud.points
     if isinstance(rotmat, np.ndarray):
@@ -229,15 +197,15 @@ def realign(src: Union[torch.Tensor, PointCloud],
     box as that of pointcloud `tgt`.
 
     Args:
-        src (torch.Tensor or PointCloud) : Source pointcloud to be transformed
-            (shape: :math:`\cdots \times N \times D`, where :math:`N` is the
-            number of points in the pointcloud, and :math:`D` is the
-            dimensionality of each point in the cloud).
-        tgt (torch.Tensor or PointCloud) : Target pointcloud to which `src`is
-            to be transformed (The `src` cloud is transformed to the
-            axis-aligned bounding box that the target cloud maps to). This
-            cloud must have the same number of dimensions :math:`D` as in the
-            source cloud. (shape: :math:`\cdots \times \cdots \times D`).
+        src ((torch.Tensor or kaolin.rep.PointCloud)) : Source pointcloud to
+             be transformed (shape: :math:`\cdots \times N \times D`, where 
+             :math:`N` is the number of points in the pointcloud, and :math:`D`
+             is the dimensionality of each point in the cloud).
+        tgt ((torch.Tensor or kaolin.rep.PointCloud)) : Target pointcloud to 
+            which `src`is to be transformed (The `src` cloud is transformed 
+            to the axis-aligned bounding box that the target cloud maps to). 
+            This cloud must have the same number of dimensions :math:`D` as 
+            in the source cloud. (shape: :math:`\cdots \times \cdots \times D`).
         inplace (bool, optional): Bool to make the transform in-place.
 
     Returns:
@@ -279,20 +247,17 @@ def normalize(cloud: Union[torch.Tensor, PointCloud],
     deviation. For batched clouds, each cloud is independently normalized.
 
     Args:
-        cloud (torch.Tensor or PointCloud): Input pointcloud to be normalized
-            (shape: :math:`B \times \cdots \times N \times D`, where :math:`B`
-            is the batchsize (optional), :math:`N` is the number of points in
-            the cloud, and :math:`D` is the dimensionality of the cloud.
+        cloud (torch.Tensor or kaolin.rep.PointCloud): Input pointcloud to
+            be normalized (shape: :math:`B \times \cdots \times N \times D`, 
+            where :math:`B` is the batchsize (optional), :math:`N` is the 
+            number of points in the cloud, and :math:`D` is the dimensionality
+            of the cloud. 
         inplace (bool, optional): Bool to make the transform in-place.
 
     Returns:
-        (torch.Tensor or PointCloud): The normalized pointcloud.
+        (torch.Tensor or kaolin.rep.PointCloud): The normalized pointcloud.
 
     """
-
-    if isinstance(cloud, np.ndarray):
-        cloud = torch.from_numpy(cloud)
-
     helpers._assert_tensor(cloud)
     helpers._assert_dim_ge(cloud, 2)
     if not inplace:
