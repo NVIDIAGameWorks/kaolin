@@ -32,7 +32,6 @@ def shift(cloud: Union[torch.Tensor, PointCloud],
     Args:
         cloud (torch.Tensor or kaolin.rep.PointCloud): pointcloud (ndims >= 2).
         shf (float, int, torch.Tensor): shift factor (scalar, or tensor).
-        inplace (bool, optional): Bool to make the transform in-place
     
     Returns:
         (torch.Tensor): shifted pointcloud of the same shape as input.
@@ -44,8 +43,10 @@ def shift(cloud: Union[torch.Tensor, PointCloud],
         - shf: :math:`(1)` or :math:`(B)`.
 
     Example:
-        >>> points = torch.rand(1000,3)
-        >>> points2 = shift(points, torch.FloatTensor([3]))
+        >>> points = torch.tensor([[0., 0., 0.], 
+                                  [1., 2., 3.],
+                                  [2., 3., 4.]])
+        >>> points2 = shift(points, 3)
     """
     if isinstance(cloud, PointCloud):
         cloud = cloud.points
@@ -119,7 +120,9 @@ def translate(cloud: Union[torch.Tensor, PointCloud], tranmat: torch.Tensor):
         - tranmat: :math:`(1, 3)` or :math:`(B, 1, 3)`.
 
     Example:
-        >>> points = torch.rand(1000,3)
+        >>> points = torch.tensor([[0., 0., 0.], 
+                                  [1., 2., 3.],
+                                  [2., 3., 4.]])
         >>> t_mat = torch.rand(1,3)
         >>> points2 = translate(points, t_mat)
 

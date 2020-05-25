@@ -205,7 +205,7 @@ class ShiftPointCloud(Transform):
     ``cloud = shf + cloud``
 
     Args:
-        shf (int or float or torch.Tensor): Shift pofactorint by which input
+        shf (int or float or torch.Tensor): Shift factor by which input
             clouds are to be shifted.
     """
 
