@@ -1,3 +1,17 @@
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 
 from torch.utils.data import DataLoader
@@ -27,13 +41,13 @@ transform = tfs.Compose([
 ])
 
 train_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories,
-                                   split='train', transform=transform, device=args.device),
+                                   split='train', transform=transform),
                           batch_size=args.batch_size, shuffle=True)
 
 val_loader = DataLoader(ModelNet(args.modelnet_root, categories=args.categories,
-                                 split='test', transform=transform, device=args.device),
+                                 split='test', transform=transform),
                         batch_size=args.batch_size)
 
 model = PointNetClassifier(num_classes=len(args.categories))
-engine = ClassificationEngine(model, train_loader, val_loader, device=args.device)
+engine = ClassificationEngine(model, train_loader, val_loader)
 engine.fit()

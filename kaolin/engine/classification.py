@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -171,7 +171,9 @@ class ClassificationEngine(Engine):
             batch (tuple): One mini-batch of training data.
 
         """
-        data, label = batch
+        data, attr = batch
+        data = data.to(self.device)
+        label = attr['category'].to(self.device)
         pred = self.model(data)
         loss = self.criterion(pred, label.view(-1))
         self.train_loss_cur_epoch += loss.item()
@@ -188,7 +190,9 @@ class ClassificationEngine(Engine):
             batch (tuple): One mini-batch of validateion data.
 
         """
-        data, label = batch
+        data, attr = batch
+        data = data.to(self.device)
+        label = attr['category'].to(self.device)
         pred = self.model(data)
         loss = self.criterion(pred, label.view(-1))
         self.val_loss_cur_epoch += loss.item()
