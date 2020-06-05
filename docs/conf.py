@@ -67,9 +67,7 @@ autodoc_mock_imports = ['kaolin.cuda.ball_query',
                         'kaolin.cuda.mesh_intersection',
                         'kaolin.graphics.nmr.cuda.rasterize_cuda',
                         'kaolin.graphics.softras.soft_rasterize_cuda',
-                        'kaolin.graphics.dib_renderer.cuda.rasterizer',
-                        'graphics.nmr.cuda.rasterize_cuda',
-                        'graphics.softras.soft_rasterize_cuda']
+                        'kaolin.graphics.dib_renderer.cuda.rasterizer']
 
 
 # Add any paths that contain templates here, relative to this directory.
