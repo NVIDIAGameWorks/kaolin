@@ -37,6 +37,7 @@ class SHREC16(KaolinDataset):
             are loaded by default.
         train (bool): If True, return the train split, else return the test
             split (default: True).
+
     Returns:
         .. code-block::
 
@@ -47,12 +48,9 @@ class SHREC16(KaolinDataset):
 
         path: The filepath to the .obj file on disk.
         category: A human-readable string describing the loaded sample.
-        label: An integer (in the range :math:`[0, \text{len(categories)}]`)
-            and can be used for training classifiers for example.
-        vertices: Vertices of the loaded mesh (:math:`(*, 3)`), where :math:`*`
-            indicates a positive integer.
-        faces: Faces of the loaded mesh (:math:`(*, 3)`), where :math:`*`
-            indicates a positive integer.
+        label: An integer (in the range :math:`[0, \text{len(categories)}]`) and can be used for training classifiers for example.
+        vertices: Vertices of the loaded mesh (:math:`(*, 3)`), where :math:`*` indicates a positive integer.
+        faces: Faces of the loaded mesh (:math:`(*, 3)`), where :math:`*` indicates a positive integer.
 
     Example:
         >>> dataset = SHREC16(root='/path/to/SHREC16/', categories=['alien', 'ants'], train=False)

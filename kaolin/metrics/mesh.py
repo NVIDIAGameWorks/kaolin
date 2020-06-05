@@ -79,20 +79,21 @@ class TriangleDistance(torch.nn.Module):
 def chamfer_distance(mesh1: Mesh, mesh2: Mesh,
                      w1: float = 1., w2: float = 1., num_points=3000):
     r""" computes the chamfer distance bewteen two meshes by sampling the two surfaces
+
     Args:
-            mesh1: (Mesh): first mesh
-            mesh2: (Mesh): second mesh
-            w1: (float): weighting of forward direction
-            w2: (float): weighting of backward direction
-            num_points: number of points to sample on each mesh
+        mesh1 (Mesh): first mesh
+        mesh2 (Mesh): second mesh
+        w1 (float): weighting of forward direction
+        w2 (float): weighting of backward direction
+        num_points (int): number of points to sample on each mesh
 
     Returns:
-            chamfer_distance (torch.Tensor): chamfer distance
+        chamfer_distance (torch.Tensor): chamfer distance
 
     Example:
-            >>> mesh1 = TriangleMesh.from_obj(file1)
-            >>> mesh2 = TriangleMesh.from_obj(file2)
-            >>> distance = chamfer_distance(mesh1, mesh2, 500)
+        >>> mesh1 = TriangleMesh.from_obj(file1)
+        >>> mesh2 = TriangleMesh.from_obj(file2)
+        >>> distance = chamfer_distance(mesh1, mesh2, 500)
 
     """
 
@@ -105,14 +106,14 @@ def edge_length(mesh: Mesh):
     r"""Returns the average length of a face in a mesh
 
     Args:
-            mesh (Mesh): mesh over which to calcuale edge length
+        mesh (Mesh): mesh over which to calcuale edge length
 
     Returns:
-            edge_length (torch.Tensor): averge lenght of mesh edge
+        edge_length (torch.Tensor): averge lenght of mesh edge
 
     Example:
-            >>> mesh  = TriangleMesh.from_obj(file)
-            >>> length = edge_length(mesh)
+        >>> mesh  = TriangleMesh.from_obj(file)
+        >>> length = edge_length(mesh)
 
     """
 
@@ -136,18 +137,18 @@ def laplacian_loss(mesh1: Mesh, mesh2: Mesh):
     r"""Returns the change in laplacian over two meshes
 
     Args:
-            mesh1 (Mesh): first mesh
-            mesh2: (Mesh): second mesh
+        mesh1 (Mesh): first mesh
+        mesh2: (Mesh): second mesh
 
 
     Returns:
-            lap_loss (torch.Tensor):  laplacian change over the mesh
+        lap_loss (torch.Tensor):  laplacian change over the mesh
 
     Example:
-            >>> mesh1 = TriangleMesh.from_obj(file)
-            >>> mesh2 = TriangleMesh.from_obj(file)
-            >>> mesh2.vertices = mesh2.vertices * 1.05
-            >>> lap = laplacian_loss(mesh1, mesh2)
+        >>> mesh1 = TriangleMesh.from_obj(file)
+        >>> mesh2 = TriangleMesh.from_obj(file)
+        >>> mesh2.vertices = mesh2.vertices * 1.05
+        >>> lap = laplacian_loss(mesh1, mesh2)
 
     """
 
@@ -161,16 +162,16 @@ def point_to_surface(points: torch.Tensor, mesh: Mesh):
     r"""Computes the minimum distances from a set of points to a mesh
 
     Args:
-            points (torch.Tensor): set of points
-            mesh (Mesh): mesh to calculate distance
+        points (torch.Tensor): set of points
+        mesh (Mesh): mesh to calculate distance
 
     Returns:
-            distance: mean distance between points and surface
+        distance: mean distance between points and surface
 
     Example:
-            >>> mesh = TriangleMesh.from_obj(file)
-            >>> points = torch.rand(1000,3)
-            >>> loss = point_to_surface(points, mesh)
+        >>> mesh = TriangleMesh.from_obj(file)
+        >>> points = torch.rand(1000,3)
+        >>> loss = point_to_surface(points, mesh)
 
     """
 

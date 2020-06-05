@@ -110,10 +110,10 @@ class CacheCompose(Transform):
     If the pipeline is already cached, data is returned from disk,
     otherwise, data is converted following the provided transforms.
 
-        Args:
-            transforms (Iterable): List of transforms to compose.
-            cache_dir (str): Directory where objects will be cached. Default
-                             to 'cache'.
+    Args:
+        transforms (Iterable): List of transforms to compose.
+        cache_dir (str): Directory where objects will be cached. Default
+                            to 'cache'.
     """
 
     __ignored_params__ = ['cache_dir', 'cached_ids']

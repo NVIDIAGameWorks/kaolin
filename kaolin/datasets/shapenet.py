@@ -87,6 +87,7 @@ def _convert_categories(categories):
 
 class ShapeNet_Meshes(data.Dataset):
     r"""ShapeNet Dataset class for meshes.
+
     Args:
         root (str): Path to the root directory of the ShapeNet dataset.
         categories (str): List of categories to load from ShapeNet. This list may

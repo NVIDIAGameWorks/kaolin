@@ -25,6 +25,7 @@ class DifferentiableRenderer(torch.nn.Module):
     A differentiable renderer takes in vertex geometry, faces (usually
     triangles), and optionally texture (and any other information
     deemed relevant), and implements the following main steps.
+
         * Lighting (ambient and optionally, directional lighting, i.e.,
           diffuse/Lambertian reflection, and optionally specular reflection)
         * (Vertex) Shading (Gouraud/Phong/etc.)

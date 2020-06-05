@@ -28,7 +28,7 @@ class PointNetFeatureExtractor(nn.Module):
     .. note::
 
         If you use this code, please cite the original paper in addition to Kaolin.
-        
+
         .. code-block::
 
             @article{qi2016pointnet,
@@ -203,7 +203,7 @@ class PointNetClassifier(nn.Module):
     .. note::
 
         If you use this code, please cite the original paper in addition to Kaolin.
-        
+
         .. code-block::
 
             @article{qi2016pointnet,
@@ -229,7 +229,7 @@ class PointNetClassifier(nn.Module):
             layers in the feature extractor is implicitly parsed from
             this variable.
         activation (function): Nonlinearity to be used as activation
-                    function after each batchnorm (default: F.relu)
+            function after each batchnorm (default: F.relu)
         batchnorm (bool): Whether or not to use batchnorm layers
             (default: True)
         transposed_input (bool): Whether the input's second and third dimension
@@ -239,12 +239,12 @@ class PointNetClassifier(nn.Module):
 
     Example:
 
-        pointnet = PointNetClassifier(in_channels=6, feat_size=1024,
-                                      feat_layer_dims=[32, 64, 256],
+        >>> pointnet = PointNetClassifier(in_channels=6, feat_size=1024, \
+                                      feat_layer_dims=[32, 64, 256], \
                                       classifier_layer_dims=[500, 200, 100])
-        x = torch.rand(5, 6, 30)
-        y = pointnet(x)
-        print(y.shape)
+        >>> x = torch.rand(5, 6, 30)
+        >>> y = pointnet(x)
+        >>> print(y.shape)
 
     """
 
@@ -368,7 +368,7 @@ class PointNetSegmenter(nn.Module):
     .. note::
 
         If you use this code, please cite the original paper in addition to Kaolin.
-        
+
         .. code-block::
 
             @article{qi2016pointnet,
@@ -394,7 +394,7 @@ class PointNetSegmenter(nn.Module):
             layers in the feature extractor is implicitly parsed from
             this variable.
         activation (function): Nonlinearity to be used as activation
-                    function after each batchnorm (default: F.relu)
+            function after each batchnorm (default: F.relu)
         batchnorm (bool): Whether or not to use batchnorm layers
             (default: True)
         transposed_input (bool): Whether the input's second and third dimension
@@ -404,12 +404,12 @@ class PointNetSegmenter(nn.Module):
 
     Example:
 
-        pointnet = PointNetSegmenter(in_channels=6, feat_size=1024,
-                                         feat_layer_dims=[32, 64, 256],
+        >>> pointnet = PointNetSegmenter(in_channels=6, feat_size=1024, \
+                                         feat_layer_dims=[32, 64, 256], \
                                          classifier_layer_dims=[500, 200, 100])
-        x = torch.rand(5, 6, 30)
-        y = pointnet(x)
-        print(y.shape)
+        >>> x = torch.rand(5, 6, 30)
+        >>> y = pointnet(x)
+        >>> print(y.shape)
 
     """
 
