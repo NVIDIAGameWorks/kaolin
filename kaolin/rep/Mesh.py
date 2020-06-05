@@ -589,12 +589,17 @@ class Mesh():
         a homogeneous mesh, i.e., each face has the same number of vertices.
 
         The outputs have the following format: AA, AA_count
-        AA_count: [count_0, ..., count_n]
+
+        AA_count: ``[count_0, ..., count_n]``
+
         with AA:
-        [[aa_{0,0}, ..., aa_{0,count_0} (, -1, ..., -1)],
-         [aa_{1,0}, ..., aa_{1,count_1} (, -1, ..., -1)],
-                    ...
-         [aa_{n,0}, ..., aa_{n,count_n} (, -1, ..., -1)]]
+
+        .. code-block::
+
+            [[aa_{0,0}, ..., aa_{0,count_0} (, -1, ..., -1)],
+            [aa_{1,0}, ..., aa_{1,count_1} (, -1, ..., -1)],
+                        ...
+            [aa_{n,0}, ..., aa_{n,count_n} (, -1, ..., -1)]]
         """
 
         device = vertices.device

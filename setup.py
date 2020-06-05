@@ -146,6 +146,8 @@ def get_extensions():
 
     # If building with readthedocs, don't compile CUDA extensions
     if os.getenv('READTHEDOCS') != 'True':
+        # For every cuda extension, ensure that their is a corresponding function in
+        # docs/conf.py under `autodoc_mock_imports`.
         cuda_extensions = [
             KaolinCUDAExtension('kaolin.cuda.load_textures', [
                 'kaolin/cuda/load_textures_cuda.cpp',

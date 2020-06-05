@@ -45,9 +45,10 @@ class KaolinDatasetMeta(type):
             - 'cache_dir': path to the cached preprocessed data.
             - 'num_workers': number of process used in parallel for preprocessing (default: number of cores)
         preprocessing_transform (Callable): Called on the outputs of _get_data over the indices
-                                            from 0 to len(self) during the construction of the dataset,
-                                            the preprocessed outputs are then cached to 'cache_dir'.
+            from 0 to len(self) during the construction of the dataset,
+            the preprocessed outputs are then cached to 'cache_dir'.
         transform (Callable): Called on the preprocessed data at __getitem__.
+
         no_progress (bool): disable tqdm progress bar for preprocessing."""
         return type.__new__(metacls, cls_name, base_cls, class_dict)
 

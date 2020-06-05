@@ -21,7 +21,7 @@ with open('../kaolin/version.py', 'r') as f:
             kal_version = row.split("'")[-2]
             break
 
-sys.path.append('../')
+# sys.path.append('../')
 sys.path.append(os.path.abspath(os.path.join(
     os.path.dirname(__file__), '..', 'kaolin')))
 # import sphinx_rtd_theme
@@ -65,7 +65,9 @@ autodoc_mock_imports = ['kaolin.cuda.ball_query',
                         'kaolin.cuda.three_nn',
                         'kaolin.cuda.tri_distance',
                         'kaolin.cuda.mesh_intersection',
-                        'kaolin.graphics.nmr.cuda.rasterize_cuda']
+                        'kaolin.graphics.nmr.cuda.rasterize_cuda',
+                        'kaolin.graphics.softras.soft_rasterize_cuda',
+                        'kaolin.graphics.dib_renderer.cuda.rasterizer']
 
 
 # Add any paths that contain templates here, relative to this directory.

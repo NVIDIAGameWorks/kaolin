@@ -108,8 +108,7 @@ class QuadMesh(Mesh):
 
             Returns:
                 points (torch.Tensor): uniformly sampled points
-                face_choices (torch.Tensor): the face idexes which each point
-                    corresponds to.
+                face_choices (torch.Tensor): the face indexes which each point corresponds to.
 
             Example:
                 >>> points, chosen_faces = mesh.sample(10)

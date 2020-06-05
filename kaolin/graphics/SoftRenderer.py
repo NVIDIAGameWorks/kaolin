@@ -59,6 +59,7 @@ class SoftRenderer(DifferentiableRenderer):
         If you use this code, please cite the original paper in addition to Kaolin.
 
         .. code-block::
+
             @article{liu2019softras,
               title={Soft Rasterizer: A Differentiable Renderer for Image-based 3D Reasoning},
               author={Liu, Shichen and Li, Tianye and Chen, Weikai and Li, Hao},

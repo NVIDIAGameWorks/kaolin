@@ -27,10 +27,8 @@ class ModelNet(KaolinDataset):
 
     Args:
         root (str): Path to the base directory of the ModelNet dataset.
-        split (str, optional): Split to load ('train' vs 'test',
-            default: 'train').
-        categories (iterable, optional): List of categories to load
-            (default: ['chair']).
+        split (str, optional): Split to load ('train' vs 'test', default: 'train').
+        categories (iterable, optional): List of categories to load (default: ['chair']).
 
     Examples:
         >>> dataset = ModelNet(root='data/ModelNet')
@@ -45,10 +43,8 @@ class ModelNet(KaolinDataset):
 
         Args:
             root (str): Path to the base directory of the ModelNet dataset.
-            split (str, optional): Split to load ('train' vs 'test',
-                default: 'train').
-            categories (iterable, optional): List of categories to load
-                (default: ['chair']).
+            split (str, optional): Split to load ('train' vs 'test', default: 'train').
+            categories (iterable, optional): List of categories to load (default: ['chair']).
         """
 
         assert split.lower() in ['train', 'test']
