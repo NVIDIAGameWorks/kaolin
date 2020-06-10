@@ -1,11 +1,17 @@
 import os
+import sys
 import pytest
 import torch
 from pathlib import Path
 
 from kaolin.rep import TriangleMesh, VoxelGrid, PointCloud
 from kaolin.conversions.meshconversions import trianglemesh_to_pointcloud, trianglemesh_to_voxelgrid
-from kaolin.visualize.vis_usd import VisUsd
+
+# Skip test if import fails unless on CI and not on Windows
+if os.environ.get('CI') and not sys.platform == 'win32':
+    from kaolin.visualize.vis_usd import VisUsd
+else:
+    VisUsd = pytest.importorskip('kaolin.visualize.vis_usd.VisUsd', reason='The pxr library could not be imported')
 
 root = Path('tests/visualize/results')
 root.mkdir(exist_ok=True)

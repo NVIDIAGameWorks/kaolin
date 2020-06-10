@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import sys
 import pytest
 import shutil
 from pathlib import Path
 
-from kaolin.datasets.usdfile import USDMeshes
-
+# Skip test if import fails unless on CI and not on Windows
+if os.environ.get('CI') and not sys.platform == 'win32':
+    from kaolin.datasets.usdfile import USDMeshes
+else:
+    VisUsd = pytest.importorskip('kaolin.datasets.usdfile.USDMeshes', reason='The pxr library could not be imported')
 
 def test_usd_meshes():
     fpath = './tests/model.usd'

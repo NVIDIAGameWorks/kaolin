@@ -69,7 +69,7 @@ class NeuralMeshRenderer(nn.Module):
                  light_color_ambient=None,
                  light_color_directional=None,
                  light_direction=None):
-        """Initialize the NeuralMeshRenderer.
+        r"""Initialize the NeuralMeshRenderer.
 
         NOTE: NeuralMeshRenderer works only in GPU mode!
 

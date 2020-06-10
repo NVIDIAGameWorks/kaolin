@@ -58,13 +58,13 @@ Kaolin curates a large _model zoo_ containing reference implementations of popul
 
 > **NOTE**: The API is currently somewhat unstable, as we're making constant changes. (It's a beta release)
 
+See supplemental section `Windows Build` for instructions specific to that platform.
+
 ### Requirements
 - Linux
 - Python == 3.6
 - CUDA >= 10.0.130 (with `nvcc` installed)
 - Display Driver >= 410.48
-
-Windows support is in the works and is currently considered experimental.
 
 ### Dependencies
 - numpy >= 1.17, <1.18.4
@@ -114,6 +114,35 @@ To verify that `kaolin` has been installed, fire up your python interpreter, and
 >>> import kaolin as kal
 >>> print(kal.__version__)
 ```
+
+### Windows Build
+
+Windows support is currently considered experimental.
+
+> **NOTE**: USD support is currently unimplemented on this platform.
+
+#### Prerequisites
+
+* Visual Studio 2019 (2017 untested)
+* Anaconda 3
+
+#### Building
+
+Perform from within a `Anaconda Prompt (Anaconda3)`:
+* `conda create --name kaolin python=3.6`
+* `conda activate kaolin`
+* `conda install pytorch torchvision cudatoolkit=10.2 -c pytorch`
+* Execute the `vcvars64.bat` batch file corresponding to the installed version of Visual Studio (Example: `%comspec% /k "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\VC\Auxiliary\Build\vcvars64.bat"`)
+* `python setup.py build_ext --inplace`
+* `python setup.py install`
+* `pip install --no-dependencies nuscenes-devkit opencv-python-headless scikit-learn joblib pyquaternion cachetools`
+
+#### Verifying Build
+
+From within the previously created kaolin conda environment:
+* `python -c "import kaolin; print(kaolin.__version__)"`
+* `pytest tests/`
+
 
 ### Building the Documentation
 
