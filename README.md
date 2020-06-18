@@ -141,6 +141,7 @@ Perform from within a `Anaconda Prompt (Anaconda3)`:
 
 From within the previously created kaolin conda environment:
 * `python -c "import kaolin; print(kaolin.__version__)"`
+* `conda install -c anaconda pytest`
 * `pytest tests/`
 
 
@@ -159,6 +160,7 @@ To run unittests, from the root directory of the repository (i.e., the directory
 
 ```bash
 $ . setenv.sh
+$ conda install -c anaconda pytest
 $ pytest tests/
 ```
 
