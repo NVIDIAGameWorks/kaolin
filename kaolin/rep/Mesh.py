@@ -944,6 +944,24 @@ class Mesh():
 
         kal.visualize.show_mesh(self)
 
+    def save_image(self, filename='mesh_image', resolution=(1080, 1080)):
+        r""" Saves the mesh image in png format. The extension is added automatically.
+
+        Args:
+            filename: the file name to save the file under
+            resulution: The resolution of the image to be saved
+
+            Example:
+                >>> mesh = Mesh.from_obj('model.obj')
+                >>> mesh.save_image('mesh_image')
+
+        """
+
+        png = kal.visualize.save_mesh_image(self, filename=filename,
+                                            resolution=resolution)
+
+        return png
+
     def save_tensors(self, filename: (str)):
         r"""Saves the tensor information of the mesh in a numpy .npz format.
 
