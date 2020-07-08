@@ -133,7 +133,7 @@ def trianglemesh_to_voxelgrid(mesh: kaolin.rep.Mesh, resolution: int,
     del(v1, v2, v3)
 
     voxel = torch.zeros((resolution, resolution, resolution))
-    points = (points * (resolution - 1)).long()
+    points = (points * (resolution - 1) + resolution / 2).long()
     points = torch.split(points.permute(1, 0), 1, dim=0)
     points = [m.unsqueeze(0) for m in points]
     voxel[points] = 1
