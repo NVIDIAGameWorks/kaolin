@@ -56,7 +56,8 @@ synset_to_label = {'04379243': 'table', '03211117': 'monitor', '04401088': 'phon
                    '03642806': 'laptop', '03710193': 'mailbox', '03761084': 'microwave',
                    '03928116': 'piano', '03938244': 'pillow', '03948459': 'pistol',
                    '04004475': 'printer', '04099429': 'rocket', '04256520': 'sofa',
-                   '04554684': 'washer', '04090263': 'rifle', '02946921': 'can'}
+                   '04554684': 'washer', '04090263': 'rifle', '02946921': 'can',
+                   '03797390': 'mug'}
 
 # Label to Synset mapping (for ShapeNet core classes)
 label_to_synset = {v: k for k, v in synset_to_label.items()}
