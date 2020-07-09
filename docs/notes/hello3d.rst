@@ -44,7 +44,7 @@ Voxels are another popular 3D representation. Think of them as the 3D extension 
 
 .. code-block:: python
 
-    >>> voxels = kal.conversions.trianglemesh_to_voxelgrid(mesh, 32)
+    >>> voxels = kal.conversions.trianglemesh_to_voxelgrid(mesh, 32, vertex_offset=0.5)
 
 To visualize the voxel grid, run
 
