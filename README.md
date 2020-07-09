@@ -10,7 +10,7 @@
 
 **[Documentation](https://kaolin.readthedocs.io/en/latest/)** | **[Paper](https://arxiv.org/abs/1911.05063)**
 
-__Kaolin is an active work-in-progress, we are working toward a stable beta release. Please Watch our github repository for releases to be notified. To start trying our code today see instructions below.__
+__Kaolin is an active work-in-progress, we are working toward a stable beta release. Please Watch our GitHub repository for releases to be notified. To start trying our code today see instructions below.__
 
 Kaolin is a PyTorch library aiming to accelerate 3D deep learning research. Kaolin provides efficient implementations of differentiable 3D modules for use in deep learning systems. With functionality to load and preprocess several popular 3D datasets, and native functions to manipulate meshes, pointclouds, signed distance functions, and voxel grids, Kaolin mitigates the need to write wasteful boilerplate code. Kaolin packages together several differentiable graphics modules including rendering, lighting, shading, and view warping. Kaolin also supports an array of loss functions and evaluation metrics for seamless evaluation and provides visualization functionality to render the 3D results. Importantly, we curate a comprehensive model zoo comprising many state-of-the-art 3D deep learning architectures, to serve as a starting point for future research endeavours.
 
@@ -99,7 +99,7 @@ Note, if modifying or adding Cython files, ensure that Cython is installed and s
 During installation, the *packman* package manager will 
 download the nv-usd package to `~/packman-repo/` containing the necessary packages for reading and writing Universal Scene Description (USD) files. 
 
-Note, if you are using an heterogeneous GPUs setup set the architectures for which you want to compile the cuda code using the environment variable.
+Note, if you are using a heterogeneous GPUs setup set the architectures for which you want to compile the cuda code using the environment variable.
 
 Example:
 ```sh
@@ -128,7 +128,7 @@ Windows support is currently considered experimental.
 
 #### Building
 
-Perform from within a `Anaconda Prompt (Anaconda3)`:
+Perform from within an `Anaconda Prompt (Anaconda3)`:
 * `conda create --name kaolin python=3.6`
 * `conda activate kaolin`
 * `conda install pytorch torchvision cudatoolkit=10.2 -c pytorch`
