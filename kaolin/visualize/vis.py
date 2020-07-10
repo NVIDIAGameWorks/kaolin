@@ -100,7 +100,7 @@ def show_sdf(sdf: kaolin.rep.SDF, mode='mesh', bbox_center: float = 0.,
     assert mode in ['mesh', 'pointcloud', 'sdf']
 
     if mode == 'mesh':
-        verts, faces = kal.conversion.SDF.to_mesh(sdf, bbox_center, bbox_dim)
+        verts, faces = kal.conversions.sdf_to_trianglemesh(sdf, bbox_center, bbox_dim)
         mesh = trimesh.Trimesh(vertices=verts.data.cpu().numpy(),
                                faces=faces.data.cpu().numpy())
         mesh.visual.vertex_colors = colors
