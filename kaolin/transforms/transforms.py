@@ -662,15 +662,18 @@ class TriangleMeshToVoxelGrid(Transform):
             unit cube centered at the origin.
         vertex_offset (float): Offset applied to all vertices after
                                normalizing.
+        voxel_range (float): Range of voxelization.
 
     """
 
     def __init__(self, resolution: int,
                  normalize: bool = True,
-                 vertex_offset: float = 0.):
+                 vertex_offset: float = 0.,
+                 voxel_range: float = 1.):
         self.resolution = resolution
         self.normalize = normalize
         self.vertex_offset = vertex_offset
+        self.voxel_range = voxel_range
 
     def __call__(self, mesh: TriangleMesh):
         """
@@ -684,7 +687,8 @@ class TriangleMeshToVoxelGrid(Transform):
         """
         voxels = cvt.trianglemesh_to_voxelgrid(mesh, self.resolution,
                                                normalize=self.normalize,
-                                               vertex_offset=self.vertex_offset)
+                                               vertex_offset=self.vertex_offset,
+                                               voxel_range=self.voxel_range)
         return voxels
 
 
