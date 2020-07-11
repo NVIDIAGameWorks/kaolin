@@ -46,22 +46,31 @@ def loss_flat(mesh, norms):
 
 def collate_fn(data): 
 	new_data = {}
-	for k in data[0].keys():
+	for k in data[0]['data'].keys():
+		print(k)
 		
-		if k in ['points','norms', 'imgs', 'cam_mat', 'cam_pos', 'sdf_points']:
-			new_info = tuple(d[k] for d in data)
+		if k in ['points','normals','images', 'cam_mat', 'cam_pos', 'sdf_points']:
+			new_info = tuple(d['data'][k] for d in data)
 			new_info = torch.stack(new_info, 0)
+			new_data[k] = new_info
 		elif k in ['adj']: 
 			
 			adj_values = tuple(d[k].coalesce().values() for d in data)
 			adj_indices = tuple(d[k].coalesce().indices() for d in data)
 			new_data['adj_values'] = adj_values
 			new_data['adj_indices'] = adj_indices
-			
-		else: 
-			new_info = tuple(d[k] for d in data)
+			new_data[k] = new_info
+		elif k in ['params']:
+			for j in data[0]['data']['params'].keys():
+				if j in ['cam_mat', 'cam_pos']:
 
-		new_data[k] = new_info
+					new_info = tuple([d['data']['params'][j] for d in data])
+					new_info = torch.stack(new_info,0)
+					new_data[j] = new_info	
+		else: 
+			new_info = tuple(d['data'][k] for d in data)
+
+			new_data[k] = new_info
 	return new_data
 
 def normalize_adj(mesh): 
