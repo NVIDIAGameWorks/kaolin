@@ -5,6 +5,10 @@
     <img src="assets/kaolin.png">
 </p>
 
+## Reformat
+
+A reformat is planned on Kaolin, we are expecting the reformat branch to be released in late August.
+Pull request reviews will be delayed until then.
 
 ## Kaolin: A PyTorch Library for Accelerating 3D Deep Learning Research
 
