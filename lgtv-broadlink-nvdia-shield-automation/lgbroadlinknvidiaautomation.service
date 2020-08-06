@@ -1,0 +1,16 @@
+[Unit]
+Description=Node.js LG TV, NVIDIA Shiled, and Broadlink connector
+After=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Scripts/lgtv
+ExecStart=node lgtv.js
+StandardOutput=inherit
+StandardError=inherit
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
