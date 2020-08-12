@@ -106,7 +106,7 @@ class SHRender(nn.Module):
         feat = torch.cat((normal_bxfx3x3, uv_bxfx3x3), dim=3)
         feat = feat.view(bnum, fnum, -1)
 
-        imfeat, improb_bxhxwx1 = linear_rasterizer(self.height, self.width,
+        imfeat, improb_bxhxwx1 = linear_rasterizer(self.width, self.height,
                                                    points3d_bxfx9, points2d_bxfx6, normalz_bxfx1, feat)
         imnormal_bxhxwx3 = imfeat[:, :, :, :3]
         imtexcoords = imfeat[:, :, :, 3:5]

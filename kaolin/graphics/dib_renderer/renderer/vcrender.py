@@ -67,8 +67,8 @@ class VCRender(nn.Module):
         color_bxfx12 = torch.cat((c0, mask, c1, mask, c2, mask), dim=2)
 
         imfeat, improb_bxhxwx1 = linear_rasterizer(
-            self.height,
             self.width,
+            self.height,
             points3d_bxfx9,
             points2d_bxfx6,
             normalz_bxfx1,
