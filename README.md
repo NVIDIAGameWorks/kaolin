@@ -99,7 +99,7 @@ Note, if modifying or adding Cython files, ensure that Cython is installed and s
 During installation, the *packman* package manager will 
 download the nv-usd package to `~/packman-repo/` containing the necessary packages for reading and writing Universal Scene Description (USD) files. 
 
-Note, if you are using an heterogeneous GPUs setup set the architectures for which you want to compile the cuda code using the environment variable.
+Note, if you are using a heterogeneous GPUs setup set the architectures for which you want to compile the cuda code using the environment variable.
 
 Example:
 ```sh
@@ -128,7 +128,7 @@ Windows support is currently considered experimental.
 
 #### Building
 
-Perform from within a `Anaconda Prompt (Anaconda3)`:
+Perform from within an `Anaconda Prompt (Anaconda3)`:
 * `conda create --name kaolin python=3.6`
 * `conda activate kaolin`
 * `conda install pytorch torchvision cudatoolkit=10.2 -c pytorch`
