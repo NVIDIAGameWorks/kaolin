@@ -1,10 +1,14 @@
 [![WIP](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 [![License](https://img.shields.io/badge/License-Apache%202.0-brightgreen.svg)](https://github.com/NVIDIAGameWorks/kaolin/blob/master/LICENSE)
 
+## /!\ Reformat /!\
+
+A reformat is currently planned on Kaolin, we are expecting the reformat branch to be released in late August.
+Pull request reviews will be delayed until then.
+
 <p align="center">
     <img src="assets/kaolin.png">
 </p>
-
 
 ## Kaolin: A PyTorch Library for Accelerating 3D Deep Learning Research
 
