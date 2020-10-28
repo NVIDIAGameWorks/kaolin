@@ -3,7 +3,7 @@
 
 ## /!\ Reformat /!\
 
-A reformat is currently planned on Kaolin, we are expecting the reformat branch to be released in late August.
+A reformat is currently planned on Kaolin, we are expecting the reformat branch to be released in December.
 Pull request reviews will be delayed until then.
 
 <p align="center">
