@@ -21,8 +21,8 @@ from PIL import Image
 import numpy as np
 
 from torch.utils.data import DataLoader
-from graphics.render.base import Render as Dib_Renderer
-from graphics.utils.utils_perspective import  perspectiveprojectionnp
+from kaolin.graphics import DIBRenderer as Dib_Renderer
+from kaolin.graphics.dib_renderer.utils.perspective import perspectiveprojectionnp
 
 from utils import preprocess, collate_fn, normalize_adj
 from architectures import Encoder
@@ -38,12 +38,12 @@ args = parser.parse_args()
 
 
 # Data
-points_set_valid = kal.dataloader.ShapeNet.Points(root ='../../datasets/',categories =args.categories , \
-	download = True, train = False, split = .7, num_points=5000 )
-images_set_valid = kal.dataloader.ShapeNet.Images(root ='../../datasets/',categories =args.categories , \
-	download = True, train = False,  split = .7, views=1, transform= preprocess )
-meshes_set_valid = kal.dataloader.ShapeNet.Meshes(root ='../../datasets/', categories =args.categories , \
-	download = True, train = False,  split = .7)
+points_set_valid = kal.datasets.ShapeNet_Points(root ='../../datasets/',categories =args.categories , \
+	cache_dir='cache/', train = False, split = .7, num_points=5000 )
+images_set_valid = kal.datasets.ShapeNet_Images(root ='../../datasets/',categories =args.categories , \
+	train = False,  split = .7, views=1, transform= preprocess )
+meshes_set_valid = kal.datasets.ShapeNet_Meshes(root ='../../datasets/', categories =args.categories , \
+	cache_dir='cache/',train = False,  split = .7)
 
 valid_set = kal.dataloader.ShapeNet.Combination([points_set_valid, images_set_valid, meshes_set_valid], root='../../datasets/')
 dataloader_val = DataLoader(valid_set, batch_size=args.batchsize, shuffle=False, collate_fn = collate_fn,
@@ -75,12 +75,12 @@ with torch.no_grad():
 	for data in tqdm(dataloader_val): 
 		# data creation
 		tgt_points = data['points'].cuda()
-		inp_images = data['imgs'].cuda()
+		inp_images = data['images'].cuda()
 		image_gt = inp_images.permute(0,2,3,1)[:,:,:,:3]
 		alhpa_gt = inp_images.permute(0,2,3,1)[:,:,:,3:]
 		cam_mat = data['cam_mat'].cuda()
 		cam_pos = data['cam_pos'].cuda()
-		gt_verts = data['verts']
+		gt_verts = data['vertices']
 		gt_faces = data['faces']
 
 		# inference 
@@ -94,7 +94,7 @@ with torch.no_grad():
 		pred_verts = initial_verts + delta_verts
 	
 		# render image
-		image_pred, _, _ = renderer.forward(points=[(pred_verts*.57 ), mesh.faces], colors=[colours])
+		image_pred, _, _ = renderer.forward(points=[(pred_verts*.57 ), mesh.faces], colors_bxpx3=colours)
 		
 		# mesh loss
 		
