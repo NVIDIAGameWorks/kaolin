@@ -146,7 +146,7 @@ class Mesh():
                 if len(data) == 0:
                     continue
                 if data[0] == 'v':
-                    vertices.append(data[1:])
+                    vertices.append([float(d) for d in data[1:]])
                 elif data[0] == 'vt':
                     uvs.append(data[1:3])
                 elif data[0] == 'f':
@@ -161,7 +161,7 @@ class Mesh():
                     else:
                         faces.append([int(d) for d in data[1:]])
                         continue
-        vertices = torch.FloatTensor([float(el) for sublist in vertices for el in sublist]).view(-1, 3)
+        vertices = torch.FloatTensor(np.array(vertices, dtype=np.float32))
         faces = torch.LongTensor(faces) - 1
 
         # compute texture info
