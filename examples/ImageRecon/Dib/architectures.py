@@ -16,6 +16,8 @@
 Network architecture definitions
 """
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -34,7 +36,7 @@ class Encoder(nn.Module):
 		block3 = self.convblock(64, 128, N_KERNELS, stride=2, pad=2)
 		block4 = self.convblock(128, 128, N_KERNELS, stride=2, pad=2)
 		
-		linear1 = self.linearblock(10368, 1024)
+		linear1 = self.linearblock(128 * (math.ceil(IMG_DIM / 16) ** 2), 1024)
 		linear2 = self.linearblock(1024, 1024)
 		self.linear3 = nn.Linear(1024, 1024)
 		
