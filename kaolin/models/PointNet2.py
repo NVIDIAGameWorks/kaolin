@@ -559,8 +559,10 @@ class PointNet2SetAbstraction(nn.Module):
 
         self.num_points_out = num_points_out
         self.pointnet_layer_dims_list = pointnet_layer_dims_list
-        self.sub_modules = nn.ModuleList()
-        self.layers = []
+        self.grouper_modules = nn.ModuleList()
+        self.pointnet_modules = nn.ModuleList()
+        self.num_samples_list = []
+
         self.pointnet_in_channels = pointnet_in_features + \
             (3 if use_xyz_feature else 0)
 
@@ -590,10 +592,9 @@ class PointNet2SetAbstraction(nn.Module):
             )
 
             # Register sub-modules
-            self.sub_modules.append(grouper)
-            self.sub_modules.append(pointnet)
-
-            self.layers.append((grouper, pointnet, num_samples))
+            self.grouper_modules.append(grouper)
+            self.pointnet_modules.append(pointnet)
+            self.num_samples_list.append(num_samples)
 
     def forward(self, xyz, features=None):
         """
@@ -625,7 +626,7 @@ class PointNet2SetAbstraction(nn.Module):
             new_xyz = new_xyz.transpose(1, 2).contiguous()
 
         new_features_list = []
-        for grouper, pointnet, num_samples in self.layers:
+        for grouper, pointnet, num_samples in zip(self.grouper_modules, self.pointnet_modules, self.num_samples_list):
             new_features = grouper(xyz, new_xyz, features)
             # shape = (batch_size, num_points_out, self.pointnet_in_channels, num_samples)
             # if num_points_out is None:
