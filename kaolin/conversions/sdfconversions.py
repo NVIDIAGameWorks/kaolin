@@ -40,44 +40,43 @@ import numpy as np
 
 from kaolin.mise import MISE
 import kaolin
-import kaolin as kal
 
 
 def sdf_to_voxelgrid(sdf: kaolin.rep.SDF, bbox_center: float = 0.,
                      bbox_dim: float = 1., resolution: int = 32,
-                     upsampling_steps: int = 2):
+                     upsampling_steps: int = 2, threshold: float = 0.0):
     r"""Converts an SDF to a voxel grid.
 
     Args:
         sdf (kaolin.rep.SDF) : an object with a .eval_occ function that
-            indicates which of a set of passed points is inside the surface.
+            returns the signed distance from the surface of a 3D shape.
         bbox_center (float): center of the surface's bounding box.
         bbox_dim (float): largest dimension of the surface's bounding box.
         resolution (int) : the initial resolution of the voxel, should be
             large enough to properly define the surface.
         upsampling_steps (int) : Number of times the initial resolution will
             be doubled.
-            The returned resolution will be resolution * (2 ^ upsampling_steps)
+            The returned resolution will be resolution * (2 ^ upsampling_steps) + 1
 
     Returns:
         (torch.Tensor): a voxel grid
 
     Example:
-        >>> sdf = kal.rep.SDF.sphere()
-        >>> voxel = kal.conversions.sdf_to_voxelgrid(sdf, bbox_dim = 2)
+        >>> sdf = kaolin.rep.SDF.sphere()
+        >>> voxel = kaolin.conversions.sdf_to_voxelgrid(sdf, bbox_dim = 2)
     """
 
     mesh_extractor = MISE(
-        resolution, upsampling_steps, .5)
+        resolution, upsampling_steps, threshold)
 
     points = mesh_extractor.query()
     while points.shape[0] != 0:
         # Query points
-        pointsf = torch.FloatTensor(points)
+        pointsf = torch.tensor(points, dtype=torch.float, device='cuda')
         # Normalize to bounding box
-        pointsf = pointsf / (mesh_extractor.resolution - 1)
-        pointsf = bbox_dim * (pointsf + (bbox_center - 0.5))
-        values = sdf(pointsf) <= 0
+        pointsf = pointsf / (mesh_extractor.resolution)
+        pointsf = bbox_dim * pointsf + (bbox_center - bbox_dim / 2)
+        values = sdf(pointsf)
         values = values.data.cpu().numpy().astype(np.float64)
         mesh_extractor.update(points, values)
         points = mesh_extractor.query()
@@ -89,12 +88,12 @@ def sdf_to_voxelgrid(sdf: kaolin.rep.SDF, bbox_center: float = 0.,
 
 def sdf_to_trianglemesh(sdf: kaolin.rep.SDF, bbox_center: float = 0.,
                         bbox_dim: float = 1., resolution: int = 32,
-                        upsampling_steps: int = 2):
+                        upsampling_steps: int = 2, threshold: float = 0.0):
     r""" Converts an SDF function to a mesh
 
     Args:
         sdf (kaolin.rep.SDF): an object with a .eval_occ function that
-            indicates which of a set of passed points is inside the surface.
+            returns the signed distance from the surface of a 3D shape.
         bbox_center (float): center of the surface's bounding box.
         bbox_dim (float): largest dimension of the surface's bounding box.
         resolution (int) : the initial resolution of the voxel, should be large
@@ -107,14 +106,17 @@ def sdf_to_trianglemesh(sdf: kaolin.rep.SDF, bbox_center: float = 0.,
         (torch.Tensor): computed mesh preperties
 
     Example:
-        >>> sdf = kal.rep.SDF.sphere()
-        >>> verts, faces = kal.conversion.sdf_to_trianglemesh(sdf, bbox_dim=2)
-        >>> mesh = kal.rep.TriangleMesh.from_tensors(verts, faces)
+        >>> sdf = kaolin.rep.SDF.sphere()
+        >>> verts, faces = kaolin.conversion.sdf_to_trianglemesh(sdf, bbox_dim=2)
+        >>> mesh = kaolin.rep.TriangleMesh.from_tensors(verts, faces)
 
     """
     voxel = sdf_to_voxelgrid(sdf, bbox_center, bbox_dim,
-                             resolution, upsampling_steps)
-    verts, faces = kal.conversions.voxelgrid_to_trianglemesh(voxel)
+                             resolution, upsampling_steps, threshold)
+
+    # reverse sign of voxel values to use signed distance with marching cube function
+    voxel = -voxel
+    verts, faces = kaolin.conversions.voxelgrid_to_trianglemesh(voxel, thresh=threshold)
     return verts, faces
 
 
@@ -125,7 +127,7 @@ def sdf_to_pointcloud(sdf: kaolin.rep.SDF, bbox_center: float = 0.,
 
     Args:
         sdf (kaolin.rep.SDF) : an object with a .eval_occ function that
-            indicates which of a set of passed points is inside the surface.
+            returns the signed distance from the surface of a 3D shape.
         bbox_center (float): center of the surface's bounding box.
         bbox_dim (float): largest dimension of the surface's bounding box.
         resolution (int) : the initial resolution of the voxel, should be large
@@ -139,11 +141,11 @@ def sdf_to_pointcloud(sdf: kaolin.rep.SDF, bbox_center: float = 0.,
         (torch.FloatTensor): computed point cloud
 
     Example:
-        >>> sdf = kal.rep.SDF.sphere()
-        >>> points = kal.conversion.sdf_to_pointcloud(sdf, bbox_dim=2)
+        >>> sdf = kaolin.rep.SDF.sphere()
+        >>> points = kaolin.conversion.sdf_to_pointcloud(sdf, bbox_dim=2)
 
     """
     verts, faces = sdf_to_trianglemesh(sdf, bbox_center, bbox_dim,
                                        resolution, upsampling_steps)
-    mesh = kal.rep.TriangleMesh.from_tensors(verts, faces)
+    mesh = kaolin.rep.TriangleMesh.from_tensors(verts, faces)
     return mesh.sample(num_points)[0]

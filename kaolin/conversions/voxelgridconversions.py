@@ -41,7 +41,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import kaolin as kal
-import trimesh
+from kaolin import mcubes
 from scipy import ndimage
 
 # from kaolin.transforms import voxelfunc
@@ -442,16 +442,17 @@ def voxelgrid_to_pointcloud(voxel: torch.Tensor, num_points: int,
     return point_positions
 
 
-def voxelgrid_to_trianglemesh(voxel: torch.Tensor, thresh: int = .5,
+def voxelgrid_to_trianglemesh(voxel: torch.Tensor, thresh: int = .2,
                               mode: str = 'marching_cubes',
-                              normalize: bool = True):
-    r""" Converts  passed voxel to a mesh
+                              normalize: bool = True,
+                              threshold: float = 0.):
+    r"""Converts passed voxel to a mesh (non-differentiable)
 
     Args:
         voxel (torch.Tensor): voxel array
-        thresh (float): threshold from which to make voxel binary
+        thresh (float): threshold from which consider voxel as part of shape
         mode (str):
-            -'exact': exect mesh conversion
+            -'exact': exact mesh conversion
             -'marching_cubes': marching cubes is applied to passed voxel
         normalize (bool): whether to scale the array to (-.5,.5)
 
@@ -465,30 +466,31 @@ def voxelgrid_to_trianglemesh(voxel: torch.Tensor, thresh: int = .5,
         [torch.Size([6144, 3]), torch.Size([12284, 3])]
 
     """
-    assert (mode in ['exact', 'marching_cubes'])
-    voxel = confirm_def(voxel)
-    voxel = threshold(voxel, thresh=thresh)
-    voxel_np = np.array((voxel.cpu() > thresh)).astype(bool)
-    trimesh_voxel = trimesh.voxel.VoxelGrid(voxel_np)
+    device = voxel.device
+    padding_value = threshold + 1e-6
+    box_size = 1.
 
-    if mode == 'exact':
-        trimesh_voxel = trimesh_voxel.as_boxes()
-    elif mode == 'marching_cubes':
-        trimesh_voxel = trimesh_voxel.marching_cubes
+    # Make sure that mesh is watertight by adding padding
+    voxel_padded = F.pad(voxel, (1, 1, 1, 1, 1, 1), mode='constant', value=-1e6)
+    n_x, n_y, n_z = voxel_padded.shape
+    if mode == 'marching_cubes':
+        isovalue = threshold
+        vertices, faces = mcubes.marching_cubes(
+            voxel_padded.cpu().numpy(), isovalue)
+    elif mode == 'exact':
+        voxel_padded = voxel_padded >= threshold
+        vertices, faces = mcubes.marching_cubes(
+            voxel_padded.cpu().numpy(), threshold)
 
-    verts = torch.FloatTensor(trimesh_voxel.vertices)
-    faces = torch.LongTensor(trimesh_voxel.faces)
-    shape = torch.FloatTensor(np.array(voxel.shape))
-    if voxel.is_cuda:
-        verts = verts.cuda()
-        faces = faces.cuda()
-        shape = shape.cuda()
+    vertices = torch.FloatTensor(vertices.astype(float)).to(device)
+    faces = torch.LongTensor(faces.astype(int)).to(device)
+    vertices -= 0.5
+
     if normalize:
+        vertices = vertices / torch.tensor([n_x - 1., n_y - 1., n_z - 1.], device=device)
+        vertices = box_size * (vertices - box_size / 2)
 
-        verts /= shape
-        verts = verts - .5
-
-    return verts, faces
+    return vertices, faces
 
 
 def voxelgrid_to_quadmesh(voxel: torch.Tensor, thresh: str = .5,
