@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from typing import Union
 
 import torch
@@ -84,6 +85,32 @@ def show_mesh(input_mesh: kaolin.rep.Mesh, colors: list = [.7, .2, .2]):
                            faces=input_mesh.faces.data.cpu().numpy())
     mesh.visual.vertex_colors = colors
     mesh.show()
+
+
+def save_mesh_image(input_mesh: kaolin.rep.Mesh,
+                    colors: list = [.7, .2, .2], filename='mesh_image',
+                    resolution=(1080, 1080)):
+    r""" Saver for meshes
+
+    Args:
+        verts (torch.Tensor): vertices of mesh to be visualized
+        faces (torch.Tensor): faces of mesh to be visualized
+        colors (list): rbg colour values for rendered mesh
+        filename: the file name to save the file under
+        resulution: The resolution of the image to be saved
+    """
+
+    mesh = trimesh.Trimesh(vertices=input_mesh.vertices.data.cpu().numpy(),
+                           faces=input_mesh.faces.data.cpu().numpy())
+    mesh.visual.vertex_colors = colors
+    png = mesh.scene().save_image(resolution=resolution, visible=True)
+    path, _ = os.path.splitext(filename)
+    filename = path + '.png'
+    with open(filename, 'wb') as f:
+        f.write(png)
+        f.close()
+
+    return png
 
 
 def show_sdf(sdf: kaolin.rep.SDF, mode='mesh', bbox_center: float = 0.,
