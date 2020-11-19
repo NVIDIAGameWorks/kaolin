@@ -198,6 +198,31 @@ class NumpyToTensor(Transform):
         return torch.from_numpy(arr)
 
 
+class ShiftPointCloud(Transform):
+    r"""Shift a pointcloud with respect a fixed shift factor.
+    Given a shift factor `shf`, this transform will shift each point in the 
+    pointcloud, i.e.,
+    ``cloud = shf + cloud``
+
+    Args:
+        shf (int or float or torch.Tensor): Shift factor by which input
+            clouds are to be shifted.
+    """
+
+    def __init__(self, shf: Union[int, float, torch.Tensor]):
+        self.shf = shf
+    
+    def __call__(self, cloud: Union[torch.Tensor, PointCloud]):
+        """
+        Args:
+            cloud (torch.Tensor or PointCloud): Pointcloud to be shifted.
+        
+        Returns:
+            (torch.Tensor or PointCloud): Shifted pointcloud.
+        """
+        return pcfunc.shift(cloud, shf=self.shf)
+
+
 class ScalePointCloud(Transform):
     """Scale a pointcloud with a fixed scaling factor.
     Given a scale factor `scf`, this transform will scale each point in the
@@ -229,6 +254,38 @@ class ScalePointCloud(Transform):
             (torch.Tensor or PointCloud): Scaled pointcloud.
         """
         return pcfunc.scale(cloud, scf=self.scf, inplace=self.inplace)
+
+
+class TranslatePointCloud(Transform):
+    r"""Translate a pointcloud with a given translation matrix.
+    Given a :math:`1 \times 3` translation matrix, this transform will 
+    translate each point in the cloud by the translation matrix specified.
+
+    Args:
+        tranmat (torch.Tensor): Translation matrix that specifies the translation 
+            to be applied to the pointcloud (shape: :math:`1 \times 3`).
+
+    Example:
+        import kaolin.transforms as tfs
+        tranmat = torch.ones(1,3)
+        translate_fn = tfs.TranslatePointCloud(tranmat)
+        pc = torch.rand(1000,3)
+        translated_pc = translate_fn(pc)
+    """
+
+    def __init__(self, tranmat: torch.Tensor):
+        self.tranmat = tranmat
+
+    def __call__(self, cloud: Union[torch.Tensor, PointCloud]):
+        """
+        Args:
+            cloud (torch.Tensor or kaolin.rep.PointCloud): Input pointcloud 
+            to be translated.
+
+        Returns:
+            (torch.Tensor or kaolin.rep.PointCloud): Translated pointcloud.
+        """
+        return pcfunc.translate(cloud, tranmat=self.tranmat)
 
 
 class RotatePointCloud(Transform):
