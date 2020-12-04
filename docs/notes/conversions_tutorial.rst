@@ -148,4 +148,4 @@ To convert a pointcloud to an SDF, use
 
 .. code-block:: python
 
-    >>> sdf_ = kal.conversions.pointcloud_to_trianglemesh(points)
+    >>> sdf_ = kal.conversions.pointcloud_to_sdf(points)
