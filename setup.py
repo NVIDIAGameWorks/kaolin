@@ -94,7 +94,7 @@ a comprehensive model zoo comprising many state-of-the-art 3D deep learning arch
 for future research endeavours.
 """
 
-version = '0.9'
+version = '0.9.0'
 
 
 def write_version_file():
