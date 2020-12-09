@@ -11,7 +11,7 @@ Kaolin library is part of a larger suite of tools for 3D deep learning research.
 
 ## Installation and Getting Started
 
-Visit the [Kaolin Library Documentation](https://readthedocs.org/projects/kaolin/) to get started!
+Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest/) to get started!
 
 ## About this Update
 
