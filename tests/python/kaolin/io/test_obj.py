@@ -142,18 +142,14 @@ class TestLoadObj:
 
     @pytest.mark.parametrize('with_normals', [False, True])
     def test_error_import_mesh(self, with_normals):
-        with pytest.raises(obj.MaterialLoadError,
-                           match=fr"Failed to load material at path '{os.path.join(SIMPLE_DIR, 'model.mtl')}':\n"
-                                 fr"\[Errno 21\] Is a directory: '{os.path.join(SIMPLE_DIR, '.')}'"):
+        with pytest.raises(obj.MaterialLoadError):
             outputs = obj.import_mesh(os.path.join(SIMPLE_DIR, 'model.obj'),
                                    with_materials=True, with_normals=with_normals,
                                    error_handler=obj.default_error_handler)
 
     @pytest.mark.parametrize('with_normals', [False, True])
     def test_warn_import_mesh(self, with_normals):
-        with pytest.warns(UserWarning,
-                          match=fr"Failed to load material at path '{os.path.join(SIMPLE_DIR, 'model.mtl')}':\n"
-                                fr"\[Errno 21\] Is a directory: '{os.path.join(SIMPLE_DIR, '.')}'"):
+        with pytest.warns(UserWarning):
             outputs = obj.import_mesh(os.path.join(SIMPLE_DIR, "model.obj"),
                                    with_materials=True, with_normals=with_normals,
                                    error_handler=obj.skip_error_handler)
