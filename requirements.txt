@@ -1,8 +1,0 @@
-nuscenes-devkit==1.0.8
-opencv-python-headless==4.2.0.34
-scikit-learn==0.22.2
-joblib==0.14.1
-pyquaternion==0.9.5
-numpy<1.18.4
-cachetools==4.1.0
-sphinx==2.2.0

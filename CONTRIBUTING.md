@@ -1,54 +1,87 @@
-# Contribution rules
+# Contributing guidelines
 
-- Kaolin Coding Style Guide can be found [here](STYLE_GUIDE.md). We follow [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html) with few exceptions and additional guidelines regarding Kaolin-specific cases. See the Kaolin Coding Style Guide for details. When no rules can be found, follow the already occuring conventions. If there is no precedence in our codebase we are open to discussion.
-- Avoid introducing unnecessary complexity into existing code so that maintainability and readability are preserved.
-- Try to keep pull requests (PRs) as concise as possible:
-  - Avoid committing commented-out code.
-  - Wherever possible, each PR should address a single concern. If there are several otherwise-unrelated things that should be fixed to reach a desired endpoint, it is perfectly fine to open several PRs and state in the description which PR depends on another PR. The more complex the changes are in a single PR, the more time it will take to review those changes.
-- Write PR and commit titles using imperative mood.
-  - Format commit messages sticking to rules described in [this](https://chris.beams.io/posts/git-commit/) guide.
-- Make sure that the build log is clean, meaning no warnings or errors should be present.
-- Some tests use licensed input datasets.  If you don't have access to the necessary input datasets, you may skip those test(s), but please state in the PR comments which tests were not run.
-- Kaolin's default build assumes recent versions of Kaolin's dependencies (CUDA, Pytorch, etc.). Contributions that add compatibility with older versions of those dependencies will be considered, but NVIDIA cannot guarantee that all possible build configurations work, are not broken by future contributions, and retain highest performance.
-- Make sure that you can contribute your work to open source (no license and/or patent conflict is introduced by your code). You need to [`sign`](#Sign) your commit.
-- Thanks in advance for your patience as we review your contributions; we do appreciate them!
+## Pull Request Checklist
 
-<a name="Sign"></a>Sign your Work
---------------
+Before sending your pull requests, make sure you followed this list.
 
-We require that all contributors "sign-off" on their commits. This certifies that the contribution is your original work, or you have rights to submit it under the same license, or a compatible license.
+1) Read these Guidelines in full.
 
-Any contribution which contains commits that are not Signed-Off will not be accepted.
+2) Please take a look at the LICENSE (it's Apache 2.0).
 
-To sign off on a commit you simply use the `--signoff` (or `-s`) option when committing your changes:
+3) Make sure you sign your commits. E.g. use ``git commit -s`` when commiting.
 
-    $ git commit -s -m "Add cool feature."
+4) Check your changes are consistent with the [Standards and Coding Style](CONTRIBUTING.md#standards-and-coding-style).
 
-This will append the following to your commit message:
+5) Make sure all unittests finish successfully before sending PR.
 
-    Signed-off-by: Your Name <your@email.com>
+6) Send your Pull Request to the `master` branch
 
-By doing this you certify the below:
+## How to become a contributor and submit your own code
 
-    Developer Certificate of Origin
-    Version 1.1
+### Signing your commits
+Before we can take your patches we need to take care of legal concerns.
 
-    Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
-    1 Letterman Drive
-    Suite D4700
-    San Francisco, CA, 94129
+Please sign each commits using ``git commit -s``.
+In case you forgot to sign previous commits you can amend previous commits using:
+* ``git commit -s --amend`` for the last commit.
+* ``git rebase --signoff`` for all the commits of your pull request.
 
-    Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.
+### Contributing code
+Contributions are welcome!
+You can send us pull requests to help improve Kaolin, if you are just getting started, Gitlab has a [how to](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html).
 
+Kaolin team members will be assigned to review your pull requests. Once they your change passes the review and the continuous integration checks, a Kaolin member will approve and merge them to the repository.
 
-    Developer's Certificate of Origin 1.1
+If you want to contribute, [Gitlab issues](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues) are a good starting point, especially the ones with the label [good first issue](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues?scope=all&utf8=%E2%9C%93&state=opened&label_name[]=good%20first%20issue). If you started working on a issue, leave a comment so other people know that you're working on it, you can also coordinate with others on the issue comment threads.
 
-    By making a contribution to this project, I certify that:
+### Standards and Coding Style
+#### General guidelines
+* New features must include unit tests which help guarantee correctness in the present and future.
+* API changes should be minimal and backward compatible. Any changes that break backward compatibility should be carefully considered and tracked so that they can be included in the release notes.
+* New features may not accepted if the cost of maintenance is too high in comparison of its benefit, they may also be integrated to contrib subfolders for minimal support and maintenance before eventually being integrated to the core.
 
-    (a) The contribution was created in whole or in part by me and I have the right to submit it under the open source license indicated in the file; or
+#### License
+Include a license at the top of new files.
 
-    (b) The contribution is based upon previous work that, to the best of my knowledge, is covered under an appropriate open source license and I have the right under that license to submit that work with modifications, whether created in whole or in part by me, under the same open source license (unless I am permitted to submit under a different license), as indicated in the file; or
+* [C/C++/CUDA example](example_license.cpp)
+* [Python example](examples_license.py)
 
-    (c) The contribution was provided directly to me by some other person who certified (a), (b) or (c) and I have not modified it.
+#### Code organization
+* [kaolin](kaolin/) - The Core of Kaolin library, everything that is not in [csrc](kaolin/csrc) is a Python module.
+  * [csrc](kaolin/csrc/) - Directory for all the C++ / CUDA implementations of custom ops.
+    The gpu ops parts will be under the subdirectory [csrc/cuda](kaolin/csrc/cuda)
+    while the cpu parts will be under the subdirectory [csrc/cpu](kaolin/csrc/cpu).
+  * [io](kaolin/io/) - Module of all the I/O features of Kaolin, such a importing and exporting 3D models.
+  * [metrics](kaolin/metrics) - Module of all the metrics that can be used as differentiable loss or distance.
+  * [ops](kaolin/ops/) - Module of all the core operations of kaolin on different 3D representations.
+  * [render](kaolin/render/) - Module of all the differentiable renderers modules and advanced implementations.
+  * [utils](kaolin/utils/) - Module of all the utility features for debugging and testing.
+  * [visualize](kaolin/visualize/) - Module of all the visualization modules.
+* [examples](examples/) - Examples of Kaolin usage
+* [tests](tests/) - Tests for all Kaolin
 
-    (d) I understand and agree that this project and the contribution are public and that a record of the contribution (including all personal information I submit with it, including my sign-off) is maintained indefinitely and may be redistributed consistent with this project or the open source license(s) involved.
+#### C++ coding style
+We follow [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)
+
+It is enforced using [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/index.html)
+
+#### Python coding style
+We follow [PEP8 Style Guide](https://www.python.org/dev/peps/pep-0008/) with some exceptions listed in [flake8 config file](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/.flake8) and generally follow PyTorch naming conventions.
+
+It is enforced using [flake8](https://pypi.org/project/flake8/), with [flake8-bugbear](https://pypi.org/project/flake8-bugbear/), [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/), [flake8-mypy](https://pypi.org/project/flake8-mypy/) and [flake8-pyi](https://pypi.org/project/flake8-pyi/)
+
+to run flake8 execute ``flake8 --config=.flake8 .`` from the [root of kaolin](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat)
+
+On top of that we use prefixes (``packed\_``, ``padded\_``) to indicate that a module / op is specific to a layout, an , all ops of the same purpose for different layouts should be in the same file.
+
+[tests/python/kaolin/](tests/python/kaolin) should follows the same directory structure of [kaolin/](kaolin/). E.g. each module kaolin/path/to/mymodule.py should have a corresponding tests/python/kaolin/path/to/test\_mymodule.py.
+
+#### Tests
+We are applying [pytest](https://docs.pytest.org/en/latest/) on [tests/python directory](tests/python/), with [pytest-cov](https://pytest-cov.readthedocs.io/en/latest/), which should follows the directory structure of [kaolin](kaolin/).
+
+to run the tests execute ``pytest --cov=kaolin/ tests/`` from the [root of kaolin](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat)
+
+#### Documentation
+Contributors are encouraged to verify the generated documentation before each pull request.
+
+To build your own documentation, follow the [guide](docs/README.md).

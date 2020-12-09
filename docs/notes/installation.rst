@@ -1,49 +1,91 @@
 Installation
-=================================
+============
 
-Installing Kaolin should be really easy, especially if you work in virtual environments.
+Kaolin is written with Pytorch and C++ / CUDA for efficient custom ops.
+
+Requirements
+------------
+
+* Linux, macOS or Windows
+* Python == 3.6 or 3.7
+* CUDA >= 10.0 (with 'nvcc' installed)
+
+Dependencies
+------------
+
+* torch >= 1.5
+* cython == 0.29.20
+* scipy >= 1.2.0
+* Pillow >= 8.0.0
+* usd-core == 20.11
+
+Installation from source
+------------------------
 
 .. Note::
-    We STRONGLY recommend using virtual environments for use with Kaolin (and in general too)!
+    If you just wanna try Kaolin, we recommend using a virtual environment, for instance with `Anaconda <https://www.anaconda.com/>`_:
+    
+    .. code-block:: bash
+    
+        $ conda create --name kaolin python=3.7
+        $ conda activate kaolin
 
-Run the following command, from the root directory of this repository (i.e., the directory containing the `README.md` file).
+We recommend following instructions from `https://pytorch.org <https://pytorch.org>`_ for installing PyTorch, and `https://cython.readthedocs.io <https://cython.readthedocs.io/en/latest/src/quickstart/install.html>`_ for installing cython, however Kaolin installation will attempt to automatically install the latest if none is installed (may fail on some systems).
+
+To install the library. You must first clone the repository:
+
+.. code-block:: bash
+
+    $ git clone https://github.com/NVIDIAGameWorks/kaolin
+    $ cd kaolin
+
+you can then select the tag if you want 0.9 or 0.1 specific release, example:
+
+.. code-block:: bash
+
+    $ git checkout v0.9
 
 .. code-block:: bash
 
     $ python setup.py develop
 
-To verify your installation, fire up your python interpreter and try executing the following statements.
+.. Note::
+    If you are using heterogeneous GPUs setup set the architectures for which you want to compile the cuda code using the ``TORCH_CUDA_ARCH_LIST`` environment variable.
 
-.. code-block:: python
-
-    >>> import kaolin as kal
-    >>> kal.__version__
-
-You should then be able to see the version of the library installed.
-
-
-.. contents::
-    :local:
-
-
-Build documentation
--------------------
-
-Optionally, you might want to build the docs on your local machine. As `sphinx` has already been installed as a dependency, you only need to do
-
-.. code-block:: bash
+    Example:
     
-    $ cd docs
-    $ sphinx-build . _build
+    .. code-block:: bash
+    
+        $ export TORCH_CUDA_ARCH_LIST="7.0 7.5"
 
-This will build docs into the `docs/_build` directory. To access the docs, open `docs/_build/index.html` in your web browser, and voila!
+.. Note::
+    Kaolin can be installed without GPU, however, CPU support is limited to some ops.
 
+Testing your installation
+-------------------------
 
-Run unittests (optional)
-------------------------
-
-Another optional step. If you wish to run unittests, from the root directory of the repository (i.e., the directory containing the main `README.md` file), run
+A quick test is to see if you can properly import kaolin and print the current version by running the following:
 
 .. code-block:: bash
 
-    $ pytest --cov=kaolin/ tests
+    $ python -c "import kaolin; print(kaolin.__version__)"
+
+Running tests
+^^^^^^^^^^^^^
+
+A more exhaustive test is to execute all the official tests.
+
+First, pytest dependencies are necessary to run those tests, to install those run:
+
+.. code-block:: bash
+
+    $ pip install -r tools/ci_requirements.txt
+ 
+Then run the tests as following:
+
+.. code-block:: bash
+
+    $ pytest tests/python/
+
+.. Note::
+    These tests rely on cuda operations and will fail if you installed on CPU only, where not all functionality is available.

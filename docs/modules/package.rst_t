@@ -1,0 +1,32 @@
+{%- macro automodule(modname, options) -%}
+API
+---
+
+.. automodule:: {{ modname }}
+{%- for option in options %}
+   :{{ option }}:
+{%- endfor %}
+{%- endmacro %}
+
+{%- macro unfoldtree(docnames) -%}
+{%- for docname in docnames %}
+   {{ docname }}
+{%- endfor %}
+{%- endmacro -%}
+
+{%- if is_namespace %}
+{{- [pkgname, "namespace"] | join(" ") | e | heading }}
+{% else %}
+{{- pkgname | e | heading }}
+{% endif %}
+
+{%- if subpackages or submodules %}
+.. toctree::
+   :maxdepth: {{ maxdepth }}
+   :titlesonly:
+{%- endif %}
+{{ unfoldtree(subpackages + submodules) }}
+
+{% if not is_namespace -%}
+{{ automodule(pkgname, automodule_options) }}
+{% endif %}

@@ -1,39 +1,84 @@
-image: "pytorch/pytorch:1.2-cuda10.0-cudnn7-devel"
-
-before_script:
-  - pip install --upgrade pip>=18.0.0
-  - pip install flake8==3.7.9 \
-                flake8-bugbear==20.1.4 \
-                flake8-comprehensions==3.2.2 \
-                flake8-mypy==17.8.0 \
-                flake8-pyi==19.3.0 \
-                pytest==5.4.2 \
-                pytest-cov==2.8.1
-  - pip install --no-dependencies -r requirements.txt
-  - apt-get update && apt-get -y install libglib2.0-0  # needed by opencv
-
 stages:
   - build
   - test
 
-build general:
-  tags:
-    - kaolin
+# ----
+
+build linux:
+  tags: [kaolin]
+  stage: build
+  image: "docker:19.03.9"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - ci/build-linux.sh
+  artifacts:
+    name: "kaolin-$CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    paths: ['artifacts/']
+    when: always
+
+build windows:
+  tags: [kaolin_windows]
   stage: build
   script:
-    - python setup.py build_ext --inplace -j$(nproc --all)
-    - python setup.py install
-    - python -c 'import kaolin; print(kaolin.__version__)'
+    - ci\build-windows.ps1
+  artifacts:
+    name: "kaolin-$CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    paths: ['artifacts/']
+    when: always
 
-full test:
-  tags:
-    - kaolin
-  stage: test
+build linux no cache:
+  when: manual
+  tags: [kaolin]
+  stage: build
+  image: "docker:19.03.9"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - flake8 --config=.flake8 .
-    - source setenv.sh
-    - python setup.py develop
-    - pytest --cov=kaolin/ tests/
-    - tests/examples/run/test_classification.sh
-    - tests/examples/run/test_nmr.sh
-    - tests/examples/run/test_softras_examples.sh
+    - ci/build-linux-no-cache.sh
+  artifacts:
+    name: "kaolin-$CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    paths: ['artifacts/']
+    when: always
+
+build windows no cache:
+  when: manual
+  tags: [kaolin_windows]
+  stage: build
+  script:
+    - ci\build-windows-no-cache.ps1
+  artifacts:
+    name: "kaolin-$CI_JOB_NAME-$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+    paths: ['artifacts/']
+    when: always
+
+
+# ----
+
+flake8 linux:
+  tags: [kaolin]
+  stage: test
+  needs: ['build linux']
+  image: "docker:19.03.0"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - ci/flake8-linux.sh
+
+pytest linux:
+  tags: [kaolin]
+  stage: test
+  needs: ['build linux']
+  image: "docker:19.03.9"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - ci/pytest-linux.sh
+
+test windows:
+  tags: [kaolin_windows]
+  stage: test
+  needs: ['build windows']
+  script:
+    - ci\test-windows.bat
+

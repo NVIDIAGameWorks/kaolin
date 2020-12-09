@@ -1,0 +1,182 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    upAxis = "Y"
+)
+
+def Xform "World"
+{
+    def Sphere "Default"
+    {
+        rel material:binding = </World/Looks/Default>
+    }
+
+    def "Looks"
+    {
+        def Material "Default"
+        {
+            token outputs:displacement.connect = </World/Looks/Default/Shader.outputs:displacement>
+            token outputs:surface.connect = </World/Looks/Default/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.timeSamples = {
+                    0: (0.5, 0.5, 0.5),
+                }
+                float inputs:metallic.timeSamples = {
+                    0: 0,
+                }
+                normal3f inputs:normal
+                float inputs:roughness.timeSamples = {
+                    0: 0.5,
+                }
+                color3f inputs:specularColor.timeSamples = {
+                    0: (0, 0, 0),
+                }
+                int inputs:useSpecularWorkflow.timeSamples = {
+                    0: 0,
+                }
+                token outputs:displacement
+                token outputs:surface
+            }
+        }
+
+        def Material "Diffuse"
+        {
+            token outputs:displacement.connect = </World/Looks/Diffuse/Shader.outputs:displacement>
+            token outputs:surface.connect = </World/Looks/Diffuse/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.timeSamples = {
+                    0: (0, 1, 0),
+                }
+                float inputs:metallic.timeSamples = {
+                    0: 0,
+                }
+                normal3f inputs:normal
+                float inputs:roughness.timeSamples = {
+                    0: 0.5,
+                }
+                color3f inputs:specularColor.timeSamples = {
+                    0: (0, 0, 0),
+                }
+                int inputs:useSpecularWorkflow.timeSamples = {
+                    0: 0,
+                }
+                token outputs:displacement
+                token outputs:surface
+            }
+        }
+
+        def Material "Roughness"
+        {
+            token outputs:displacement.connect = </World/Looks/Roughness/Shader.outputs:displacement>
+            token outputs:surface.connect = </World/Looks/Roughness/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.timeSamples = {
+                    0: (0.5, 0.5, 0.5),
+                }
+                float inputs:metallic.timeSamples = {
+                    0: 0,
+                }
+                normal3f inputs:normal
+                float inputs:roughness.timeSamples = {
+                    0: 0.1,
+                }
+                color3f inputs:specularColor.timeSamples = {
+                    0: (0, 0, 0),
+                }
+                int inputs:useSpecularWorkflow.timeSamples = {
+                    0: 0,
+                }
+                token outputs:displacement
+                token outputs:surface
+            }
+        }
+
+        def Material "Metallic"
+        {
+            token outputs:displacement.connect = </World/Looks/Metallic/Shader.outputs:displacement>
+            token outputs:surface.connect = </World/Looks/Metallic/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.timeSamples = {
+                    0: (0.5, 0.5, 0.5),
+                }
+                float inputs:metallic.timeSamples = {
+                    0: 1,
+                }
+                normal3f inputs:normal
+                float inputs:roughness.timeSamples = {
+                    0: 0.5,
+                }
+                color3f inputs:specularColor.timeSamples = {
+                    0: (0, 0, 0),
+                }
+                int inputs:useSpecularWorkflow.timeSamples = {
+                    0: 0,
+                }
+                token outputs:displacement
+                token outputs:surface
+            }
+        }
+
+        def Material "Specular"
+        {
+            token outputs:displacement.connect = </World/Looks/Specular/Shader.outputs:displacement>
+            token outputs:surface.connect = </World/Looks/Specular/Shader.outputs:surface>
+
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.timeSamples = {
+                    0: (0.5, 0.5, 0.5),
+                }
+                float inputs:metallic.timeSamples = {
+                    0: 0,
+                }
+                normal3f inputs:normal
+                float inputs:roughness.timeSamples = {
+                    0: 0.5,
+                }
+                color3f inputs:specularColor.timeSamples = {
+                    0: (1, 0, 0),
+                }
+                int inputs:useSpecularWorkflow.timeSamples = {
+                    0: 1,
+                }
+                token outputs:displacement
+                token outputs:surface
+            }
+        }
+    }
+
+    def Sphere "Diffuse"
+    {
+        rel material:binding = </World/Looks/Diffuse>
+    }
+
+    def Sphere "Roughness"
+    {
+        rel material:binding = </World/Looks/Roughness>
+    }
+
+    def Sphere "Metallic"
+    {
+        rel material:binding = </World/Looks/Metallic>
+    }
+
+    def Sphere "Specular"
+    {
+        rel material:binding = </World/Looks/Specular>
+    }
+}
+
