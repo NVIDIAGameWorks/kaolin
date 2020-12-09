@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
 #include <torch/extension.h>
+
+#ifdef WITH_CUDA
+#include <iostream>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -233,8 +235,10 @@ std::vector<at::Tensor> unbatched_mcube_forward(const at::Tensor voxelgrid, floa
 
   return result;
 }
-
+#endif
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+#ifdef WITH_CUDA
   m.def("forward_cuda", &unbatched_mcube_forward, "Unbatched Marching Cube forward");
+#endif
 }
