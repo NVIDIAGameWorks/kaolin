@@ -1,0 +1,15 @@
+newmtl Material.001
+Ka 0.500000 0.600000 0.700000
+Kd 0.400000 0.300000 0.200000
+Ks 0.100000 0.300000 0.500000
+map_Ka ambient_tex_001.png
+map_Kd diffuse_tex_001.png
+map_Ks .
+
+newmtl Material.002
+Ka 0.700000 0.700000 0.700000
+Kd 0.200000 0.200000 0.200000
+Ks 0.100000 0.100000 0.100000
+map_Ka ambient_tex_002.png
+map_Kd diffuse_tex_002.png
+map_Ks spec_col_tex_002.png

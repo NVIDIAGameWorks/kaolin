@@ -1,3 +1,3 @@
-from .voxel import *
-from .point import *
-from .mesh import *
+from . import voxelgrid
+from . import trianglemesh
+from . import pointcloud

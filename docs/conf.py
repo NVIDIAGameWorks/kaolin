@@ -2,42 +2,24 @@
 #
 # This file only contains a selection of the most common options. For a full
 # list see the documentation:
-# http://www.sphinx-doc.org/en/master/config
+# https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 # -- Path setup --------------------------------------------------------------
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-
+#
 import os
 import sys
-
-
-# Get version number
-with open('../kaolin/version.py', 'r') as f:
-    for row in f:
-        if '__version__' in row:
-            kal_version = row.split("'")[-2]
-            break
-
-# sys.path.append('../')
-sys.path.append(os.path.abspath(os.path.join(
-    os.path.dirname(__file__), '..', 'kaolin')))
-# import sphinx_rtd_theme
-
-# The master toctree document.
-master_doc = 'index'
+sys.path.insert(0, os.path.abspath('../kaolin'))
 
 
 # -- Project information -----------------------------------------------------
 
-project = 'kaolin'
-copyright = '2019, NVIDIA Development Inc.'
+project = 'Kaolin'
+copyright = '2020, NVIDIA'
 author = 'NVIDIA'
-version = kal_version
-# The full version, including alpha/beta/rc tags
-release = kal_version
 
 
 # -- General configuration ---------------------------------------------------
@@ -47,28 +29,18 @@ release = kal_version
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
-    'sphinx.ext.viewcode',
 ]
 
-napoleon_use_ivar = True
+todo_include_todos = True
 
-# Mock CUDA Imports
-autodoc_mock_imports = ['kaolin.cuda.ball_query',
-                        'kaolin.cuda.load_textures',
-                        'kaolin.cuda.sided_distance',
-                        'kaolin.cuda.furthest_point_sampling',
-                        'kaolin.cuda.three_nn',
-                        'kaolin.cuda.tri_distance',
-                        'kaolin.cuda.mesh_intersection',
-                        'kaolin.graphics.nmr.cuda.rasterize_cuda',
-                        'kaolin.graphics.softras.soft_rasterize_cuda',
-                        'kaolin.graphics.dib_renderer.cuda.rasterizer']
-
+intersphinx_mapping = {
+    'python': ("https://docs.python.org/3", None),
+    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+    'PyTorch': ('http://pytorch.org/docs/master/', None),
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -78,97 +50,20 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-
-# The name of the Pygments (syntax highlighting) style to use
-pygments_style = 'sphinx'
-
-# If true, `todo` and `todoList` produce output, else they produce nothing
-todo_include_todos = True
-
-# Do not prepend module name to functions
-add_module_names = False
-
-
 # -- Options for HTML output -------------------------------------------------
+
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
+import sphinx_rtd_theme
+
+html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+html_theme = "sphinx_rtd_theme"
+
 # html_theme = 'alabaster'
-html_theme = 'sphinx_rtd_theme'
-html_theme_path = ['_themes']
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
-
-html_css_files = [
-    'copybutton.css',
-]
-html_js_files = [
-    'clipboard.min.js',
-    'copybutton.js',
-]
-
-
-# -- Options for LaTeX output -------------------------------------------------
-
-latex_elements = {
-    # The paper size ('letterpaper' or 'a4paper')
-    #
-    # 'papersize': 'letterpaper',
-
-    # The font size ('10pt', '11pt' or '12pt')
-    #
-    # 'pointsize': '10pt',
-
-    # Font packages
-    'fontpkg': '\\usepackage{amsmath, amsfonts, amssymb, amsthm}'
-
-    # Additional stuff for the LaTeX preamble.
-    #
-    # 'preamble': '',
-
-    # Latex figure (float) alignment
-    #
-    # 'figure_align': 'htbp',
-}
-
-# Grouping the document tree into LateX files. List of tuples
-# (source start file, target name, title,
-# author, documentclass [howto, manual, or own class]).
-latex_documents = [
-    (master_doc, 'kaolin.tex', u'kaolin Documentation',
-        [author], 1),
-]
-
-
-# -- Options for manual page output -------------------------------------------
-
-# One entry per manual page. List of tuples
-# (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'kaolin', u'kaolin Documentation', 
-        [author], 1)
-]
-
-
-# -- Options for Texinfo output -----------------------------------------------
-
-# Grouping the document tree into Texinfo files. List of tuples
-# (source start file, target name, title, author, 
-#  dir menu entry, description, category)
-texinfo_documents = [
-    (master_doc, 'kaolin', 'kaolin Documentation', 
-        author, 'kaolin', 'NVIDIA 3D Deep Learning Library.', 
-        'Miscellaneous'),
-]
-
-
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-    'numpy': ('http://docs.scipy.org/doc/numpy', None),
-    'torch': ('http://pytorch.org/docs/master', None),
-}
+html_static_path = []

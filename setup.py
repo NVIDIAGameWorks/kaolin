@@ -1,36 +1,83 @@
-import os
-import io
-import logging
-from setuptools import setup, find_packages
+# some useful environment variables:
+#
+# TORCH_CUDA_ARCH_LIST
+#   specify which CUDA architectures to build for
+#
+# IGNORE_VER_ERR
+#   ignore version error for torch
+
+from setuptools import setup, find_packages, dist
+import importlib
 from pkg_resources import parse_version
-import copy
+import warnings
 
+TORCH_MIN_VER = '1.5.0'
+TORCH_MAX_VER = '1.7.0'
+CYTHON_MIN_VER = '0.29.20'
+
+missing_modules = []
+torch_spec = importlib.util.find_spec("torch")
+if torch_spec is None:
+    warnings.warn("Couldn't find torch installed, so this will try to install it. "
+                  "If the installation fails we recommend to first install it.")
+    missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
+else:
+    import torch
+    torch_ver = parse_version(torch.__version__)
+    if torch_ver <= parse_version(TORCH_MIN_VER) and \
+       torch_ver <= parse_version(TORCH_MAX_VER):
+        warnings.warn('Kaolin is compatible with PyTorch >= 1.5.0, '
+                      f'but found version {torch.__version__} instead. '
+                      'This will try to install torch in the right version. '
+                      'If the installation fails we recommend to first install it.')
+        missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
+
+cython_spec = importlib.util.find_spec("cython")
+if cython_spec is None:
+    warnings.warn("Couldn't find cython installed, so this will try to install it. "
+                  "If the installation fails we recommend to first instal it.")
+    missing_modules.append(f'cython=={CYTHON_MIN_VER}')
+else:
+    import Cython
+    cython_ver = parse_version(Cython.__version__)
+    if cython_ver != parse_version('0.29.20'):
+        warnings.warn('Kaolin is compatible with cython == 0.29.20, '
+                      f'but found version {Cython.__version__} instead. '
+                      'This will try to install torch in the right version. '
+                      'If the installation fails we recommend to first install it.')
+        missing_modules.append(f'cython=={CYTHON_MIN_VER}')
+
+
+dist.Distribution().fetch_build_eggs(missing_modules)
+
+import os
+import logging
+
+import numpy
 import torch
-from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CppExtension
-import torchvision
-import numpy as np
-
+from torch.utils.cpp_extension import BuildExtension, CppExtension, \
+    CUDAExtension
 
 cwd = os.path.dirname(os.path.abspath(__file__))
+
 logger = logging.getLogger()
 logging.basicConfig(format='%(levelname)s - %(message)s')
-
 
 if not torch.cuda.is_available():
     # From: https://github.com/NVIDIA/apex/blob/b66ffc1d952d0b20d6706ada783ae5b23e4ee734/setup.py
     # Extension builds after https://github.com/pytorch/pytorch/pull/23408 attempt to query torch.cuda.get_device_capability(),
     # which will fail if you are compiling in an environment without visible GPUs (e.g. during an nvidia-docker build command).
-    logging.warning('\nWarning: Torch did not find available GPUs on this system.\n'
-                    'If your intention is to cross-compile, this is not an error.\n'
-                    'By default, Kaolin will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n'
-                    'Volta (compute capability 7.0), and Turing (compute capability 7.5).\n'
-                    'If you wish to cross-compile for a single specific architecture,\n'
-                    'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n')
+    logging.warning(
+        '\nWarning: Torch did not find available GPUs on this system.\n'
+        'If your intention is to cross-compile, this is not an error.\n'
+        'By default, Kaolin will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n'
+        'Volta (compute capability 7.0), and Turing (compute capability 7.5).\n'
+        'If you wish to cross-compile for a single specific architecture,\n'
+        'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n')
     if os.environ.get("TORCH_CUDA_ARCH_LIST", None) is None:
         os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5"
 
 PACKAGE_NAME = 'kaolin'
-VERSION = '0.1.0'
 DESCRIPTION = 'Kaolin: A PyTorch library for accelerating 3D deep learning research'
 URL = 'https://github.com/NVIDIAGameWorks/kaolin'
 AUTHOR = 'NVIDIA'
@@ -47,152 +94,152 @@ a comprehensive model zoo comprising many state-of-the-art 3D deep learning arch
 for future research endeavours.
 """
 
+version = '0.9'
 
 
-# Check that PyTorch version installed meets minimum requirements
-torch_ver = parse_version(torch.__version__)
-if torch_ver < parse_version('1.2.0') or torch_ver >= parse_version('1.5.0'):
-    logger.warning(f'Kaolin is tested with PyTorch >=1.2.0, <1.5.0 Found version {torch.__version__} instead.')
-
-# Check that torchvision version installed meets minimum requirements
-torchvision_ver = parse_version(torchvision.__version__)
-if torchvision_ver < parse_version('0.4.0') or torchvision_ver >= parse_version('0.6.0'):
-    logger.warning(f'Kaolin is tested with torchvision >=0.4.0, <0.6.0 Found version {torchvision.__version__} instead.')
-
-# Get version number from version.py
-version = {}
-with open("kaolin/version.py") as fp:
-    exec(fp.read(), version)
+def write_version_file():
+    version_path = os.path.join(cwd, 'kaolin', 'version.py')
+    with open(version_path, 'w') as f:
+        f.write("__version__ = '{}'\n".format(version))
 
 
-def build_deps():
-    print('Building nv-usd...')
-    os.system('./buildusd.sh')
+write_version_file()
 
 
-def read(*names, **kwargs):
-    with io.open(
-            os.path.join(os.path.dirname(__file__), *names),
-            encoding=kwargs.get('encoding', 'utf8')
-    ) as fp:
-        return fp.read()
-
-
-def KaolinCUDAExtension(*args, **kwargs):
-    if not os.name == 'nt':
-        FLAGS = ['-Wno-deprecated-declarations']
-        kwargs = copy.deepcopy(kwargs)
-        if 'extra_compile_args' in kwargs:
-            kwargs['extra_compile_args'] += FLAGS
+def get_requirements():
+    requirements = []
+    if os.name != 'nt':  # no pypi torch for windows
+        if os.getenv('PYTORCH_VERSION'):
+            requirements.append('torch==%s' % os.getenv('PYTORCH_VERSION'))
         else:
-            kwargs['extra_compile_args'] = FLAGS
+            requirements.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
+    requirements.append('scipy>=1.2.0,<=1.5.2')
+    requirements.append('Pillow>=8.0.0')
+    requirements.append('tqdm>=4.51.0')
+    requirements.append('usd-core==20.11')
 
-    return CUDAExtension(*args, **kwargs)
+    return requirements
 
 
-class KaolinBuildExtension(BuildExtension):
-    def __init__(self, *args, **kwargs):
-        kwargs = copy.deepcopy(kwargs)
-        kwargs['use_ninja'] = False  # ninja is interfering with compiling separate extensions in parallel
-        super().__init__(*args, **kwargs)
-
-    def build_extensions(self):
-        if not os.name == 'nt':
-            FLAG_BLACKLIST = ['-Wstrict-prototypes']
-            FLAGS = ['-Wno-deprecated-declarations']
-            self.compiler.compiler_so = [x for x in self.compiler.compiler_so if x not in FLAG_BLACKLIST] + FLAGS  # Covers non-cuda
-
-        super().build_extensions()
+def filters_cu(sources, with_cuda):
+    if with_cuda:
+        return sources
+    else:
+        return [s for s in sources if not s.endswith('.cu')]
 
 
 def get_extensions():
-    use_cython = os.getenv('USE_CYTHON')
+    extra_compile_args = {'cxx': ['-O3']}
+    define_macros = []
+    # FORCE_CUDA is for cross-compilation in docker build
+    if torch.cuda.is_available() or os.getenv('FORCE_CUDA', '0') == '1':
+        with_cuda = True
+        define_macros += [("WITH_CUDA", None)]
+        extension = CUDAExtension
+        extra_compile_args.update({'nvcc': ['-O3']})
+    else:
+        extension = CppExtension
+        with_cuda = False
+    extensions = []
+    extensions.append(
+        extension(
+            name='kaolin.ops.packed_sum_cuda',
+            sources=filters_cu(['kaolin/csrc/cuda/ops/packed_sum_cuda.cpp',
+                                'kaolin/csrc/cuda/ops/packed_sum_cuda_kernel.cu'],
+                               with_cuda),
+            define_macros=define_macros,
+            extra_compile_args=extra_compile_args
+        )
+    )
+    extensions.append(
+        extension(
+            name='kaolin.ops.tile_to_packed_cuda',
+            sources=filters_cu(['kaolin/csrc/cuda/ops/tile_to_packed_cuda.cpp',
+                                'kaolin/csrc/cuda/ops/tile_to_packed_cuda_kernel.cu'],
+                               with_cuda),
+            define_macros=define_macros,
+            extra_compile_args=extra_compile_args
+        )
+    )
+    extensions.append(
+        extension(
+            name='kaolin.metrics.sided_distance_cuda',
+            sources=filters_cu(['kaolin/csrc/cuda/metrics/sided_distance.cpp',
+                                'kaolin/csrc/cuda/metrics/sided_distance_cuda.cu'],
+                               with_cuda),
+            define_macros=define_macros,
+            extra_compile_args=extra_compile_args
+        )
+    )
+    extensions.append(
+        extension(
+            name='kaolin.metrics.unbatched_triangle_distance_cuda',
+            sources=filters_cu(
+                ['kaolin/csrc/cuda/metrics/unbatched_triangle_distance_cuda.cpp',
+                 'kaolin/csrc/cuda/metrics/unbatched_triangle_distance_cuda_kernel.cu'],
+                with_cuda),
+            define_macros=define_macros,
+            extra_compile_args=extra_compile_args
+        )
+    )
+    extensions.append(
+        extension(
+            name='kaolin.ops.mesh.mesh_intersection_cuda',
+            sources=filters_cu(
+                ['kaolin/csrc/cuda/ops/mesh/mesh_intersection_cuda.cpp',
+                 'kaolin/csrc/cuda/ops/mesh/mesh_intersection_cuda_kernel.cu'],
+                with_cuda),
+            define_macros=define_macros,
+            extra_compile_args=extra_compile_args
+        )
+    )
+    extensions.append(
+        extension(
+            name='kaolin.render.mesh.dibr_rasterization_cuda',
+            sources=filters_cu(['kaolin/csrc/cuda/render/dibr.cpp',
+                                'kaolin/csrc/cuda/render/dibr_for.cu',
+                                'kaolin/csrc/cuda/render/dibr_back.cu'],
+                               with_cuda),
+            define_macros=define_macros,
+            extra_compile_args=extra_compile_args
+        )
+    )
+
+    extensions.append(
+        CUDAExtension(
+            name='kaolin.ops.conversions.unbatched_mcube_cuda',
+            sources=filters_cu(['kaolin/csrc/cuda/ops/conversions/unbatched_mcube/unbatched_mcube_cuda.cpp',
+                                'kaolin/csrc/cuda/ops/conversions/unbatched_mcube/unbatched_mcube_cuda_kernel.cu'],
+                               with_cuda),
+            define_macros=define_macros,
+            extra_compile_args=extra_compile_args
+        )
+    )
+
+
+    # use cudart_static instead
+    for extension in extensions:
+        extension.libraries = ['cudart_static' if x == 'cudart' else x
+                               for x in extension.libraries]
+
+    use_cython = True
     ext = '.pyx' if use_cython else '.cpp'
+
     cython_extensions = [
         CppExtension(
-            'kaolin.triangle_hash',
+            'kaolin.ops.mesh.triangle_hash',
             sources=[
-                f'kaolin/cython/triangle_hash{ext}'
+                f'kaolin/csrc/cpu/ops/mesh/triangle_hash{ext}'
             ],
+            include_dirs=[numpy.get_include()],
         ),
         CppExtension(
-            'kaolin.triangle_hash',
+            'kaolin.ops.conversions.mise',
             sources=[
-                f'kaolin/cython/triangle_hash{ext}'
-            ],
-        ),
-        CppExtension(
-            'kaolin.mise',
-            sources=[
-                f'kaolin/cython/mise{ext}'
-            ],
-        ),
-        CppExtension(
-            'kaolin.mcubes',
-            sources=[
-                f'kaolin/cython/mcubes{ext}',
-                'kaolin/cython/pywrapper.cpp',
-                'kaolin/cython/marchingcubes.cpp'
-            ],
-            extra_compile_args=['-std=c++11'],
-        ),
-        CppExtension(
-            'kaolin.nnsearch',
-            sources=[
-                f'kaolin/cython/nnsearch{ext}'
+                f'kaolin/csrc/cpu/ops/conversions/mise{ext}'
             ],
         ),
     ]
-
-    # If building with readthedocs, don't compile CUDA extensions
-    if os.getenv('READTHEDOCS') != 'True':
-        # For every cuda extension, ensure that their is a corresponding function in
-        # docs/conf.py under `autodoc_mock_imports`.
-        cuda_extensions = [
-            KaolinCUDAExtension('kaolin.cuda.load_textures', [
-                'kaolin/cuda/load_textures_cuda.cpp',
-                'kaolin/cuda/load_textures_cuda_kernel.cu',
-            ]),
-            KaolinCUDAExtension('kaolin.cuda.sided_distance', [
-                'kaolin/cuda/sided_distance.cpp',
-                'kaolin/cuda/sided_distance_cuda.cu',
-            ]),
-            KaolinCUDAExtension('kaolin.cuda.furthest_point_sampling', [
-                'kaolin/cuda/furthest_point_sampling.cpp',
-                'kaolin/cuda/furthest_point_sampling_cuda.cu',
-            ]),
-            KaolinCUDAExtension('kaolin.cuda.ball_query', [
-                'kaolin/cuda/ball_query.cpp',
-                'kaolin/cuda/ball_query_cuda.cu',
-            ]),
-            KaolinCUDAExtension('kaolin.cuda.three_nn', [
-                'kaolin/cuda/three_nn.cpp',
-                'kaolin/cuda/three_nn_cuda.cu',
-            ]),
-            KaolinCUDAExtension('kaolin.cuda.tri_distance', [
-                'kaolin/cuda/triangle_distance.cpp',
-                'kaolin/cuda/triangle_distance_cuda.cu',
-            ]),
-            KaolinCUDAExtension('kaolin.cuda.mesh_intersection', [
-                'kaolin/cuda/mesh_intersection.cpp',
-                'kaolin/cuda/mesh_intersection_cuda.cu',
-            ]),
-            KaolinCUDAExtension('kaolin.graphics.nmr.cuda.rasterize_cuda', [
-                'kaolin/graphics/nmr/cuda/rasterize_cuda.cpp',
-                'kaolin/graphics/nmr/cuda/rasterize_cuda_kernel.cu',
-            ]),
-            KaolinCUDAExtension('kaolin.graphics.softras.soft_rasterize_cuda', [
-                'kaolin/graphics/softras/cuda/soft_rasterize_cuda.cpp',
-                'kaolin/graphics/softras/cuda/soft_rasterize_cuda_kernel.cu',
-            ]),
-            KaolinCUDAExtension('kaolin.graphics.dib_renderer.cuda.rasterizer', [
-                'kaolin/graphics/dib_renderer/cuda/rasterizer.cpp',
-                'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda.cu',
-                'kaolin/graphics/dib_renderer/cuda/rasterizer_cuda_back.cu',
-            ]),
-        ]
-    else:
-        cuda_extensions = []
 
     if use_cython:
         from Cython.Build import cythonize
@@ -202,30 +249,14 @@ def get_extensions():
         cython_extensions = cythonize(cython_extensions, language='c++',
                                       compiler_directives=compiler_directives)
 
-    return cython_extensions + cuda_extensions
-
-
-cwd = os.path.dirname(os.path.abspath(__file__))
-
-
-def get_requirements():
-    return [
-        'matplotlib<3.0.0',
-        'scikit-image==0.16.2',
-        'trimesh>=3.0',
-        'scipy==1.4.1',
-        'tqdm==4.32.1',
-        'pptk==0.1.0',
-        'pillow<7.0.0',
-    ]
+    return extensions + cython_extensions
 
 
 if __name__ == '__main__':
-    build_deps()
     setup(
         # Metadata
         name=PACKAGE_NAME,
-        version=version['__version__'],
+        version=version,
         author=AUTHOR,
         description=DESCRIPTION,
         url=URL,
@@ -234,10 +265,11 @@ if __name__ == '__main__':
         python_requires='~=3.6',
 
         # Package info
-        packages=find_packages(exclude=('docs', 'test', 'examples')),
+        packages=find_packages(exclude=('docs', 'tests', 'examples')),
         install_requires=get_requirements(),
         zip_safe=True,
         ext_modules=get_extensions(),
-        include_dirs=[np.get_include()],
-        cmdclass={'build_ext': KaolinBuildExtension}
+        cmdclass={
+            'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)
+        }
     )

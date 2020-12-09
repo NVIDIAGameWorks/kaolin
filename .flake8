@@ -10,27 +10,4 @@ ignore =
     # these ignores are from flake8-comprehensions; please fix!
     C400,C401,C402,C403,C404,C405,C407,C411
 per-file-ignores = __init__.py: F401
-exclude = .git, tests/, build/,
-          examples/ImageRecon,
-          examples/renderers/SoftRas,
-          examples/renderers/test,
-          examples/renderers/NMR,
-          examples/SuperResolution,
-          kaolin/cuda,
-          kaolin/datasets/scannet.py,
-          kaolin/datasets/shapenet.py,
-          kaolin/datasets/usdfile.py,
-          kaolin/engine,
-          kaolin/graphics/dib_renderer,
-          kaolin/graphics/DIBRenderer.py,
-          kaolin/graphics/NeuralMeshRenderer.py,
-          kaolin/graphics/nmr,
-          kaolin/helpers.py,
-          kaolin/mathutils,
-          kaolin/metrics,
-          kaolin/models,
-          kaolin/rep,
-          kaolin/testing,
-          kaolin/transforms,
-          kaolin/vision,
-          kaolin/visualize
+exclude = .git, tests/, build/, _build/, .eggs/

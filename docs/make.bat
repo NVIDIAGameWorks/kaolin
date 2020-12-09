@@ -4,6 +4,20 @@ pushd %~dp0
 
 REM Command file for Sphinx documentation
 
+set KAOLIN_ROOT=%~dp0..
+echo "%KAOLIN_ROOT%\docs\modules\"
+
+REM not to be used by end users
+set EXCLUDE_PATHS="%KAOLIN_ROOT%\kaolin\packed\ %KAOLIN_ROOT%\kaolin\padded\ %KAOLIN_ROOT%\kaolin\unbatched\ \kaolin\*_cuda.*"
+REM Those files are unused since we already have index.rst and conf.py
+set EXCLUDE_GEN_RST=%KAOLIN_ROOT%\docs\modules\setup.rst %KAOLIN_ROOT%\docs\modules\kaolin.rst %KAOLIN_ROOT%\docs\modules\kaolin.version.rst
+
+sphinx-apidoc -eT -d 2 --templatedir=%KAOLIN_ROOT%\docs\modules\ -o %KAOLIN_ROOT%\docs\modules\ %KAOLIN_ROOT% %EXCLUDE_PATHS%
+
+echo %EXCLUDE_GEN_RST%
+del %EXCLUDE_GEN_RST%
+
+
 if "%SPHINXBUILD%" == "" (
 	set SPHINXBUILD=sphinx-build
 )
@@ -25,11 +39,11 @@ if errorlevel 9009 (
 	exit /b 1
 )
 
-%SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS%
+%SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 goto end
 
 :help
-%SPHINXBUILD% -M help %SOURCEDIR% %BUILDDIR% %SPHINXOPTS%
+%SPHINXBUILD% -M help %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 
 :end
 popd
