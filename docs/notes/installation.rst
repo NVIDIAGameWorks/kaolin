@@ -23,7 +23,7 @@ Installation from source
 ------------------------
 
 .. Note::
-    If you just wanna try Kaolin, we recommend using a virtual environment, for instance with `Anaconda <https://www.anaconda.com/>`_:
+    If you just want to try Kaolin, we recommend using a virtual environment, for instance with `Anaconda <https://www.anaconda.com/>`_:
     
     .. code-block:: bash
     
