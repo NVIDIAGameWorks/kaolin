@@ -3,8 +3,11 @@
 kaolin.visualize
 ================
 
-.. toctree::
-   :maxdepth: 2
-   :titlesonly:
+API
+---
 
-   kaolin.visualize.timelapse
+.. automodule:: kaolin.visualize
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
