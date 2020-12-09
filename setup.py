@@ -206,7 +206,7 @@ def get_extensions():
     )
 
     extensions.append(
-        CUDAExtension(
+        extension(
             name='kaolin.ops.conversions.unbatched_mcube_cuda',
             sources=filters_cu(['kaolin/csrc/cuda/ops/conversions/unbatched_mcube/unbatched_mcube_cuda.cpp',
                                 'kaolin/csrc/cuda/ops/conversions/unbatched_mcube/unbatched_mcube_cuda_kernel.cu'],
