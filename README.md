@@ -15,7 +15,7 @@ Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest
 
 ## About this Update
 
-With the version 0.9 release we have revamped the entire Kaolin library, redesigned the API, rewrote and optimized operations and removed unreliable or outdated code. Although this may appear to be a smaller library than our [original release](https://github.com/NVIDIAGameWorks/kaolin/tree/v0.1), test-driven development of Kaolin>=0.9 ensures reliable functionality and timely updates from now on. See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.9) for details.
+With the version 0.9 release we have revamped the entire Kaolin library, redesigned the API, rewrote and optimized operations and removed unreliable or outdated code. Although this may appear to be a smaller library than our [original release](https://github.com/NVIDIAGameWorks/kaolin/tree/v0.1), test-driven development of Kaolin>=0.9 ensures reliable functionality and timely updates from now on. See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.9.0) for details.
 
 ## Contributing
 
