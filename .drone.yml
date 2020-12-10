@@ -2,21 +2,43 @@ kind: pipeline
 type: docker
 name: default
 
+environment:
+  CUDA_VERSION: "10.1"
+  PYTORCH_VERSION: "1.6"
+  CUDNN_VERSION: "7"
+  TORCH_CUDA_ARCH_LIST: "5.2 6.0 6.1 7.0 7.5+PTX"
+
 steps:
-- name: test
-  image: pytorch/pytorch:1.2-cuda10.0-cudnn7-devel
+- name: flake8
+  image: nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
   commands:
-  - pip install --upgrade pip>=18.0.0
-  - pip install flake8==3.7.9 \
-                flake8-bugbear==20.1.4 \
-                flake8-comprehensions==3.2.2 \
-                flake8-mypy==17.8.0 \
-                flake8-pyi==19.3.0 \
-                pytest==5.4.2 \
-                pytest-cov==2.8.1
-  - pip install --no-dependencies -r requirements.txt
-  - apt-get update && apt-get -y install libglib2.0-0  # needed by opencv
+  - >
+    apt-get update && apt-get install -y --no-install-recommends
+    ca-certificates
+    python3-pip
+  - pip3 install --upgrade pip>=19.3
+  - pip install -r tools/ci_requirements.txt
   - flake8 --config=.flake8 .
+
+- name: pytest
+  image: nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
+  commands:
+  - >
+    apt-get update && apt-get install -y --no-install-recommends
+    build-essential
+    curl
+    git
+    libglib2.0-0
+    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
+  - >
+    curl -o ~/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh &&
+    sh ~/miniconda.sh -b -p /opt/conda &&
+    /opt/conda/bin/conda install -y python=${PYTHON_VERSION} &&
+    /opt/conda/bin/conda clean -ya
+  - pip install --upgrade pip>=19.3
+  - export PATH=/opt/conda/bin:$PATH
+  - conda install -y pytorch==${PYTORCH_VERSION} cudatoolkit=${CUDA_VERSION} -c pytorch
   - python setup.py develop
-  - . ./setenv.sh
-  - pytest --cov=kaolin/ tests/
+  - pip install -r tools/ci_requirements.txt
+  - pytest --cov=kaolin/ tests/python && pytest --doctest-modules kaolin/
