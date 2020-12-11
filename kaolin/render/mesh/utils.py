@@ -17,6 +17,8 @@ from __future__ import division
 import torch
 import torch.nn
 
+from .. import camera
+from ... import ops
 
 def texture_mapping(texture_coordinates, texture_maps, mode='nearest'):
     r"""Interpolates texture_maps by texture_coordinates.
