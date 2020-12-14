@@ -39,3 +39,4 @@ steps:
   - python setup.py develop
   - pip install -r tools/ci_requirements.txt
   - pytest --cov=kaolin/ tests/python && pytest --doctest-modules kaolin/
+
