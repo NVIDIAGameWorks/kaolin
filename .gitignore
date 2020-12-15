@@ -12,6 +12,8 @@ kaolin/version.py
 build/
 kaolin.egg-info
 *.so
+*.egg
+.eggs/
 
 # byte-compiled python files
 *.py[cod]
