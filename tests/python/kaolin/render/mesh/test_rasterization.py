@@ -20,8 +20,8 @@ import torch
 import os
 
 from kaolin.render.camera import perspective_camera, rotate_translate_points
-from kaolin.render.mesh.rasterization import dibr_rasterization
-from kaolin.render.mesh.utils import texture_mapping, spherical_harmonic_lighting
+from kaolin.render.mesh import dibr_rasterization, texture_mapping, \
+                               spherical_harmonic_lighting, prepare_vertices
 from kaolin.ops.mesh import index_vertices_by_faces, face_normals
 from PIL import Image
 
@@ -141,6 +141,15 @@ class TestDIBR:
     def face_camera_normals_z(self, face_vertices_camera):
         face_normals_unit = face_normals(face_vertices_camera, unit=True)
         return face_normals_unit[:, :, 2]
+
+    def test_prepare_vertices(self, vertices, faces, camera_rot, camera_trans,
+                              camera_proj, face_vertices_camera, face_vertices_image):
+        _face_vertices_camera, _face_vertices_image, _face_normals = \
+            prepare_vertices(vertices, faces, camera_rot, camera_trans, camera_proj)
+        assert torch.equal(face_vertices_camera, _face_vertices_camera)
+        assert torch.equal(face_vertices_image, _face_vertices_image)
+        assert torch.equal(face_normals(face_vertices_camera, unit=True),
+                           _face_normals)
 
     def test_render_vertex_colors(self, vertex_colors, faces,
                                   face_vertices_camera, face_vertices_image,
@@ -332,8 +341,11 @@ class TestDIBR:
         batch_size = faces.shape[0]
         # face_vertex_colors
         camera_rot = camera_rot.to(device, dtype)
+        camera_rot.requires_grad = False
         camera_trans = camera_trans.to(device, dtype)
+        camera_trans.requires_grad = False
         camera_proj = camera_proj.to(device, dtype)
+        camera_proj.requires_grad = False
         face_attributes = index_vertices_by_faces(vertex_colors.to(device, dtype), faces)
         vertices = vertices.to(device, dtype).clone().detach()
         vertices.requires_grad = False
@@ -347,19 +359,18 @@ class TestDIBR:
                      for bs in range(batch_size)]
         images_gt = torch.stack(images_gt, dim=0).to(device, dtype) / 255.
 
-        moved_vertices_camera = rotate_translate_points(moved_vertices, camera_rot, camera_trans)
-        moved_vertices_image = perspective_camera(moved_vertices_camera, camera_proj)
+        with torch.no_grad():
+            moved_vertices_camera = rotate_translate_points(moved_vertices, camera_rot, camera_trans)
+            moved_vertices_image = perspective_camera(moved_vertices_camera, camera_proj)
 
         # test that the vertex are far enough to fail the test.
         assert not torch.allclose(moved_vertices_image, vertices_image, atol=1e-2, rtol=1e-2)
 
         with torch.no_grad():
-            moved_vertices_camera = rotate_translate_points(moved_vertices, camera_rot, camera_trans)
-            moved_vertices_image = perspective_camera(moved_vertices_camera, camera_proj)
-            face_moved_vertices_camera = index_vertices_by_faces(moved_vertices_camera, faces)
-            face_moved_vertices_image = index_vertices_by_faces(moved_vertices_image, faces)
-            face_moved_normals_z = face_normals(face_moved_vertices_camera,
-                                                     unit=True)[:, :, 2]
+            face_moved_vertices_camera, face_moved_vertices_image, face_moved_normals = \
+                prepare_vertices(moved_vertices, faces, camera_rot, camera_trans, camera_proj)
+            face_moved_normals_z = face_moved_normals[:, :, 2]
+
             imfeat, _, _ = dibr_rasterization(height,
                                               width,
                                               face_moved_vertices_camera[:, :, :, 2],
@@ -374,12 +385,9 @@ class TestDIBR:
 
         for i in range(100):
             optimizer.zero_grad()
-            moved_vertices_camera = rotate_translate_points(moved_vertices, camera_rot, camera_trans)
-            moved_vertices_image = perspective_camera(moved_vertices_camera, camera_proj)
-            face_moved_vertices_camera = index_vertices_by_faces(moved_vertices_camera, faces)
-            face_moved_vertices_image = index_vertices_by_faces(moved_vertices_image, faces)
-            face_moved_normals_z = face_normals(face_moved_vertices_camera,
-                                                     unit=True)[:, :, 2]
+            face_moved_vertices_camera, face_moved_vertices_image, face_moved_normals = \
+                prepare_vertices(moved_vertices, faces, camera_rot, camera_trans, camera_proj)
+            face_moved_normals_z = face_moved_normals[:, :, 2]
             imfeat, _, _ = dibr_rasterization(height,
                                               width,
                                               face_moved_vertices_camera[:, :, :, 2],
@@ -388,7 +396,6 @@ class TestDIBR:
                                               face_moved_normals_z)
             loss = torch.mean(torch.abs(imfeat - images_gt))
             loss.backward()
-
             optimizer.step()
 
         moved_vertices_camera = rotate_translate_points(moved_vertices, camera_rot, camera_trans)
