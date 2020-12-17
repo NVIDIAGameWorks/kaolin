@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import hashlib
+from abc import abstractmethod
 from collections import namedtuple
 from pathlib import Path
 from typing import Callable
@@ -127,7 +128,48 @@ def _get_cache_key(dataset, index):
 KaolinDatasetItem = namedtuple('KaolinDatasetItem', ['data', 'attributes'])
 
 
-class ProcessedDataset(Dataset):
+class KaolinDataset(Dataset):
+    """A dataset supporting the separation of data and attributes, and combines
+    them in its `__getitem__`.
+
+    The return value of `__getitem__` will be a named tuple containing the
+    return value of both `get_data` and `get_attributes`.
+
+    The difference between `get_data` and `get_attributes` is that data are able
+    to be transformed or preprocessed (such as using `ProcessedDataset`), while
+    attributes are generally not.
+    """
+
+    def __getitem__(self, index):
+        """Returns the item at the given index.
+
+        Will contain a named tuple of both data and attributes.
+        """
+        attributes = self.get_attributes(index)
+        data = self.get_data(index)
+        return KaolinDatasetItem(data=data, attributes=attributes)
+
+    @abstractmethod
+    def get_data(self, index):
+        """Returns the data at the given index."""
+        pass
+
+    @abstractmethod
+    def get_attributes(self, index):
+        """Returns the attributes at the given index.
+
+        Attributes are usually not transformed by wrappers such as
+        `ProcessedDataset`.
+        """
+        pass
+
+    @abstractmethod
+    def __len__(self):
+        """Returns the number of entries."""
+        pass
+
+
+class ProcessedDataset(KaolinDataset):
     def __init__(self, dataset, preprocessing_transform=None,
                  cache_dir=None, num_workers=None, transform=None,
                  no_progress: bool = False):
@@ -213,17 +255,6 @@ class ProcessedDataset(Dataset):
     def __len__(self):
         return len(self.dataset)
 
-    def __getitem__(self, index):
-        """Returns the item at the given index.
-
-        Will contain both data (preprocessed and transformed) and attributes.
-        """
-        attributes = self.get_attributes(index)
-        data = self.get_data(index)
-
-        return KaolinDatasetItem(data=data,
-                                 attributes=attributes)
-
     def get_data(self, index):
         """Returns the data at the given index. """
         print(index)
@@ -245,7 +276,7 @@ class ProcessedDataset(Dataset):
         return _get_cache_key(self.dataset, index)
 
 
-class CombinationDataset(Dataset):
+class CombinationDataset(KaolinDataset):
     """Dataset combining a list of datasets into a unified dataset object.
 
     Useful when multiple output representations are needed from a common base
@@ -279,14 +310,6 @@ class CombinationDataset(Dataset):
 
     def __len__(self):
         return self.len
-
-    def __getitem__(self, index):
-        """Returns the item at the given index.
-
-        Will contain both data (preprocessed and transformed) and attributes.
-        """
-        return KaolinDatasetItem(data=self.get_data(index),
-                                 attributes=self.get_attributes(index))
 
     def get_data(self, index):
         return tuple(_get_data(d, index) for d in self.datasets)
