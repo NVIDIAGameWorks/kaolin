@@ -16,37 +16,45 @@ import os
 import warnings
 from collections import namedtuple
 
-from PIL import Image
 import numpy as np
 import torch
+from PIL import Image
 
-return_type = namedtuple('return_type',
-                         ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
-                          'materials_order', 'vertex_normals', 'face_normals'])
+ObjMesh = namedtuple('ObjMesh',
+                     ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
+                      'materials_order', 'vertex_normals', 'face_normals'])
+
 
 class MaterialError(Exception):
     pass
 
+
 class MaterialLoadError(MaterialError):
     pass
+
 
 class MaterialFileError(MaterialError):
     pass
 
+
 class MaterialNotFoundError(MaterialError):
     pass
+
 
 def skip_error_handler(error, **kwargs):
     """Simple error handler to use in :func:`load_obj` that skips all errors
     and logs them as warnings."""
     warnings.warn(error.args[0], UserWarning)
 
+
 def default_error_handler(error, **kwargs):
     """Simple error handle to use in :func:`load_obj` that raises all errors."""
     raise error
 
+
 # TODO(cfujitsang): support https://en.wikipedia.org/wiki/Wavefront_.obj_file#Geometric_vertex ?
-def import_mesh(path, with_materials=False, with_normals=False, error_handler=None):
+def import_mesh(path, with_materials=False, with_normals=False,
+                error_handler=None):
     r"""Load data from an obj file as a single mesh.
 
     With limited materials support to Kd, Ka, Ks, map_Kd, map_Ka and map_Ks.
@@ -139,12 +147,12 @@ def import_mesh(path, with_materials=False, with_normals=False, error_handler=No
     materials = [{} for i in materials_idx]
     for material_name, idx in materials_idx.items():
         if material_name not in materials_dict:
-            error_handler(MaterialNotFoundError(f"'{material_name}' not found."),
-                          material_name=material_name, idx=idx,
-                          materials=materials, materials_order=materials_order)
+            error_handler(
+                MaterialNotFoundError(f"'{material_name}' not found."),
+                material_name=material_name, idx=idx,
+                materials=materials, materials_order=materials_order)
         else:
             materials[idx] = materials_dict[material_name]
-
 
     vertices = torch.FloatTensor([float(el) for sublist in vertices
                                   for el in sublist]).view(-1, 3)
@@ -162,15 +170,17 @@ def import_mesh(path, with_materials=False, with_normals=False, error_handler=No
         materials_order = None
 
     if with_normals:
-        vertex_normals = torch.FloatTensor([float(el) for sublist in vertex_normals
-                                            for el in sublist]).view(-1, 3)
+        vertex_normals = torch.FloatTensor(
+            [float(el) for sublist in vertex_normals
+             for el in sublist]).view(-1, 3)
         face_normals = torch.LongTensor(face_normals) - 1
     else:
         vertex_normals = None
         face_normals = None
 
-    return return_type(vertices, faces, uvs, face_uvs_idx, materials,
-                       materials_order, vertex_normals, face_normals)
+    return ObjMesh(vertices, faces, uvs, face_uvs_idx, materials,
+                   materials_order, vertex_normals, face_normals)
+
 
 def load_mtl(mtl_path, error_handler):
     """Load and parse a Material file.
@@ -203,8 +213,9 @@ def load_mtl(mtl_path, error_handler):
     try:
         f = open(mtl_path, 'r', encoding='utf-8')
     except Exception as e:
-        error_handler(MaterialFileError(f"Failed to load material at path '{mtl_path}':\n{e}"),
-                      mtl_path=mtl_path, mtl_data=mtl_data)
+        error_handler(MaterialFileError(
+            f"Failed to load material at path '{mtl_path}':\n{e}"),
+            mtl_path=mtl_path, mtl_data=mtl_data)
     else:
         for line in f.readlines():
             data = line.split()
@@ -219,11 +230,14 @@ def load_mtl(mtl_path, error_handler):
                     img = Image.open(texture_path)
                     if img.mode != 'RGB':
                         img = img.convert('RGB')
-                    mtl_data[material_name][data[0]] = torch.from_numpy(np.array(img))
+                    mtl_data[material_name][data[0]] = torch.from_numpy(
+                        np.array(img))
                 elif data[0] in {'Kd', 'Ka', 'Ks'}:
-                    mtl_data[material_name][data[0]] = torch.tensor([float(val) for val in data[1:]])
+                    mtl_data[material_name][data[0]] = torch.tensor(
+                        [float(val) for val in data[1:]])
             except Exception as e:
-                error_handler(MaterialLoadError(f"Failed to load material at path '{mtl_path}':\n{e}"),
-                              data=data, mtl_data=mtl_data)
+                error_handler(MaterialLoadError(
+                    f"Failed to load material at path '{mtl_path}':\n{e}"),
+                    data=data, mtl_data=mtl_data)
         f.close()
     return mtl_data
