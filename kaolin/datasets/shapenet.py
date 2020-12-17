@@ -73,6 +73,9 @@ def _convert_categories(categories):
 class ShapeNet(KaolinDataset):
     r"""ShapeNetV1 Dataset class for meshes.
 
+    The `__getitem__` method will return a `KaolinDatasetItem`, with its `data`
+    field containing a `kaolin.io.obj.ObjMesh`.
+
     Args:
         root (str): path to ShapeNet root directory
         categories (list): List of categories to load from ShapeNet. This list may
@@ -80,14 +83,6 @@ class ShapeNet(KaolinDataset):
                            or a combination of both.
         train (bool): If True, return the training set, otherwise the test set
         split (float): fraction of the dataset to be used for training (>=0 and <=1)
-
-    Example:
-        >>> meshes = ShapeNet(root='../data/ShapeNet/')
-        >>> obj = meshes[0]
-        >>> obj.data.vertices.shape
-        torch.Size([2133, 3])
-        >>> obj.data.faces.shape
-        torch.Size([1910, 3])
     """
 
     def __init__(self, root: str, categories: list, train: bool = True,
