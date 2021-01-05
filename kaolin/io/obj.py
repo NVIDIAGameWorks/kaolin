@@ -209,7 +209,7 @@ def load_mtl(mtl_path, error_handler):
     except Exception as e:
         error_handler(MaterialFileError(
             f"Failed to load material at path '{mtl_path}':\n{e}"),
-                      mtl_path=mtl_path, mtl_data=mtl_data)
+            mtl_path=mtl_path, mtl_data=mtl_data)
     else:
         for line in f.readlines():
             data = line.split()
@@ -232,6 +232,6 @@ def load_mtl(mtl_path, error_handler):
             except Exception as e:
                 error_handler(MaterialLoadError(
                     f"Failed to load material at path '{mtl_path}':\n{e}"),
-                              data=data, mtl_data=mtl_data)
+                    data=data, mtl_data=mtl_data)
         f.close()
     return mtl_data
