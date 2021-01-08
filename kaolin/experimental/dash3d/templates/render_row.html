@@ -1,0 +1,34 @@
+{# Note: number of render cards is limited to ensure decent performance for all cases. #}
+<div class="row" id="{{type}}-all">
+  {% if count == 0 %}
+  No {{type}} content written.
+  {% elif count == 1 %}
+  <div class="col col-md-8">
+    <div id="{{type}}-view0" class="view-container"></div>
+  </div>
+  <div class="col col-md-4">
+    <div id="{{type}}-header0">
+      <div class="form-control">
+        <select class="cat"></select>
+      </div>
+      <div class="form-control">
+        <select class="id"></select>
+      </div>
+    </div>
+    <div id="{{type}}-info0" class="info">
+    </div>
+  </div>
+  {% elif count == 2 %}
+  {% for id in range(2) %}
+  <div class="col col-md-6">
+    {% include 'render_card.html' %}
+  </div>
+  {% endfor %}
+  {% else %}
+  {% for id in range(3) %}
+  <div class="col-md-4">
+    {% include 'render_card.html' %}
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>

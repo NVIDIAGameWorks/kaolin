@@ -1,0 +1,2 @@
+recursive-include kaolin/experimental/dash3d/static *
+recursive-include kaolin/experimental/dash3d/templates *

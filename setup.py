@@ -6,6 +6,7 @@
 # IGNORE_VER_ERR
 #   ignore version error for torch
 
+from os import environ
 from setuptools import setup, find_packages, dist
 import importlib
 from pkg_resources import parse_version
@@ -14,6 +15,7 @@ import warnings
 TORCH_MIN_VER = '1.5.0'
 TORCH_MAX_VER = '1.7.1'
 CYTHON_MIN_VER = '0.29.20'
+INCLUDE_EXPERIMENTAL = environ.get('KAOLIN_INSTALL_EXPERIMENTAL') is not None
 
 missing_modules = []
 torch_spec = importlib.util.find_spec("torch")
@@ -122,8 +124,18 @@ def get_requirements():
                       "and won't be installed, please use python_version 3.6 or 3.6 "
                       "to use USD related features")
     requirements.append('usd-core==20.11; python_version < "3.8"')
-
+    if INCLUDE_EXPERIMENTAL:
+        requirements.append('tornado==6.0.4')
+        requirements.append('flask==1.1.2')
     return requirements
+
+
+def get_scripts():
+    if INCLUDE_EXPERIMENTAL:
+        logger.info('Including experimental features')
+        return ['kaolin/experimental/dash3d/kaolin-dash3d']
+    return []
+
 
 def get_extensions():
     extra_compile_args = {'cxx': ['-O3']}
@@ -204,6 +216,8 @@ if __name__ == '__main__':
 
         # Package info
         packages=find_packages(exclude=('docs', 'tests', 'examples')),
+        scripts=get_scripts(),
+        include_package_data=True,
         install_requires=get_requirements(),
         include_dirs=get_include_dirs(),
         zip_safe=True,

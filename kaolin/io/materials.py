@@ -36,7 +36,7 @@ class Material:
     """
     @abstractmethod
     def write_to_usd(self, file_path, scene_path, bound_prims=None, time=None,
-                     usd_dir=None, texture_dir=None, texture_prefix=''):
+                     texture_dir=None, texture_file_prefix='', **kwargs):
         pass
 
     @abstractmethod
@@ -110,8 +110,8 @@ class PBRMaterial(Material):
             },
         }
 
-    def write_to_usd(self, file_path, scene_path, shader='UsdPreviewSurface', bound_prims=None, time=None,
-                     texture_dir='', texture_file_prefix=''):
+    def write_to_usd(self, file_path, scene_path, bound_prims=None, time=None,
+                     texture_dir='', texture_file_prefix='', shader='UsdPreviewSurface'):
         r"""Write material to USD.
         Textures will be written to disk in the format 
         `{file_path}/{texture_dir}/{texture_file_prefix}{attr}.png` where `attr` is one of 

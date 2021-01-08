@@ -107,10 +107,14 @@ if __name__ == "__main__":
             # Emulate a training update
             out_pt_clouds = []
             out_vert_list = []
+            out_voxels = []
             for i in range(len(gt_vert_list)):
                 delta_weight = 1.0 - iteration / (args.iterations - 1)
                 out_vert_list.append(gt_vert_list[i] * (1.0 + delta_list[i] * delta_weight))
                 out_pt_clouds.append(input_pt_clouds[i] * (1.0 + delta_pt_list[i] * delta_weight))
+                vg = kaolin.ops.conversions.trianglemeshes_to_voxelgrids(
+                    out_vert_list[-1].unsqueeze(0), face_list[i], 30)
+                out_voxels.append(vg.squeeze(0).bool())
 
             # Save model predictions to track training progress over time
             timelapse.add_mesh_batch(
@@ -122,10 +126,14 @@ if __name__ == "__main__":
                 iteration=iteration,
                 category='output',
                 pointcloud_list=out_pt_clouds)
+            timelapse.add_voxelgrid_batch(
+                iteration=iteration,
+                category='output',
+                voxelgrid_list=out_voxels)
 
     logger.info('Emulated training complete!\n'
                 'You can now view created USD files found here: {}\n\n'
-                'You will soon be able to visualize these in the Kaolin Research Omniverse App '
+                'You will soon be able to visualize these in the Kaolin Omniverse App '
                 'and our web visualizer. Stay tuned!'.format(args.output_dir))
 
     # TODO(mshugrina): update command line once finalized

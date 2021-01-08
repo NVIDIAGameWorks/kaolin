@@ -1,4 +1,7 @@
+import glob
+import logging
 import os
+import re
 import posixpath
 import warnings
 
@@ -9,12 +12,14 @@ except ImportError:
 
 from kaolin import io
 
+logger = logging.getLogger(__name__)
+
 
 class Timelapse:
     def __init__(self, log_dir, up_axis='Y'):
         self.logdir = log_dir
 
-    def _add_shading_variant(self, stage, prim, name):
+    def _add_shading_variant(self, prim, name):
         vset = prim.GetVariantSets().AddVariantSet("shadingVariant")
         vset.AddVariant(name)
         return vset
@@ -126,7 +131,6 @@ class Timelapse:
 
             stage.Save()
 
-
     def add_mesh_batch(self, iteration=0, category='', vertices_list=None, faces_list=None,
                        uvs_list=None, face_uvs_idx_list=None, face_normals_list=None, materials_list=None):
         """
@@ -168,7 +172,7 @@ class Timelapse:
                 stage.SetDefaultPrim(stage.GetPrimAtPath(f'/{mesh_name}'))
                 if materials_list is not None:
                     for material_name, _ in materials_list[i].items():
-                        self._add_shading_variant(stage, mesh_prim, material_name)
+                        self._add_shading_variant(mesh_prim, material_name)
             else:
                 stage = Usd.Stage.Open(ind_out_path)
                 mesh_prim = stage.GetPrimAtPath(f'/{mesh_name}')
@@ -188,10 +192,206 @@ class Timelapse:
                     vset.SetVariantSelection(material_name)
                     material.usd_root_path = meshes_path
                     with vset.GetVariantEditContext():
-                        material_prim = material.write_to_usd(ind_out_path, f'/{mesh_name}/{material_name}', time=iteration,
-                                                              texture_dir='textures',
-                                                              texture_file_prefix=f'{mesh_name}_{material_name}_{iteration}_')
+                        material_prim = material.write_to_usd(
+                            ind_out_path, f'/{mesh_name}/{material_name}',
+                            time=iteration,
+                            texture_dir='textures',
+                            texture_file_prefix=f'{mesh_name}_{material_name}_{iteration}_')
                         binding_api = UsdShade.MaterialBindingAPI(mesh_prim)
                         binding_api.Bind(UsdShade.Material(material_prim))
-
             stage.Save()
+
+
+def _get_timestamps(filenames):
+    """
+    Returns the timestamps of all filenames as a dictionary keyed by
+    filename. Will throw error if files do not exits.
+    """
+    res = {}
+    for f in filenames:
+        res[f] = os.stat(f).st_mtime_ns
+    return res
+
+
+class TimelapseParser(object):
+    """
+    Utility class for working with log directories created using the Timelapse
+    interface. For example, this class can be used to extract raw data from
+    the written checkpoints as follows:
+
+    Example:
+        # During training
+        timelapse = Timelapse(log_dir)
+        timelapse.add_pointcloud_batch(iteration=idx, category="prediction", pointcloud_list=[predictions])
+
+        # Examining training run
+        parser = TimelapseParser(log_dir)
+        path = parser.get_file_path("pointcloud", "prediction", 0)
+        cloud = kaolin.io.usd.import_pointclouds(path, time=iteration_number)  # time should be iteration number
+        # Visualize, save or analyze as desired
+    """
+    __SUPPORTED_TYPES = ["mesh", "pointcloud", "voxelgrid"]
+
+    class CategoryInfo:
+        """
+        Corresponds to a "category" specified in Timelapse for a specific type
+        like "mesh". The ids corresponds to the number of objects
+        saved in calls like add_mesh_batch, and end_time is the largest end
+        time in the group.
+        """
+        def __init__(self, category, ids=None, end_time=0):
+            self.category = category
+            self.ids = [] if ids is None else list(ids)
+            self.end_time = end_time
+
+        def serializable(self):
+            return {'category': self.category,
+                    'ids': self.ids,
+                    'end_time': self.end_time}
+
+        def __repr__(self):
+            return repr((self.category, len(self.ids), self.end_time))
+
+        def __lt__(self, other):
+            return repr(self) < repr(other)
+
+        def add_instance(self, new_id, end_timecode):
+            if new_id in self.ids:
+                raise RuntimeError('Id {} already added for category {}'.format(new_id, self.category))
+            self.ids.append(new_id)
+            self.ids.sort()
+            self.end_time = max(self.end_time, end_timecode)
+
+    def __init__(self, log_dir):
+        self.logdir = log_dir
+
+        # { (typestr, category, id) : path }
+        self.filepaths = TimelapseParser.get_filepaths(self.logdir)
+        self.timestamps = _get_timestamps(self.filepaths.values())
+
+        # { typestr : [CategoryInfo (serializable)] }
+        self.dir_info = TimelapseParser.parse_filepath_info(self.filepaths)
+        logger.debug(self.dir_info)
+
+    def get_file_path(self, type, category, id):
+        """Gets file path by keys.
+        Args:
+            type (str): one of "mesh", "pointcloud", "voxelgrid"
+            category (str): category passed to Timelapse when writing checkpoints
+            id (int): id of the item within its batch
+        Return:
+            (str) or None
+        """
+        fpath_key = (type, category, int(id))
+        if fpath_key not in self.filepaths:
+            logger.error('Key {} not in filepaths: {}'.format(fpath_key, self.filepaths))
+            return None
+        return self.filepaths[fpath_key]
+
+    def check_for_updates(self):
+        """Updates parse information if it has changed in the logdir.
+
+        Returns:
+            (bool) - True if updates exist, False if not
+        """
+        filepaths = TimelapseParser.get_filepaths(self.logdir)
+        timestamps = _get_timestamps(filepaths.values())
+        if timestamps != self.timestamps:
+            logger.info('Changes to logdirectory detected: {}'.format(self.logdir))
+            self.filepaths = filepaths
+            self.timestamps = timestamps
+            self.dir_info = TimelapseParser.parse_filepath_info(self.filepaths)
+            return True
+        return False
+
+    def num_mesh_categories(self):
+        return len(self.dir_info['mesh'])
+
+    def num_pointcloud_categories(self):
+        return len(self.dir_info['pointcloud'])
+
+    def num_voxelgrid_categories(self):
+        return len(self.dir_info['voxelgrid'])
+
+    def get_category_names_by_type(self, type):
+        if type not in self.dir_info:
+            return [x['category'] for x in self.dir_info[type]]
+
+    def get_category_info(self, type, category):
+        if type not in self.dir_info:
+            return None
+        return next((x for x in self.dir_info[type] if x['category'] == category), None)
+
+    @staticmethod
+    def get_filepaths(logdir):
+        """Get all USD file paths within a directory that match naming conventions imposed by Timelapse.
+
+        Args:
+            logdir (str): root directory where USD timelapse files are written
+
+        Returns:
+            dict: keyed by tuples (typestr, category, id_within_batch) with values
+             containing full USD file paths
+        """
+        fname_pattern = '(.*)_([0-9]+).usd'
+
+        filepaths = {}
+        for typestr in TimelapseParser.__SUPPORTED_TYPES:
+            usd_pattern = '{}*.usd'.format(typestr)
+            files = glob.glob(os.path.join(logdir, '**', usd_pattern), recursive=True)
+
+            if len(files) == 0:
+                logger.info('No checkpoints found for type {}: no files matched pattern {} in {}'.format(
+                    typestr, usd_pattern, logdir))
+
+            for fpath in files:
+                cat = os.path.dirname(os.path.relpath(fpath, logdir))
+                m = re.match(fname_pattern, os.path.basename(fpath))
+                if m is None:
+                    logger.error('USD {} basename does not match pattern {}'.format(
+                        fpath, fname_pattern))
+                    continue
+                num = int(m.group(2))
+                filepaths[(typestr, cat, num)] = fpath
+
+        return filepaths
+
+    @staticmethod
+    def parse_filepath_info(filepaths):
+        """Parses a directory of checkpoints written by Timelapse module into a summary format.
+
+        Args:
+            filepaths: dictionary output by get_filepaths
+
+        Returns:
+            dictionary keyed by checkpoint type ("mesh", "pointcloud", "voxelgrid")
+                      with each value a list of (serializable) CategoryInfo
+        """
+        info = {}  # { "mesh" : { "category": CategoryInfo} }
+        for k, fpath in filepaths.items():
+            stage = Usd.Stage.Open(fpath)
+
+            # Note: stage.GetEndTimeCode() may store incorrect value
+            times = io.usd.get_authored_time_samples(fpath)
+            if len(times) == 0:
+                end_time = 0
+            else:
+                end_time = times[-1]
+
+            typestr, cat, id_num = k
+
+            if typestr not in info:
+                info[typestr] = {}
+            if cat not in info[typestr]:
+                info[typestr][cat] = TimelapseParser.CategoryInfo(cat)
+            info[typestr][cat].add_instance(id_num, end_time)
+
+        result = {}  # { "mesh": [ CategoryInfo (serializable dict) ] }
+        for typestr, catdict in info.items():
+            result[typestr] = [x.serializable() for x in sorted(catdict.values())]
+
+        for typestr in TimelapseParser.__SUPPORTED_TYPES:
+            if typestr not in result:
+                result[typestr] = []   # Ensure all types are represented
+
+        return result

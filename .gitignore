@@ -15,9 +15,14 @@ kaolin.egg-info
 *.egg
 .eggs/
 kaolin/cython/**/*.cpp
+node_modules/
 
 # byte-compiled python files
 *.py[cod]
 
 # pip cache
 .cache
+
+# editor specific
+*~
+.idea

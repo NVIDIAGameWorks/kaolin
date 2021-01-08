@@ -1,0 +1,148 @@
+ /*
+ Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ */
+:root {
+  --sidebar-color: #f5f5f5;
+  --nvidia-color: #76B900;
+}
+
+body {
+    margin: 0;
+  padding: 0;
+    font-family: DINPro,Helvetica,Arial,Sans-Serif;
+}
+
+nav,
+.nav {
+    background: #ffffff;
+    border-bottom: 1px solid #ddd;
+}
+
+.title {
+    font-size: 150%
+}
+
+input[type=checkbox]:checked {
+  color: var(--nvidia-color);
+}
+
+.card {
+  margin: 15px 0;
+}
+
+.container {
+    padding: 0;
+}
+
+/* SIDEBAR ------------------------------------------*/
+
+html{
+  box-sizing: border-box;
+  height: 100%;
+  width: 100%;
+}
+*,
+*:after,
+*:before{
+  box-sizing: inherit;
+}
+
+.full_height{
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+}
+@media (min-width: 992px){
+  .full_height{
+    padding-left: 25%;
+  }
+}
+.sidebar{
+  background-color: var(--sidebar-color);
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 30px;
+  padding: 20px;
+  width: 100%;
+}
+@media (min-width: 992px){
+  .sidebar{
+    height: 100%;
+    left: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: fixed;
+    /*top: 0;*/
+    width: 25%;
+  }
+}
+.main{
+  padding: 20px;
+  width: 100%;
+}
+
+.logdir {
+  width: 100%;
+  font-weight: normal;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-all;
+}
+
+/* VIEWS ------------------------------------------*/
+
+.info {
+  font-size: 80%;
+}
+
+.view-container {
+  margin-top: 10px;
+}
+
+/* EXPERIMENTAL ----------------------------------------------------------------------------*/
+
+.slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 15px;
+  border-radius: 5px;
+  background: #d3d3d3;
+  outline: none;
+  opacity: 0.7;
+  -webkit-transition: .2s;
+  transition: opacity .2s;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: var(--nvidia-color);
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: var(--nvidia-color);
+  cursor: pointer;
+}
+
+input[type="range"] {
+  padding: 0;
+}

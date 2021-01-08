@@ -47,7 +47,8 @@ Include a license at the top of new files.
 * [Python example](examples_license.py)
 
 #### Code organization
-* [kaolin](kaolin/) - The Core of Kaolin library, everything that is not in [csrc](kaolin/csrc) is a Python module.
+* [kaolin](kaolin/) - The core Kaolin library, comprised of python modules, 
+except for code under [csrc](kaolin/csrc) or [experimental](kaolin/experimental).
   * [csrc](kaolin/csrc/) - Directory for all the C++ / CUDA implementations of custom ops.
     The gpu ops parts will be under the subdirectory [csrc/cuda](kaolin/csrc/cuda)
     while the cpu parts will be under the subdirectory [csrc/cpu](kaolin/csrc/cpu).
@@ -57,6 +58,7 @@ Include a license at the top of new files.
   * [render](kaolin/render/) - Module of all the differentiable renderers modules and advanced implementations.
   * [utils](kaolin/utils/) - Module of all the utility features for debugging and testing.
   * [visualize](kaolin/visualize/) - Module of all the visualization modules.
+  * [experimental](kaolin/experimental/) - Contains less thoroughly tested components for early adoption.
 * [examples](examples/) - Examples of Kaolin usage
 * [tests](tests/) - Tests for all Kaolin
 
@@ -70,7 +72,7 @@ We follow [PEP8 Style Guide](https://www.python.org/dev/peps/pep-0008/) with som
 
 It is enforced using [flake8](https://pypi.org/project/flake8/), with [flake8-bugbear](https://pypi.org/project/flake8-bugbear/), [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/), [flake8-mypy](https://pypi.org/project/flake8-mypy/) and [flake8-pyi](https://pypi.org/project/flake8-pyi/)
 
-to run flake8 execute ``flake8 --config=.flake8 .`` from the [root of kaolin](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat)
+To run flake8 execute ``flake8 --config=.flake8 .`` from the [root of kaolin](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat).
 
 On top of that we use prefixes (``packed\_``, ``padded\_``) to indicate that a module / op is specific to a layout, an , all ops of the same purpose for different layouts should be in the same file.
 
@@ -78,8 +80,10 @@ On top of that we use prefixes (``packed\_``, ``padded\_``) to indicate that a m
 
 #### Tests
 We are applying [pytest](https://docs.pytest.org/en/latest/) on [tests/python directory](tests/python/), with [pytest-cov](https://pytest-cov.readthedocs.io/en/latest/), which should follows the directory structure of [kaolin](kaolin/).
+To run these tests execute ``pytest --cov=kaolin/ tests/`` from the [root of kaolin](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat).
 
-to run the tests execute ``pytest --cov=kaolin/ tests/`` from the [root of kaolin](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat)
+Additional integration tests are located in [tests/integration](tests/integration).
+See that subdirectory for details.
 
 #### Documentation
 Contributors are encouraged to verify the generated documentation before each pull request.
