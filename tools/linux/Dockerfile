@@ -33,6 +33,10 @@ ENV PATH /opt/conda/bin:$PATH
 
 RUN conda install -y pytorch==$PYTORCH_VERSION cudatoolkit=${CUDA_VERSION} -c pytorch
 
+RUN conda install -c conda-forge nodejs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2 libxtst6 xauth xvfb
+
 WORKDIR /kaolin
 
 RUN conda list > conda_build.txt
@@ -43,5 +47,8 @@ COPY . .
 
 RUN pip install -r tools/ci_requirements.txt
 
+RUN npm install
+
 ENV TORCH_CUDA_ARCH_LIST "5.2 6.0 6.1 7.0 7.5+PTX"
+ENV KAOLIN_INSTALL_EXPERIMENTAL "1"
 RUN python setup.py develop

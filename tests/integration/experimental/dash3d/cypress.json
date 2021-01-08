@@ -1,0 +1,11 @@
+{
+  "fileServerFolder":  "tests/integration/experimental/dash3d/cypress",
+  "componentFolder" :   "tests/integration/experimental/dash3d/cypress/component",
+  "downloadsFolder" :   "tests/integration/experimental/dash3d/cypress/downloads",
+  "fixturesFolder":    "tests/integration/experimental/dash3d/cypress/fixtures",
+  "integrationFolder": "tests/integration/experimental/dash3d/cypress/integration",
+  "pluginsFile":       "tests/integration/experimental/dash3d/cypress/plugins/index.js",
+  "screenshotsFolder": "tests/integration/experimental/dash3d/cypress/screenshots",
+  "supportFile":       "tests/integration/experimental/dash3d/cypress/support/index.js",
+  "videosFolder":      "tests/integration/experimental/dash3d/cypress/videos"
+}

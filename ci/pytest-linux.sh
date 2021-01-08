@@ -16,4 +16,4 @@ docker run \
     --runtime=nvidia \
     --rm \
     "$IMAGE_NAME" \
-    /bin/bash -c "pytest --cov=kaolin/ tests/python && pytest --doctest-modules kaolin/"
+    /bin/bash -c "pytest --cov=kaolin/ tests/python tests/integration && pytest --doctest-modules kaolin/"

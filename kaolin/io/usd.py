@@ -16,6 +16,7 @@
 and PointCloud representations are currently supported.
 """
 
+import itertools
 import os
 import re
 import warnings
@@ -66,6 +67,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, time):
     prim = stage.GetPrimAtPath(scene_path)
     if not prim:
         raise ValueError(f'No prim found at "{scene_path}".')
+
     mesh_prims = [x for x in Usd.PrimRange(prim).AllPrims(prim) if UsdGeom.Mesh(x)]
     cur_first_idx_faces = 0
     cur_first_idx_uvs = 0
@@ -172,7 +174,22 @@ def get_root(file_path):
     return stage.GetPseudoRoot().GetPath()
 
 
-def get_scene_paths(file_path, scene_path_regex=None, prim_types=None):
+def get_pointcloud_scene_paths(file_path):
+    r"""Returns all point cloud scene paths contained in specified file. Assumes that point
+    clouds are exported using this API.
+
+    Args:
+        file_path (str): Path to usd file (\*.usd, \*.usda).
+
+    Returns:
+        (list of str): List of filtered scene paths.
+    """
+    # TODO(mshugrina): is passing prim_types='PointInstancer' the same as UsdGeom.PointInstancer(p) ?
+    return get_scene_paths(file_path, prim_types=['PointInstancer'],
+                           conditional=lambda p: p.GetAttribute('primvars:kaolin_type').Get() == 'PointCloud')
+
+
+def get_scene_paths(file_path, scene_path_regex=None, prim_types=None, conditional=lambda x: True):
     r"""Return all scene paths contained in specified file. Filter paths with regular
     expression in `scene_path_regex` if provided.
 
@@ -181,6 +198,7 @@ def get_scene_paths(file_path, scene_path_regex=None, prim_types=None):
         scene_path_regex (str, optional): Optional regular expression used to select returned scene paths.
         prim_types (list of str, optional): Optional list of valid USD Prim types used to
             select scene paths.
+        conditional (function path: Bool): Custom conditionals to check
 
     Returns:
         (list of str): List of filtered scene paths.
@@ -206,9 +224,30 @@ def get_scene_paths(file_path, scene_path_regex=None, prim_types=None):
     for p in stage.Traverse():
         is_valid_prim_type = prim_types is None or p.GetTypeName().lower() in prim_types
         is_valid_scene_path = re.match(scene_path_regex, str(p.GetPath()))
-        if is_valid_prim_type and is_valid_scene_path:
+        passes_conditional = conditional(p)
+        if is_valid_prim_type and is_valid_scene_path and passes_conditional:
             scene_paths.append(p.GetPath())
     return scene_paths
+
+
+def get_authored_time_samples(file_path):
+    r"""
+    Returns *all* authored time samples within the USD, aggregated across all primitives.
+
+    Args:
+        file_path (str): Path to usd file (\*.usd, \*.usda).
+
+    Returns:
+        (list)
+    """
+    stage = Usd.Stage.Open(file_path)
+    scene_paths = get_scene_paths(file_path)
+    res = set()
+    for scene_path in scene_paths:
+        prim = stage.GetPrimAtPath(scene_path)
+        attr = prim.GetAttributes()
+        res.update(set(itertools.chain.from_iterable([x.GetTimeSamples() for x in attr])))
+    return sorted(res)
 
 
 def create_stage(file_path, up_axis='Y'):
@@ -625,27 +664,40 @@ def import_pointclouds(file_path, scene_paths=None, times=None):
         torch.Size([100, 3])
     """
     assert os.path.exists(file_path)
-    stage = Usd.Stage.Open(file_path)
 
-    # If scene path not specified, find all point clouds
     if scene_paths is None:
-        scene_paths = []
-        for p in stage.Traverse():
-            is_point_instancer = UsdGeom.PointInstancer(p)
-            if UsdGeom.PointInstancer(p) and p.GetAttribute('primvars:kaolin_type').Get() == 'PointCloud':
-                scene_paths.append(p.GetPath())
+        scene_paths = get_pointcloud_scene_paths(file_path)
     if times is None:
         times = [Usd.TimeCode.Default()] * len(scene_paths)
 
     pointclouds = []
+    stage = Usd.Stage.Open(file_path)
     for scene_path, time in zip(scene_paths, times):
         prim = stage.GetPrimAtPath(scene_path)
         assert prim, f'The prim at {scene_path} does not exist.'
 
         instancer = UsdGeom.PointInstancer(prim)
-        assert instancer   # Currently only support pointclouds from point instancers
+        assert instancer, f'Only point clouds from point instancers are supported. No PointInstancer at {scene_path}.'
         pointclouds.append(torch.tensor(instancer.GetPositionsAttr().Get(time=time)))
     return pointclouds
+
+
+def get_pointcloud_bracketing_time_samples(stage, scene_path, target_time):
+    """Returns two time samples that bracket target_time for point cloud attributes at a specified
+    scene_path.
+
+    Args:
+        stage (Usd.Stage)
+        scene_path (str)
+        target_time (Number)
+    Returns:
+        (iterable of 2 numbers)
+    """
+    # Note: can also get usd_attr.GetTimeSamples()
+    prim = stage.GetPrimAtPath(scene_path)
+    instancer = UsdGeom.PointInstancer(prim)
+    assert instancer, f'Only point clouds from point instancers are supported. No PointInstancer at {scene_path}.'
+    return instancer.GetPositionsAttr().GetBracketingTimeSamples(target_time)
 
 
 def add_pointcloud(stage, points, scene_path, time=None):

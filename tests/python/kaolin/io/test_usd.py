@@ -55,6 +55,16 @@ def hetero_mesh_path():
     return os.path.join(cur_dir, os.pardir, os.pardir,
                         os.pardir, 'samples/rocket_hetero.usd')
 
+@pytest.fixture(scope='module')
+def pointcloud():
+    cur_dir = os.path.dirname(os.path.realpath(__file__))
+    pointcloud = usd.import_pointcloud(
+        os.path.join(cur_dir, os.pardir, os.pardir,
+                     os.pardir, 'samples/rocket_pointcloud.usda'),
+        '/World/pointcloud')
+    return pointcloud
+
+
 class TestMeshes:
     def setup_method(self):
         self.file_name = 'meshes.usda'
@@ -252,14 +262,6 @@ class TestPointCloud:
         self.scene_path = '/World/pointcloud'
         self.num_multiple = 3
 
-    @pytest.fixture(scope='class')
-    def pointcloud(self):
-        cur_dir = os.path.dirname(os.path.realpath(__file__))
-        pointcloud = usd.import_pointcloud(os.path.join(cur_dir, os.pardir, os.pardir,
-                                           os.pardir, 'samples/rocket_pointcloud.usda'),
-                                           '/World/pointcloud')
-        return pointcloud
-
     def test_export_single(self, out_dir, pointcloud):
         out_path = os.path.join(out_dir, 'pointcloud.usda')
         usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path)
@@ -274,6 +276,10 @@ class TestPointCloud:
         # Export some meshes using default scene paths
         usd.export_pointclouds(pointclouds=[pointcloud for _ in range(self.num_multiple)],
                                file_path=out_path)
+
+        # Test that can get their scene paths later
+        scene_paths = usd.get_pointcloud_scene_paths(out_path)
+        assert len(scene_paths) == self.num_multiple
 
     def test_import_single(self, out_dir, pointcloud):
         out_path = os.path.join(out_dir, 'pointcloud.usda')
@@ -297,12 +303,16 @@ class TestVoxelGrid:
         self.scene_path = '/World/voxelgrid'
         self.num_multiple = 3
 
-    @pytest.fixture(scope='class')
-    def voxelgrid(self, mesh):
+    @staticmethod
+    def make_voxelgrid(mesh):
         resolution = 64
         voxelgrid = trianglemeshes_to_voxelgrids(mesh.vertices.unsqueeze(0), mesh.faces,
                                                  resolution)
         return voxelgrid[0].bool()
+
+    @pytest.fixture(scope='class')
+    def voxelgrid(self, mesh):
+        return TestVoxelGrid.make_voxelgrid(mesh)
 
     def test_export_single(self, out_dir, voxelgrid):
         out_path = os.path.join(out_dir, 'voxelgrid.usda')
@@ -331,3 +341,35 @@ class TestVoxelGrid:
         assert len(voxelgrid_in_list) == self.num_multiple
         for voxelgrid_in in voxelgrid_in_list:
             assert torch.equal(voxelgrid, voxelgrid_in)
+
+
+class TestMisc:
+    @pytest.fixture(scope='class')
+    def voxelgrid(self, mesh):
+        return TestVoxelGrid.make_voxelgrid(mesh)
+
+    def test_get_authored_time_samples_untimed(self, out_dir, mesh, voxelgrid):
+        out_path = os.path.join(out_dir, 'untimed.usda')
+        usd.export_voxelgrid(file_path=out_path, voxelgrid=voxelgrid, scene_path='/World/voxelgrid')
+        usd.export_mesh(out_path, scene_path='/World/meshes', vertices=mesh.vertices, faces=mesh.faces)
+
+        times = usd.get_authored_time_samples(out_path)
+        assert times == []
+
+    def test_get_authored_time_samples_timed(self, out_dir, mesh, voxelgrid, pointcloud):
+        out_path = os.path.join(out_dir, 'timed.usda')
+        usd.export_voxelgrid(file_path=out_path, voxelgrid=voxelgrid, scene_path='/World/voxelgrid')
+        times = usd.get_authored_time_samples(out_path)
+        assert times == []
+
+        usd.export_voxelgrid(file_path=out_path, voxelgrid=voxelgrid, scene_path='/World/voxelgrid', time=1)
+        times = usd.get_authored_time_samples(out_path)
+        assert times == [1]
+
+        usd.export_mesh(out_path, scene_path='/World/meshes', vertices=mesh.vertices, faces=mesh.faces, time=20)
+        usd.export_mesh(out_path, scene_path='/World/meshes', vertices=mesh.vertices, faces=None, time=250)
+        times = usd.get_authored_time_samples(out_path)
+        assert times == [1, 20, 250]
+
+        usd.export_pointcloud(out_path, pointcloud)
+

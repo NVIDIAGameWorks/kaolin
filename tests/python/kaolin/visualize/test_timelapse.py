@@ -180,3 +180,87 @@ class TestTimelapse:
             pointcloud_in = io.usd.import_pointcloud(filename, scene_path='/pointcloud_0', time=iteration)
 
             assert torch.allclose(pointcloud_in, params['pointcloud_list'][0])
+
+
+class TestTimelapseParser:
+    @pytest.fixture(scope='class')
+    def timelapse_sample_dir(self):
+        # To regenerate run:
+        # 'examples/tutorial/visualize_main.py \
+        #    --checkpoint_interval=10 --iterations=101 --skip_normalization  \
+        #    --test_objs=test/samples/rocket.obj,test/samples/model.obj --output_dir=<CLEARED_OUTPUT_DIR>
+        cur_dir = os.path.dirname(os.path.realpath(__file__))
+        return os.path.join(cur_dir, os.pardir, os.pardir, os.pardir, 'samples',
+                            'timelapse', 'notexture')
+
+    @pytest.fixture(scope='class')
+    def output_dir2(self):
+        # Create temporary output directory
+        out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '_viz_out')
+        if os.path.exists(out_dir):
+            shutil.rmtree(out_dir)
+        yield out_dir
+        # shutil.rmtree(out_dir)  # Note: comment to keep output directory
+
+    def test_parsing(self, timelapse_sample_dir, output_dir2, meshes):
+        shutil.copytree(timelapse_sample_dir, output_dir2)
+
+        parser = timelapse.TimelapseParser(output_dir2)
+        expected_keys = [('mesh', 'ground_truth', 0),
+                         ('mesh', 'ground_truth', 1),
+                         ('mesh', 'output', 0),
+                         ('mesh', 'output', 1),
+                         ('pointcloud', 'input', 0),
+                         ('pointcloud', 'input', 1),
+                         ('pointcloud', 'output', 0),
+                         ('pointcloud', 'output', 1),
+                         ('voxelgrid', 'output', 0),
+                         ('voxelgrid', 'output', 1)]
+        expected_keys.sort()
+        assert sorted(parser.filepaths.keys()) == expected_keys
+        for k in expected_keys:
+            assert os.path.exists(parser.filepaths[k])
+
+        assert parser.num_mesh_categories() == 2
+        assert parser.num_pointcloud_categories() == 2
+        assert parser.num_voxelgrid_categories() == 1
+
+        expected_categories = {
+            "mesh": [
+                timelapse.TimelapseParser.CategoryInfo(
+                    'ground_truth', ids=[0, 1], end_time=0).serializable(),
+                timelapse.TimelapseParser.CategoryInfo(
+                    'output', ids=[0, 1], end_time=100).serializable()],
+            "pointcloud": [
+                timelapse.TimelapseParser.CategoryInfo(
+                    'input', ids=[0, 1], end_time=0).serializable(),
+                timelapse.TimelapseParser.CategoryInfo(
+                    'output', ids=[0, 1], end_time=100).serializable()],
+            "voxelgrid": [
+                timelapse.TimelapseParser.CategoryInfo(
+                    'output', ids=[0, 1], end_time=100).serializable()]
+        }
+        assert set(expected_categories.keys()) == set(parser.dir_info.keys())
+        for k, v in expected_categories.items():
+            expected = v
+            actual = parser.dir_info[k]
+            assert len(expected) == len(actual)
+            for i in range(len(expected)):
+                for ck, cv in expected[i].items():  # Only check expected properties
+                    assert (ck in actual[i])
+                    assert cv == actual[i][ck]
+
+        # Now we add another iteration
+        writer = timelapse.Timelapse(output_dir2)
+        writer.add_mesh_batch(iteration=200, category='output',
+                              vertices_list=[m.vertices for m in meshes],
+                              faces_list=[m.faces for m in meshes])
+        assert parser.check_for_updates()
+        assert parser.get_category_info('mesh', 'output')['end_time'] == 200
+
+        # Now let's delete a category
+        shutil.rmtree(os.path.join(output_dir2, 'output'))
+        assert parser.check_for_updates()
+        assert parser.num_mesh_categories() == 1
+        assert parser.num_pointcloud_categories() == 1
+        assert parser.num_voxelgrid_categories() == 0
