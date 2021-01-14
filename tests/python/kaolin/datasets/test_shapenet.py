@@ -16,8 +16,8 @@ from pathlib import Path
 import pytest
 import torch
 
-from kaolin.datasets.shapenet import ShapeNet
 from kaolin.io.obj import ObjMesh
+from kaolin.io.shapenet import ShapeNet
 
 SHAPENET_PATH = '/data/ShapeNet'
 SHAPENET_TEST_CATEGORY_SYNSETS = ['03001627']
