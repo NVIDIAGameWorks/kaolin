@@ -20,21 +20,41 @@ from kaolin.io.obj import ObjMesh
 from kaolin.io.shapenet import ShapeNet
 
 SHAPENET_PATH = '/data/ShapeNet'
-SHAPENET_TEST_CATEGORY_SYNSETS = ['03001627']
-SHAPENET_TEST_CATEGORY_LABELS = ['chair']
+SHAPENET_TEST_CATEGORY_SYNSETS = ['02691156']
+SHAPENET_TEST_CATEGORY_LABELS = ['plane']
+SHAPENET_TEST_CATEGORY_SYNSETS_2 = ['02958343']
+SHAPENET_TEST_CATEGORY_LABELS_2 = ['car']
+SHAPENET_TEST_CATEGORY_SYNSETS_MULTI = ['02691156', '02958343']
+SHAPENET_TEST_CATEGORY_LABELS_MULTI = ['plane', 'car']
+
+ALL_CATEGORIES = [
+    SHAPENET_TEST_CATEGORY_SYNSETS,
+    SHAPENET_TEST_CATEGORY_LABELS,
+    SHAPENET_TEST_CATEGORY_SYNSETS_2,
+    SHAPENET_TEST_CATEGORY_LABELS_2,
+    SHAPENET_TEST_CATEGORY_SYNSETS_MULTI,
+    SHAPENET_TEST_CATEGORY_LABELS_MULTI,
+]
 
 
+@pytest.mark.parametrize('categories', ALL_CATEGORIES)
+@pytest.mark.parametrize('train', [True, False])
+@pytest.mark.parametrize('index', [0, -1])
 class TestShapeNet(object):
 
     @pytest.fixture(autouse=True)
-    def shapenet_dataset(self):
+    def shapenet_dataset(self, categories, train):
         return ShapeNet(root=SHAPENET_PATH,
-                        categories=SHAPENET_TEST_CATEGORY_SYNSETS,
-                        train=True, split=1.0)
+                        categories=categories,
+                        train=train, split=0.7)
 
-    def test_basic_getitem(self, shapenet_dataset):
+    def test_basic_getitem(self, shapenet_dataset, index):
         assert len(shapenet_dataset) > 0
-        item = shapenet_dataset[0]
+
+        if index == -1:
+            index = len(shapenet_dataset) - 1
+
+        item = shapenet_dataset[index]
         data = item.data
         attributes = item.attributes
         assert isinstance(data, ObjMesh)
@@ -50,11 +70,3 @@ class TestShapeNet(object):
         assert isinstance(attributes['path'], Path)
         assert isinstance(attributes['synset'], str)
         assert isinstance(attributes['label'], str)
-
-    def test_init_by_labels(self):
-        dataset = ShapeNet(root=SHAPENET_PATH,
-                           categories=SHAPENET_TEST_CATEGORY_LABELS,
-                           train=True, split=1.0)
-
-        assert isinstance(dataset[0].data, ObjMesh)
-        assert isinstance(dataset[0].attributes, dict)
