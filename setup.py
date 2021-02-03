@@ -12,7 +12,7 @@ from pkg_resources import parse_version
 import warnings
 
 TORCH_MIN_VER = '1.5.0'
-TORCH_MAX_VER = '1.7.0'
+TORCH_MAX_VER = '1.7.1'
 CYTHON_MIN_VER = '0.29.20'
 
 missing_modules = []

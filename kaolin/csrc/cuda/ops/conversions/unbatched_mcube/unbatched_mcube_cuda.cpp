@@ -50,9 +50,6 @@ void launch_generateTriangles2(at::Tensor pos, at::Tensor faces, at::Tensor comp
 void allocateTextures(at::Tensor d_triTable, at::Tensor d_numUniqueVertsTable, at::Tensor d_numTrianglesTable, 
                       at::Tensor d_numPartialVertsTable, at::Tensor d_vertsOrderTable);
 
-// TODO:change to Cub Scan in the future.
-void ThrustScanWrapper(at::Tensor output, at::Tensor input, int numElements);
-
 // torch::Tensor used to store tables
 torch::Tensor d_triTable;
 torch::Tensor d_numUniqueVertsTable;
@@ -68,9 +65,10 @@ computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
                   int *activeVoxels, int *totalVerts, int *totalTriangles, int *totalPartialVerts,
                   int numVoxels, float3 voxelSize, int maxVerts, int maxFaces,
                   torch::Tensor voxelgrid, torch::Tensor d_pos, torch::Tensor d_faces,
-                  torch::Tensor d_voxelPartialVerts, torch::Tensor d_voxelPartialVertsScan,
-                  torch::Tensor d_voxelTriangles, torch::Tensor d_voxelTrianglesScan,
-                  torch::Tensor d_voxelOccupied, torch::Tensor d_voxelOccupiedScan, torch::Tensor d_compVoxelArray,
+                  torch::Tensor d_voxelPartialVerts,
+                  torch::Tensor d_voxelTriangles,
+                  torch::Tensor d_voxelOccupied,
+                  torch::Tensor d_compVoxelArray,
                   torch::Tensor d_voxelVertsOrder)
 {
   // calculate number of vertices and triangles need per voxel
@@ -79,9 +77,10 @@ computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
                        d_voxelVertsOrder,
                        gridSize, numVoxels, voxelgrid,
                        voxelSize, isoValue);
-
-  // scan voxel occupied array
-  ThrustScanWrapper(d_voxelOccupiedScan, d_voxelOccupied, numVoxels);
+  
+  torch::Tensor d_voxelOccupiedScan = at::_cumsum(d_voxelOccupied, 0);
+  d_voxelOccupiedScan = at::roll(d_voxelOccupiedScan, 1, {0});
+  d_voxelOccupiedScan.index_put_({0}, 0);
 
   // read back values to calculate total number of non-empty voxels
   // since we are using an exclusive scan, the total is the last value of
@@ -108,13 +107,17 @@ computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
 
   // compact voxel index array
   launch_compactVoxels(d_compVoxelArray, d_voxelOccupied, d_voxelOccupiedScan, numVoxels);
-
+  
   //scan voxel triangle count array
-  ThrustScanWrapper(d_voxelTrianglesScan, d_voxelTriangles, numVoxels);
-
+  torch::Tensor d_voxelTrianglesScan = at::_cumsum(d_voxelTriangles, 0);
+  d_voxelTrianglesScan = at::roll(d_voxelTrianglesScan, 1, {0});
+  d_voxelTrianglesScan.index_put_({0}, 0);
+  
   //scan partial vertex count array
-  ThrustScanWrapper(d_voxelPartialVertsScan, d_voxelPartialVerts, numVoxels);
-
+  torch::Tensor d_voxelPartialVertsScan = at::_cumsum(d_voxelPartialVerts, 0);
+  d_voxelPartialVertsScan = at::roll(d_voxelPartialVertsScan, 1, {0});
+  d_voxelPartialVertsScan.index_put_({0}, 0);
+  
   // readback total number of triangles
   {
     int lastElement, lastScanElement;
@@ -191,11 +194,8 @@ std::vector<at::Tensor> unbatched_mcube_forward(const at::Tensor voxelgrid, floa
   torch::Tensor d_faces = torch::zeros({maxFaces, 3}, int_options); // tensor to store output faces
 
   torch::Tensor d_voxelPartialVerts = torch::zeros({numVoxels}, int_options); // tensor to measure how many vertices a voxel will generate, only count on three edges.
-  torch::Tensor d_voxelPartialVertsScan = torch::zeros({numVoxels}, int_options); // prefix sum of d_voxelPartialVerts
   torch::Tensor d_voxelTriangles = torch::zeros({numVoxels}, int_options); // tensor to measure how many trianlges a voxel will generate
-  torch::Tensor d_voxelTrianglesScan = torch::zeros({numVoxels}, int_options); // prefix sum of d_voxelTriangles
   torch::Tensor d_voxelOccupied = torch::zeros({numVoxels}, int_options); // binary tensor to indicate whether the voxel will generate any vertices or not
-  torch::Tensor d_voxelOccupiedScan = torch::zeros({numVoxels}, int_options); // prefix sum of d_voxelOccupied
   torch::Tensor d_compVoxelArray = torch::zeros({numVoxels}, int_options); // compact representation of d_voxelOccupiedScan
 
   torch::Tensor d_voxelVertsOrder = torch::zeros({numVoxels, 3}, int_options); // tensor to store the order of added verts for each voxel
@@ -216,9 +216,9 @@ std::vector<at::Tensor> unbatched_mcube_forward(const at::Tensor voxelgrid, floa
                     &activeVoxels, &totalVerts, &totalTriangles, &totalPartialVerts,
                     numVoxels, voxelSize, maxVerts, maxFaces,
                     voxelgrid, d_pos, d_faces,
-                    d_voxelPartialVerts, d_voxelPartialVertsScan,
-                    d_voxelTriangles, d_voxelTrianglesScan,
-                    d_voxelOccupied, d_voxelOccupiedScan, d_compVoxelArray, d_voxelVertsOrder);
+                    d_voxelPartialVerts,
+                    d_voxelTriangles,
+                    d_voxelOccupied, d_compVoxelArray, d_voxelVertsOrder);
 
   std::vector<at::Tensor> result;
 
