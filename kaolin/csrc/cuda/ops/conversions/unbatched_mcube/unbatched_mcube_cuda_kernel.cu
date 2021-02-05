@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#define CUB_NS_PREFIX namespace kaolin {
+#define CUB_NS_POSTFIX }
 
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +22,7 @@
 
 #include <ATen/ATen.h>
 
-// #include <cub/cub.cuh> 
+#include <cub/cub.cuh>
 
 // textures containing look-up tables
 texture<uint, 1, cudaReadModeElementType> triTex;
@@ -446,10 +448,11 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
 
     v[0] = &vertlist[(edge*NTHREADS)+threadIdx.x];
 
+    // Add the vertex in reverse order to keep the original pose.
     if (index < (maxVerts - 3)) {
-      pos[index * 3] = (v[0]) -> x;
+      pos[index * 3] = (v[0]) -> z;
       pos[index * 3 + 1] = (v[0]) -> y;
-      pos[index * 3 + 2] = (v[0]) -> z;
+      pos[index * 3 + 2] = (v[0]) -> x;
     }
   }
 
@@ -475,11 +478,12 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
     int offset2 = find_offset(face_idx2, target_voxel_idx2, voxelVertsOrder); 
     int offset3 = find_offset(face_idx3, target_voxel_idx3, voxelVertsOrder);
 
+    // Add the faces in reverse order to ensure that original pose is unchanged
     // handle first vertex
     num_prev_verts = numPartialVertsScanned[target_voxel_idx1];
     num_prev_triangles = numTrianglesScanned[voxel];
 
-    faces[num_prev_triangles * 3 + j] = num_prev_verts + offset1;
+    faces[num_prev_triangles * 3 + j + 2] = num_prev_verts + offset1;
 
     // handle second vertex
     num_prev_verts = numPartialVertsScanned[target_voxel_idx2];
@@ -491,7 +495,7 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
     num_prev_verts = numPartialVertsScanned[target_voxel_idx3];
     num_prev_triangles = numTrianglesScanned[voxel];
 
-    faces[num_prev_triangles * 3 + j + 2] = num_prev_verts + offset3;
+    faces[num_prev_triangles * 3 + j] = num_prev_verts + offset3;
   }
 }
 
@@ -515,4 +519,28 @@ void launch_generateTriangles2(at::Tensor pos, at::Tensor faces, at::Tensor comp
                                           voxelgrid.data_ptr<float>(), gridSize,
                                           voxelSize, isoValue, activeVoxels,
                                           maxVerts);
+}
+
+void CubScanWrapper(at::Tensor output, at::Tensor input, int numElements)
+{
+  int *d_in = input.data_ptr<int>();
+  int *d_out = output.data_ptr<int>();
+
+  cudaError_t err = cudaGetLastError();
+
+  if ( err != cudaSuccess )
+  {
+    printf("CUDA Error: %s\n", cudaGetErrorString(err));
+    exit(-1);
+  }
+  // Determine temporary device storage requirements
+  void *d_temp_storage = NULL;
+  size_t temp_storage_bytes = 0;
+  kaolin::cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_in, d_out, numElements);
+
+  // Allocate temporary storage
+  cudaMalloc(&d_temp_storage, temp_storage_bytes);
+
+  // Run exclusive prefix sum
+  kaolin::cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_in, d_out, numElements);
 }

@@ -50,6 +50,8 @@ void launch_generateTriangles2(at::Tensor pos, at::Tensor faces, at::Tensor comp
 void allocateTextures(at::Tensor d_triTable, at::Tensor d_numUniqueVertsTable, at::Tensor d_numTrianglesTable, 
                       at::Tensor d_numPartialVertsTable, at::Tensor d_vertsOrderTable);
 
+void CubScanWrapper(at::Tensor output, at::Tensor input, int numElements);
+
 // torch::Tensor used to store tables
 torch::Tensor d_triTable;
 torch::Tensor d_numUniqueVertsTable;
@@ -78,9 +80,8 @@ computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
                        gridSize, numVoxels, voxelgrid,
                        voxelSize, isoValue);
   
-  torch::Tensor d_voxelOccupiedScan = at::_cumsum(d_voxelOccupied, 0);
-  d_voxelOccupiedScan = at::roll(d_voxelOccupiedScan, 1, {0});
-  d_voxelOccupiedScan.index_put_({0}, 0);
+  torch::Tensor d_voxelOccupiedScan = torch::zeros({numVoxels}, voxelgrid.options().dtype(torch::kInt32));
+  CubScanWrapper(d_voxelOccupiedScan, d_voxelOccupied, numVoxels);
 
   // read back values to calculate total number of non-empty voxels
   // since we are using an exclusive scan, the total is the last value of
@@ -109,14 +110,13 @@ computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
   launch_compactVoxels(d_compVoxelArray, d_voxelOccupied, d_voxelOccupiedScan, numVoxels);
   
   //scan voxel triangle count array
-  torch::Tensor d_voxelTrianglesScan = at::_cumsum(d_voxelTriangles, 0);
-  d_voxelTrianglesScan = at::roll(d_voxelTrianglesScan, 1, {0});
-  d_voxelTrianglesScan.index_put_({0}, 0);
+  torch::Tensor d_voxelTrianglesScan = torch::zeros({numVoxels}, voxelgrid.options().dtype(torch::kInt32));
+  CubScanWrapper(d_voxelTrianglesScan, d_voxelTriangles, numVoxels);
   
   //scan partial vertex count array
-  torch::Tensor d_voxelPartialVertsScan = at::_cumsum(d_voxelPartialVerts, 0);
-  d_voxelPartialVertsScan = at::roll(d_voxelPartialVertsScan, 1, {0});
-  d_voxelPartialVertsScan.index_put_({0}, 0);
+  torch::Tensor d_voxelPartialVertsScan = torch::zeros({numVoxels}, voxelgrid.options().dtype(torch::kInt32));
+  CubScanWrapper(d_voxelPartialVertsScan, d_voxelPartialVerts, numVoxels);
+
   
   // readback total number of triangles
   {
