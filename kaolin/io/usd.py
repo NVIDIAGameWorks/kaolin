@@ -81,7 +81,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
 
     attrs = {}
 
-    def _process_mesh(mesh_prim, ref_path, attrs):
+    def _process_mesh(mesh_prim, ref_path, attrs, time):
         cur_first_idx_faces = sum([len(v) for v in attrs.get('vertices', [])])
         cur_first_idx_uvs = sum([len(u) for u in attrs.get('uvs', [])])
         mesh = UsdGeom.Mesh(mesh_prim)
@@ -200,16 +200,16 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
                             # Assign to `None` material (ie. index 0)
                             attrs.setdefault('materials_face_idx', []).extend([0] * mesh_face_vertex_counts[face_idx])
 
-    def _traverse(cur_prim, ref_path, attrs):
+    def _traverse(cur_prim, ref_path, attrs, time):
         metadata = cur_prim.GetMetadata('references')
         if metadata:
             ref_path = os.path.dirname(metadata.GetAddedOrExplicitItems()[0].assetPath)
         if UsdGeom.Mesh(cur_prim):
-            _process_mesh(cur_prim, ref_path, attrs)
+            _process_mesh(cur_prim, ref_path, attrs, time)
         for child in cur_prim.GetChildren():
-            _traverse(child, ref_path, attrs)
+            _traverse(child, ref_path, attrs, time)
 
-    _traverse(stage.GetPrimAtPath(scene_path), '', attrs)
+    _traverse(stage.GetPrimAtPath(scene_path), '', attrs, time)
 
     if not attrs.get('vertices'):
         warnings.warn(f'Scene object at {scene_path} contains no vertices.', UserWarning)
