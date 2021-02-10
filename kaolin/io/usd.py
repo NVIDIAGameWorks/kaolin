@@ -101,6 +101,9 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
 
         # Parse mesh geometry
         if mesh_vertices:
+            mesh_vertices = torch.tensor(mesh_vertices)
+            mesh_vertices_homo = torch.nn.functional.pad(mesh_vertices, (0, 1), mode='constant', value=1.)
+            mesh_vertices = (mesh_vertices_homo @ transform)[:, :3]
             attrs.setdefault('vertices', []).append(torch.from_numpy(np.array(mesh_vertices, dtype=np.float32)))
         if mesh_vertex_indices:
             attrs.setdefault('face_vertex_counts', []).append(torch.from_numpy(
