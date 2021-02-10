@@ -119,12 +119,12 @@ def import_mesh(path, with_materials=False, with_normals=False, error_handler=No
                     if len(data[1]) > 1 and data[1][1] != '':
                         face_uvs_idx.append([int(d[1]) for d in data])
                     else:
-                        face_uvs_idx.append([-1, -1, -1])
+                        face_uvs_idx.append([0, 0, 0])
                 if with_normals:
                     if len(data[1]) > 2:
                         face_normals.append([int(d[2]) for d in data])
                     else:
-                        face_normals.append([-1, -1, -1])
+                        face_normals.append([0, 0, 0])
             elif with_materials and data[0] == 'usemtl':
                 cur_idx += len(face_uvs_idx)
                 material_name = data[1]

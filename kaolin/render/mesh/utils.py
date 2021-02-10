@@ -1,5 +1,5 @@
 # Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -46,7 +46,7 @@ def texture_mapping(texture_coordinates, texture_maps, mode='nearest'):
     # some opengl texture coordinate is larger than 1 or less than 0
     # in opengl it will be normalized by remainder
     # we do the same in pytorch
-    texture_coordinates = torch.remainder(texture_coordinates, 1.0)
+    texture_coordinates = torch.clamp(texture_coordinates, 0., 1.)
     texture_coordinates = texture_coordinates * 2 - 1  # [0, 1] to [-1, 1]
     texture_coordinates[:, :, :, 1] = -texture_coordinates[:, :, :, 1]  # reverse y
 
@@ -107,7 +107,8 @@ def spherical_harmonic_lighting(imnormal, lights):
 
     return lighting_effect
 
-def prepare_vertices(vertices, faces, camera_rot, camera_trans, camera_proj):
+def prepare_vertices(vertices, faces, camera_proj, camera_rot=None, camera_trans=None,
+                     camera_transform=None):
     r"""Wrapper function to move and project vertices to cameras then index them with faces.
 
     Args:
@@ -115,15 +116,18 @@ def prepare_vertices(vertices, faces, camera_rot, camera_trans, camera_proj):
             the meshes vertices, of shape :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
         faces (torch.LongTensor):
             the meshes faces, of shape :math:`(\text{num_faces}, \text{face_size})`.
-        camera_rot (torch.Tensor):
-            the camera rotation matrices,
-            of shape :math:`(\text{batch_size}, 3, 3)`.
-        camera_trans (torch.Tensor):
-            the camera translation vectors,
-            of  shape :math:`(\text{batch_size}, 3)`.
         camera_proj (torch.Tensor):
             the camera projection vector, of shape :math:`(3, 1)`.
-
+        camera_rot (torch.Tensor, optional):
+            the camera rotation matrices,
+            of shape :math:`(\text{batch_size}, 3, 3)`.
+        camera_trans (torch.Tensor, optional):
+            the camera translation vectors,
+            of  shape :math:`(\text{batch_size}, 3)`.
+        camera_transform (torch.Tensor, optional):
+            the camera transformation matrices,
+            of shape :math:`(\text{batch_size}, 4, 3}`.
+            Replace `camera_trans` and `camera_rot`.
     Returns:
         (torch.Tensor, torch.Tensor, torch.Tensor):
             The vertices in camera coordinate indexed by faces,
@@ -132,7 +136,20 @@ def prepare_vertices(vertices, faces, camera_rot, camera_trans, camera_proj):
             of shape :math:`(\text{batch_size}, \text{num_faces}, \text{face_size}, 2)`.
             The face normals, of shape :math:`(\text{batch_size}, \text{num_faces})`.
     """
-    vertices_camera = camera.rotate_translate_points(vertices, camera_rot, camera_trans)
+    # Apply the transformation from camera_rot and camera_trans or camera_transform
+    if camera_transform is None:
+        assert camera_trans is not None and camera_rot is not None, \
+            "camera_transform or camera_trans and camera_rot must be defined"
+        vertices_camera = camera.rotate_translate_points(vertices, camera_rot,
+                                                         camera_trans)
+    else:
+        assert camera_trans is None and camera_rot is None, \
+            "camera_trans and camera_rot must be None when camera_transform is defined"
+        padded_vertices = torch.nn.functional.pad(
+            vertices, (0, 1), mode='constant', value=1.
+        )
+        vertices_camera = (padded_vertices @ camera_transform)
+    # Project the vertices on the camera image plan
     vertices_image = camera.perspective_camera(vertices_camera, camera_proj)
     face_vertices_camera = ops.mesh.index_vertices_by_faces(vertices_camera, faces)
     face_vertices_image = ops.mesh.index_vertices_by_faces(vertices_image, faces)

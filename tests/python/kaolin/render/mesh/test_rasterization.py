@@ -145,7 +145,7 @@ class TestDIBR:
     def test_prepare_vertices(self, vertices, faces, camera_rot, camera_trans,
                               camera_proj, face_vertices_camera, face_vertices_image):
         _face_vertices_camera, _face_vertices_image, _face_normals = \
-            prepare_vertices(vertices, faces, camera_rot, camera_trans, camera_proj)
+            prepare_vertices(vertices, faces, camera_proj, camera_rot, camera_trans)
         assert torch.equal(face_vertices_camera, _face_vertices_camera)
         assert torch.equal(face_vertices_image, _face_vertices_image)
         assert torch.equal(face_normals(face_vertices_camera, unit=True),
@@ -368,7 +368,7 @@ class TestDIBR:
 
         with torch.no_grad():
             face_moved_vertices_camera, face_moved_vertices_image, face_moved_normals = \
-                prepare_vertices(moved_vertices, faces, camera_rot, camera_trans, camera_proj)
+                prepare_vertices(moved_vertices, faces, camera_proj, camera_rot, camera_trans)
             face_moved_normals_z = face_moved_normals[:, :, 2]
 
             imfeat, _, _ = dibr_rasterization(height,
@@ -386,7 +386,7 @@ class TestDIBR:
         for i in range(100):
             optimizer.zero_grad()
             face_moved_vertices_camera, face_moved_vertices_image, face_moved_normals = \
-                prepare_vertices(moved_vertices, faces, camera_rot, camera_trans, camera_proj)
+                prepare_vertices(moved_vertices, faces, camera_proj, camera_rot, camera_trans)
             face_moved_normals_z = face_moved_normals[:, :, 2]
             imfeat, _, _ = dibr_rasterization(height,
                                               width,
