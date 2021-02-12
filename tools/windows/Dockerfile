@@ -25,6 +25,7 @@ RUN setx /M PATH $('C:\Users\Administrator\miniconda3\Library\bin;C:\Users\Admin
 RUN Invoke-WebRequest "https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe" -OutFile miniconda3.exe -UseBasicParsing; \
     Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Users\Administrator\miniconda3'; \
     Remove-Item .\miniconda3.exe; \
+    conda install -y -c conda-forge 7za; \
     conda install -y python=3.6 7za pytorch=$Env:PYTORCH_VERSION cudatoolkit=$Env:CUDA_VERSION cython -c pytorch
 
 ARG CUDA_FILENAME=cuda_10.1.243_426.00_win10.exe
