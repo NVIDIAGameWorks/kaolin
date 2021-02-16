@@ -36,9 +36,15 @@ def run_apidoc(_):
             "kaolin/ops/mesh/check_sign.py",
             "kaolin/ops/mesh/mesh.py",
             "kaolin/ops/mesh/trianglemesh.py",
+            "kaolin/ops/spc/spc.py",
+            "kaolin/ops/spc/convolution.py",
+            "kaolin/ops/spc/points.py",
+            "kaolin/ops/spc/uint8.py",
             "kaolin/render/mesh/rasterization.py",
             "kaolin/render/mesh/utils.py",
-            "kaolin/visualize/timelapse.py",
+            "kaolin/render/spc/raytrace.py",
+            "kaolin/rep/spc.py",
+            "kaolin/visualize/timelapse.py"
         ]
     ]
 

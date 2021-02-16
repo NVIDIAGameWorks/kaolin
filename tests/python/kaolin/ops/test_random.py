@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +17,9 @@ import pytest
 import torch
 
 from kaolin.ops.random import random_shape_per_tensor, random_tensor, \
-    manual_seed
-from kaolin.utils.testing import BOOL_TYPES, NUM_TYPES, check_tensor
+                              random_spc_octrees, manual_seed
+from kaolin.utils.testing import BOOL_TYPES, NUM_TYPES, check_tensor, \
+                                 check_spc_octrees
 
 
 @pytest.mark.parametrize("batch_size", [1, 8])
@@ -90,3 +92,10 @@ def test_random_tensor_seed(low, high, shape):
     manual_seed(1)
     tensor4 = random_tensor(low, high, shape)
     assert torch.sum(tensor1 != tensor4) > threshold
+
+@pytest.mark.parametrize("batch_size", [1, 8])
+@pytest.mark.parametrize("level", [1, 3])
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+def test_random_spc_octree(batch_size, level, device):
+    octrees, lengths = random_spc_octrees(batch_size, level, device)
+    check_spc_octrees(octrees, lengths, batch_size, level, device)

@@ -26,3 +26,9 @@ node_modules/
 # editor specific
 *~
 .idea
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json
+*.sw*
+

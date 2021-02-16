@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@ import random
 
 import numpy as np
 import torch
+from .spc.uint8 import bits_to_uint8
 
 
 def manual_seed(torch_seed, random_seed=None, numpy_seed=None):
@@ -128,3 +130,39 @@ def random_tensor(low, high, shape, dtype=torch.float, device='cpu'):
     else:
         output = torch.randint(low, high + 1, size=shape, dtype=dtype, device=device)
     return output
+
+def random_spc_octrees(batch_size, max_level, device='cpu'):
+    """Generate random SPC octrees.
+
+    Args:
+        batch_size (int): The desired number of octrees.
+        max_level (int): The desired max level of the octrees.
+        device (torch.device): The desired output device.
+
+    Return:
+        (torch.ByteTensor, torch.IntTensor):
+
+            - A batch of randomly generated octrees.
+            - The length of each octree.
+
+    Example:
+        >>> _ = torch.random.manual_seed(1)
+        >>> random_spc_octrees(2, 3, device='cpu')
+        (tensor([169,  29,  13, 238,  81, 173, 208, 236,  72, 191, 148,  54, 211, 252,
+                 61,  22, 251, 131, 189,  64,  46, 248,  11,  66, 118,  53, 239,  41,
+                 57, 105,  36, 118, 179, 213, 131, 142, 118,  66,  56, 228, 144,  92,
+                140, 192, 124,  52, 217,  78], dtype=torch.uint8), tensor([21, 27], dtype=torch.int32))
+    """
+    octrees = []
+    lengths = []
+    for bs in range(batch_size):
+        octree_length = 0
+        cur_num_nodes = 1
+        for i in range(max_level):
+            octree = torch.rand(size=(cur_num_nodes, 8), device=device) > 0.5
+            cur_num_nodes = torch.sum(octree)
+            uint8_mask = bits_to_uint8(octree)
+            octrees.append(uint8_mask)
+            octree_length += uint8_mask.shape[0]
+        lengths.append(octree_length)
+    return torch.cat(octrees, dim=0), torch.tensor(lengths, dtype=torch.torch.int32)

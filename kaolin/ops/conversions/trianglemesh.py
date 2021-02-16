@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +19,8 @@ from .pointcloud import _base_points_to_voxelgrids
 
 __all__ = ['trianglemeshes_to_voxelgrids']
 
-def trianglemeshes_to_voxelgrids(vertices, faces, resolution, origin=None, scale=None, return_sparse=False):
+def trianglemeshes_to_voxelgrids(vertices, faces, resolution, origin=None, scale=None,
+                                 return_sparse=False):
     r"""Converts meshes to surface voxelgrids of a given resolution. It first upsamples 
     triangle mesh's vertices to given resolution, then it performs a box test. 
     If a voxel contains a triangle vertex, set that voxel to 1. Vertex will be 
@@ -36,7 +38,7 @@ def trianglemeshes_to_voxelgrids(vertices, faces, resolution, origin=None, scale
                               Default: scale = torch.max(torch.max(vertices, dim=1)[0] - origin, dim=1)[0]
 
     Returns:
-        (torch.Tensor or torch.FloatTensor): 
+        (torch.Tensor or torch.FloatTensor):
             Binary batched voxelgrids of shape (B, resolution, resolution, resolution).
             If return_sparse == True, sparse tensor is returned.
 
@@ -45,7 +47,7 @@ def trianglemeshes_to_voxelgrids(vertices, faces, resolution, origin=None, scale
         ...                           [1, 0, 0],
         ...                           [0, 0, 1]]], dtype=torch.float)
         >>> faces = torch.tensor([[0, 1, 2]], dtype=torch.long)
-        >>> origin = torch.zeros((1, 3)) 
+        >>> origin = torch.zeros((1, 3))
         >>> scale = torch.ones((1))
         >>> trianglemeshes_to_voxelgrids(vertices, faces, 3, origin, scale)
         tensor([[[[1., 1., 1.],

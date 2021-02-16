@@ -25,5 +25,6 @@ Kaolin library is part of a larger suite of tools for 3D deep learning research.
    modules/kaolin.metrics
    modules/kaolin.io
    modules/kaolin.render
+   modules/kaolin.rep
    modules/kaolin.utils
    modules/kaolin.visualize

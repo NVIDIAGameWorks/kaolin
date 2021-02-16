@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +21,8 @@ import torch
 
 
 from kaolin.ops.random import random_tensor
+from kaolin.ops.spc.uint8 import bits_to_uint8
+
 from kaolin.utils import testing
 
 
@@ -336,6 +339,68 @@ class TestCheckBatchedTensor:
                                         max_shape=max_shape, last_dim=last_dim,
                                         dtype=dtype,
                                         device=device)
+
+class TestCheckSpcOctrees:
+    @pytest.fixture(autouse=True)
+    def device(self):
+        return 'cuda'
+
+    @pytest.fixture(autouse=True)
+    def octrees(self, device):
+        bits_t = torch.flip(torch.tensor(
+            [[0, 0, 0, 0, 1, 0, 0, 0],
+             [0, 0, 0, 1, 0, 0, 0, 1],
+             [0, 0, 0, 0, 0, 0, 1, 1], [1, 1, 1, 1, 0, 0, 0, 0],
+
+             [1, 0, 1, 0, 0, 0, 0, 0],
+             [0, 0, 0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 0, 1, 0],
+             [0, 0, 0, 0, 0, 0, 1, 1], [0, 1, 0, 0, 0, 0, 0, 0]
+            ], dtype=torch.bool, device=device), dims=(-1,))
+        return bits_to_uint8(bits_t)
+
+    @pytest.fixture(autouse=True)
+    def lengths(self):
+        return torch.tensor([4, 5], dtype=torch.int)
+
+    @pytest.fixture(autouse=True)
+    def batch_size(self):
+        return 2
+
+    @pytest.fixture(autouse=True)
+    def level(self):
+        return 3
+
+    def test_spc_success(self, octrees, lengths, batch_size, level, device):
+        assert testing.check_spc_octrees(octrees, lengths, batch_size, level, device)
+
+    def test_spc_default_success(self, octrees, lengths):
+        assert testing.check_spc_octrees(octrees, lengths)
+
+    @pytest.mark.parametrize('wrong_device', ['cpu'])
+    def test_spc_wrong_device(self, octrees, lengths, wrong_device):
+        with pytest.raises(ValueError,
+                           match='octrees is on cuda:0, should be on cpu'):
+            testing.check_spc_octrees(octrees, lengths, device=wrong_device)
+
+    @pytest.mark.parametrize('wrong_lengths',
+                             [torch.tensor([3, 5], dtype=torch.int)])
+    def test_spc_wrong_lengths(self, octrees, wrong_lengths):
+        with pytest.raises(ValueError,
+                           match='lengths at 0 is 3, but level 3 ends at length 4'):
+            testing.check_spc_octrees(octrees, wrong_lengths)
+
+    @pytest.mark.parametrize('wrong_batch_size', [3])
+    def test_spc_wrong_batch_size(self, octrees, lengths, wrong_batch_size):
+        with pytest.raises(ValueError,
+                           match=r'lengths is of shape torch.Size\(\[2\]\), '
+                                 'but batch_size should be 3'):
+            testing.check_spc_octrees(octrees, lengths, batch_size=wrong_batch_size)
+
+    @pytest.mark.parametrize('wrong_level', [4])
+    def test_spc_wrong_level(self, octrees, lengths, wrong_level):
+        with pytest.raises(ValueError,
+                           match='octree 0 ends at level 3, should end at 4'):
+            testing.check_spc_octrees(octrees, lengths, level=wrong_level)
 
 class TestSeedDecorator:
 
