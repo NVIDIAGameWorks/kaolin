@@ -14,6 +14,8 @@
 
 
 import os
+from pathlib import Path
+import posixpath
 from abc import abstractmethod
 
 import torch
@@ -79,7 +81,7 @@ class PBRMaterial(Material):
         specular_color=(0.0, 0.0, 0.0),
         diffuse_texture=None,
         roughness_texture=None,
-        metallic_texture=None,  
+        metallic_texture=None,
         specular_texture=None,
         normals_texture=None,
         displacement_texture=None,
@@ -134,6 +136,7 @@ class PBRMaterial(Material):
 
     def _write_usd_preview_surface(self, stage, file_path, scene_path, bound_prims,
                                    time, texture_dir, texture_file_prefix):
+        texture_dir = Path(texture_dir).as_posix()
         """Write a USD Preview Surface material."""
         material = UsdShade.Material.Define(stage, scene_path)
 
@@ -162,28 +165,28 @@ class PBRMaterial(Material):
         # Export textures abd Connect textures to shader
         usd_dir = os.path.dirname(file_path)
         if self.diffuse_texture is not None:
-            rel_filepath = os.path.join(texture_dir, f'{texture_file_prefix}diffuse.png')
-            self._write_image(self.diffuse_texture, os.path.join(usd_dir, rel_filepath))
+            rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}diffuse.png')
+            self._write_image(self.diffuse_texture, posixpath.join(usd_dir, rel_filepath))
             texture = self._add_texture_shader(stage, f'{scene_path}/diffuse_texture', rel_filepath, time=time, channels_out=3)
             diffuse_input.ConnectToSource(texture, 'rgb')
         if self.roughness_texture is not None:
-            rel_filepath = os.path.join(texture_dir, f'{texture_file_prefix}roughness.png')
-            self._write_image(self.roughness_texture, os.path.join(usd_dir, rel_filepath))
+            rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}roughness.png')
+            self._write_image(self.roughness_texture, posixpath.join(usd_dir, rel_filepath))
             texture = self._add_texture_shader(stage, f'{scene_path}/roughness_texture', rel_filepath, time=time, channels_out=1)
             roughness_input.ConnectToSource(texture, 'r')
         if self.specular_texture is not None:
-            rel_filepath = os.path.join(texture_dir, f'{texture_file_prefix}specular.png')
-            self._write_image(self.specular_texture, os.path.join(usd_dir, rel_filepath))
+            rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}specular.png')
+            self._write_image(self.specular_texture, posixpath.join(usd_dir, rel_filepath))
             texture = self._add_texture_shader(stage, f'{scene_path}/specular_texture', rel_filepath, time=time, channels_out=3)
             specular_input.ConnectToSource(texture, 'rgb')
         if self.metallic_texture is not None:
-            rel_filepath = os.path.join(texture_dir, f'{texture_file_prefix}metallic.png')
-            self._write_image(self.metallic_texture, os.path.join(usd_dir, rel_filepath))
+            rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}metallic.png')
+            self._write_image(self.metallic_texture, posixpath.join(usd_dir, rel_filepath))
             texture = self._add_texture_shader(stage, f'{scene_path}/metallic_texture', rel_filepath, time=time, channels_out=1)
             metallic_input.ConnectToSource(texture, 'r')
         if self.normals_texture is not None:
-            rel_filepath = os.path.join(texture_dir, f'{texture_file_prefix}normals.png')
-            self._write_image(((self.normals_texture + 1.) / 2.), os.path.join(usd_dir, rel_filepath))
+            rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}normals.png')
+            self._write_image(((self.normals_texture + 1.) / 2.), posixpath.join(usd_dir, rel_filepath))
             texture = self._add_texture_shader(stage, f'{scene_path}/normals_texture', rel_filepath, time=time, channels_out=3)
             normal_input.ConnectToSource(texture, 'rgb')
 
@@ -191,7 +194,7 @@ class PBRMaterial(Material):
         shader.CreateOutput('surface', Sdf.ValueTypeNames.Token)
         shader.CreateOutput('displacement', Sdf.ValueTypeNames.Token)
 
-        # create material    
+        # create material
         material.CreateSurfaceOutput().ConnectToSource(shader.GetOutput('surface'))
         material.CreateDisplacementOutput().ConnectToSource(shader.GetOutput('displacement'))
 
@@ -249,7 +252,7 @@ class PBRMaterial(Material):
             texture_file_path = os.path.dirname(file_path)
         else:
             usd_dir = os.path.dirname(file_path)
-            texture_file_path = os.path.join(usd_dir, texture_file_path)
+            texture_file_path = posixpath.join(usd_dir, texture_file_path)
         stage = Usd.Stage.Open(file_path)
         material = UsdShade.Material(stage.GetPrimAtPath(scene_path))
         assert material
@@ -267,6 +270,7 @@ class PBRMaterial(Material):
 
     def _read_usd_preview_surface(self, inputs, texture_file_path, time):
         """Read UsdPreviewSurface material."""
+        texture_file_path = Path(texture_file_path).as_posix()
         params = {}
         for i in inputs:
             name = i.GetBaseName()
@@ -279,25 +283,25 @@ class PBRMaterial(Material):
                 if itype == Sdf.ValueTypeNames.Color3f:
                     self.diffuse_color = tuple(value)
                 elif itype == Sdf.ValueTypeNames.Asset:
-                    fp = os.path.join(texture_file_path, value.path)
+                    fp = posixpath.join(texture_file_path, value.path)
                     self.diffuse_texture = self._read_image(fp)
             elif 'roughness' in name.lower():
                 if itype == Sdf.ValueTypeNames.Float:
                     self.roughness_value = value
                 elif itype == Sdf.ValueTypeNames.Asset:
-                    fp = os.path.join(texture_file_path, value.path)
+                    fp = posixpath.join(texture_file_path, value.path)
                     self.roughness_texture = self._read_image(fp)
             elif 'metallic' in name.lower():
                 if itype == Sdf.ValueTypeNames.Float:
                     self.metallic_value = value
                 elif itype == Sdf.ValueTypeNames.Asset:
-                    fp = os.path.join(texture_file_path, value.path)
+                    fp = posixpath.join(texture_file_path, value.path)
                     self.metallic_texture = self._read_image(fp)
             elif 'specular' in name.lower():
                 if itype == Sdf.ValueTypeNames.Color3f:
                     self.specular_color = tuple(value)
                 elif itype == Sdf.ValueTypeNames.Asset:
-                    fp = os.path.join(texture_file_path, value.path)
+                    fp = posixpath.join(texture_file_path, value.path)
                     self.specular_texture = self._read_image(fp)
                 self.is_specular_workflow = True
             elif 'specular' in name.lower() and 'workflow' in name.lower():
@@ -305,6 +309,6 @@ class PBRMaterial(Material):
                     self.is_specular_workflow = value
             elif 'normal' in name.lower():
                 if itype == Sdf.ValueTypeNames.Asset:
-                    fp = os.path.join(texture_file_path, value.path)
+                    fp = posixpath.join(texture_file_path, value.path)
                     self.normals_texture = self._read_image(fp) * 2. - 1.
         return self
