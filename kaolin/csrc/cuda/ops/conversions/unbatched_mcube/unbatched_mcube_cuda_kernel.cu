@@ -20,10 +20,6 @@
 
 #include <ATen/ATen.h>
 
-
-#include <thrust/device_vector.h>
-#include <thrust/scan.h>
-
 // #include <cub/cub.cuh> 
 
 // textures containing look-up tables
@@ -519,11 +515,4 @@ void launch_generateTriangles2(at::Tensor pos, at::Tensor faces, at::Tensor comp
                                           voxelgrid.data_ptr<float>(), gridSize,
                                           voxelSize, isoValue, activeVoxels,
                                           maxVerts);
-}
-
-void ThrustScanWrapper(at::Tensor output, at::Tensor input, int numElements)
-{
-    thrust::exclusive_scan(thrust::device_ptr<int>(input.data_ptr<int>()),
-                           thrust::device_ptr<int>(input.data_ptr<int>() + numElements),
-                           thrust::device_ptr<int>(output.data_ptr<int>()));
 }
