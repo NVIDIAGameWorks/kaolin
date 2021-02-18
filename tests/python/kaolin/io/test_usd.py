@@ -191,8 +191,7 @@ class TestMeshes:
         golden = os.path.join(out_dir, '../../../../samples/golden/rocket_homogenized.usda')
         assert open(golden).read() == open(out_path).read()
     def test_import_with_transform(self, scene_paths, out_dir, hetero_mesh_path):
-        """Test that imports homogeneous mesh when importing heterogeneous mesh with naive homogenize handler"""
-        # TODO(jlafleche) Render meshes before/after homogenize operation
+        """Test that mesh transforms are correctly applied during import"""
         out_path = os.path.join(out_dir, 'transformed.usda')
         mesh = usd.import_mesh(hetero_mesh_path, '/Root',
                                heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_naive_homogenize)
