@@ -71,12 +71,15 @@ def spherical_harmonic_lighting(imnormal, lights):
             per pixel normal, of shape :math:`(\text{batch_size}, \text{height}, \text{width}, 3)`
         lights (torch.FloatTensor):
             spherical harmonic lighting parameters, of shape :math:`(\text{batch_size}, 9)`
+
     Returns:
         (torch.FloatTensor):
             lighting effect, shape of :math:`(\text{batch_size}, \text{height}, \text{width})`
 
     .. _Efficient Monte Carlo Methods for Light Transport in Scattering Media:
+
     https://cs.dartmouth.edu/~wjarosz/publications/dissertation/appendixB.pdf
+
     """
     # SH lighting
     # light effect
