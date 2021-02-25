@@ -73,8 +73,7 @@ def normalize_adj(adj):
 
 
 class GraphConv(nn.Module):
-    """
-    A simple graph convolution layer, similar to the one defined in Kipf et al.
+    """A simple graph convolution layer, similar to the one defined in Kipf et al.
     https://arxiv.org/abs/1609.02907
 
     This operation with self_layer=False is equivalent to :math:`(A H W)` where:
@@ -92,6 +91,22 @@ class GraphConv(nn.Module):
 
     Note that when self_layer is True, A should not include self-loop.
 
+    If you use this code, please cite the original paper in addition to Kaolin.
+
+    .. code-block::
+
+        @article{kipf2016semi,
+            title={Semi-Supervised Classification with Graph Convolutional Networks},
+            author={Kipf, Thomas N and Welling, Max},
+            journal={arXiv preprint arXiv:1609.02907},
+            year={2016}
+        }
+
+    Args:
+        input_dim (int): The number of features in each input node.
+        output_dim (int): The number of features in each output node.
+        bias (bool): Whether to add bias after the node-wise linear layer.
+
     Example:
         >>> node_feat = torch.rand(1, 3, 5)
         >>> i = torch.LongTensor(
@@ -103,20 +118,6 @@ class GraphConv(nn.Module):
         >>> # pre-normalize adj
         >>> adj = normalize_adj(adj)
         >>> output = model(node_feat, adj, normalize_adj=False)
-
-    If you use this code, please cite the original paper in addition to Kaolin.
-    .. code-block::
-        @article{kipf2016semi,
-          title={Semi-Supervised Classification with Graph Convolutional Networks},
-          author={Kipf, Thomas N and Welling, Max},
-          journal={arXiv preprint arXiv:1609.02907},
-          year={2016}
-        }
-
-    Args:
-        input_dim (int): The number of features in each input node.
-        output_dim (int): The number of features in each output node.
-        bias (bool): Whether to add bias after the node-wise linear layer.
     """
 
     def __init__(self, input_dim, output_dim, self_layer=True, bias=True):

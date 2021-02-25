@@ -38,7 +38,7 @@
 import numpy as np
 import torch
 
-from .triangle_hash import TriangleHash as _TriangleHash
+from . import triangle_hash
 from . import mesh_intersection_cuda as mint
 
 __all__ = ['check_sign']
@@ -259,7 +259,7 @@ class _UnbatchedMeshIntersector:
 class _TriangleIntersector2d:
     def __init__(self, triangles, resolution=128):
         self.triangles = triangles
-        self.tri_hash = _TriangleHash(triangles, resolution)
+        self.tri_hash = triangle_hash.TriangleHash(triangles, resolution)
 
     def query(self, points):
         point_indices, tri_indices = self.tri_hash.query(points)

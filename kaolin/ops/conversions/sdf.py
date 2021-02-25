@@ -38,7 +38,7 @@
 import torch
 import numpy as np
 
-from .mise import MISE
+from . import mise
 
 __all__ = ['sdf_to_voxelgrids']
 
@@ -128,7 +128,7 @@ def sdf_to_voxelgrids(sdf, bbox_center=0., bbox_dim=1., init_res=32, upsampling_
         if not callable(sdf[i_batch]):
             raise TypeError(f"Expected sdf[{i_batch}] to be callable "
                             f"but got {type(sdf[i_batch])}.")
-        mesh_extractor = MISE(
+        mesh_extractor = mise.MISE(
             init_res, upsampling_steps, .5)
 
         points = mesh_extractor.query()
