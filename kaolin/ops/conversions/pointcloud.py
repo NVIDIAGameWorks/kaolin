@@ -16,7 +16,7 @@ import torch
 
 __all__ = ['pointclouds_to_voxelgrids']
 
-def pointclouds_to_voxelgrids(pointclouds, resolution, return_sparse=False):
+def pointclouds_to_voxelgrids(pointclouds, resolution, origin=None, scale=None, return_sparse=False):
     r"""Converts pointclouds to voxelgrids. It separates the 3D space into empty
     voxelgrid, and for each boxes, if there is a corresponding point, set that voxelgrid
     to be occupied.
@@ -27,6 +27,12 @@ def pointclouds_to_voxelgrids(pointclouds, resolution, return_sparse=False):
             :math:`(\text{batch_size}, \text{P}, \text{3})`.
         resolution (int):
             Resolution of output voxelgrids
+        origin (torch.tensor): origin of the voxelgrid in the pointcloud coordinates. 
+                               It has shape :math:`(\text{batch_size}, 3)`.
+                               Default: origin = torch.min(pointcloud, dim=1)[0]
+        scale (torch.tensor): the scale by which we divide the pointclouds' coordinates.
+                              It has shape :math:`(\text{batch_size})`.
+                              Default: scale = torch.max(torch.max(pointclouds, dim=1)[0] - origin, dim=1)[0]
         return_sparse (bool):
             Whether to return a sparse voxelgrids or not.
 
@@ -59,23 +65,42 @@ def pointclouds_to_voxelgrids(pointclouds, resolution, return_sparse=False):
     device = pointclouds.device
     dtype = pointclouds.dtype
 
+    if origin is None:
+        min_val = torch.min(pointclouds, dim=1)[0]
+        origin = min_val
+
+    if scale is None:
+        max_val = torch.max(pointclouds, dim=1)[0]
+        scale = torch.max(max_val - origin, dim=1)[0]
+
     if isinstance(resolution, int):
         vg_size = (batch_size, resolution, resolution, resolution)
     else:
         raise ValueError(f'Resolution `{resolution}` must be an integer.')
 
+    # Normalize pointcloud with origin and scale
+    pointclouds = (pointclouds - origin.unsqueeze(1)) / scale.view(-1, 1, 1)
+
     pc_size = pointclouds.max(dim=1)[0] - pointclouds.min(dim=1)[0]  # size of (batch_size, P)
     max_pc_size = pc_size.max(dim=1)[0]  # size of (batch_size)
 
-    mult = torch.ones(batch_size, device=device, dtype=dtype) * (resolution - 1) / max_pc_size   # size of (batch_size)
+    mult = torch.ones(batch_size, device=device, dtype=dtype) * (resolution - 1)  # size of (batch_size)
 
     prefix_index = torch.arange(start=0, end=batch_size, device=device, dtype=torch.long).repeat(num_p, 1).T.reshape(-1, 1)
 
-    pc_index = torch.unique(torch.round(((pointclouds - pointclouds.min(dim=1)[0].unsqueeze(1)) * mult.view(-1, 1, 1))).long(), dim=1)
-    pc_index = pc_index.reshape(-1, 3)
-    pc_index = torch.cat((prefix_index, pc_index), dim=1)
+    pc_index = torch.round(((pointclouds) * mult.view(-1, 1, 1))).long()
+    pc_index = torch.cat((prefix_index, pc_index.reshape(-1, 3)), dim=1)
+    pc_index = torch.unique(pc_index, dim=0)
 
-    vg = torch.sparse.FloatTensor(pc_index.T, torch.ones(batch_size * num_p, device=pc_index.device), vg_size)
+    # filter point that is outside of range 0 and resolution - 1
+    condition = pc_index[:, 1:] <= (resolution - 1)
+    condition = torch.logical_and(condition, pc_index[:, 1:] >= 0)
+    row_cond = condition.all(1)
+
+    pc_index = pc_index[row_cond, :]
+    pc_index = pc_index.reshape(-1, 4)
+
+    vg = torch.sparse.FloatTensor(pc_index.T, torch.ones(pc_index.shape[0], device=pc_index.device), vg_size)
 
     if not return_sparse:
         vg = vg.to_dense().to(dtype)

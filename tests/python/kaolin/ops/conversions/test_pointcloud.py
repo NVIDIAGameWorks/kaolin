@@ -58,5 +58,86 @@ class TestPointcloudToVoxelgrid:
                                       [0., 0., 0.]]]], device=device, dtype=dtype)
         
         output_vg = pointclouds_to_voxelgrids(pointclouds, 3)
+        
+        assert torch.equal(output_vg, expected_vg)
 
+    def test_pointclouds_to_voxelgrids_origin(self, device, dtype):
+        pointclouds = torch.tensor([[[0, 0, 0],
+                                     [1, 1, 1],
+                                     [2, 2, 2],
+                                     [0, 2, 2]],
+                                    
+                                    [[0, 1, 2],
+                                     [2, 0, 0],
+                                     [1, 2, 0],
+                                     [1, 1, 2]]], device=device, dtype=dtype)
+        
+        expected_vg = torch.tensor([[[[1., 0., 0.],
+                                      [0., 0., 0.],
+                                      [0., 0., 0.]],
+
+                                     [[0., 0., 0.],
+                                      [0., 0., 0.],
+                                      [0., 0., 0.]],
+
+                                     [[0., 0., 0.],
+                                      [0., 0., 0.],
+                                      [0., 0., 1.]]],
+
+                                    [[[0., 0., 1.],
+                                      [0., 0., 0.],
+                                      [0., 0., 0.]],
+
+                                     [[0., 0., 0.],
+                                      [0., 0., 0.],
+                                      [0., 0., 0.]],
+
+                                     [[0., 0., 0.],
+                                      [0., 0., 0.],
+                                      [0., 0., 0.]]]], device=device, dtype=dtype)
+        
+        
+        output_vg = pointclouds_to_voxelgrids(pointclouds, 3, origin=torch.ones((2, 3), device=device))
+
+        assert torch.equal(output_vg, expected_vg)
+
+    def test_pointclouds_to_voxelgrids_scale(self, device, dtype):
+        pointclouds = torch.tensor([[[0, 0, 0],
+                                     [1, 1, 1],
+                                     [2, 2, 2],
+                                     [0, 2, 2]],
+                                    
+                                    [[0, 1, 2],
+                                     [2, 0, 0],
+                                     [1, 2, 0],
+                                     [1, 1, 2]]], device=device, dtype=dtype)
+        
+        expected_vg = torch.tensor([[[[1., 0., 0.],
+                                      [0., 1., 0.],
+                                      [0., 0., 0.]],
+
+                                     [[0., 0., 0.],
+                                      [0., 1., 0.],
+                                      [0., 0., 0.]],
+
+                                     [[0., 0., 0.],
+                                      [0., 0., 0.],
+                                      [0., 0., 0.]]],
+
+                                    [[[0., 1., 0.],
+                                      [1., 0., 0.],
+                                      [0., 0., 0.]],
+
+                                     [[1., 0., 0.],
+                                      [0., 0., 0.],
+                                      [0., 0., 0.]],
+
+                                     [[0., 0., 0.],
+                                      [0., 0., 0.],
+                                      [0., 0., 0.]]]], device=device, dtype=dtype)
+        
+        output_vg = pointclouds_to_voxelgrids(pointclouds, 3, scale=torch.ones((2), device=device) * 4)
+
+        print(output_vg)
+        
         assert torch.equal(output_vg, expected_vg)
