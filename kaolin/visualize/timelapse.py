@@ -1,4 +1,5 @@
 import os
+import posixpath
 
 from pxr import Usd, UsdShade
 from kaolin import io
@@ -43,14 +44,14 @@ class Timelapse:
         )
         pointcloud_list, colors, semantic_ids = validated
 
-        pc_path = os.path.join(self.logdir, category)
+        pc_path = posixpath.join(self.logdir, category)
         os.makedirs(pc_path, exist_ok=True)
 
         for i, sample in enumerate(zip(pointcloud_list, colors, semantic_ids)):
             points, colour, semantic_id = sample
             # Establish default USD file paths for sample
             pc_name = f'pointcloud_{i}'
-            ind_out_path = os.path.join(pc_path, f'{pc_name}.usd') 
+            ind_out_path = posixpath.join(pc_path, f'{pc_name}.usd') 
 
             if not os.path.exists(ind_out_path):
                 # If sample does not exist, create it.
@@ -89,14 +90,14 @@ class Timelapse:
         )
         voxelgrid_list, colors, semantic_ids = validated
 
-        vg_path = os.path.join(self.logdir, category)
+        vg_path = posixpath.join(self.logdir, category)
         os.makedirs(vg_path, exist_ok=True)
 
         for i, sample in enumerate(zip(voxelgrid_list, colors, semantic_ids)):
             voxelgrid, colour, semantic_id = sample
             # Establish default USD file paths for sample
             vg_name = f'voxelgrid_{i}'
-            ind_out_path = os.path.join(vg_path, f'{vg_name}.usd') 
+            ind_out_path = posixpath.join(vg_path, f'{vg_name}.usd') 
 
             if not os.path.exists(ind_out_path):
                 # If sample does not exist, create it.
@@ -144,8 +145,8 @@ class Timelapse:
             materials_list=materials_list
         )
 
-        meshes_path = os.path.join(self.logdir, category)
-        textures_path = os.path.join(meshes_path, 'textures')
+        meshes_path = posixpath.join(self.logdir, category)
+        textures_path = posixpath.join(meshes_path, 'textures')
         os.makedirs(meshes_path, exist_ok=True)
         os.makedirs(textures_path, exist_ok=True)
 
@@ -153,7 +154,7 @@ class Timelapse:
             vertices, faces, uvs, face_uvs_idx, face_normals, materials = sample
             # Establish default USD file paths for sample
             mesh_name = f'mesh_{i}'
-            ind_out_path = os.path.join(meshes_path, f'{mesh_name}.usd') 
+            ind_out_path = posixpath.join(meshes_path, f'{mesh_name}.usd') 
 
             if not os.path.exists(ind_out_path):
                 # If sample does not exist, create it.

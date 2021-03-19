@@ -85,7 +85,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 asset inputs:file.timeSamples = {
-                    0: @diffuse.png@,
+                    0: @./diffuse.png@,
                 }
                 float outputs:b
                 float outputs:g
@@ -127,7 +127,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 asset inputs:file.timeSamples = {
-                    0: @roughness.png@,
+                    0: @./roughness.png@,
                 }
                 float outputs:r
             }
@@ -166,7 +166,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 asset inputs:file.timeSamples = {
-                    0: @metallic.png@,
+                    0: @./metallic.png@,
                 }
                 float outputs:r
             }
@@ -204,7 +204,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 asset inputs:file.timeSamples = {
-                    0: @normals.png@,
+                    0: @./normals.png@,
                 }
                 float outputs:b
                 float outputs:g
@@ -246,7 +246,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 asset inputs:file.timeSamples = {
-                    0: @specular.png@,
+                    0: @./specular.png@,
                 }
                 float outputs:b
                 float outputs:g
