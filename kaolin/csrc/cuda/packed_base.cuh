@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef KAOLIN_CUDA_PACKED_BASE_CUH_
+#define KAOLIN_CUDA_PACKED_BASE_CUH_
+
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 
@@ -169,3 +172,5 @@ void packed_simple_cuda_launcher(
   param.chunk_to_idx[param_idx] = chunk_idx;
   cuda_kernel<<<param_idx, block_size, 0, stream>>>(packed_tensor, param, args...);
 }
+
+#endif  // KAOLIN_CUDA_PACKED_BASE_CUH_

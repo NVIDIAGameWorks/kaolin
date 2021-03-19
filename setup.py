@@ -143,9 +143,9 @@ def get_extensions():
     extensions = []
     extensions.append(
         extension(
-            name='kaolin.ops.packed_sum_cuda',
-            sources=filters_cu(['kaolin/csrc/cuda/ops/packed_sum_cuda.cpp',
-                                'kaolin/csrc/cuda/ops/packed_sum_cuda_kernel.cu'],
+            name='kaolin.ops.packed_simple_sum_cuda',
+            sources=filters_cu(['kaolin/csrc/cuda/ops/packed_simple_sum.cpp',
+                                'kaolin/csrc/cuda/ops/packed_simple_sum_impl.cu'],
                                with_cuda),
             define_macros=define_macros,
             extra_compile_args=extra_compile_args
