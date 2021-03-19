@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,30 +18,15 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#include <iostream>
-
 #include "../../utils.h"
 #include "../packed_base.cuh"
+#include "../../check.h"
+
 // currently based on sizeof(long), TODO(cfujitsang): make it variable to sizeof(idx_t)
 #define NB_CHUNK_LIMIT 448
 #define CHUNK_SIZE 32768
 #define ILP 7
 #define BLOCK_SIZE 1024
-
-#define DISPATCH_INOUT_DEDUCED_TYPES(TYPE, IN_TYPE_NAME, OUT_TYPE_NAME, SCOPE_NAME, ...) \
-  [&] { \
-    switch(TYPE) \
-    { \
-      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Bool, bool, int64_t, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
-      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Int, int32_t, int64_t, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
-      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Long, int64_t, int64_t, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
-      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Half, at::Half, float, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
-      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Float, float, float, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
-      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Double, double, double, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
-      default: \
-        AT_ERROR(#SCOPE_NAME, " not implemented for output as '", toString(TYPE), "'"); \
-    } \
-  }()
 
 /*
  * Make sum reduction within a block using shared memory and warp intrinsic.
@@ -79,7 +64,7 @@ __device__ __forceinline__ DType ReduceBlockIntoLanes(DType* x,
 }
 
 template<typename scalar_t, typename out_scalar_t, typename idx_t>
-__global__ void packed_simple_sum_cuda_forward_kernel(
+__global__ void packed_simple_sum_cuda_kernel(
     const scalar_t* __restrict__ packed_tensor,
     PackedSimpleKernelMetadata<unsigned char, NB_CHUNK_LIMIT, 256, 1, 0, false, false> param,
     out_scalar_t* output) {
@@ -119,10 +104,25 @@ __global__ void packed_simple_sum_cuda_forward_kernel(
   }
 }
 
+#define DISPATCH_INOUT_DEDUCED_TYPES(TYPE, IN_TYPE_NAME, OUT_TYPE_NAME, SCOPE_NAME, ...) \
+  [&] { \
+    switch(TYPE) \
+    { \
+      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Bool, bool, int64_t, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
+      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Int, int32_t, int64_t, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
+      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Long, int64_t, int64_t, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
+      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Half, at::Half, float, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
+      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Float, float, float, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
+      PRIVATE_CASE_INOUT_DEDUCED_TYPES(at::ScalarType::Double, double, double, IN_TYPE_NAME, OUT_TYPE_NAME, __VA_ARGS__) \
+      default: \
+        AT_ERROR(#SCOPE_NAME, " not implemented for output as '", toString(TYPE), "'"); \
+    } \
+  }()
+
 /*
  * CUDA function for packed tensor sum over subtensor of last_dim = 1
  */
-at::Tensor packed_simple_sum_cuda_forward(
+at::Tensor packed_simple_sum_cuda_kernel_launcher(
     at::Tensor packed_tensor,
     at::Tensor shape_per_tensor,
     at::Tensor output) {
@@ -137,7 +137,7 @@ at::Tensor packed_simple_sum_cuda_forward(
         input_ptr,
         shape_per_tensor.data_ptr<int64_t>(),
         batch_size,
-        packed_simple_sum_cuda_forward_kernel<scalar_t, out_scalar_t, unsigned int>,
+        packed_simple_sum_cuda_kernel<scalar_t, out_scalar_t, unsigned int>,
         CHUNK_SIZE,
         std::array<int64_t*, 0>(),
         output_ptr);
@@ -145,3 +145,53 @@ at::Tensor packed_simple_sum_cuda_forward(
   return output;
 }
 
+#undef DISPATCH_INOUT_DEDUCE_TYPES
+
+at::ScalarType accumulate_type(const at::ScalarType input_type) {
+  switch (input_type) {
+    case at::ScalarType::Half:
+      return at::ScalarType::Float;
+    case at::ScalarType::Bool:
+    case at::ScalarType::Byte:
+    case at::ScalarType::Char:
+    case at::ScalarType::Short:
+    case at::ScalarType::Int:
+      return at::ScalarType::Long;
+    default:
+      return input_type;
+  }
+};
+
+at::Tensor packed_simple_sum_cuda(
+    at::Tensor packed_tensor,
+    at::Tensor shape_per_tensor) {
+  CHECK_CONTIGUOUS(packed_tensor);
+  CHECK_CONTIGUOUS(shape_per_tensor);
+  CHECK_CUDA(packed_tensor);
+  CHECK_CPU(shape_per_tensor);
+  // By default certains types shouldn't be accumulated with the same type
+  // (example fp16 range is too small)
+  auto output_dtype = accumulate_type(packed_tensor.scalar_type());
+  auto output = at::empty({shape_per_tensor.size(0)},
+                          packed_tensor.options().dtype(output_dtype));
+  packed_simple_sum_cuda_kernel_launcher(
+    packed_tensor,
+    shape_per_tensor,
+    output);
+  return output;
+}
+
+at::Tensor packed_simple_sum_out_cuda(
+    at::Tensor packed_tensor,
+    at::Tensor shape_per_tensor,
+    at::Tensor output) {
+  CHECK_CONTIGUOUS(packed_tensor);
+  CHECK_CONTIGUOUS(shape_per_tensor);
+  CHECK_CUDA(packed_tensor);
+  CHECK_CPU(shape_per_tensor);
+  packed_simple_sum_cuda_kernel_launcher(
+    packed_tensor,
+    shape_per_tensor,
+    output);
+  return output;
+}

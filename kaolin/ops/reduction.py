@@ -14,7 +14,7 @@
 
 import torch
 from . import tile_to_packed_cuda
-from . import packed_sum_cuda
+from . import packed_simple_sum_cuda
 
 class _PackedSimpleSumCuda(torch.autograd.Function):
     """torch.autograd.function wrapper for :func:`tile_to_packed` CUDA implementations"""
@@ -23,7 +23,7 @@ class _PackedSimpleSumCuda(torch.autograd.Function):
     def forward(ctx, inputs, numel_per_tensor):
         inputs = inputs.contiguous()
         numel_per_tensor = numel_per_tensor.contiguous()
-        output = packed_sum_cuda.simple_forward(inputs, numel_per_tensor)
+        output = packed_simple_sum_cuda.forward(inputs, numel_per_tensor)
         if inputs.dtype == torch.half:
             output = output.to(torch.half)
         ctx.save_for_backward(numel_per_tensor)

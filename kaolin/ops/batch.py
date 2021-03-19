@@ -14,7 +14,7 @@
 
 import torch
 from . import tile_to_packed_cuda
-from . import packed_sum_cuda
+from . import packed_simple_sum_cuda
 
 class _TileToPackedCuda(torch.autograd.Function):
     """torch.autograd.function wrapper for :func:`tile_to_packed` CUDA implementations"""
@@ -31,7 +31,7 @@ class _TileToPackedCuda(torch.autograd.Function):
     def backward(ctx, grad_output):
         grad_output = grad_output.contiguous()
         numel_per_tensor, = ctx.saved_tensors
-        grad_inputs = packed_sum_cuda.simple_forward(grad_output, numel_per_tensor)
+        grad_inputs = packed_simple_sum_cuda.forward(grad_output, numel_per_tensor)
         return grad_inputs.to(ctx.inputs_dtype), None, None
 
 def get_shape_per_tensor(tensor_list):

@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef KAOLIN_CHECK_H_
-#define KAOLIN_CHECK_H_
+#include <torch/extension.h>
 
-#include <ATen/native/TypeProperties.h>
-#include <ATen/TensorGeometry.h>
+#include "./packed_simple_sum.h"
 
-#define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
-#define CHECK_CPU(x) TORCH_CHECK(x.device().is_cpu(), #x " must be a cpu tensor")
-#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 
-#endif  // KAOLIN_CHECK_H_
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+#ifdef WITH_CUDA
+  m.def("forward", &packed_simple_sum_cuda);
+  m.def("forward_out", &packed_simple_sum_out_cuda);
+#endif
+}
