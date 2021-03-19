@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import torch
-from . import sided_distance_cuda
+from kaolin import _C
 
 
 class _SidedDistanceFunction(torch.autograd.Function):
@@ -36,7 +36,7 @@ class _SidedDistanceFunction(torch.autograd.Function):
         dist = torch.zeros(batchsize, n, device=p1_device, dtype=p1_dtype, requires_grad=True)
         idx = torch.zeros(batchsize, n, device=p1_device, dtype=torch.long)
 
-        sided_distance_cuda.forward(p1, p2, dist, idx)
+        _C.metrics.sided_distance_forward_cuda(p1, p2, dist, idx)
 
         ctx.save_for_backward(p1, p2, idx)
         ctx.mark_non_differentiable(idx)
@@ -53,7 +53,7 @@ class _SidedDistanceFunction(torch.autograd.Function):
         grad_p1 = torch.zeros_like(p1)
         grad_p2 = torch.zeros_like(p2)
 
-        sided_distance_cuda.backward(grad_output_dist, p1, p2, idx, grad_p1, grad_p2)
+        _C.metrics.sided_distance_backward_cuda(grad_output_dist, p1, p2, idx, grad_p1, grad_p2)
 
         return grad_p1, grad_p2
 
