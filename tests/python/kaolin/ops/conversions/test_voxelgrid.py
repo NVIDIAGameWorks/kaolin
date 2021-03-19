@@ -1122,9 +1122,6 @@ class TestMarchingCube:
                 curr_expected_vertices, curr_voxelgrid = self._flip(new_voxelgrid, new_expected_vertices, flip)
                 curr_vertices, _ = vg.voxelgrids_to_trianglemeshes(curr_voxelgrid.unsqueeze(0))
 
-                print(curr_expected_vertices)
-                print(curr_vertices)
-
                 curr_vertices = torch.sort(curr_vertices[0], dim=0)[0]
                 curr_expected_vertices = torch.sort(curr_expected_vertices, dim=0)[0]
 

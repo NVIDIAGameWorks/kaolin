@@ -56,7 +56,6 @@ import logging
 import numpy
 import torch
 from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDAExtension
-from torch.utils.cpp_extension import CUDA_HOME as cuda_home
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
