@@ -97,7 +97,7 @@ class TestPointcloudToVoxelgrid:
                                       [0., 0., 0.]]]], device=device, dtype=dtype)
         
         
-        output_vg = pointclouds_to_voxelgrids(pointclouds, 3, origin=torch.ones((2, 3), device=device))
+        output_vg = pointclouds_to_voxelgrids(pointclouds, 3, origin=torch.ones((2, 3), device=device, dtype=dtype))
 
         assert torch.equal(output_vg, expected_vg)
 
@@ -136,8 +136,6 @@ class TestPointcloudToVoxelgrid:
                                       [0., 0., 0.],
                                       [0., 0., 0.]]]], device=device, dtype=dtype)
         
-        output_vg = pointclouds_to_voxelgrids(pointclouds, 3, scale=torch.ones((2), device=device) * 4)
-
-        print(output_vg)
-        
+        output_vg = pointclouds_to_voxelgrids(pointclouds, 3, scale=torch.ones((2), device=device, dtype=dtype) * 4)
+    
         assert torch.equal(output_vg, expected_vg)
