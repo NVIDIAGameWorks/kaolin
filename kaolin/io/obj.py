@@ -56,6 +56,9 @@ def import_mesh(path, with_materials=False, with_normals=False, error_handler=No
         path (str): path to the obj file (with extension).
         with_materials (bool): if True, load materials. Default: False.
         with_normals (bool): if True, load vertex normals. Default: False.
+        error_handler (Callable):
+            function that handle errors that may happen during file processing.
+            Default: raise all errors.
 
     Returns:
 
