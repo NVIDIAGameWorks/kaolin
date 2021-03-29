@@ -12,6 +12,7 @@ steps:
 - name: submodules
   image: nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
   commands:
+  - apt install -y git
   - git submodule update --recursive --remote
 
 - name: flake8
