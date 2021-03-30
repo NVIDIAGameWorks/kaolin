@@ -53,19 +53,16 @@ kernels = torch.cat([kernel, kernel.transpose(
 
 def voxelgrids_to_cubic_meshes(voxelgrids, is_trimesh=True):
     r"""Convert voxelgrids to meshes by replacing each occupied voxel with a cuboid mesh (unit cube). 
-
     Each cube has 8 vertices and 6 (for quadmesh) or 12 faces 
     (for triangular mesh). Internal faces are ignored. 
     If `is_trimesh==True`, this function performs the same operation
     as "Cubify" defined in the ICCV 2019 paper "Mesh R-CNN": 
     https://arxiv.org/abs/1906.02739.
-
     Args:
         voxelgrids (torch.Tensor): binary voxel array with shape (B, X, Y, Z).
         is_trimesh (bool): the outputs are triangular meshes if True. Otherwise quadmeshes are returned.
     Returns:
         (list[torch.Tensor], list[torch.LongTensor]): tuple containing the list of vertices and the list of faces for each mesh.
-
     Example:
         >>> voxelgrids = torch.ones((1, 1, 1, 1))
         >>> verts, faces = voxelgrids_to_cubic_meshes(voxelgrids)
@@ -172,9 +169,11 @@ def voxelgrids_to_trianglemeshes(voxelgrids, iso_value=0.5):
             Value in the range [0, 1] used to determine whether a voxel is inside the
             surface or not. Isovalue is also used to interpolate 
             newly created triangle vertices. Defaults to 0.5
+
     Returns:
         (List of torch.FloatTensor, List of torch.LongTensor): 
          List of vertices and faces tensors of the converted triangle mesh, corresponds to each voxelgrid.
+
     Example:
         >>> voxelgrid = torch.tensor([[[[1, 0], 
         ...                             [0, 0]], 
@@ -182,21 +181,21 @@ def voxelgrids_to_trianglemeshes(voxelgrids, iso_value=0.5):
         ...                             [0, 0]]]], device='cuda', dtype=torch.uint8)
         >>> vertices, faces = voxelgrids_to_trianglemeshes(voxelgrid)
         >>> vertices[0]
-        tensor([[0.5000, 1.0000, 1.0000],
+        tensor([[1.0000, 1.0000, 0.5000],
                 [1.0000, 0.5000, 1.0000],
-                [1.0000, 1.0000, 0.5000],
-                [1.5000, 1.0000, 1.0000],
+                [0.5000, 1.0000, 1.0000],
+                [1.0000, 1.0000, 1.5000],
                 [1.0000, 1.5000, 1.0000],
-                [1.0000, 1.0000, 1.5000]], device='cuda:0')
+                [1.5000, 1.0000, 1.0000]], device='cuda:0')
         >>> faces[0]
-        tensor([[2, 1, 0],
-                [1, 2, 3],
-                [2, 0, 4],
-                [3, 2, 4],
-                [1, 5, 0],
-                [1, 3, 5],
-                [0, 5, 4],
-                [3, 4, 5]], device='cuda:0')
+        tensor([[0, 1, 2],
+                [3, 2, 1],
+                [4, 0, 2],
+                [4, 2, 3],
+                [0, 5, 1],
+                [5, 3, 1],
+                [4, 5, 0],
+                [5, 4, 3]], device='cuda:0')
 
     .. _Marching cubes, A high resolution 3D surface construction algorithm:
         https://www.researchgate.net/publication/202232897_Marching_Cubes_A_High_Resolution_3D_Surface_Construction_Algorithm

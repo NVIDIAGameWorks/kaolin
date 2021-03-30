@@ -36,7 +36,7 @@ To install the library. You must first clone the repository:
 
 .. code-block:: bash
 
-    $ git clone https://github.com/NVIDIAGameWorks/kaolin
+    $ git clone --recursive https://github.com/NVIDIAGameWorks/kaolin
     $ cd kaolin
 
 you can then select the tag if you want 0.9.0 or 0.1 specific release, example:

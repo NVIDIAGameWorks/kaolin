@@ -55,8 +55,7 @@ import logging
 
 import numpy
 import torch
-from torch.utils.cpp_extension import BuildExtension, CppExtension, \
-    CUDAExtension
+from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDAExtension
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
@@ -251,6 +250,12 @@ def get_extensions():
 
     return extensions + cython_extensions
 
+def get_include_dirs():
+    if torch.cuda.is_available() or os.getenv('FORCE_CUDA', '0') == '1':
+        cub_home = os.environ.get("CUB_HOME", os.path.join(cwd, 'third_party/cub'))
+        return [cub_home]
+    else:
+        return None
 
 if __name__ == '__main__':
     setup(
@@ -267,6 +272,7 @@ if __name__ == '__main__':
         # Package info
         packages=find_packages(exclude=('docs', 'tests', 'examples')),
         install_requires=get_requirements(),
+        include_dirs=get_include_dirs(),
         zip_safe=True,
         ext_modules=get_extensions(),
         cmdclass={

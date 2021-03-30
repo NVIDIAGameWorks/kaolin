@@ -2,6 +2,8 @@ stages:
   - build
   - test
 
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
 # ----
 
 build linux:

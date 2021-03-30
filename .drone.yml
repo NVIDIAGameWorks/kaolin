@@ -9,6 +9,12 @@ environment:
   TORCH_CUDA_ARCH_LIST: "5.2 6.0 6.1 7.0 7.5+PTX"
 
 steps:
+- name: submodules
+  image: nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
+  commands:
+  - apt-get update && apt-get install -y git
+  - git submodule update --init --recursive
+
 - name: flake8
   image: nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
   commands:

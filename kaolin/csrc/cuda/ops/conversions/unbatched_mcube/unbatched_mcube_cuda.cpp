@@ -50,12 +50,14 @@ void launch_generateTriangles2(at::Tensor pos, at::Tensor faces, at::Tensor comp
 void allocateTextures(at::Tensor d_triTable, at::Tensor d_numUniqueVertsTable, at::Tensor d_numTrianglesTable, 
                       at::Tensor d_numPartialVertsTable, at::Tensor d_vertsOrderTable);
 
-// torch::Tensor used to store tables
-torch::Tensor d_triTable;
-torch::Tensor d_numUniqueVertsTable;
-torch::Tensor d_numTrianglesTable;
-torch::Tensor d_numPartialVertsTable;
-torch::Tensor d_vertsOrderTable;
+void CubScanWrapper(at::Tensor output, at::Tensor input, int numElements);
+
+// at::Tensor used to store tables
+at::Tensor d_triTable;
+at::Tensor d_numUniqueVertsTable;
+at::Tensor d_numTrianglesTable;
+at::Tensor d_numPartialVertsTable;
+at::Tensor d_vertsOrderTable;
 
 ////////////////////////////////////////////////////////////////////////////////
 //! Run the Cuda part of the computation
@@ -64,12 +66,12 @@ void
 computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
                   int *activeVoxels, int *totalVerts, int *totalTriangles, int *totalPartialVerts,
                   int numVoxels, float3 voxelSize, int maxVerts, int maxFaces,
-                  torch::Tensor voxelgrid, torch::Tensor d_pos, torch::Tensor d_faces,
-                  torch::Tensor d_voxelPartialVerts,
-                  torch::Tensor d_voxelTriangles,
-                  torch::Tensor d_voxelOccupied,
-                  torch::Tensor d_compVoxelArray,
-                  torch::Tensor d_voxelVertsOrder)
+                  at::Tensor voxelgrid, at::Tensor d_pos, at::Tensor d_faces,
+                  at::Tensor d_voxelPartialVerts,
+                  at::Tensor d_voxelTriangles,
+                  at::Tensor d_voxelOccupied,
+                  at::Tensor d_compVoxelArray,
+                  at::Tensor d_voxelVertsOrder)
 {
   // calculate number of vertices and triangles need per voxel
   launch_classifyVoxel(d_voxelOccupied,
@@ -78,9 +80,8 @@ computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
                        gridSize, numVoxels, voxelgrid,
                        voxelSize, isoValue);
   
-  torch::Tensor d_voxelOccupiedScan = at::_cumsum(d_voxelOccupied, 0);
-  d_voxelOccupiedScan = at::roll(d_voxelOccupiedScan, 1, {0});
-  d_voxelOccupiedScan.index_put_({0}, 0);
+  at::Tensor d_voxelOccupiedScan = at::zeros({numVoxels}, voxelgrid.options().dtype(torch::kInt32));
+  CubScanWrapper(d_voxelOccupiedScan, d_voxelOccupied, numVoxels);
 
   // read back values to calculate total number of non-empty voxels
   // since we are using an exclusive scan, the total is the last value of
@@ -109,14 +110,13 @@ computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
   launch_compactVoxels(d_compVoxelArray, d_voxelOccupied, d_voxelOccupiedScan, numVoxels);
   
   //scan voxel triangle count array
-  torch::Tensor d_voxelTrianglesScan = at::_cumsum(d_voxelTriangles, 0);
-  d_voxelTrianglesScan = at::roll(d_voxelTrianglesScan, 1, {0});
-  d_voxelTrianglesScan.index_put_({0}, 0);
+  at::Tensor d_voxelTrianglesScan = at::zeros({numVoxels}, voxelgrid.options().dtype(torch::kInt32));
+  CubScanWrapper(d_voxelTrianglesScan, d_voxelTriangles, numVoxels);
   
   //scan partial vertex count array
-  torch::Tensor d_voxelPartialVertsScan = at::_cumsum(d_voxelPartialVerts, 0);
-  d_voxelPartialVertsScan = at::roll(d_voxelPartialVertsScan, 1, {0});
-  d_voxelPartialVertsScan.index_put_({0}, 0);
+  at::Tensor d_voxelPartialVertsScan = at::zeros({numVoxels}, voxelgrid.options().dtype(torch::kInt32));
+  CubScanWrapper(d_voxelPartialVertsScan, d_voxelPartialVerts, numVoxels);
+
   
   // readback total number of triangles
   {
@@ -189,24 +189,24 @@ std::vector<at::Tensor> unbatched_mcube_forward(const at::Tensor voxelgrid, floa
   // initialize tensors
   auto int_options = voxelgrid.options().dtype(torch::kInt32);
 
-  torch::Tensor d_pos = torch::zeros({maxVerts, 3}, voxelgrid.options().dtype(torch::kFloat32)); // tensor to store output vertices
+  at::Tensor d_pos = at::zeros({maxVerts, 3}, voxelgrid.options().dtype(torch::kFloat32)); // tensor to store output vertices
 
-  torch::Tensor d_faces = torch::zeros({maxFaces, 3}, int_options); // tensor to store output faces
+  at::Tensor d_faces = at::zeros({maxFaces, 3}, int_options); // tensor to store output faces
 
-  torch::Tensor d_voxelPartialVerts = torch::zeros({numVoxels}, int_options); // tensor to measure how many vertices a voxel will generate, only count on three edges.
-  torch::Tensor d_voxelTriangles = torch::zeros({numVoxels}, int_options); // tensor to measure how many trianlges a voxel will generate
-  torch::Tensor d_voxelOccupied = torch::zeros({numVoxels}, int_options); // binary tensor to indicate whether the voxel will generate any vertices or not
-  torch::Tensor d_compVoxelArray = torch::zeros({numVoxels}, int_options); // compact representation of d_voxelOccupiedScan
+  at::Tensor d_voxelPartialVerts = at::zeros({numVoxels}, int_options); // tensor to measure how many vertices a voxel will generate, only count on three edges.
+  at::Tensor d_voxelTriangles = at::zeros({numVoxels}, int_options); // tensor to measure how many trianlges a voxel will generate
+  at::Tensor d_voxelOccupied = at::zeros({numVoxels}, int_options); // binary tensor to indicate whether the voxel will generate any vertices or not
+  at::Tensor d_compVoxelArray = at::zeros({numVoxels}, int_options); // compact representation of d_voxelOccupiedScan
 
-  torch::Tensor d_voxelVertsOrder = torch::zeros({numVoxels, 3}, int_options); // tensor to store the order of added verts for each voxel
+  at::Tensor d_voxelVertsOrder = at::zeros({numVoxels, 3}, int_options); // tensor to store the order of added verts for each voxel
 
   // initialize static pointers
   if (!d_triTable.defined()) {
-    d_triTable = torch::zeros({256, 16}, int_options);
-    d_numUniqueVertsTable = torch::zeros({256}, int_options);
-    d_numTrianglesTable = torch::zeros({256}, int_options);
-    d_numPartialVertsTable = torch::zeros({256}, int_options);
-    d_vertsOrderTable = torch::zeros({256, 3}, int_options);
+    d_triTable = at::zeros({256, 16}, int_options);
+    d_numUniqueVertsTable = at::zeros({256}, int_options);
+    d_numTrianglesTable = at::zeros({256}, int_options);
+    d_numPartialVertsTable = at::zeros({256}, int_options);
+    d_vertsOrderTable = at::zeros({256, 3}, int_options);
 
     // allocate table textures after we initialize everything.
     allocateTextures(d_triTable, d_numUniqueVertsTable, d_numTrianglesTable, d_numPartialVertsTable, d_vertsOrderTable);

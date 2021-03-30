@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#define CUB_NS_PREFIX namespace kaolin {
+#define CUB_NS_POSTFIX }
 
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +22,7 @@
 
 #include <ATen/ATen.h>
 
-// #include <cub/cub.cuh> 
+#include <cub/cub.cuh>
 
 // textures containing look-up tables
 texture<uint, 1, cudaReadModeElementType> triTex;
@@ -152,12 +154,12 @@ void launch_classifyVoxel(at::Tensor voxelOccupied, at::Tensor voxelTriangles, a
     grid.y = grid.x / 32768;
     grid.x = 32768;
   }
-    // calculate number of vertices need per voxel
-    classifyVoxel<<<grid, threads>>>(voxelOccupied.data_ptr<int>(), 
-                                     voxelTriangles.data_ptr<int>(), voxelPartialVerts.data_ptr<int>(),
-                                     voxelVertsOrder.data_ptr<int>(),
-                                     voxelgrid.data_ptr<float>(), gridSize,
-                                     numVoxels, voxelSize, isoValue);
+  // calculate number of vertices need per voxel
+  classifyVoxel<<<grid, threads>>>(voxelOccupied.data_ptr<int>(), 
+                                   voxelTriangles.data_ptr<int>(), voxelPartialVerts.data_ptr<int>(),
+                                   voxelVertsOrder.data_ptr<int>(),
+                                   voxelgrid.data_ptr<float>(), gridSize,
+                                   numVoxels, voxelSize, isoValue);
 }
 
 // compact voxel array
@@ -217,7 +219,7 @@ int find_target_voxel(int3 gridSize, int face_idx, int current_voxel)
     case 0:  // looking for vertices in bot-front voxel
       target_voxel_idx = current_voxel - gridSize.x - gridSize.x*gridSize.y;
       break;
-    
+  
     case 1:  // looking for vertices in right-front voxel
       target_voxel_idx = current_voxel + 1 - gridSize.x*gridSize.y;
       break;
@@ -237,7 +239,7 @@ int find_target_voxel(int3 gridSize, int face_idx, int current_voxel)
     case 5: // looking for vertices in right voxel
       target_voxel_idx = current_voxel + 1;
       break;
-    
+  
     case 6:  // looking for vertices in current voxel
       target_voxel_idx = current_voxel;
       break;
@@ -257,7 +259,7 @@ int find_target_voxel(int3 gridSize, int face_idx, int current_voxel)
     case 10: // looking for vertices in right voxel
       target_voxel_idx = current_voxel + 1;
       break;
-    
+  
     case 11: // looking for vertices in current voxel
       target_voxel_idx = current_voxel;
       break;
@@ -265,7 +267,7 @@ int find_target_voxel(int3 gridSize, int face_idx, int current_voxel)
     default:
       target_voxel_idx = current_voxel;
       break;
-  }
+    }
   return target_voxel_idx;
 }
 
@@ -280,7 +282,7 @@ int find_offset(int face_idx, int voxel_index, int* voxelVertsOrder)
     case 0:  // looking for vertices in bot-front voxel
       corresponding_edge = 6; // corresponds to edge 6
       break;
-    
+  
     case 1:  // looking for vertices in right-front voxel
       corresponding_edge = 7; // corresponds to edge 7
       break;
@@ -300,7 +302,7 @@ int find_offset(int face_idx, int voxel_index, int* voxelVertsOrder)
     case 5: // looking for vertices in right voxel
       corresponding_edge = 7; // corresponds to edge 7
       break;
-    
+  
     case 6:  // looking for vertices in current voxel
       corresponding_edge = 6;
       break;
@@ -320,7 +322,7 @@ int find_offset(int face_idx, int voxel_index, int* voxelVertsOrder)
     case 10: // looking for vertices in right voxel
       corresponding_edge = 11; // corresponds to edge 11
       break;
-    
+  
     case 11: // looking for vertices in current voxel
       corresponding_edge = 11;
       break;
@@ -436,7 +438,7 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
     uint edge = tex1Dfetch(vertsOrderTex, (cubeindex*3) + i);
 
     if (edge == 255) {
-      break;
+        break;
     }
 
     // Only add the top-left-back vertices of the cube to the vertices' list
@@ -446,14 +448,15 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
 
     v[0] = &vertlist[(edge*NTHREADS)+threadIdx.x];
 
+    // Add the vertex in reverse order to keep the original pose.
     if (index < (maxVerts - 3)) {
-      pos[index * 3] = (v[0]) -> x;
-      pos[index * 3 + 1] = (v[0]) -> y;
-      pos[index * 3 + 2] = (v[0]) -> z;
+        pos[index * 3] = (v[0]) -> z;
+        pos[index * 3 + 1] = (v[0]) -> y;
+        pos[index * 3 + 2] = (v[0]) -> x;
     }
   }
 
-  // Add triangles
+    // Add triangles
   for (int j=0; j<16; j+=3) {
     uint face_idx1 = tex1Dfetch(triTex, cubeindex*16 + j);
 
@@ -475,11 +478,12 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
     int offset2 = find_offset(face_idx2, target_voxel_idx2, voxelVertsOrder); 
     int offset3 = find_offset(face_idx3, target_voxel_idx3, voxelVertsOrder);
 
+    // Add the faces in reverse order to ensure that original pose is unchanged
     // handle first vertex
     num_prev_verts = numPartialVertsScanned[target_voxel_idx1];
     num_prev_triangles = numTrianglesScanned[voxel];
 
-    faces[num_prev_triangles * 3 + j] = num_prev_verts + offset1;
+    faces[num_prev_triangles * 3 + j + 2] = num_prev_verts + offset1;
 
     // handle second vertex
     num_prev_verts = numPartialVertsScanned[target_voxel_idx2];
@@ -491,15 +495,15 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
     num_prev_verts = numPartialVertsScanned[target_voxel_idx3];
     num_prev_triangles = numTrianglesScanned[voxel];
 
-    faces[num_prev_triangles * 3 + j + 2] = num_prev_verts + offset3;
+    faces[num_prev_triangles * 3 + j] = num_prev_verts + offset3;
   }
 }
 
 void launch_generateTriangles2(at::Tensor pos, at::Tensor faces, at::Tensor compactedVoxelArray,
-                              at::Tensor numTrianglesScanned, at::Tensor numPartialVertsScanned, at::Tensor numPartialVerts,
-                              at::Tensor voxelVertsOrder,
-                              int3 gridSize, at::Tensor voxelgrid,
-                              float3 voxelSize, float isoValue, int activeVoxels, int maxVerts)
+                               at::Tensor numTrianglesScanned, at::Tensor numPartialVertsScanned, at::Tensor numPartialVerts,
+                               at::Tensor voxelVertsOrder,
+                               int3 gridSize, at::Tensor voxelgrid,
+                               float3 voxelSize, float isoValue, int activeVoxels, int maxVerts)
 {
   dim3 grid2((int) ceil(activeVoxels/ (float) NTHREADS), 1, 1);
 
@@ -515,4 +519,22 @@ void launch_generateTriangles2(at::Tensor pos, at::Tensor faces, at::Tensor comp
                                           voxelgrid.data_ptr<float>(), gridSize,
                                           voxelSize, isoValue, activeVoxels,
                                           maxVerts);
+}
+
+void CubScanWrapper(at::Tensor output, at::Tensor input, int numElements)
+{
+  int *d_in = input.data_ptr<int>();
+  int *d_out = output.data_ptr<int>();
+
+  // Determine temporary device storage requirements
+  void *d_temp_storage = NULL;
+  size_t temp_storage_bytes = 0;
+  kaolin::cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_in, d_out, numElements);
+
+  // Allocate temporary storage
+  at::Tensor temp_storage = at::zeros({(int) temp_storage_bytes}, input.options());
+  d_temp_storage = temp_storage.data_ptr<int>();
+
+  // Run exclusive prefix sum
+  kaolin::cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_in, d_out, numElements);
 }
