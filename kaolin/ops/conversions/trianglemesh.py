@@ -84,7 +84,7 @@ def trianglemeshes_to_voxelgrids(vertices, faces, resolution, origin=None, scale
 
         points = _unbatched_subdivide_vertices(batched_points[i], faces, resolution)
 
-        voxelgrid = _points_to_voxelgrids(points.unsqueeze(0), resolution, return_sparse=return_sparse)
+        voxelgrid = _base_points_to_voxelgrids(points.unsqueeze(0), resolution, return_sparse=return_sparse)
 
         voxelgrids[i] = voxelgrid
 
