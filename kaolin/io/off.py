@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import namedtuple
+
 import numpy as np
 import torch
 
@@ -27,12 +29,12 @@ def _get_faces(f, num_faces):
         data = line.split()
         if len(data) > 0:
             face_size = int(data[0])
-            faces.append([int(d) for d in data[1:face_size]])
+            faces.append([int(d) for d in data[1:face_size + 1]])
             if len(faces) == num_faces:
                 break
     return torch.LongTensor(faces)
 
-def _get_faces_with_color(f, num_faces):
+def _get_faces_with_colors(f, num_faces):
     faces = []
     face_colors = []
     for line in f:
@@ -41,33 +43,28 @@ def _get_faces_with_color(f, num_faces):
         data = line.split()
         if len(data) > 0:
             face_size = int(data[0])
-            faces.append([int(d) for d in data[1:face_size]])
-            face_colors.append([float(d) for d in data[face_size:]])
+            faces.append([int(d) for d in data[1:face_size + 1]])
+            face_colors.append([float(d) for d in data[face_size + 1:]])
             if len(faces) == num_faces:
                 break
     faces = torch.LongTensor(faces)
-    face_colors = torch.FloatTensor(face_colors)
+    face_colors = torch.LongTensor(face_colors)
     return faces, face_colors
 
-def import_mesh(path, with_face_colors=False, error_handler=None):
+def import_mesh(path, with_face_colors=False):
     r"""Load data from an off file as a single mesh.
 
     Args:
         path (str): path to the obj file (with extension).
         with_face_colors (bool): if True, load face colors. Default: False.
-        error_handler (Callable):
-            function that handle errors that may happen during file processing.
-            Default: raise all errors.
 
     Returns:
 
     nametuple of:
         - **vertices** (torch.FloatTensor): of shape (num_vertices, 3)
         - **faces** (torch.LongTensor): of shape (num_faces, face_size)
-        - **face_colors** (torch.FloatTensor): of shape (num_faces, 3)
+        - **face_colors** (torch.LongTensor): in the range [0, 255], of shape (num_faces, 3).
     """
-    if error_handler is None:
-        error_handler = default_error_handler
     vertices = []
     uvs = []
     f = open(path, 'r', encoding='utf-8')
@@ -79,8 +76,6 @@ def import_mesh(path, with_face_colors=False, error_handler=None):
         if len(data) > 0:
             num_vertices = int(data[0])
             num_faces = int(data[1])
-            if len(data) == 3:
-                num_edges = int(data[2])
             break
     # Get vertices
     for line in f:
@@ -93,10 +88,10 @@ def import_mesh(path, with_face_colors=False, error_handler=None):
                 break
     vertices = torch.FloatTensor(vertices)
     # Get faces
-    if with_faces_colors:
-        faces, faces_colors = _get_faces_with_colors(f, num_faces)
+    if with_face_colors:
+        faces, face_colors = _get_faces_with_colors(f, num_faces)
     else:
-		faces = _get_faces_with_colors(f, num_faces)
-        faces_colors = None
+        faces = _get_faces(f, num_faces)
+        face_colors = None
     f.close()
-	return return_type(vertices, faces, faces_colors)
+    return return_type(vertices, faces, face_colors)

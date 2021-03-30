@@ -17,42 +17,41 @@ import pytest
 
 import torch
 
-from kaolin.io import obj
+from kaolin.io import off
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../samples/')
-
-# TODO(cfujitsang): Add sanity test over a dataset like ModelNet
+SIMPLE_DIR = os.path.join(ROOT_DIR, 'simple_off/')
 
 class TestLoadOff:
     @pytest.fixture(autouse=True)
     def expected_vertices(self):
         return torch.FloatTensor([
             [-0.1, -0.1, -0.1],
-            [0.1, -0.1, -0.1],
-            [-0.1, 0.1, -0.1],
-            [0.1, 0.1, -0.1],
-            [-0.1, -0.1, 0.1],
-            [0.1, -0.1, 0.1]
+            [ 0.1, -0.1, -0.1],
+            [-0.1,  0.1, -0.1],
+            [ 0.1,  0.1, -0.1],
+            [-0.1, -0.1,  0.1],
+            [ 0.1, -0.1,  0.1]
         ])
 
     @pytest.fixture(autouse=True)
     def expected_faces(self):
         return torch.LongTensor([
-            [0, 1, 3, 2],
-            [1, 0, 4, 5]
+            [1, 2, 4, 3],
+            [2, 1, 5, 6]
         ])
 
     @pytest.fixture(autouse=True)
     def expected_face_colors(self):
         return torch.LongTensor([
             [128, 128, 128],
-            [0, 0, 255]
+            [0,   0,   255],
         ])
 
     @pytest.mark.parametrize('with_face_colors', [False, True])
     def test_import_mesh(self, with_face_colors, expected_vertices, expected_faces,
                          expected_face_colors):
-        outputs = obj.import_mesh(os.path.join(SIMPLE_DIR, 'model.off'),
+        outputs = off.import_mesh(os.path.join(SIMPLE_DIR, 'model.off'),
                                   with_face_colors=with_face_colors)
         assert torch.equal(outputs.vertices, expected_vertices)
         assert torch.equal(outputs.faces, expected_faces)
