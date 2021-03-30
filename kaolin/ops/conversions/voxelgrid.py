@@ -160,6 +160,7 @@ def voxelgrids_to_trianglemeshes(voxelgrids, iso_value=0.5):
     r"""Converts voxelgrids to triangle meshes using marching cube algorithm.
     Please refer to: *Lorensen, William E.; Cline, Harvey E.* in
     `Marching cubes, A high resolution 3D surface construction algorithm`_
+
     Args:
         voxelgrids (torch.Tensor):
             Exact batched voxel array with shape
@@ -168,9 +169,11 @@ def voxelgrids_to_trianglemeshes(voxelgrids, iso_value=0.5):
             Value in the range [0, 1] used to determine whether a voxel is inside the
             surface or not. Isovalue is also used to interpolate 
             newly created triangle vertices. Defaults to 0.5
+
     Returns:
         (List of torch.FloatTensor, List of torch.LongTensor): 
          List of vertices and faces tensors of the converted triangle mesh, corresponds to each voxelgrid.
+
     Example:
         >>> voxelgrid = torch.tensor([[[[1, 0], 
         ...                             [0, 0]], 
@@ -193,6 +196,7 @@ def voxelgrids_to_trianglemeshes(voxelgrids, iso_value=0.5):
                 [5, 3, 1],
                 [4, 5, 0],
                 [5, 4, 3]], device='cuda:0')
+
     .. _Marching cubes, A high resolution 3D surface construction algorithm:
         https://www.researchgate.net/publication/202232897_Marching_Cubes_A_High_Resolution_3D_Surface_Construction_Algorithm
     """
