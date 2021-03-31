@@ -43,7 +43,9 @@ def _get_faces_with_colors(f, num_faces):
         if len(data) > 0:
             face_size = int(data[0])
             faces.append([int(d) for d in data[1:face_size + 1]])
-            face_colors.append([float(d) for d in data[face_size + 1:]])
+            face_colors.append([
+                float(d) for d in data[face_size + 1:face_size + 4]
+            ])
             if len(faces) == num_faces:
                 break
     faces = torch.LongTensor(faces)
@@ -82,7 +84,7 @@ def import_mesh(path, with_face_colors=False):
             continue
         data = line.split()
         if len(data) > 0:
-            vertices.append([float(d) for d in data])
+            vertices.append([float(d) for d in data[:3]])
             if len(vertices) == num_vertices:
                 break
     vertices = torch.FloatTensor(vertices)
