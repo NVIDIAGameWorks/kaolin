@@ -20,37 +20,8 @@ import torch
 return_type = namedtuple('return_type',
                          ['vertices', 'faces', 'face_colors'])
 
-def _get_faces(f, num_faces):
-    faces = []
-    for line in f:
-        if line.startswith('#'):
-            continue
-        data = line.split()
-        if len(data) > 0:
-            face_size = int(data[0])
-            faces.append([int(d) for d in data[1:face_size + 1]])
-            if len(faces) == num_faces:
-                break
-    return torch.LongTensor(faces)
-
-def _get_faces_with_colors(f, num_faces):
-    faces = []
-    face_colors = []
-    for line in f:
-        if line.startswith('#'):
-            continue
-        data = line.split()
-        if len(data) > 0:
-            face_size = int(data[0])
-            faces.append([int(d) for d in data[1:face_size + 1]])
-            face_colors.append([
-                float(d) for d in data[face_size + 1:face_size + 4]
-            ])
-            if len(faces) == num_faces:
-                break
-    faces = torch.LongTensor(faces)
-    face_colors = torch.LongTensor(face_colors)
-    return faces, face_colors
+def is_void(splitted_str):
+    return len(splitted_str) == 0 or splitted_str[0].startswith('#')
 
 def import_mesh(path, with_face_colors=False):
     r"""Load data from an off file as a single mesh.
@@ -71,28 +42,43 @@ def import_mesh(path, with_face_colors=False):
     f = open(path, 'r', encoding='utf-8')
     # Get metadata (number of vertices / faces (/ edges))
     for line in f:
-        if line.startswith('#') or line.startswith('OFF'):
-            continue
         data = line.split()
-        if len(data) > 0:
-            num_vertices = int(data[0])
-            num_faces = int(data[1])
-            break
+        if is_void(data) or data[0] == 'OFF':
+            continue
+        num_vertices = int(data[0])
+        num_faces = int(data[1])
+        break
+
     # Get vertices
     for line in f:
-        if line.startswith('#'):
-            continue
         data = line.split()
-        if len(data) > 0:
-            vertices.append([float(d) for d in data[:3]])
-            if len(vertices) == num_vertices:
-                break
+        if is_void(data):
+            continue
+        vertices.append([float(d) for d in data[:3]])
+        if len(vertices) == num_vertices:
+            break
     vertices = torch.FloatTensor(vertices)
+
     # Get faces
+    faces = []
+    face_colors = []
+    for line in f:
+        data = line.split()
+        if is_void(data):
+            continue
+        face_size = int(data[0])
+        faces.append([int(d) for d in data[1:face_size + 1]])
+        if with_face_colors:
+            face_colors.append([
+                float(d) for d in data[face_size + 1:face_size + 4]
+            ])
+        if len(faces) == num_faces:
+            break
+    faces = torch.LongTensor(faces)
     if with_face_colors:
-        faces, face_colors = _get_faces_with_colors(f, num_faces)
+        face_colors = torch.LongTensor(face_colors)
     else:
-        faces = _get_faces(f, num_faces)
         face_colors = None
+
     f.close()
     return return_type(vertices, faces, face_colors)
