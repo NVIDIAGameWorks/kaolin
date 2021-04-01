@@ -58,6 +58,9 @@ def import_mesh(path, with_materials=False, with_normals=False, error_handler=No
         with_normals (bool): if True, load vertex normals. Default: False.
         error_handler (Callable):
             function that handle errors that may happen during file processing.
+            Take (error (Exception), material_name (str, optional),
+            materials (list of dict, optional),
+            materials_order (list, optional)) as input.
             Default: raise all errors.
 
     Returns:
