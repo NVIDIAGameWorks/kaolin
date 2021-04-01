@@ -20,7 +20,7 @@ import torch
 return_type = namedtuple('return_type',
                          ['vertices', 'faces', 'face_colors'])
 
-def is_void(splitted_str):
+def _is_void(splitted_str):
     return len(splitted_str) == 0 or splitted_str[0].startswith('#')
 
 def import_mesh(path, with_face_colors=False):
@@ -43,7 +43,7 @@ def import_mesh(path, with_face_colors=False):
     # Get metadata (number of vertices / faces (/ edges))
     for line in f:
         data = line.split()
-        if is_void(data) or data[0] == 'OFF':
+        if _is_void(data) or data[0] == 'OFF':
             continue
         num_vertices = int(data[0])
         num_faces = int(data[1])
@@ -52,7 +52,7 @@ def import_mesh(path, with_face_colors=False):
     # Get vertices
     for line in f:
         data = line.split()
-        if is_void(data):
+        if _is_void(data):
             continue
         vertices.append([float(d) for d in data[:3]])
         if len(vertices) == num_vertices:
@@ -64,7 +64,7 @@ def import_mesh(path, with_face_colors=False):
     face_colors = []
     for line in f:
         data = line.split()
-        if is_void(data):
+        if _is_void(data):
             continue
         face_size = int(data[0])
         faces.append([int(d) for d in data[1:face_size + 1]])
