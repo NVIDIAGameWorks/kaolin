@@ -22,7 +22,12 @@ import warnings
 from collections import namedtuple
 
 import torch
-from pxr import Usd, UsdGeom, Vt, Sdf
+
+try:
+    from pxr import Usd, UsdGeom, Vt, Sdf
+except ImportError:
+    warnings.warn("Warning: module pxr not found", ImportWarning)
+
 
 
 mesh_return_type = namedtuple('mesh_return_type', ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'face_normals', 'materials'])

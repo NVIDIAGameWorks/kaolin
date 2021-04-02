@@ -17,10 +17,15 @@ import os
 from pathlib import Path
 import posixpath
 from abc import abstractmethod
+import warnings
 
 import torch
 from PIL import Image
-from pxr import UsdShade, Sdf, Usd
+
+try:
+    from pxr import UsdShade, Sdf, Usd
+except ImportError:
+    warnings.warn("Warning: module pxr not found", ImportWarning)
 
 from kaolin.io import usd
 
