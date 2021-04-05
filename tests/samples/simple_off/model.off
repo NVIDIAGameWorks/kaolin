@@ -1,0 +1,15 @@
+OFF
+ # this is an example model
+
+6 2
+# those are the vertices
+-0.100000 -0.100000 -0.100000 #Those are still vertices  
+0.100000 -0.100000 -0.100000
+-0.100000 0.100000 -0.100000
+0.100000 0.100000 -0.100000
+-0.100000 -0.100000 0.100000
+0.100000 -0.100000 0.100000
+
+#those are the faces followed by the face colors
+4 1 2 4 3 128 128 128 #those are still faces
+4 2 1 5 6 0 0 255
