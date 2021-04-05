@@ -51,6 +51,7 @@ else:
 dist.Distribution().fetch_build_eggs(missing_modules)
 
 import os
+import sys
 import logging
 
 import numpy
@@ -115,6 +116,10 @@ def get_requirements():
     requirements.append('scipy>=1.2.0,<=1.5.2')
     requirements.append('Pillow>=8.0.0')
     requirements.append('tqdm>=4.51.0')
+    if sys.version_info >= (3, 8):
+        warnings.warn("usd-core is not compatible with python_version >= 3.8 "
+                      "and won't be installed, please use python_version 3.6 or 3.6 "
+                      "to use USD related features")
     requirements.append('usd-core==20.11; python_version < "3.8"')
 
     return requirements
