@@ -18,8 +18,7 @@ __all__ = ['pointclouds_to_voxelgrids']
 
 def _base_points_to_voxelgrids(points, resolution, return_sparse=False):
     r"""Converts points to voxelgrids. This is the base function for both trianglemeshes_to_voxelgrids
-    and pointclouds_to_voxelgrids. For point cloud, the points are the original points. For Triangle Mesh,
-    the points are sampled along the edges. The points are normalized into range [0, 1].
+    and pointclouds_to_voxelgrids. The points are normalized into range [0, 1].
 
     Args:
         points (torch.Tensor):
