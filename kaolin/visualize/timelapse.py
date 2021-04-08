@@ -1,7 +1,12 @@
 import os
 import posixpath
+import warnings
 
-from pxr import Usd, UsdShade
+try:
+    from pxr import Usd, UsdShade
+except ImportError:
+    warnings.warn("Warning: module pxr not found", ImportWarning)
+
 from kaolin import io
 
 
