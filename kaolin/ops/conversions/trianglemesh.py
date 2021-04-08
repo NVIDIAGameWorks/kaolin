@@ -14,6 +14,7 @@
 
 import torch
 from ..mesh.trianglemesh import _unbatched_subdivide_vertices
+from .pointcloud import _base_points_to_voxelgrids
 
 __all__ = ['trianglemeshes_to_voxelgrids']
 
