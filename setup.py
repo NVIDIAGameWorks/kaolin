@@ -43,7 +43,7 @@ else:
     if cython_ver != parse_version('0.29.20'):
         warnings.warn('Kaolin is compatible with cython == 0.29.20, '
                       f'but found version {Cython.__version__} instead. '
-                      'This will try to install torch in the right version. '
+                      'This will try to install cython in the right version. '
                       'If the installation fails we recommend to first install it.')
         missing_modules.append(f'cython=={CYTHON_MIN_VER}')
 
