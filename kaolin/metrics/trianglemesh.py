@@ -14,7 +14,7 @@
 
 import torch
 from ..ops.mesh import uniform_laplacian
-from . import unbatched_triangle_distance_cuda
+from kaolin import _C
 
 class _UnbatchedTriangleDistance(torch.autograd.Function):
     """torch.autograd.Function for triangle_distance.
@@ -45,7 +45,7 @@ class _UnbatchedTriangleDistance(torch.autograd.Function):
         idx = torch.zeros(n, device=device, dtype=torch.long)
         dist_type = torch.zeros(n, device=device, dtype=torch.int)
 
-        unbatched_triangle_distance_cuda.forward(pointcloud, v1, v2, v3, dist, idx, dist_type)
+        _C.metrics.unbatched_triangle_distance_forward_cuda(pointcloud, v1, v2, v3, dist, idx, dist_type)
 
         ctx.save_for_backward(pointcloud, v1, v2, v3, idx, dist_type)
         ctx.mark_non_differentiable(idx, dist_type)
@@ -67,7 +67,7 @@ class _UnbatchedTriangleDistance(torch.autograd.Function):
 
         grad_output_dist = grad_output_dist.contiguous()
 
-        unbatched_triangle_distance_cuda.backward(
+        _C.metrics.unbatched_triangle_distance_backward_cuda(
             grad_output_dist, pointcloud, v1, v2, v3, idx, dist_type, grad_input_p,
             grad_input_v1, grad_input_v2, grad_input_v3)
 

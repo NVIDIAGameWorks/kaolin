@@ -53,6 +53,7 @@ dist.Distribution().fetch_build_eggs(missing_modules)
 import os
 import sys
 import logging
+import glob
 
 import numpy
 import torch
@@ -124,21 +125,15 @@ def get_requirements():
 
     return requirements
 
-
-def filters_cu(sources, with_cuda):
-    if with_cuda:
-        return sources
-    else:
-        return [s for s in sources if not s.endswith('.cu')]
-
-
 def get_extensions():
     extra_compile_args = {'cxx': ['-O3']}
     define_macros = []
+    sources = glob.glob('kaolin/csrc/**/*.cpp', recursive=True)
     # FORCE_CUDA is for cross-compilation in docker build
     if torch.cuda.is_available() or os.getenv('FORCE_CUDA', '0') == '1':
         with_cuda = True
         define_macros += [("WITH_CUDA", None)]
+        sources += glob.glob('kaolin/csrc/**/*.cu', recursive=True)
         extension = CUDAExtension
         extra_compile_args.update({'nvcc': ['-O3']})
     else:
@@ -147,79 +142,12 @@ def get_extensions():
     extensions = []
     extensions.append(
         extension(
-            name='kaolin.ops.packed_simple_sum_cuda',
-            sources=filters_cu(['kaolin/csrc/cuda/ops/packed_simple_sum.cpp',
-                                'kaolin/csrc/cuda/ops/packed_simple_sum_impl.cu'],
-                               with_cuda),
+            name='kaolin._C',
+            sources=sources,
             define_macros=define_macros,
             extra_compile_args=extra_compile_args
         )
     )
-    extensions.append(
-        extension(
-            name='kaolin.ops.tile_to_packed_cuda',
-            sources=filters_cu(['kaolin/csrc/cuda/ops/tile_to_packed_cuda.cpp',
-                                'kaolin/csrc/cuda/ops/tile_to_packed_cuda_kernel.cu'],
-                               with_cuda),
-            define_macros=define_macros,
-            extra_compile_args=extra_compile_args
-        )
-    )
-    extensions.append(
-        extension(
-            name='kaolin.metrics.sided_distance_cuda',
-            sources=filters_cu(['kaolin/csrc/cuda/metrics/sided_distance.cpp',
-                                'kaolin/csrc/cuda/metrics/sided_distance_cuda.cu'],
-                               with_cuda),
-            define_macros=define_macros,
-            extra_compile_args=extra_compile_args
-        )
-    )
-    extensions.append(
-        extension(
-            name='kaolin.metrics.unbatched_triangle_distance_cuda',
-            sources=filters_cu(
-                ['kaolin/csrc/cuda/metrics/unbatched_triangle_distance_cuda.cpp',
-                 'kaolin/csrc/cuda/metrics/unbatched_triangle_distance_cuda_kernel.cu'],
-                with_cuda),
-            define_macros=define_macros,
-            extra_compile_args=extra_compile_args
-        )
-    )
-    extensions.append(
-        extension(
-            name='kaolin.ops.mesh.mesh_intersection_cuda',
-            sources=filters_cu(
-                ['kaolin/csrc/cuda/ops/mesh/mesh_intersection_cuda.cpp',
-                 'kaolin/csrc/cuda/ops/mesh/mesh_intersection_cuda_kernel.cu'],
-                with_cuda),
-            define_macros=define_macros,
-            extra_compile_args=extra_compile_args
-        )
-    )
-    extensions.append(
-        extension(
-            name='kaolin.render.mesh.dibr_rasterization_cuda',
-            sources=filters_cu(['kaolin/csrc/cuda/render/dibr.cpp',
-                                'kaolin/csrc/cuda/render/dibr_for.cu',
-                                'kaolin/csrc/cuda/render/dibr_back.cu'],
-                               with_cuda),
-            define_macros=define_macros,
-            extra_compile_args=extra_compile_args
-        )
-    )
-
-    extensions.append(
-        extension(
-            name='kaolin.ops.conversions.unbatched_mcube_cuda',
-            sources=filters_cu(['kaolin/csrc/cuda/ops/conversions/unbatched_mcube/unbatched_mcube_cuda.cpp',
-                                'kaolin/csrc/cuda/ops/conversions/unbatched_mcube/unbatched_mcube_cuda_kernel.cu'],
-                               with_cuda),
-            define_macros=define_macros,
-            extra_compile_args=extra_compile_args
-        )
-    )
-
 
     # use cudart_static instead
     for extension in extensions:
@@ -233,14 +161,14 @@ def get_extensions():
         CppExtension(
             'kaolin.ops.mesh.triangle_hash',
             sources=[
-                f'kaolin/csrc/cpu/ops/mesh/triangle_hash{ext}'
+                f'kaolin/cython/ops/mesh/triangle_hash{ext}'
             ],
             include_dirs=[numpy.get_include()],
         ),
         CppExtension(
             'kaolin.ops.conversions.mise',
             sources=[
-                f'kaolin/csrc/cpu/ops/conversions/mise{ext}'
+                f'kaolin/cython/ops/conversions/mise{ext}'
             ],
         ),
     ]

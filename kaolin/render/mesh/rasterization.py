@@ -16,7 +16,8 @@ import torch
 import torch.nn
 import torch.autograd
 from torch.autograd import Function
-from . import dibr_rasterization_cuda
+
+from kaolin import _C
 
 
 class DIBRasterization(Function):
@@ -91,7 +92,7 @@ class DIBRasterization(Function):
                                             dtype=dtype,
                                             device=dev)
 
-        dibr_rasterization_cuda.packed_rasterize_forward(
+        _C.render.packed_rasterize_forward_cuda(
             valid_face_vertices_z.contiguous(),
             valid_face_vertices_image.contiguous(),
             valid_face_bboxes.contiguous(),
@@ -125,7 +126,7 @@ class DIBRasterization(Function):
                                       dtype=dtype,
                                       device=dev)
 
-        dibr_rasterization_cuda.generate_soft_mask(
+        _C.render.generate_soft_mask_cuda(
             face_vertices_image,
             face_large_bboxes,
             face_idx,
@@ -167,7 +168,7 @@ class DIBRasterization(Function):
 
         colors_bxfx3d = face_features
         gradcolors_bxfx3d = grad_face_features
-        dibr_rasterization_cuda.rasterize_backward(
+        _C.render.rasterize_backward_cuda(
             grad_interpolated_features.contiguous(),
             grad_improb_bxhxwx1.contiguous(),
             interpolated_features,

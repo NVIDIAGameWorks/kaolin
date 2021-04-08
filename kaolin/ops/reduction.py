@@ -13,8 +13,7 @@
 # limitations under the License.
 
 import torch
-from . import tile_to_packed_cuda
-from . import packed_simple_sum_cuda
+from kaolin import _C
 
 class _PackedSimpleSumCuda(torch.autograd.Function):
     """torch.autograd.function wrapper for :func:`tile_to_packed` CUDA implementations"""
@@ -23,7 +22,7 @@ class _PackedSimpleSumCuda(torch.autograd.Function):
     def forward(ctx, inputs, numel_per_tensor):
         inputs = inputs.contiguous()
         numel_per_tensor = numel_per_tensor.contiguous()
-        output = packed_simple_sum_cuda.forward(inputs, numel_per_tensor)
+        output = _C.ops.packed_simple_sum_cuda(inputs, numel_per_tensor)
         if inputs.dtype == torch.half:
             output = output.to(torch.half)
         ctx.save_for_backward(numel_per_tensor)
@@ -36,7 +35,7 @@ class _PackedSimpleSumCuda(torch.autograd.Function):
         grad_output = grad_output.contiguous()
         numel_per_tensor, = ctx.saved_tensors
         grad_inputs = torch.empty(ctx.inputs_shape, dtype=ctx.inputs_dtype, device=grad_output.device)
-        tile_to_packed_cuda.forward_out(grad_output, numel_per_tensor, grad_inputs)
+        _C.ops.tile_to_packed_out_cuda(grad_output, numel_per_tensor, grad_inputs)
         return grad_inputs, None
 
 def packed_simple_sum(tensor, numel_per_tensor):

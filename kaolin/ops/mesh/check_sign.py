@@ -39,7 +39,7 @@ import numpy as np
 import torch
 
 from . import triangle_hash
-from . import mesh_intersection_cuda as mint
+from kaolin import _C
 
 __all__ = ['check_sign']
 
@@ -51,7 +51,7 @@ def _unbatched_check_sign_cuda(verts, faces, points):
     v3 = torch.index_select(verts, 0, faces[:, 2]).view(-1, 3).contiguous()
 
     ints = torch.zeros(n, device=points.device)
-    mint.forward_cuda(points, v1, v2, v3, ints)
+    _C.ops.mesh.unbatched_mesh_intersection_cuda(points, v1, v2, v3, ints)
     contains = ints % 2 == 1
 
     return contains

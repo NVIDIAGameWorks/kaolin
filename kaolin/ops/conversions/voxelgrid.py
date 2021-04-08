@@ -13,8 +13,9 @@
 # limitations under the License.
 
 import torch
-from . import unbatched_mcube_cuda as mcube
 import torch.nn.functional as F
+
+from kaolin import _C
 
 __all__ = ['voxelgrids_to_cubic_meshes', 'voxelgrids_to_trianglemeshes']
 
@@ -148,7 +149,7 @@ def voxelgrids_to_cubic_meshes(voxelgrids, is_trimesh=True):
 class MarchingCubesLorensenCuda(torch.autograd.Function):
     @staticmethod
     def forward(ctx, voxelgrid, iso_value):
-        vertices, faces = mcube.forward_cuda(voxelgrid, iso_value)
+        vertices, faces = _C.ops.conversions.unbatched_mcube_forward_cuda(voxelgrid, iso_value)
         return vertices, faces
 
     @staticmethod
