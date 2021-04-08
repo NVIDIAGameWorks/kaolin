@@ -14,10 +14,11 @@
 
 import torch
 from ..mesh.trianglemesh import _unbatched_subdivide_vertices
+from .pointcloud import wrongfunc
 
 __all__ = ['trianglemeshes_to_voxelgrids']
 
-def trianglemeshes_to_voxelgrids(vertices, faces, resolution, origin=None, scale=None):
+def trianglemeshes_to_voxelgrids(vertices, faces, resolution, origin=None, scale=None, return_sparse=False):
     r"""Converts meshes to surface voxelgrids of a given resolution. It first upsamples 
     triangle mesh's vertices to given resolution, then it performs a box test. 
     If a voxel contains a triangle vertex, set that voxel to 1. Vertex will be 
@@ -35,8 +36,9 @@ def trianglemeshes_to_voxelgrids(vertices, faces, resolution, origin=None, scale
                               Default: scale = torch.max(torch.max(vertices, dim=1)[0] - origin, dim=1)[0]
 
     Returns:
-        (torch.Tensor): 
+        (torch.Tensor or torch.FloatTensor): 
             Binary batched voxelgrids of shape (B, resolution, resolution, resolution).
+            If return_sparse == True, sparse tensor is returned.
 
     Example:
         >>> vertices = torch.tensor([[[0, 0, 0],
@@ -82,16 +84,8 @@ def trianglemeshes_to_voxelgrids(vertices, faces, resolution, origin=None, scale
 
         points = _unbatched_subdivide_vertices(batched_points[i], faces, resolution)
 
-        points = torch.round(points * (resolution - 1)).long()
+        voxelgrid = _base_points_to_voxelgrids(points.unsqueeze(0), resolution, return_sparse=return_sparse)
 
-        points = torch.unique(points, dim=0)
-
-        condition = points <= (resolution - 1)
-
-        condition = torch.logical_and(condition, points >= 0)
-        row_cond = condition.all(1)
-        points = points[row_cond, :]
-
-        voxelgrids[i, points[:, 0], points[:, 1], points[:, 2]] = 1
+        voxelgrids[i] = voxelgrid
 
     return voxelgrids
