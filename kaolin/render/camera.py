@@ -19,7 +19,8 @@ import torch.nn
 from numpy import tan
 
 def rotate_translate_points(points, camera_rot, camera_trans):
-    r"""rotate and translate 3D points on based on rotation matrix and transformation matrix.
+    r"""Rotate and translate 3D points on based on rotation matrix and transformation matrix.
+
     Formula is  :math:`\text{P_new} = R * (\text{P_old} - T)`
 
     Args:
@@ -36,23 +37,24 @@ def rotate_translate_points(points, camera_rot, camera_trans):
 
 
 def generate_rotate_translate_matrices(camera_position, look_at, camera_up_direction):
-    r"""generate rotation and translation matrix for given camera parameters.
-        Formula is :math:`\text{P_cam} = \text{mtx} * \text{P_world} + \text{shift}`
+    r"""Generate rotation and translation matrix for given camera parameters.
 
-        Args:
-            camera_position (torch.FloatTensor):
-                camera positions of shape :math:`(\text{batch_size}, 3)`,
-                it means where your cameras are
-            look_at (torch.FloatTensor):
-                where the camera is watching, of shape :math:`(\text{batch_size}, 3)`,
-            camera_up_direction (torch.FloatTensor):
-                camera up directions of shape :math:`(\text{batch_size}, 3)`,
-                it means what are your camera up directions, generally [0, 1, 0]
+    Formula is :math:`\text{P_cam} = \text{rot_mtx} * (\text{P_world} - \text{trans_mtx})`
 
-        Returns:
-            (torch.FloatTensor, torch.FloatTensor):
-                the camera rotation matrix of shape :math:`(\text{batch_size}, 3, 3)`
-                and the camera transformation matrix of shape :math:`(\text{batch_size}, 3)`
+    Args:
+        camera_position (torch.FloatTensor):
+            camera positions of shape :math:`(\text{batch_size}, 3)`,
+            it means where your cameras are
+        look_at (torch.FloatTensor):
+            where the camera is watching, of shape :math:`(\text{batch_size}, 3)`,
+        camera_up_direction (torch.FloatTensor):
+            camera up directions of shape :math:`(\text{batch_size}, 3)`,
+            it means what are your camera up directions, generally [0, 1, 0]
+
+    Returns:
+        (torch.FloatTensor, torch.FloatTensor):
+            the camera rotation matrix of shape :math:`(\text{batch_size}, 3, 3)`
+            and the camera transformation matrix of shape :math:`(\text{batch_size}, 3)`
     """
 
     # 3 variables should be length 1
@@ -73,8 +75,35 @@ def generate_rotate_translate_matrices(camera_position, look_at, camera_up_direc
 
     return mtx_bx3x3, shift_bx3
 
+def generate_transformation_matrix(camera_position, look_at, camera_up_direction):
+    r"""Generate transformation matrix for given camera parameters.
 
-################################################################
+    Formula is :math:`\text{P_cam} = \text{P_world} * {\text{transformation_mtx}`,
+    with :math:`\text{P_world}` being the points coordinates padded with 1.
+
+    Args:
+        camera_position (torch.FloatTensor):
+            camera positions of shape :math:`(\text{batch_size}, 3)`,
+            it means where your cameras are
+        look_at (torch.FloatTensor):
+            where the camera is watching, of shape :math:`(\text{batch_size}, 3)`,
+        camera_up_direction (torch.FloatTensor):
+            camera up directions of shape :math:`(\text{batch_size}, 3)`,
+            it means what are your camera up directions, generally [0, 1, 0]
+
+    Returns:
+        (torch.FloatTensor):
+            The camera transformation matrix of shape :math:`(\text{batch_size, 4, 3)`.
+    """
+    z_axis = (camera_position - look_at)
+    z_axis /= z_axis.norm(dim=1, keepdim=True)
+    x_axis = torch.cross(camera_up_direction, z_axis, dim=1)
+    x_axis /= x_axis.norm(dim=1, keepdim=True)
+    y_axis = torch.cross(z_axis, x_axis, dim=1)
+    rot_part = torch.stack([x_axis, y_axis, z_axis], dim=2)
+    trans_part = (-camera_position.unsqueeze(1) @ rot_part)
+    return torch.cat([rot_part, trans_part], dim=1)
+
 def perspective_camera(points, camera_proj):
     r"""Projects 3D points on 2D images in perspective projection mode.
 

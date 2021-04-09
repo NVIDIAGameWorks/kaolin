@@ -19,7 +19,8 @@ import numpy as np
 import torch
 
 from kaolin.render.camera import perspective_camera, generate_perspective_projection, \
-                                 rotate_translate_points, generate_rotate_translate_matrices
+                                 rotate_translate_points, generate_rotate_translate_matrices, \
+                                 generate_transformation_matrix
 
 
 @pytest.mark.parametrize("device", ["cuda"])
@@ -30,19 +31,19 @@ class TestCamera:
     @pytest.fixture(autouse=True)
     def camera_pos(self, batch_size, device):
         # shape: (batch_size, 3)
-        return torch.tensor([[0, 0, 4]], dtype=torch.float,
+        return torch.tensor([[0., 0., 4.]], dtype=torch.float,
                             device=device).repeat(batch_size, 1)
 
     @pytest.fixture(autouse=True)
     def object_pos(self, batch_size, device):
         # shape: (batch_size, 3)
-        return torch.tensor([[0, 0, 0]], dtype=torch.float,
+        return torch.tensor([[0., 0., 0.]], dtype=torch.float,
                             device=device).repeat(batch_size, 1)
 
     @pytest.fixture(autouse=True)
     def camera_up(self, batch_size, device):
         # shape: (batch_size, 3)
-        return torch.tensor([[0, 1, 0]], dtype=torch.float,
+        return torch.tensor([[0., 1., 0.]], dtype=torch.float,
                             device=device).repeat(batch_size, 1)
 
     @pytest.fixture(autouse=True)
@@ -57,7 +58,9 @@ class TestCamera:
         # shape: (batch_size, 3, 3)
         mtx_rot, _ = generate_rotate_translate_matrices(
             camera_pos, object_pos, camera_up)
-        mtx_rot2 = torch.tensor([[[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
+        mtx_rot2 = torch.tensor([[[1., 0., 0.],
+                                  [0., 1., 0.],
+                                  [0., 0., 1.]]],
                                 dtype=torch.float,
                                 device=device).repeat(batch_size, 1, 1)
 
@@ -73,7 +76,7 @@ class TestCamera:
         # shape: (batch_size, 3, 1)
         _, mtx_trans = generate_rotate_translate_matrices(
             camera_pos, object_pos, camera_up)
-        mtx_trans2 = torch.tensor([[0, 0, 4]],
+        mtx_trans2 = torch.tensor([[0., 0., 4.]],
                                   dtype=torch.float,
                                   device=device).repeat(batch_size, 1)
         nRet = torch.allclose(mtx_trans,
@@ -82,6 +85,19 @@ class TestCamera:
                               atol=1e-08,
                               equal_nan=False)
         assert nRet
+
+    def test_camera_transform(self, batch_size, device, width, height, camera_pos,
+                              object_pos, camera_up):
+        mtx_transform = generate_transformation_matrix(
+            camera_pos, object_pos, camera_up)
+        mtx_transform2 = torch.tensor([[[1., 0., 0.],
+                                        [0., 1., 0.],
+                                        [0., 0., 1.],
+                                        [0., 0., -4.]]],
+                                  dtype=torch.float,
+                                  device=device).repeat(batch_size, 1, 1)
+        assert torch.allclose(mtx_transform, mtx_transform2)
+
 
     def test_camera_proj(self, batch_size, height, width, device, camera_fovy):
         # shape: (3, 1)
@@ -99,3 +115,26 @@ class TestCamera:
                               atol=1e-08,
                               equal_nan=False)
         assert nRet
+
+    @pytest.fixture(autouse=True)
+    def vertices(self, batch_size, device):
+        return torch.tensor([[[0., 0., 0.],
+                              [1., 1., 0.],
+                              [1., 1., 1.],
+                              [-2., -3., -4.]]], dtype=torch.float,
+                            device=device).repeat(batch_size, 1, 1)
+
+    def test_cmp_transform_rotate_translate(self, batch_size, device, width, height, camera_pos,
+                                            object_pos, camera_up, vertices):
+        mtx_rot, mtx_trans = generate_rotate_translate_matrices(
+            camera_pos, object_pos, camera_up)
+        mtx_transform = generate_transformation_matrix(
+            camera_pos, object_pos, camera_up)
+        vertices_camera = rotate_translate_points(vertices, mtx_rot, mtx_trans)
+        padded_vertices = torch.nn.functional.pad(
+            vertices, (0, 1), mode='constant', value=1.
+        )
+        vertices_camera2 = padded_vertices @ mtx_transform
+        assert torch.allclose(vertices_camera, vertices_camera2)
+
+        
