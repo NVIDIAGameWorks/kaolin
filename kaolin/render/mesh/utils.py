@@ -126,7 +126,7 @@ def prepare_vertices(vertices, faces, camera_proj, camera_rot=None, camera_trans
             of  shape :math:`(\text{batch_size}, 3)`.
         camera_transform (torch.Tensor, optional):
             the camera transformation matrices,
-            of shape :math:`(\text{batch_size}, 4, 3}`.
+            of shape :math:`(\text{batch_size}, 4, 3)`.
             Replace `camera_trans` and `camera_rot`.
     Returns:
         (torch.Tensor, torch.Tensor, torch.Tensor):
