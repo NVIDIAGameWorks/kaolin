@@ -60,13 +60,15 @@ label_to_synset = {v: k for k, v in synset_to_label.items()}
 
 
 def _convert_categories(categories):
-    assert categories is not None, 'List of categories cannot be empty!'
-    if not (c in synset_to_label.keys() + label_to_synset.keys()
-            for c in categories):
-        warnings.warn('Some or all of the categories requested are not part of \
-            ShapeNetCore. Data loading may fail if these categories are not avaliable.')
-    synsets = [label_to_synset[c] if c in label_to_synset.keys()
-               else c for c in categories]
+    if categories is None:
+        synset = [value for key, value in label_to_synset.items()]
+    else:
+        if not (c in synset_to_label.keys() + label_to_synset.keys()
+                for c in categories):
+            warnings.warn('Some or all of the categories requested are not part of \
+                ShapeNetCore. Data loading may fail if these categories are not avaliable.')
+        synsets = [label_to_synset[c] if c in label_to_synset.keys()
+                else c for c in categories]
     return synsets
 
 
