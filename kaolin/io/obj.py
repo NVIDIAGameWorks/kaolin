@@ -20,9 +20,9 @@ import numpy as np
 import torch
 from PIL import Image
 
-ObjMesh = namedtuple('ObjMesh',
-                     ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
-                      'materials_order', 'vertex_normals', 'face_normals'])
+return_type = namedtuple('ObjMesh',
+                        ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
+                         'materials_order', 'vertex_normals', 'face_normals'])
 
 
 class MaterialError(Exception):
@@ -178,8 +178,8 @@ def import_mesh(path, with_materials=False, with_normals=False,
         vertex_normals = None
         face_normals = None
 
-    return ObjMesh(vertices, faces, uvs, face_uvs_idx, materials,
-                   materials_order, vertex_normals, face_normals)
+    return return_type(vertices, faces, uvs, face_uvs_idx, materials,
+                       materials_order, vertex_normals, face_normals)
 
 
 def load_mtl(mtl_path, error_handler):

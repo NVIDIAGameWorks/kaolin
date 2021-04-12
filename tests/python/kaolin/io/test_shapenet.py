@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from kaolin.io.obj import ObjMesh
+from kaolin.io.obj import return_type
 from kaolin.io.shapenet import ShapeNet
 
 SHAPENET_PATH = '/data/ShapeNet'
@@ -57,7 +57,7 @@ class TestShapeNet(object):
         item = shapenet_dataset[index]
         data = item.data
         attributes = item.attributes
-        assert isinstance(data, ObjMesh)
+        assert isinstance(data, return_type)
         assert isinstance(attributes, dict)
 
         assert isinstance(data.vertices, torch.Tensor)
