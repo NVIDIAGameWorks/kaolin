@@ -13,6 +13,8 @@
 # limitations under the License.
 from pathlib import Path
 
+import os
+
 import pytest
 import torch
 
@@ -36,7 +38,8 @@ ALL_CATEGORIES = [
     SHAPENET_TEST_CATEGORY_LABELS_MULTI,
 ]
 
-
+# Skip test in a CI environment
+@pytest.mark.skipif(os.getenv('CI'), reason="CI does not have dataset")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
 @pytest.mark.parametrize('train', [True, False])
 @pytest.mark.parametrize('index', [0, -1])
