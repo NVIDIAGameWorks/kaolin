@@ -20,9 +20,9 @@ import numpy as np
 import torch
 from PIL import Image
 
-return_type = namedtuple('ObjMesh',
-                        ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
-                         'materials_order', 'vertex_normals', 'face_normals'])
+return_type = namedtuple('return_type',
+                         ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
+                          'materials_order', 'vertex_normals', 'face_normals'])
 
 
 class MaterialError(Exception):

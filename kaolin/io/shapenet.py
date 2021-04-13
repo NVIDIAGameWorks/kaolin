@@ -68,7 +68,7 @@ def _convert_categories(categories):
             warnings.warn('Some or all of the categories requested are not part of \
                 ShapeNetCore. Data loading may fail if these categories are not avaliable.')
         synsets = [label_to_synset[c] if c in label_to_synset.keys()
-                else c for c in categories]
+                   else c for c in categories]
     return synsets
 
 
