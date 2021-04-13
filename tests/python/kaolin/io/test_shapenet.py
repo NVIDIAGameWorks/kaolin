@@ -19,7 +19,7 @@ import torch
 from kaolin.io.obj import return_type
 from kaolin.io.shapenet import ShapeNet
 
-SHAPENET_PATH = '/data/ShapeNet'
+SHAPENET_PATH = 'data/ShapeNet'
 SHAPENET_TEST_CATEGORY_SYNSETS = ['02691156']
 SHAPENET_TEST_CATEGORY_LABELS = ['plane']
 SHAPENET_TEST_CATEGORY_SYNSETS_2 = ['02958343']
