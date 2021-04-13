@@ -5,3 +5,4 @@ from . import off
 from . import render
 from . import shapenet
 from . import usd
+from . import modelnet
