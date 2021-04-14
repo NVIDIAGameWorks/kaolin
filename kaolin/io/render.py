@@ -12,7 +12,7 @@ def import_synthetic_view(root_dir, idx, rgb=True, depth_linear=False,
                           semantic=False, instance=False, normals=False,
                           bbox_2d_tight=False, bbox_2d_loose=False):
     """Import views of synthetic data simulating sensors on 3D models,
-    following the format output by the Data Generator extension in the Omniverse Kaolin App.
+    following the format output by the Data Generator extension in the `Omniverse Kaolin App`_.
 
     Args:
         root_dir (str): path to the root directory containin the views.
@@ -39,6 +39,9 @@ def import_synthetic_view(root_dir, idx, rgb=True, depth_linear=False,
             - 'cam_transform': the transformation matrix, of shape :math:`(4, 3)`.
             - 'cam_proj': the projection matrix, of shape :math:`(3, 1)`.
             - 'clipping_range': the range at which the object are seen, as a list of (min, max).
+
+    .. _`Omniverse Kaolin App`
+        https://docs.omniverse.nvidia.com/app_kaolin/app_kaolin/user_manual.html#data-generator
     """
     output = {}
     aspect_ratio = None

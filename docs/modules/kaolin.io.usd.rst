@@ -20,7 +20,7 @@ More tutorials and documentation can be found `here <https://graphics.pixar.com/
 
 Viewing USD Files
 ~~~~~~~~~~~~~~~~~
-USD files can be visualized with realtime pathtracing using Nvidia Omniverse (Coming soon!).
+USD files can be visualized with realtime pathtracing using the [Omniverse Kaolin App](docs/modules/kaolin.io.usd.rst).
 Alternatively, you may use Pixar's USDView which can be obtained by visiting 
 `https://developer.nvidia.com/usd <https://developer.nvidia.com/usd>`_ and selecting the 
 corresponding platform under *.USD Pre-Built Libraries and Tools*.
