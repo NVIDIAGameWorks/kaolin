@@ -16,4 +16,5 @@ and :ref:`materials module<kaolin.io.materials>` contains Materials definition t
    kaolin.io.dataset
    kaolin.io.materials
    kaolin.io.obj
+   kaolin.io.render
    kaolin.io.usd
