@@ -53,7 +53,7 @@ Differentiable Rendering:
 3D Checkpoints and Visualization:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-:ref:`kaolin/visualize<kaolin.visualize>` contains utilities for writing 3D checkpoints for visualization. Currently we provide timelapse exporter that can be quickly picked up by the Omniverse Kaolin App (see `Kaolin developer page <https://developer.nvidia.com/kaolin>`_).
+:ref:`kaolin/visualize<kaolin.visualize>` contains utilities for writing 3D checkpoints for visualization. Currently we provide timelapse exporter that can be quickly picked up by the `Omniverse Kaolin App <https://docs.omniverse.nvidia.com/app_kaolin/app_kaolin/user_manual.html#training-visualizer>`_.
 
 .. toctree::
    :maxdepth: 2
