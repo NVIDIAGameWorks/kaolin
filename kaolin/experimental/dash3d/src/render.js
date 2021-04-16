@@ -29,11 +29,6 @@ nvidia.ThreeJsRenderer = function(elemid) {
 
   this.mesh = null;
 
-  // this.defaultMaterial = new THREE.MeshBasicMaterial( {
-  //   color: 0x76B900,
-  //   side: THREE.DoubleSide
-  // });
-
   this.fragment_shaders = {};
   this.defaultMaterial = new THREE.ShaderMaterial({
     vertexShader: $("#shader-vs").text(),
@@ -98,7 +93,6 @@ nvidia.ThreeJsRenderer.prototype.init = function() {
   var worldAxis = new THREE.AxesHelper(20);
   this.scene.add(worldAxis);
 
-
   this.renderer = new THREE.WebGLRenderer( { antialias: true, preserveDrawingBuffer: true } );
   this.scene.background = new THREE.Color("rgb(250, 250, 250)");
   this.renderer.setPixelRatio( window.devicePixelRatio );
@@ -106,7 +100,6 @@ nvidia.ThreeJsRenderer.prototype.init = function() {
   this.renderer.shadowMap.enabled = true;
   this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   this.container.appendChild( this.renderer.domElement );
-
 
   var self = this;
   $(document).keyup(function(e) {
@@ -144,8 +137,6 @@ nvidia.ThreeJsRenderer.prototype.init = function() {
   };
   animate();
 };
-
-
 
 // nvidia.ThreeJsRenderer.prototype.initScalePosition = function(boundingBox) {
 //   this.model_scale = RenderUtils.computeGeometryScale(boundingBox);
@@ -190,75 +181,6 @@ nvidia.ThreeJsRenderer.prototype.setMeshes = function(geometries, material) {
   this.render();
   console.log("Rendered");
 };
-
-//nvidia.ThreeJsRenderer.prototype.createSailRenderMesh = function() {
-//  // geometry ------------------------------------------------------------------
-//  var sail_geometry = new THREE.BufferGeometry();
-//  sail_geometry.setAttribute(
-//    'position', new THREE.Float32BufferAttribute(this.sail.mesh.verts, 4)); //.onUpload( disposeArray ) );
-//  //geometry.addAttribute(
-//   // 'normal', new THREE.Float32BufferAttribute( normals, 3 ).onUpload( disposeArray ) );
-//  sail_geometry.setAttribute(
-//    'color', new THREE.Float32BufferAttribute(this.sail.mesh.vertex_colors, 4)); //.onUpload( disposeArray ) );
-//  sail_geometry.computeBoundingSphere();
-//
-//  var material = new THREE.MeshBasicMaterial( {
-//    color: 0xffffff,
-//    vertexColors: THREE.VertexColors,
-//    side: THREE.DoubleSide
-//  } );
-//  var mesh = new THREE.Mesh(sail_geometry, material);
-//
-//  //var wireframeMaterial = new THREE.MeshBasicMaterial(
-//  //  { color: 0x000000, wireframe: true, transparent: true } );
-//  //var wireframe = new THREE.Mesh(sail_geometry, wireframeMaterial);
-//  //mesh.add( wireframe );
-//  mesh.position.x = 0;
-//  mesh.position.y = 0;
-//  mesh.castShadow = true;
-//  return mesh;
-//};
-
-// csail.ThreeJsRenderer.prototype.replaceSail = function(sail) {
-//   this.sail = sail.copy(true);
-//   this.updateSail();
-// };
-//
-// csail.ThreeJsRenderer.prototype.updateSail = function() {
-//   if (this.sail_mesh) {
-//     this.scene.remove(this.sail_mesh);
-//   }
-//   this.sail_mesh = this.createSailRenderMesh();
-//   this.scene.add(this.sail_mesh);
-//   this.updateWindViz();
-//
-//   this.render();
-// };
-
-// csail.ThreeJsRenderer.prototype.updateWindViz = function () {
-//   var samples = this.sail.mesh.sampleWindDirection(this.sail, 5);
-//
-//   for (var i = 0; i < this.wind_spheres.length; ++i) {
-//     this.scene.remove(this.wind_spheres[i]);
-//   }
-//   this.wind_spheres = [];
-//
-//   for (var i = 0; i < samples.length; ++i) {
-//     var sample = samples[i];
-//     sample[0] = Math.min(1.0, Math.max(0.0, sample[0]));
-//     sample[1] = Math.min(1.0, Math.max(0.0, sample[1]));
-//     sample[2] = Math.min(1.0, Math.max(0.0, sample[2]));
-//     var geometry = new THREE.SphereGeometry(0.05, 32, 32);
-//     var color = tinycolor.fromRatio({r: sample[0], g: sample[1], b: sample[2]}).toRgbString();
-//     var material = new THREE.MeshBasicMaterial( {color: color} );
-//     var sphere = new THREE.Mesh( geometry, material );
-//     sphere.position.x = sample[0];
-//     sphere.position.y = sample[1];
-//     sphere.position.z = sample[2];
-//     this.scene.add( sphere );
-//     this.wind_spheres.push(sphere);
-//   }
-// };
 
 nvidia.ThreeJsRenderer.prototype.setManualCamera = function() {
   this.camera.position.z = 0.5 + this.radius * Math.cos(this.xzAngle);
