@@ -1,7 +1,7 @@
 .. _kaolin.io.render:
 
 kaolin.io.render
-=============
+================
 
 API
 ---
