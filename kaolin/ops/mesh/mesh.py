@@ -18,7 +18,6 @@ __all__ = [
     'index_vertices_by_faces',
     'adjacency_matrix',
     'uniform_laplacian',
-    'uniform_laplacian_smoothing'
 ]
 
 def index_vertices_by_faces(vertices_features, faces):
@@ -112,41 +111,7 @@ def uniform_laplacian(num_vertices, faces):
     mask = torch.eye(num_vertices, num_vertices, device=faces.device, dtype=torch.bool)
     L = L.masked_fill_(mask, -1)
 
-    if torch.any(torch.isnan(L)):
-        raise ValueError("The mesh is not fully connected.")
+    # Fill NaN value with 0
+    L[torch.isnan(L)] = 0
 
     return L
-
-def uniform_laplacian_smoothing(vertices, faces):
-    r"""Calculates the uniform laplacian smoothing of meshes.
-    The position of updated vertices is defined as :math:`V_i = \frac{1}{N} * \sum^{N}_{j=1}V_j`,
-    where :math:`N` is the number of neighbours of :math:`V_i`, :math:`V_j` is the position of the
-    j-th adjacent vertex.
-
-    Args:
-        vertices (torch.Tensor):
-            Vertices of the meshes, of shape :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
-        faces (torch.LongTensor):
-            Faces of the meshes, of shape :math:`(\text{num_faces}, \text{face_size})`.
-
-    Returns:
-        (torch.FloatTensor):
-            smoothed vertices, of shape :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
-
-    Example:
-        >>> vertices = torch.tensor([[[1, 0, 0],
-        ...                           [0, 1, 0],
-        ...                           [0, 0, 1]]], dtype=torch.float)
-        >>> faces = torch.tensor([[0, 1, 2]])
-        >>> uniform_laplacian_smoothing(vertices, faces)
-        tensor([[[0.0000, 0.5000, 0.5000],
-                 [0.5000, 0.0000, 0.5000],
-                 [0.5000, 0.5000, 0.0000]]])
-    """
-    dtype = vertices.dtype
-    num_vertices = vertices.shape[1]
-
-    laplacian_matrix = uniform_laplacian(num_vertices, faces).to(dtype)
-    smoothed_vertices = torch.matmul(laplacian_matrix, vertices) + vertices
-
-    return smoothed_vertices

@@ -356,12 +356,17 @@ class TestUniformLaplacian:
                                  [0.5, 0.5, 0, 0, -1]], dtype=torch.float, device=device)
 
         assert torch.equal(output, expected)
-
+    
     def test_not_connected_mesh(self, device, dtype):
-        num_vertices = 5
+        num_vertices = 4
         faces = torch.tensor([[0, 1, 2]], dtype=torch.long, device=device)
-        with pytest.raises(ValueError, match="The mesh is not fully connected."):
-            result = mesh.uniform_laplacian(num_vertices, faces)
+
+        result = mesh.uniform_laplacian(num_vertices, faces)
+        
+        # Any row and column related to V3 is zeros.
+        assert torch.equal(result[3, :3], torch.zeros((3), device=device, dtype=torch.float))
+        assert torch.equal(result[:3, 3], torch.zeros((3), device=device, dtype=torch.float))
+
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 class TestSubdivide:
 
