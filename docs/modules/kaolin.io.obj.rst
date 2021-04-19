@@ -12,7 +12,7 @@ Functions
 ---------
 
 .. automodule:: kaolin.io.obj
-    :members: load_obj, load_mtl
+    :members: import_mesh, load_mtl
     :exclude-members: return_type
 
 Exceptions
