@@ -43,26 +43,29 @@ class Timelapse:
                 return_params.append(v)
         return return_params
 
-    def add_pointcloud_batch(self, iteration=0, category='', pointcloud_list=None, colors=None, semantic_ids=None):
+    def add_pointcloud_batch(self, iteration=0, category='', pointcloud_list=None, colors=None):
         """
         Add pointclouds to visualizer output.
 
         Args:
             iteration (int): Positive integer identifying the iteration the supplied pointclouds belong to.
+            category (str, optional): Batch name.
             pointcloud_list (list of tensors, optional): Batch of points of length N defining N pointclouds.
             colors (list of tensors, optional): Batch of RGB colors of length N.
-            semantic_ids (list of int, optional): Batch of semantic IDs.
         """
         validated = self._validate_parameters(
-            pointcloud_list=pointcloud_list, colors=colors, semantic_ids=semantic_ids,
+            pointcloud_list=pointcloud_list, colors=colors,
         )
-        pointcloud_list, colors, semantic_ids = validated
+        pointcloud_list, colors = validated
 
         pc_path = posixpath.join(self.logdir, category)
         os.makedirs(pc_path, exist_ok=True)
 
-        for i, sample in enumerate(zip(pointcloud_list, colors, semantic_ids)):
-            points, colour, semantic_id = sample
+        if colors is None:
+            colors = [None] * len(pointcloud_list)
+
+        for i, sample in enumerate(zip(pointcloud_list, colors)):
+            points, colour = sample
             # Establish default USD file paths for sample
             pc_name = f'pointcloud_{i}'
             ind_out_path = posixpath.join(pc_path, f'{pc_name}.usd') 
@@ -70,7 +73,7 @@ class Timelapse:
             if not os.path.exists(ind_out_path):
                 # If sample does not exist, create it.
                 stage = io.usd.create_stage(ind_out_path)
-                stage.DefinePrim(f'/{pc_name}', 'PointInstancer')
+                stage.DefinePrim(f'/{pc_name}', 'Points')
                 stage.SetDefaultPrim(stage.GetPrimAtPath(f'/{pc_name}'))
             else:
                 stage = Usd.Stage.Open(ind_out_path)
@@ -79,13 +82,8 @@ class Timelapse:
             # Adjust end timecode to match current iteration
             stage.SetEndTimeCode(iteration)
 
-            # Set each attribute supplied
-            if points is not None:
-                io.usd.add_pointcloud(stage, points, f'/{pc_name}', time=iteration)
-            if colour is not None:
-                raise NotImplementedError
-            if semantic_id is not None:
-                raise NotImplementedError
+            io.usd.add_pointcloud(stage, points, f'/{pc_name}', colors=colour, time=iteration)
+
             stage.Save()
 
     def add_voxelgrid_batch(self, iteration=0, category='', voxelgrid_list=None, colors=None, semantic_ids=None):
