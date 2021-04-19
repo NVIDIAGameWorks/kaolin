@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "jquery": "^3.5.1",
+    "mustard-ui": "^1.0.4",
+    "three": "^0.125.2"
+  },
+  "devDependencies": {
+    "cypress": "^6.5.0",
+    "mocha": "^8.3.0",
+    "uglify-js": "^3.12.8"
+  }
+}
