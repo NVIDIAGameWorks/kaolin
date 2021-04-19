@@ -44,16 +44,11 @@ Functions
 Heterogeneous Mesh Handlers
 ---------------------------
 
-.. automodule:: kaolin.io.usd
-    :members: 
-        heterogeneous_mesh_handler_empty, 
-        heterogeneous_mesh_handler_naive_homogenize, 
-        heterogeneous_mesh_handler_skip
+.. autofunction:: heterogeneous_mesh_handler_empty
+.. autofunction:: heterogeneous_mesh_handler_naive_homogenize
+.. autofunction:: heterogeneous_mesh_handler_skip
 
 Exceptions
 ----------
 
-.. automodule:: kaolin.io.usd
-    :members: NonHomogeneousMeshError
-
-
+.. autoclass:: NonHomogeneousMeshError
