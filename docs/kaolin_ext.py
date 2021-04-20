@@ -23,7 +23,8 @@ def run_apidoc(_):
             "**.so",
             "kaolin/ops/conversions/[!_][!_]*.py",
             "kaolin/ops/mesh/[!_][!_]*.py",
-            "kaolin/render/mesh/[!_][!_]*.py"
+            "kaolin/render/mesh/[!_][!_]*.py",
+            "kaolin/visualize/[!_][!_]*.py"
         ]
     ]
 

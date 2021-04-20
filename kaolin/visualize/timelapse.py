@@ -14,6 +14,10 @@ from kaolin import io
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    'Timelapse'
+    'TimelapseParser'
+]
 
 class Timelapse:
     def __init__(self, log_dir, up_axis='Y'):
