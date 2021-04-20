@@ -13,6 +13,6 @@ point_to_mesh_distance and other simple regularization such as uniform_laplacian
    :titlesonly:
 
    kaolin.metrics.pointcloud
-   kaolin.metrics.render.rst
+   kaolin.metrics.render
    kaolin.metrics.trianglemesh
    kaolin.metrics.voxelgrid

@@ -21,10 +21,16 @@ def run_apidoc(_):
     EXCLUDE_PATHS = [
         str(os.path.join(KAOLIN_ROOT, path)) for path in [
             "**.so",
-            "kaolin/ops/conversions/[!_][!_]*.py",
-            "kaolin/ops/mesh/[!_][!_]*.py",
-            "kaolin/render/mesh/[!_][!_]*.py",
-            "kaolin/visualize/[!_][!_]*.py"
+            "kaolin/ops/conversions/pointcloud.py",
+            "kaolin/ops/conversions/sdf.py",
+            "kaolin/ops/conversions/trianglemesh.py",
+            "kaolin/ops/conversions/voxelgrid.py",
+            "kaolin/ops/mesh/check_sign.py",
+            "kaolin/ops/mesh/mesh.py",
+            "kaolin/ops/mesh/trianglemesh.py",
+            "kaolin/render/mesh/rasterization.py",
+            "kaolin/render/mesh/utils.py",
+            "kaolin/visualize/timelapse.py"
         ]
     ]
 
