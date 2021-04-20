@@ -39,14 +39,14 @@ def run_apidoc(_):
     DOCS_MODULE_PATH = os.path.join(KAOLIN_ROOT, "docs", "modules")
 
     argv = [
-      "-eT",
-      "-d", "2",
-      "--templatedir",
-      DOCS_MODULE_PATH,
-      "-o",
-      DOCS_MODULE_PATH,
-      KAOLIN_ROOT,
-      *EXCLUDE_PATHS
+        "-eT",
+        "-d", "2",
+        "--templatedir",
+        DOCS_MODULE_PATH,
+        "-o",
+        DOCS_MODULE_PATH,
+        KAOLIN_ROOT,
+        *EXCLUDE_PATHS
     ]
     apidoc.main(argv)
 
