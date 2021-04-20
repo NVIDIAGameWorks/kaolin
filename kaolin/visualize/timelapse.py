@@ -15,7 +15,7 @@ from kaolin import io
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'Timelapse'
+    'Timelapse',
     'TimelapseParser'
 ]
 
