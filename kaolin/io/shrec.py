@@ -57,8 +57,8 @@ class SHREC16(KaolinDataset):
     More details about the challenge and the dataset are available
     `here <https://shapenet.cs.stanford.edu/shrec16/>`_.
 
-    The `__getitem__` method will return a `KaolinDatasetItem`, with its `data`
-    field containing a `kaolin.io.obj.return_type`.
+    The `__getitem__` method will return a `KaolinDatasetItem`, with its data field 
+    containing a namedtuple returned by :func:`kaolin.io.obj.import_mesh`.
 
     Args:
         root (str): Path to the root directory of the dataset.
