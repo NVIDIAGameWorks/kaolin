@@ -28,3 +28,16 @@
 }
   </style>
 {% endblock %}
+
+{% block menu %}
+<p class="caption">
+  <span class="caption-text">Getting Started</span>
+</p>
+
+<ul>
+  <li class="toctree-l1"><a href="{{ pathto('notes/installation') }}">Installation</a></li>
+  <li class="toctree-l1"><a href="{{ pathto('notes/overview') }}">Overview</a></li>
+</ul>
+
+{{super()}}
+{% endblock %}
