@@ -162,47 +162,6 @@ class KaolinDataset(Dataset):
         """Returns the number of entries."""
         pass
 
-class KaolinDataset(Dataset):
-    """A dataset supporting the separation of data and attributes, and combines
-    them in its `__getitem__`.
-
-    The return value of `__getitem__` will be a named tuple containing the
-    return value of both `get_data` and `get_attributes`.
-
-    The difference between `get_data` and `get_attributes` is that data are able
-    to be transformed or preprocessed (such as using `ProcessedDataset`), while
-    attributes are generally not.
-    """
-
-    def __getitem__(self, index):
-        """Returns the item at the given index.
-
-        Will contain a named tuple of both data and attributes.
-        """
-        attributes = self.get_attributes(index)
-        data = self.get_data(index)
-        return KaolinDatasetItem(data=data, attributes=attributes)
-
-    @abstractmethod
-    def get_data(self, index):
-        """Returns the data at the given index."""
-        pass
-
-    @abstractmethod
-    def get_attributes(self, index):
-        """Returns the attributes at the given index.
-
-        Attributes are usually not transformed by wrappers such as
-        `ProcessedDataset`.
-        """
-        pass
-
-    @abstractmethod
-    def __len__(self):
-        """Returns the number of entries."""
-        pass
-
-
 class ProcessedDataset(KaolinDataset):
     def __init__(self, dataset, preprocessing_transform=None,
                  cache_dir=None, num_workers=None, transform=None,
