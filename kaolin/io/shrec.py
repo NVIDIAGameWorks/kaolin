@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import warnings
-
 from pathlib import Path
 
 from kaolin.io.dataset import KaolinDataset
@@ -77,7 +75,7 @@ class SHREC16(KaolinDataset):
         path: The filepath to the .obj file on disk.
         name: The file name of the .obj file on disk.
         label: A human-readable string describing the loaded sample.
-    
+
     Example:
         >>> dataset = SHREC16(root='/path/to/SHREC16/', categories=['alien', 'ants'], train=False)
         >>> sample = dataset[0]
@@ -113,7 +111,7 @@ class SHREC16(KaolinDataset):
                 raise RuntimeWarning(
                     "No .obj files could be read " f"for category '{cl}'. Skipping..."
                 )
-        
+
         self.names = [p.names for p in self.paths]
 
     def __len__(self):
