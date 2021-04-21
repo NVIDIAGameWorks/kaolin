@@ -17,10 +17,18 @@ import os
 KAOLIN_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir)
 
 def run_apidoc(_):
+    # This is runnning sphinx-apidoc which is automatically generating
+    # .rst files for each python file in kaolin
+    # This won't override existing .rst files
+    # Like kaolin.ops.rst where we added an introduction
     from sphinx.ext import apidoc
+    # Those are files are excluded from parsing
+    # Such as files where the functions are forwarded to the parent namespace
     EXCLUDE_PATHS = [
         str(os.path.join(KAOLIN_ROOT, path)) for path in [
+            "setup.py",
             "**.so",
+            "kaolin/version.py",
             "kaolin/ops/conversions/pointcloud.py",
             "kaolin/ops/conversions/sdf.py",
             "kaolin/ops/conversions/trianglemesh.py",
@@ -30,12 +38,10 @@ def run_apidoc(_):
             "kaolin/ops/mesh/trianglemesh.py",
             "kaolin/render/mesh/rasterization.py",
             "kaolin/render/mesh/utils.py",
-            "kaolin/visualize/timelapse.py"
+            "kaolin/visualize/timelapse.py",
         ]
     ]
 
-    EXCLUDE_GEN_RST = [str(os.path.join(KAOLIN_ROOT, "docs", "modules", path))
-                       for path in ["setup.rst", "kaolin.rst", "kaolin.version.rst"]]
     DOCS_MODULE_PATH = os.path.join(KAOLIN_ROOT, "docs", "modules")
 
     argv = [
@@ -49,9 +55,7 @@ def run_apidoc(_):
         *EXCLUDE_PATHS
     ]
     apidoc.main(argv)
-
-    for f in EXCLUDE_GEN_RST:
-        os.remove(f)
+    os.remove(os.path.join(DOCS_MODULE_PATH, 'kaolin.rst'))
 
 def setup(app):
     app.connect("builder-inited", run_apidoc)
