@@ -123,6 +123,8 @@ When adding a new python binding module to the core of kaolin, a basic .rst will
 
 The resulting .rst file will look like:
 ```
+.. _moduleName:
+
 <moduleName>
 ============
 
@@ -131,6 +133,8 @@ The resulting .rst file will look like:
     :undoc-members:
     :show-inheritance:
 ```
+
+If you want the .rst to not be generated, you must add the corresponding python path in [this list][#8].
 
 To add more contents such as an introduction the .rst have to modified following RestructuredText syntax.
 
@@ -141,3 +145,4 @@ To add more contents such as an introduction the .rst have to modified following
 [#5]: http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
 [#6]: https://pybind11.readthedocs.io/en/stable/basics.html?highlight=py%3A%3Aarg#keyword-arguments
 [#7]: https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html
+[#8]: https://github.com/NVIDIAGameWorks/kaolin/tree/master/docs/kaolin_ext.py#L21
