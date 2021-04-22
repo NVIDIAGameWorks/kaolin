@@ -71,10 +71,9 @@ def normalize_adj(adj):
                                             device=adj.device))
         return adj / norm
 
-
 class GraphConv(nn.Module):
-    """A simple graph convolution layer, similar to the one defined in Kipf et al.
-    https://arxiv.org/abs/1609.02907
+    """A simple graph convolution layer, similar to the one defined by *Kipf et al.* in
+    `Semi-Supervised Classification with Graph Convolutional Networks`_ ICLR 2017
 
     This operation with self_layer=False is equivalent to :math:`(A H W)` where:
     - :math:`H` is the node features with shape (batch_size, num_nodes, input_dim)
@@ -90,17 +89,6 @@ class GraphConv(nn.Module):
     - :math:`W_{\\text{self}}` is a separate weight matrix to filter each node's self features.
 
     Note that when self_layer is True, A should not include self-loop.
-
-    If you use this code, please cite the original paper in addition to Kaolin.
-
-    .. code-block::
-
-        @article{kipf2016semi,
-            title={Semi-Supervised Classification with Graph Convolutional Networks},
-            author={Kipf, Thomas N and Welling, Max},
-            journal={arXiv preprint arXiv:1609.02907},
-            year={2016}
-        }
 
     Args:
         input_dim (int): The number of features in each input node.
@@ -118,8 +106,10 @@ class GraphConv(nn.Module):
         >>> # pre-normalize adj
         >>> adj = normalize_adj(adj)
         >>> output = model(node_feat, adj, normalize_adj=False)
-    """
 
+    .. _Semi-Supervised Classification with Graph Convolutional Networks:
+        https://arxiv.org/abs/1609.02907
+    """
     def __init__(self, input_dim, output_dim, self_layer=True, bias=True):
         super(GraphConv, self).__init__()
 

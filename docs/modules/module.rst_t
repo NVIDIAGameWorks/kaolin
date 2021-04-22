@@ -1,5 +1,7 @@
 {%- if show_headings -%}
-{{- basename | e | heading }}
+.. _{{ basename }}:
+
+{{ basename | e | heading }}
 {%- endif %}
 
 API

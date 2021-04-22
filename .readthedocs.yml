@@ -7,3 +7,7 @@ python:
       - requirements: tools/doc_requirements.txt
       - method: setuptools
         path: '.'
+
+sphinx:
+   configuration: docs/conf.py
+   fail_on_warning: true

@@ -1,12 +1,10 @@
-kaolin.render.mesh
+kaolin.io.shapenet
 ==================
-
-
 
 API
 ---
 
-.. automodule:: kaolin.render.mesh
+.. automodule:: kaolin.io.shapenet
    :members:
    :undoc-members:
    :show-inheritance:

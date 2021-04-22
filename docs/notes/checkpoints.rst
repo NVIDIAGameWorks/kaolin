@@ -35,6 +35,7 @@ without providing an ``iteration`` parameter, e.g.::
                              vertices_list=gt_vert_list)
     timelapse.add_pointcloud_batch(category='input',
                                    pointcloud_list=input_pt_clouds)
+
 The ``category`` identifies the meaning of the data. In this toy example,
 the model learns to turn the ``'input'`` pointcloud into the ``'output'`` mesh. Both the ``'ground_truth'`` mesh and the ``'input'`` pointcloud batches are only saved once for easy visual comparison.
 

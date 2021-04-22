@@ -12,7 +12,8 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../kaolin'))
+
+sys.path.insert(1, os.path.abspath('.'))
 
 
 # -- Project information -----------------------------------------------------
@@ -32,6 +33,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
+    'kaolin_ext'
 ]
 
 todo_include_todos = True

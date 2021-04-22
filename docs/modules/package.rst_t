@@ -16,15 +16,17 @@ API
 
 {%- if is_namespace %}
 {{- [pkgname, "namespace"] | join(" ") | e | heading }}
-{% else %}
-{{- pkgname | e | heading }}
-{% endif %}
+{% else -%}
+.. _{{ pkgname }}:
 
-{%- if subpackages or submodules %}
+{{ pkgname | e | heading }}
+{%- endif -%}
+
+{%- if subpackages or submodules -%}
 .. toctree::
    :maxdepth: {{ maxdepth }}
    :titlesonly:
-{%- endif %}
+{%- endif -%}
 {{ unfoldtree(subpackages + submodules) }}
 
 {% if not is_namespace -%}

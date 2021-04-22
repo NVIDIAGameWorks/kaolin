@@ -40,7 +40,7 @@ def import_synthetic_view(root_dir, idx, rgb=True, depth_linear=False,
             - 'cam_proj': the projection matrix, of shape :math:`(3, 1)`.
             - 'clipping_range': the range at which the object are seen, as a list of (min, max).
 
-    .. _`Omniverse Kaolin App`
+    .. _Omniverse Kaolin App:
         https://docs.omniverse.nvidia.com/app_kaolin/app_kaolin/user_manual.html#data-generator
     """
     output = {}

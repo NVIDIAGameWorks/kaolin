@@ -12,17 +12,26 @@ Functions
 ---------
 
 .. automodule:: kaolin.io.obj
-    :members: load_obj, load_mtl
-    :exclude-members: return_type
+    :members:
+    :exclude-members:
+        return_type,
+        skip_error_handler,
+        default_error_handler,
+        MaterialError,
+        MaterialLoadError,
+        MaterialFileError,
+        MaterialNotFoundError
+
+Error Handler
+-------------
+
+.. autofunction:: skip_error_handler
+.. autofunction:: default_error_handler
 
 Exceptions
 ----------
 
-.. automodule:: kaolin.io.obj
-    :members: MaterialError, MaterialLoadError, MaterialNotFoundError
-
-Error handlers
---------------
-
-.. automodule:: kaolin.io.obj
-    :members: default_error_handler, skip_error_handler
+.. autoclass:: MaterialError
+.. autoclass:: MaterialLoadError
+.. autoclass:: MaterialFileError
+.. autoclass:: MaterialNotFoundError
