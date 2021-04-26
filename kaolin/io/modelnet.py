@@ -21,13 +21,14 @@ import os
 
 class ModelNet(KaolinDataset):
     r"""Dataset class for the ModelNet dataset.
+
     Args:
         root (str): Path to the base directory of the ModelNet dataset.
         split (str): Split to load ('train' vs 'test', default: 'train').
-        categories (list): List of categories to load. If None is provided, 
-                           all categories will be loaded. (default: None).
+        categories (list): 
+            List of categories to load. If None is provided, 
+            all categories will be loaded. (default: None).
     """
-
     def __init__(self, root, categories=None, split='train'):
         assert split in ['train', 'test'], f'Split must be either train or test ,but got {split}.'
 
