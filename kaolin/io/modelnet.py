@@ -28,7 +28,7 @@ class ModelNet(KaolinDataset):
                            all categories will be loaded. (default: None).
     """
 
-    def __init__(self, root: str, categories: list = None, split: str = 'train'):
+    def __init__(self, root, categories=None, split='train'):
         assert split in ['train', 'test'], f'Split must be either train or test ,but got {split}.'
 
         self.root = Path(root)
