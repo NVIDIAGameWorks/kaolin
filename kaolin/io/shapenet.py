@@ -83,28 +83,23 @@ class ShapeNet(KaolinDataset):
         categories (list): List of categories to load from ShapeNet. This list may
                            contain synset ids, class label names (for ShapeNetCore classes),
                            or a combination of both.
-        train (bool): If True, return the training set, otherwise the test set
-        split (float): fraction of the dataset to be used for training (>=0 and <=1)
+        train (bool):
+            If True, return the training set, otherwise the test set.
+            Default: True.
+        split (float):
+            fraction of the dataset to be used for training (>=0 and <=1).
+            Default: 0.7
+        with_materials (bool): If True, load and return materials. Default: True.
     """
-
     def __init__(self, root: str, categories: list, train: bool = True,
-                 split: float = .7):
-        """
-        Args:
-            root (str): path to ShapeNet root directory
-            categories (list):
-                List of categories to load from ShapeNet. This list may
-                contain synset ids, class label names (for ShapeNetCore classes),
-                or a combination of both.
-            train (bool): If True, return the training set, otherwise the test set
-            split (float): fraction of the dataset to be used for training (>=0 and <=1)
-        """
+                 split: float = .7, with_materials=True):
 
         self.root = Path(root)
         self.paths = []
         self.synset_idxs = []
         self.synsets = _convert_categories(categories)
         self.labels = [synset_to_label[s] for s in self.synsets]
+        self.with_materials = with_materials
 
         # loops through desired classes
         for i in range(len(self.synsets)):
@@ -132,7 +127,7 @@ class ShapeNet(KaolinDataset):
 
     def get_data(self, index):
         obj_location = self.paths[index] / 'model.obj'
-        mesh = import_mesh(str(obj_location))
+        mesh = import_mesh(str(obj_location), with_materials=self.with_materials)
         return mesh
 
     def get_attributes(self, index):
