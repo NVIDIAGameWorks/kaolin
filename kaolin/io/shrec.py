@@ -85,7 +85,7 @@ class SHREC16(KaolinDataset):
         alien
     """
 
-    def __init__(self, root: str, categories: Iterable = None, train: bool = True):
+    def __init__(self, root, categories=None, train=true):
 
         if not categories:
             categories = VALID_CATEGORIES
