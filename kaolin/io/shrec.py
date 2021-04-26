@@ -65,24 +65,6 @@ class SHREC16(KaolinDataset):
                            category). If this argument is not specified, all categories
                            are loaded by default.
         train (bool): If True, return the train split, else return the test.
-
-    Returns:
-        .. code-block::
-           dict: {
-                attributes: {path: str, category: str, label: int},
-                data: kaolin.rep.TriangleMesh
-           }
-        path: The filepath to the .obj file on disk.
-        name: The file name of the .obj file on disk.
-        label: A human-readable string describing the loaded sample.
-
-    Example:
-        >>> dataset = SHREC16(root='/path/to/SHREC16/', categories=['alien', 'ants'], train=False)
-        >>> sample = dataset[0]
-        >>> sample["attributes"]["path"]
-        /path/to/SHREC16/alien/test/T411.obj
-        >>> sample["attributes"]["label"]
-        alien
     """
 
     def __init__(self, root, categories=None, train=True):
