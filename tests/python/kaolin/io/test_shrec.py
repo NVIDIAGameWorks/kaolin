@@ -22,7 +22,7 @@ import torch
 from kaolin.io.obj import return_type
 from kaolin.io.shrec import SHREC16
 
-SHREC16_PATH = '/home/jiehanw/Downloads/shrec16'
+SHREC16_PATH = '/data/shrec16'
 SHREC16_TEST_CATEGORY_SYNSETS = ['02691156']
 SHREC16_TEST_CATEGORY_LABELS = ['airplane']
 SHREC16_TEST_CATEGORY_SYNSETS_2 = ['02958343']
@@ -43,7 +43,6 @@ ALL_CATEGORIES = [
 @pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
 @pytest.mark.parametrize('split', ['val'])
-@pytest.mark.parametrize('index', [0, -1])
 class TestSHREC16(object):
 
     @pytest.fixture(autouse=True)
@@ -52,6 +51,7 @@ class TestSHREC16(object):
                        categories=categories,
                        split=split)
 
+    @pytest.mark.parametrize('index', [0, -1])
     def test_basic_getitem(self, shrec16_dataset, index):
         assert len(shrec16_dataset) > 0
 
