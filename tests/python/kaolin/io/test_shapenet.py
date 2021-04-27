@@ -39,7 +39,7 @@ ALL_CATEGORIES = [
 ]
 
 # Skip test in a CI environment
-@pytest.mark.skipif(os.getenv('CI') == 'true' or os.getenv('CI'), reason="CI does not have dataset")
+@pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
 @pytest.mark.parametrize('train', [True, False])
 @pytest.mark.parametrize('with_materials', [True, False])
