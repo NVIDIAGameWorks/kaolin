@@ -22,7 +22,7 @@ import torch
 from kaolin.io.off import return_type
 from kaolin.io.modelnet import ModelNet
 
-MODELNET_PATH = '/data/ModelNet'
+MODELNET_PATH = '/home/jiehanw/Downloads/ModelNet10'
 MODELNET_TEST_CATEGORY_LABELS = ['bathtub']
 MODELNET_TEST_CATEGORY_LABELS_2 = ['desk']
 MODELNET_TEST_CATEGORY_LABELS_MULTI = ['bathtub', 'desk']
@@ -34,7 +34,7 @@ ALL_CATEGORIES = [
 ]
 
 # Skip test in a CI environment
-@pytest.mark.skipif(os.getenv('CI') == 'true' or os.getenv('CI'), reason="CI does not have dataset")
+@pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
 @pytest.mark.parametrize('split', ['train', 'test'])
 @pytest.mark.parametrize('index', [0, -1])
@@ -67,3 +67,6 @@ class TestModelNet(object):
         assert isinstance(attributes['name'], str)
         assert isinstance(attributes['path'], Path)
         assert isinstance(attributes['label'], str)
+
+        assert isinstance(data.face_colors, torch.Tensor)
+    

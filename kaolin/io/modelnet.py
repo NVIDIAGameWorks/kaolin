@@ -22,6 +22,9 @@ import os
 class ModelNet(KaolinDataset):
     r"""Dataset class for the ModelNet dataset.
 
+    The `__getitem__` method will return a `KaolinDatasetItem`, with its data field 
+    containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+
     Args:
         root (str): Path to the base directory of the ModelNet dataset.
         split (str): Split to load ('train' vs 'test', default: 'train').
@@ -62,7 +65,7 @@ class ModelNet(KaolinDataset):
 
     def get_data(self, index):
         obj_location = self.paths[index]
-        mesh = import_mesh(str(obj_location))
+        mesh = import_mesh(str(obj_location), with_face_colors=True)
         return mesh
 
     def get_attributes(self, index):
