@@ -22,7 +22,7 @@ import torch
 from kaolin.io.off import return_type
 from kaolin.io.modelnet import ModelNet
 
-MODELNET_PATH = '/home/jiehanw/Downloads/ModelNet10'
+MODELNET_PATH = '/data/ModelNet'
 MODELNET_TEST_CATEGORY_LABELS = ['bathtub']
 MODELNET_TEST_CATEGORY_LABELS_2 = ['desk']
 MODELNET_TEST_CATEGORY_LABELS_MULTI = ['bathtub', 'desk']
