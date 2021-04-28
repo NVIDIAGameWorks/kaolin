@@ -39,6 +39,7 @@ ALL_CATEGORIES = [
     SHREC16_TEST_CATEGORY_LABELS_MULTI,
 ]
 
+
 # Skip test in a CI environment
 @pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
