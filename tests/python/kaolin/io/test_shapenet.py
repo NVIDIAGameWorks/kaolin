@@ -39,19 +39,22 @@ ALL_CATEGORIES = [
 ]
 
 # Skip test in a CI environment
-@pytest.mark.skipif(os.getenv('CI') == 'true' or os.getenv('CI'), reason="CI does not have dataset")
+@pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
 @pytest.mark.parametrize('train', [True, False])
-@pytest.mark.parametrize('index', [0, -1])
+@pytest.mark.parametrize('with_materials', [True, False])
 class TestShapeNet(object):
 
     @pytest.fixture(autouse=True)
-    def shapenet_dataset(self, categories, train):
+    def shapenet_dataset(self, categories, train, with_materials):
         return ShapeNet(root=SHAPENET_PATH,
                         categories=categories,
-                        train=train, split=0.7)
+                        train=train,
+                        split=0.7,
+                        with_materials=with_materials)
 
-    def test_basic_getitem(self, shapenet_dataset, index):
+    @pytest.mark.parametrize('index', [0, -1])
+    def test_basic_getitem(self, shapenet_dataset, index, with_materials):
         assert len(shapenet_dataset) > 0
 
         if index == -1:
@@ -65,9 +68,33 @@ class TestShapeNet(object):
 
         assert isinstance(data.vertices, torch.Tensor)
         assert len(data.vertices.shape) == 2
+        assert data.vertices.shape[0] > 0
         assert data.vertices.shape[1] == 3
-        assert isinstance(data.faces, torch.Tensor)
+
+        assert isinstance(data.faces, torch.LongTensor)
         assert len(data.faces.shape) == 2
+        assert data.faces.shape[0] > 0
+        assert data.faces.shape[1] == 3
+
+        if with_materials:
+            assert isinstance(data.uvs, torch.Tensor)
+            assert len(data.uvs.shape) == 2
+            assert data.uvs.shape[1] == 2
+
+            assert isinstance(data.face_uvs_idx, torch.LongTensor)
+            assert data.face_uvs_idx.shape == data.faces.shape
+            assert isinstance(data.materials, list)
+            assert len(data.materials) > 0
+            assert isinstance(data.materials_order, torch.LongTensor)
+            assert len(data.materials_order.shape) == 2
+            assert data.materials_order.shape[0] > 0
+            assert data.materials_order.shape[1] == 2
+        else:
+            assert data.uvs is None
+            assert data.face_uvs_idx is None
+            assert data.materials is None
+            assert data.materials_order is None
+
 
         assert isinstance(attributes['name'], str)
         assert isinstance(attributes['path'], Path)
