@@ -20,3 +20,4 @@ and :ref:`materials module<kaolin.io.materials>` contains Materials definition t
    kaolin.io.render
    kaolin.io.shapenet
    kaolin.io.usd
+   kaolin.io.modelnet
