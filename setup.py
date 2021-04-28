@@ -3,8 +3,8 @@
 # TORCH_CUDA_ARCH_LIST
 #   specify which CUDA architectures to build for
 #
-# IGNORE_VER_ERR
-#   ignore version error for torch
+# IGN_TORCH_VER
+#   ignore version of PyTorch
 
 from os import environ
 from setuptools import setup, find_packages, dist
@@ -16,6 +16,7 @@ TORCH_MIN_VER = '1.5.0'
 TORCH_MAX_VER = '1.7.1'
 CYTHON_MIN_VER = '0.29.20'
 INCLUDE_EXPERIMENTAL = environ.get('KAOLIN_INSTALL_EXPERIMENTAL') is not None
+IGN_TORCH_VER = environ.get('IGN_TORCH_VER') is not None
 
 missing_modules = []
 torch_spec = importlib.util.find_spec("torch")
@@ -26,9 +27,10 @@ if torch_spec is None:
 else:
     import torch
     torch_ver = parse_version(torch.__version__)
-    if torch_ver <= parse_version(TORCH_MIN_VER) and \
-       torch_ver <= parse_version(TORCH_MAX_VER):
-        warnings.warn('Kaolin is compatible with PyTorch >= 1.5.0, '
+    if (torch_ver < parse_version(TORCH_MIN_VER) or
+       torch_ver > parse_version(TORCH_MAX_VER)) and \
+       not IGN_TORCH_VER:
+        warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
                       f'but found version {torch.__version__} instead. '
                       'This will try to install torch in the right version. '
                       'If the installation fails we recommend to first install it.')
@@ -114,6 +116,8 @@ def get_requirements():
     if os.name != 'nt':  # no pypi torch for windows
         if os.getenv('PYTORCH_VERSION'):
             requirements.append('torch==%s' % os.getenv('PYTORCH_VERSION'))
+        elif IGN_TORCH_VER:
+            requirements.append('torch')
         else:
             requirements.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
     requirements.append('scipy>=1.2.0,<=1.5.2')
