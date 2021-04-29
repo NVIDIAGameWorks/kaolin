@@ -21,6 +21,19 @@ With the version 0.9 release we have revamped the entire Kaolin library, redesig
 
 Please review our [contribution guidelines](CONTRIBUTING.md).
 
+## Citation
+
+If you found this codebase useful in your research, please cite
+
+```
+@article{Kaolin,
+title = {Kaolin: A PyTorch Library for Accelerating 3D Deep Learning Research},
+author = {Krishna Murthy Jatavallabhula and Edward Smith and Jean-Francois Lafleche and Clement Fuji Tsang and Artem Rozantsev and Wenzheng Chen and Tommy Xiang and Rev Lebaredian and Sanja Fidler},
+journal = {arXiv:1911.05063},
+year = {2019}
+}
+```
+
 ## Contributors
 
 In alphabetical order:
