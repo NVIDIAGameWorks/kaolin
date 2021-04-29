@@ -40,6 +40,9 @@ class MaterialFileError(MaterialError):
 class MaterialNotFoundError(MaterialError):
     pass
 
+def ignore_error_handler(error, **kwargs):
+    """Simple error handler to use in :func:`load_obj` that ignore all errors"""
+    pass
 
 def skip_error_handler(error, **kwargs):
     """Simple error handler to use in :func:`load_obj` that skips all errors
