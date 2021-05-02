@@ -106,6 +106,10 @@ class TestLoadObj:
                                          [[51,  51,  51],  [51,  51,  51]]]),
              'map_Ks': torch.ByteTensor([[[0,   0,   25],  [0,   0,   25]],
                                          [[51,  51,  25],  [51,  51,  25]]])
+            },
+            {'Ka': torch.tensor([0., 0., 0.]),
+             'Kd': torch.tensor([0., 0., 0.]),
+             'Ks': torch.tensor([0., 0., 0.])
             }
         ]
 
@@ -129,7 +133,7 @@ class TestLoadObj:
                     assert torch.allclose(outputs_material[property_name],
                                           expected_property_val)
             assert torch.equal(outputs.materials_order,
-                               torch.LongTensor([[0, 0], [1, 1]]))
+                               torch.LongTensor([[0, 0], [1, 1], [2, 2]]))
         else:
             assert outputs.materials is None
             assert outputs.materials_order is None

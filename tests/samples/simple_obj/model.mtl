@@ -13,3 +13,8 @@ Ks 0.100000 0.100000 0.100000
 map_Ka ambient_tex_002.png
 map_Kd diffuse_tex_002.png
 map_Ks spec_col_tex_002.png
+
+newmtl Material.003
+Ka 0.000000 0.000000 0.000000
+Kd 0.000000 0.000000 0.000000
+Ks 0.000000 0.000000 0.000000

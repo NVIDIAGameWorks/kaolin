@@ -40,6 +40,9 @@ class MaterialFileError(MaterialError):
 class MaterialNotFoundError(MaterialError):
     pass
 
+def ignore_error_handler(error, **kwargs):
+    """Simple error handler to use in :func:`load_obj` that ignore all errors"""
+    pass
 
 def skip_error_handler(error, **kwargs):
     """Simple error handler to use in :func:`load_obj` that skips all errors
@@ -107,7 +110,6 @@ def import_mesh(path, with_materials=False, with_normals=False,
     materials_order = []
     materials_dict = {}
     materials_idx = {}
-    cur_idx = 0
 
     with open(path, 'r', encoding='utf-8') as f:
         for line in f:
@@ -134,11 +136,10 @@ def import_mesh(path, with_materials=False, with_normals=False,
                     else:
                         face_normals.append([0, 0, 0])
             elif with_materials and data[0] == 'usemtl':
-                cur_idx += len(face_uvs_idx)
                 material_name = data[1]
                 if material_name not in materials_idx:
                     materials_idx[material_name] = len(materials_idx)
-                materials_order.append([materials_idx[material_name], cur_idx])
+                materials_order.append([materials_idx[material_name], len(face_uvs_idx)])
             elif with_materials and data[0] == 'mtllib':
                 mtl_path = os.path.join(os.path.dirname(path), data[1])
                 materials_dict.update(load_mtl(mtl_path, error_handler))

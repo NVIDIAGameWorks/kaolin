@@ -16,7 +16,7 @@ import warnings
 from pathlib import Path
 
 from kaolin.io.dataset import KaolinDataset
-from kaolin.io.obj import import_mesh
+from kaolin.io.obj import import_mesh, ignore_error_handler
 
 # Synset to Label mapping (for ShapeNet core classes)
 synset_to_label = {
@@ -127,7 +127,8 @@ class ShapeNet(KaolinDataset):
 
     def get_data(self, index):
         obj_location = self.paths[index] / 'model.obj'
-        mesh = import_mesh(str(obj_location), with_materials=self.with_materials)
+        mesh = import_mesh(str(obj_location), with_materials=self.with_materials,
+                           error_handler=ignore_error_handler)
         return mesh
 
     def get_attributes(self, index):
