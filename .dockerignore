@@ -1,0 +1,5 @@
+**/.git
+ci
+.gitlab-ci.yml
+**/.gitignore
+**/.gitmodules
