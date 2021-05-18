@@ -31,12 +31,16 @@ else:
     import torch
     torch_ver = parse_version(torch.__version__)
     if (torch_ver < parse_version(TORCH_MIN_VER) or
-       torch_ver > parse_version(TORCH_MAX_VER)) and \
-       not IGNORE_TORCH_VER:
-        warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
-                      f'but found version {torch.__version__} instead. '
-                      'This will try to install torch in the right version. '
-                      'If the installation fails we recommend to first install it.')
+       torch_ver > parse_version(TORCH_MAX_VER)):
+        if IGNORE_TORCH_VER:
+            warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
+                          f'but found version {torch.__version__}. Continuing with the installed '
+                          'version as IGNORE_TORCH_VER is set.')
+        else:
+            warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
+                          f'but found version {torch.__version__} instead. ' 
+                          'This will try to install a compatible version of PyTorch. '
+                          'If the installation fails we recommend to first install it.')
         missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
 
 cython_spec = importlib.util.find_spec("cython")
@@ -117,9 +121,7 @@ write_version_file()
 def get_requirements():
     requirements = []
     if os.name != 'nt':  # no pypi torch for windows
-        if os.getenv('PYTORCH_VERSION'):
-            requirements.append('torch==%s' % os.getenv('PYTORCH_VERSION'))
-        elif IGNORE_TORCH_VER:
+        if IGNORE_TORCH_VER:
             requirements.append('torch')
         else:
             requirements.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
