@@ -16,7 +16,6 @@ import hashlib
 from abc import abstractmethod
 from collections import namedtuple
 from pathlib import Path
-from typing import Callable
 
 import torch
 from torch.multiprocessing import Pool
