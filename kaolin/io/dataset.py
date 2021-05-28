@@ -16,7 +16,6 @@ import hashlib
 from abc import abstractmethod
 from collections import namedtuple
 from pathlib import Path
-from typing import Callable
 
 import torch
 from torch.multiprocessing import Pool
@@ -44,7 +43,7 @@ class Cache(object):
         cache_key (str): The corresponding cache key for this function.
     """
 
-    def __init__(self, func: Callable, cache_dir: [str, Path], cache_key: str):
+    def __init__(self, func, cache_dir, cache_key):
         self.func = func
         self.cache_dir = Path(cache_dir) / str(cache_key)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
