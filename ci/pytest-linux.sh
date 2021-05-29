@@ -12,7 +12,7 @@ if [ ! -z "${CI_REGISTRY_IMAGE}" ]; then
 fi
 
 docker run \
-    --env CI=True \
+    --env CI='true' \
     --runtime=nvidia \
     --rm \
     "$IMAGE_NAME" \
