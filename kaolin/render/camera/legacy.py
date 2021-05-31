@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,6 +63,12 @@ def generate_rotate_translate_matrices(camera_position, look_at, camera_up_direc
     camz_length_bx1 = camz_bx3.norm(dim=1, keepdim=True)
     camz_bx3 = camz_bx3 / (camz_length_bx1 + 1e-10)
 
+    # torch.cross don't support broadcast
+    # (https://github.com/pytorch/pytorch/issues/39656)
+    if camera_up_direction.shape[0] < camz_bx3.shape[0]:
+        camera_up_direction = camera_up_direction.repeat(camz_bx3.shape[0], 1)
+    elif camera_up_direction.shape[0] > camz_bx3.shape[0]:
+        camz_bx3 = camz_bx3.repeat(camera_up_direction.shape[0], 1)
     camx_bx3 = torch.cross(camz_bx3, camera_up_direction, dim=1)
     camx_len_bx1 = camx_bx3.norm(dim=1, keepdim=True)
     camx_bx3 = camx_bx3 / (camx_len_bx1 + 1e-10)
@@ -97,6 +104,12 @@ def generate_transformation_matrix(camera_position, look_at, camera_up_direction
     """
     z_axis = (camera_position - look_at)
     z_axis /= z_axis.norm(dim=1, keepdim=True)
+    # torch.cross don't support broadcast
+    # (https://github.com/pytorch/pytorch/issues/39656)
+    if camera_up_direction.shape[0] < z_axis.shape[0]:
+        camera_up_direction = camera_up_direction.repeat(z_axis.shape[0], 1)
+    elif z_axis.shape[0] < camera_up_direction.shape[0]:
+        z_axis = z_axis.repeat(camera_up_direction.shape[0], 1)
     x_axis = torch.cross(camera_up_direction, z_axis, dim=1)
     x_axis /= x_axis.norm(dim=1, keepdim=True)
     y_axis = torch.cross(z_axis, x_axis, dim=1)
