@@ -22,7 +22,7 @@ import torch
 from kaolin.io.obj import return_type
 from kaolin.io.shrec import SHREC16
 
-SHREC16_PATH = '/data/shrec16'
+SHREC16_PATH = '/home/jiehanw/Downloads/shrec16'
 SHREC16_TEST_CATEGORY_SYNSETS = ['02691156']
 SHREC16_TEST_CATEGORY_LABELS = ['airplane']
 SHREC16_TEST_CATEGORY_SYNSETS_2 = ['02958343']
@@ -31,6 +31,7 @@ SHREC16_TEST_CATEGORY_SYNSETS_MULTI = ['02691156', '02958343']
 SHREC16_TEST_CATEGORY_LABELS_MULTI = ['airplane', 'car']
 
 ALL_CATEGORIES = [
+    None,
     SHREC16_TEST_CATEGORY_SYNSETS,
     SHREC16_TEST_CATEGORY_LABELS,
     SHREC16_TEST_CATEGORY_SYNSETS_2,
@@ -43,7 +44,7 @@ ALL_CATEGORIES = [
 # Skip test in a CI environment
 @pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
-@pytest.mark.parametrize('split', ['val'])
+@pytest.mark.parametrize('split', ['train', 'val', 'test'])
 class TestSHREC16(object):
 
     @pytest.fixture(autouse=True)
@@ -53,7 +54,7 @@ class TestSHREC16(object):
                        split=split)
 
     @pytest.mark.parametrize('index', [0, -1])
-    def test_basic_getitem(self, shrec16_dataset, index):
+    def test_basic_getitem(self, shrec16_dataset, index, split):
         assert len(shrec16_dataset) > 0
 
         if index == -1:
@@ -73,5 +74,30 @@ class TestSHREC16(object):
 
         assert isinstance(attributes['name'], str)
         assert isinstance(attributes['path'], Path)
-        assert isinstance(attributes['synset'], str)
-        assert isinstance(attributes['label'], str)
+        
+        if split == "test":
+            assert attributes['synset'] is None
+            assert attributes['label'] is None
+        else:
+            assert isinstance(attributes['synset'], str)
+            assert isinstance(attributes['label'], list)
+    
+    @pytest.mark.parametrize('index', [-1, -2])
+    def test_neg_index(self, shrec16_dataset, index):
+
+        assert len(shrec16_dataset) > 0
+
+        gt_item = shrec16_dataset[len(shrec16_dataset) + index]
+        gt_data = gt_item.data
+        gt_attributes = gt_item.attributes
+
+        item = shrec16_dataset[index]
+        data = item.data
+        attributes = item.attributes
+
+        assert torch.equal(data.vertices, gt_data.vertices)
+        assert torch.equal(data.faces, gt_data.faces)
+
+        assert attributes['name'] == gt_attributes['name']
+        assert attributes['path'] == gt_attributes['path']
+        assert attributes['synset'] == gt_attributes['synset']
