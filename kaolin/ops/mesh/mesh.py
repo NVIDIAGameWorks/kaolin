@@ -66,6 +66,7 @@ def adjacency_matrix(num_vertices, faces, sparse=True):
     forward_i = torch.stack([faces, torch.roll(faces, 1, dims=-1)], dim=-1)
     backward_i = torch.stack([torch.roll(faces, 1, dims=-1), faces], dim=-1)
     indices = torch.cat([forward_i, backward_i], dim=1).reshape(-1, 2)
+    indices = indices.unique(dim=0)
 
     if sparse:
         indices = indices.t()
