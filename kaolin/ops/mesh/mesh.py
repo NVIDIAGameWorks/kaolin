@@ -56,8 +56,8 @@ def adjacency_matrix(num_vertices, faces, sparse=True):
     Example:
         >>> faces = torch.tensor([[0, 1, 2]])
         >>> adjacency_matrix(3, faces)
-        tensor(indices=tensor([[0, 1, 2, 2, 0, 1],
-                               [2, 0, 1, 0, 1, 2]]),
+        tensor(indices=tensor([[0, 0, 1, 1, 2, 2],
+                               [1, 2, 0, 2, 0, 1]]),
                values=tensor([1., 1., 1., 1., 1., 1.]),
                size=(3, 3), nnz=6, layout=torch.sparse_coo)
     """
