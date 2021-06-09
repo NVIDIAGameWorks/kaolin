@@ -340,6 +340,20 @@ def test_adjacency_matrix_dense(device, dtype):
     assert torch.equal(output, expected)
 
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
+def test_adjacency_consistent(device, dtype):
+    test_mesh = obj.import_mesh('tests/samples/model.obj')
+    vertices = test_mesh.vertices
+    faces = test_mesh.faces
+
+    num_vertices = vertices.shape[0]
+
+    sparse = mesh.adjacency_matrix(num_vertices, faces)
+    sparse_to_dense = sparse.to_dense()
+    dense = mesh.adjacency_matrix(num_vertices, faces, sparse=False)
+
+    assert torch.equal(sparse_to_dense, dense)
+
+@pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 class TestUniformLaplacian:
 
     def test_uniform_laplacian(self, device, dtype):
