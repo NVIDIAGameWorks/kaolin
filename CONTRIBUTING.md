@@ -43,8 +43,44 @@ If you want to contribute, [Gitlab issues](https://gitlab-master.nvidia.com/Toro
 #### License
 Include a license at the top of new files.
 
-* [C/C++/CUDA example](example_license.cpp)
-* [Python example](examples_license.py)
+##### C/C++/CUDA
+```cpp
+// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// All rights reserved.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//    http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+```
+
+##### Python
+```python
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+```
+
+When non-trivial changes are made, the license should be changed accordingly. For instance, if the file is originally authored in 2021, a few typos get fixed in 202, a paragraph or subroutine is added in 2023, and a major rev2.0 is created in 2024, you would in 2024 write:
+"Copyright (c) 2021,23-24 NVIDIA CORPORATION & AFFILIATES"
 
 #### Code organization
 * [kaolin](kaolin/) - The core Kaolin library, comprised of python modules, 
