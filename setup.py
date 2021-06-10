@@ -3,8 +3,8 @@
 # TORCH_CUDA_ARCH_LIST
 #   specify which CUDA architectures to build for
 #
-# IGNORE_VER_ERR
-#   ignore version error for torch
+# IGNORE_TORCH_VER
+#   ignore version requirements for PyTorch
 
 from os import environ
 from setuptools import setup, find_packages, dist
@@ -16,22 +16,31 @@ TORCH_MIN_VER = '1.5.0'
 TORCH_MAX_VER = '1.7.1'
 CYTHON_MIN_VER = '0.29.20'
 INCLUDE_EXPERIMENTAL = environ.get('KAOLIN_INSTALL_EXPERIMENTAL') is not None
+IGNORE_TORCH_VER = environ.get('IGNORE_TORCH_VER') is not None
 
 missing_modules = []
 torch_spec = importlib.util.find_spec("torch")
 if torch_spec is None:
     warnings.warn("Couldn't find torch installed, so this will try to install it. "
                   "If the installation fails we recommend to first install it.")
-    missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
+    if IGNORE_TORCH_VER:
+        missing_modules.append('torch')
+    else:
+        missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
 else:
     import torch
     torch_ver = parse_version(torch.__version__)
-    if torch_ver <= parse_version(TORCH_MIN_VER) and \
-       torch_ver <= parse_version(TORCH_MAX_VER):
-        warnings.warn('Kaolin is compatible with PyTorch >= 1.5.0, '
-                      f'but found version {torch.__version__} instead. '
-                      'This will try to install torch in the right version. '
-                      'If the installation fails we recommend to first install it.')
+    if (torch_ver < parse_version(TORCH_MIN_VER) or
+       torch_ver > parse_version(TORCH_MAX_VER)):
+        if IGNORE_TORCH_VER:
+            warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
+                          f'but found version {torch.__version__}. Continuing with the installed '
+                          'version as IGNORE_TORCH_VER is set.')
+        else:
+            warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
+                          f'but found version {torch.__version__} instead. ' 
+                          'This will try to install a compatible version of PyTorch. '
+                          'If the installation fails we recommend to first install it.')
         missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
 
 cython_spec = importlib.util.find_spec("cython")
@@ -112,8 +121,8 @@ write_version_file()
 def get_requirements():
     requirements = []
     if os.name != 'nt':  # no pypi torch for windows
-        if os.getenv('PYTORCH_VERSION'):
-            requirements.append('torch==%s' % os.getenv('PYTORCH_VERSION'))
+        if IGNORE_TORCH_VER:
+            requirements.append('torch')
         else:
             requirements.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
     requirements.append('scipy>=1.2.0,<=1.5.2')
