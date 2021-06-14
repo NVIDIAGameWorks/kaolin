@@ -22,7 +22,7 @@ import torch
 from kaolin.io.obj import return_type
 from kaolin.io.shrec import SHREC16
 
-SHREC16_PATH = '/home/jiehanw/Downloads/shrec16'
+SHREC16_PATH = '/data/shrec16/'
 SHREC16_TEST_CATEGORY_SYNSETS = ['02691156']
 SHREC16_TEST_CATEGORY_LABELS = ['airplane']
 SHREC16_TEST_CATEGORY_SYNSETS_2 = ['02958343']
