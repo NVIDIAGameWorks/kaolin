@@ -14,6 +14,7 @@
 
 import math
 import pytest
+import os
 
 import torch
 
@@ -22,6 +23,9 @@ from kaolin.ops.batch import get_first_idx, tile_to_packed, list_to_packed
 from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_tensor
 from kaolin.ops import mesh
 from kaolin.ops.mesh.trianglemesh import _unbatched_subdivide_vertices
+from kaolin.io import obj
+
+ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../samples/')
 
 @pytest.mark.parametrize("device,dtype", FLOAT_TYPES)
 class TestFaceAreas:
@@ -341,7 +345,7 @@ def test_adjacency_matrix_dense(device, dtype):
 
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 def test_adjacency_consistent(device, dtype):
-    test_mesh = obj.import_mesh('tests/samples/model.obj')
+    test_mesh = obj.import_mesh(os.path.join(ROOT_DIR, 'model.obj'))
     vertices = test_mesh.vertices
     faces = test_mesh.faces
 
