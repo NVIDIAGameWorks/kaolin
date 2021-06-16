@@ -125,7 +125,7 @@ class SHREC16(KaolinDataset):
             self.labels = [synset_to_labels[s] for s in self.synsets]
 
         # loops through desired classes
-        if split == "test":
+        if split == "test_allinone":
             class_target = self.root / "test"
             # find all objects in the class
             models = sorted(class_target.glob('*'))
