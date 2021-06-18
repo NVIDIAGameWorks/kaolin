@@ -21,3 +21,4 @@ and :ref:`materials module<kaolin.io.materials>` contains Materials definition t
    kaolin.io.shapenet
    kaolin.io.usd
    kaolin.io.modelnet
+   kaolin.io.shrec
