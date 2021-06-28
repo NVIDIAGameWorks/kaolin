@@ -688,7 +688,6 @@ def import_pointclouds(file_path, scene_paths=None, times=None):
 
         if UsdGeom.Points(prim):
             geom_points = UsdGeom.Points(prim)
-            # import pdb; pdb.set_trace()
             pointclouds.append(torch.tensor(geom_points.GetPointsAttr().Get(time=time)))
 
             color = geom_points.GetDisplayColorAttr().Get(time=time)
