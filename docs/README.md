@@ -2,6 +2,10 @@
 
 This guide is for developers who write API documentation. To build the documentation, run
 
+`pip install -r tools/doc_requirements.txt` to install the dependencies for documentation.
+
+Then, run
+
 ```make html``` on Linux
 
 ```make.bat html``` on Windows
