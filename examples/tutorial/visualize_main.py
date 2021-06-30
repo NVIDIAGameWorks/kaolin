@@ -25,7 +25,6 @@ import kaolin
 
 logger = logging.getLogger(__name__)
 
-
 def __normalize_vertices(vertices):
     """
     Normalizes vertices to fit an [-1...1] bounding box,

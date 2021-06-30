@@ -48,10 +48,17 @@ def voxelgrid(meshes):
 def pointcloud():
     cur_dir = os.path.dirname(os.path.realpath(__file__))
     pointcloud = io.usd.import_pointcloud(os.path.join(cur_dir, os.pardir, os.pardir,
-                                          os.pardir, 'samples/rocket_pointcloud.usda'),
-                                          '/World/pointcloud')
+                                          os.pardir, 'samples/rocket_pointcloud_GeomPoints.usda'),
+                                          '/World/pointcloud').points
     return pointcloud
 
+@pytest.fixture(scope='module')
+def pointcloud_color():
+    cur_dir = os.path.dirname(os.path.realpath(__file__))
+    pointcloud, color, normals = io.usd.import_pointcloud(os.path.join(cur_dir, os.pardir, os.pardir,
+                                            os.pardir, 'samples/golden/pointcloud_GeomPoints_colors.usda'),
+                                            '/World/pointcloud')
+    return pointcloud, color
 
 @pytest.fixture(scope='module')
 def meshes():
@@ -177,9 +184,30 @@ class TestTimelapse:
         # Verify
         filename = os.path.join(out_dir, 'test', 'pointcloud_0.usd')
         for iteration, params in data.items():
-            pointcloud_in = io.usd.import_pointcloud(filename, scene_path='/pointcloud_0', time=iteration)
+            pointcloud_in = io.usd.import_pointcloud(filename, scene_path='/pointcloud_0', time=iteration)[0]
 
             assert torch.allclose(pointcloud_in, params['pointcloud_list'][0])
+
+    def test_add_pointcloud_batch_color(self, out_dir, pointcloud_color):
+        writer = timelapse.Timelapse(out_dir)
+
+        pointcloud, color = pointcloud_color
+
+        data = {
+            0: {'pointcloud_list': [pointcloud], 'colors': [color]},
+            10: {'pointcloud_list': [pointcloud + 100.], 'colors': [color]},
+        }
+        for iteration, params in data.items():
+            writer.add_pointcloud_batch(iteration=iteration, category='test', **params)
+
+        # Verify
+        filename = os.path.join(out_dir, 'test', 'pointcloud_0.usd')
+        for iteration, params in data.items():
+            pointcloud_in, color_in, normals_in = io.usd.import_pointcloud(filename, scene_path='/pointcloud_0', time=iteration)
+
+            assert torch.allclose(pointcloud_in, params['pointcloud_list'][0])
+
+            assert torch.allclose(color_in, params['colors'][0])
 
 
 class TestTimelapseParser:

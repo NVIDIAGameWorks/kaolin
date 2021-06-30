@@ -32,6 +32,7 @@ except ImportError:
 
 
 mesh_return_type = namedtuple('mesh_return_type', ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'face_normals', 'materials'])
+pointcloud_return_type = namedtuple('pointcloud_return_type', ['points', 'colors', 'normals'])
 
 
 class NonHomogeneousMeshError(Exception):
@@ -60,7 +61,6 @@ def _get_stage_next_free_path(stage, scene_path):
         scene_path = f'{scene_path}_{i:02d}'
 
     return scene_path
-
 
 def _get_flattened_mesh_attributes(stage, scene_path, time):
     """Return mesh attributes flattened into a single mesh."""
@@ -185,8 +185,10 @@ def get_pointcloud_scene_paths(file_path):
         (list of str): List of filtered scene paths.
     """
     # TODO(mshugrina): is passing prim_types='PointInstancer' the same as UsdGeom.PointInstancer(p) ?
-    return get_scene_paths(file_path, prim_types=['PointInstancer'],
-                           conditional=lambda p: p.GetAttribute('primvars:kaolin_type').Get() == 'PointCloud')
+    geom_points_paths = get_scene_paths(file_path, prim_types=['Points'])
+    point_instancer_paths = get_scene_paths(file_path, prim_types=['PointInstancer'],
+                                            conditional=lambda p: p.GetAttribute('primvars:kaolin_type').Get() == 'PointCloud')
+    return geom_points_paths + point_instancer_paths
 
 
 def get_scene_paths(file_path, scene_path_regex=None, prim_types=None, conditional=lambda x: True):
@@ -610,12 +612,11 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
 
     return stage
 
-
-# PointCloud Functions
+# Pointcloud functions
 def import_pointcloud(file_path, scene_path, time=None):
     r"""Import a single pointcloud from a USD file.
 
-    Assumes that the USD pointcloud is interpreted using a point instancer. Converts the coordinates
+    Assumes that the USD pointcloud is interpreted using a point instancer or UsdGeomPoints. Converts the coordinates
     of each point instance to a point within the output pointcloud.
 
     Args:
@@ -623,41 +624,48 @@ def import_pointcloud(file_path, scene_path, time=None):
         scene_path (str): Scene path within the USD file indicating which primitive to import.
         time (int, optional): Positive integer indicating the time at which to retrieve parameters.
     Returns:
-        (torch.FloatTensor): Point coordinates.
+        namedtuple of:
+            - **points** (torch.FloatTensor): of shape (num_points, 3)
+            - **colors** (torch.FloatTensor): of shape (num_points, 3)
+            - **normals** (torch.FloatTensor): of shape (num_points, 3) (not yet implemented)
 
     Example:
         >>> points = torch.rand(100, 3)
         >>> stage = export_pointcloud('./new_stage.usd', points, scene_path='/World/pointcloud')
         >>> points_imp = import_pointcloud(file_path='./new_stage.usd',
-        ...                                scene_path='/World/pointcloud')
+        ...                                scene_path='/World/pointcloud')[0]
         >>> points_imp.shape
         torch.Size([100, 3])
     """
     if time is None:
         time = Usd.TimeCode.Default()
-    pointcloud_list = import_pointclouds(file_path, [scene_path], times=[time])
-    return pointcloud_list[0]
 
+    pointcloud_list = import_pointclouds(file_path, [scene_path], times=[time])
+
+    return pointcloud_return_type(*pointcloud_list[0])
 
 def import_pointclouds(file_path, scene_paths=None, times=None):
     r"""Import one or more pointclouds from a USD file.
 
-    Assumes that pointclouds are interpreted using point instancers. Converts the coordinates
+    Assumes that pointclouds are interpreted using point instancers or UsdGeomPoints. Converts the coordinates
     of each point instance to a point within the output pointcloud.
 
     Args:
         file_path (str): Path to usd file (\*.usd, \*.usda).
         scene_paths (list of str, optional): Scene path(s) within the USD file indicating which primitive(s)
-            to import. If None, will return all pointclouds found based on PointInstancer prims with `kaolin_type`
+            to import. If None, will return all pointclouds found based on PointInstancer or UsdGeomPoints prims with `kaolin_type`
             primvar set to `PointCloud`.
         times (list of int): Positive integers indicating the time at which to retrieve parameters.
     Returns:
-        (list of torch.FloatTensor): Point coordinates.
+        list of namedtuple of:
+            - **points** (list of torch.FloatTensor): of shape (num_points, 3)
+            - **colors** (list of torch.FloatTensor): of shape (num_points, 3)
+            - **normals** (list of torch.FloatTensor): of shape (num_points, 2)
 
     Example:
         >>> points = torch.rand(100, 3)
         >>> stage = export_pointclouds('./new_stage.usd', [points, points, points])
-        >>> pointclouds = import_pointclouds(file_path='./new_stage.usd')
+        >>> pointclouds = import_pointclouds(file_path='./new_stage.usd')[0]
         >>> len(pointclouds)
         3
         >>> pointclouds[0].shape
@@ -671,15 +679,35 @@ def import_pointclouds(file_path, scene_paths=None, times=None):
         times = [Usd.TimeCode.Default()] * len(scene_paths)
 
     pointclouds = []
+    colors = []
+    normals = []
     stage = Usd.Stage.Open(file_path)
     for scene_path, time in zip(scene_paths, times):
         prim = stage.GetPrimAtPath(scene_path)
         assert prim, f'The prim at {scene_path} does not exist.'
 
-        instancer = UsdGeom.PointInstancer(prim)
-        assert instancer, f'Only point clouds from point instancers are supported. No PointInstancer at {scene_path}.'
-        pointclouds.append(torch.tensor(instancer.GetPositionsAttr().Get(time=time)))
-    return pointclouds
+        if UsdGeom.Points(prim):
+            geom_points = UsdGeom.Points(prim)
+            pointclouds.append(torch.tensor(geom_points.GetPointsAttr().Get(time=time)))
+
+            color = geom_points.GetDisplayColorAttr().Get(time=time)
+
+            if color is None:
+                colors.append(color)
+            else:
+                colors.append(torch.tensor(color))
+        elif UsdGeom.PointInstancer(prim):
+            instancer = UsdGeom.PointInstancer(prim)
+            pointclouds.append(torch.tensor(instancer.GetPositionsAttr().Get(time=time)))
+            colors.append(None)
+        else:
+            raise TypeError("The prim is neither UsdGeomPoints nor UsdGeomPointInstancer.")
+
+    # TODO: place holders for normals for now
+    normals = [None] * len(colors)
+
+    params = [pointclouds, colors, normals]
+    return [pointcloud_return_type(p, c, n) for p, c, n in zip(*params)]
 
 
 def get_pointcloud_bracketing_time_samples(stage, scene_path, target_time):
@@ -695,12 +723,19 @@ def get_pointcloud_bracketing_time_samples(stage, scene_path, target_time):
     """
     # Note: can also get usd_attr.GetTimeSamples()
     prim = stage.GetPrimAtPath(scene_path)
-    instancer = UsdGeom.PointInstancer(prim)
-    assert instancer, f'Only point clouds from point instancers are supported. No PointInstancer at {scene_path}.'
-    return instancer.GetPositionsAttr().GetBracketingTimeSamples(target_time)
+
+    if UsdGeom.Points(prim):
+        geom_points = UsdGeom.Points(prim)
+        result = geom_points.GetPointsAttr().GetBracketingTimeSamples(target_time)
+    elif UsdGeom.PointInstancer(prim):
+        instancer = UsdGeom.PointInstancer(prim)
+        result = instancer.GetPositionsAttr().GetBracketingTimeSamples(target_time)
+    else:
+        raise TypeError("The prim is neither UsdGeomPoints nor UsdGeomPointInstancer.")
+    return result
 
 
-def add_pointcloud(stage, points, scene_path, time=None):
+def add_pointcloud(stage, points, scene_path, colors=None, time=None):
     r"""Add a pointcloud to an existing USD stage.
 
     Create a pointcloud represented by point instances of a sphere centered at each point coordinate.
@@ -710,6 +745,8 @@ def add_pointcloud(stage, points, scene_path, time=None):
         stage (Usd.Stage): Stage onto which to add the pointcloud.
         points (torch.FloatTensor): Pointcloud tensor containing ``N`` points of shape ``(N, 3)``.
         scene_path (str): Absolute path of pointcloud within the USD file scene. Must be a valid Sdf.Path.
+        colors (torch.FloatTensor, optional): Color tensor corresponding each point in the pointcloud
+            tensor of shape ``(N, 3)``.
         time (int, optional): Positive integer defining the time at which the supplied parameters correspond to.
     Returns:
         (Usd.Stage)
@@ -725,14 +762,10 @@ def add_pointcloud(stage, points, scene_path, time=None):
         time = Usd.TimeCode.Default()
 
     if stage.GetPrimAtPath(scene_path):
-        instancer_prim = stage.GetPrimAtPath(scene_path)
+        points_prim = stage.GetPrimAtPath(scene_path)
     else:
-        instancer_prim = stage.DefinePrim(scene_path, 'PointInstancer')
-    instancer = UsdGeom.PointInstancer(instancer_prim)
-    assert instancer
-    sphere = UsdGeom.Sphere.Define(stage, f'{scene_path}/sphere')
-    sphere.GetRadiusAttr().Set(0.5)
-    instancer.CreatePrototypesRel().SetTargets([sphere.GetPath()])
+        points_prim = stage.DefinePrim(scene_path, 'Points')
+    geom_points = UsdGeom.Points(points_prim)
 
     # Calculate default point scale
     bounds = points.max(dim=0)[0] - points.min(dim=0)[0]
@@ -740,24 +773,21 @@ def add_pointcloud(stage, points, scene_path, time=None):
     scale = (min_bound / points.size(0) ** (1 / 3)).item()
 
     # Generate instancer parameters
-    indices = [0] * points.size(0)
     positions = points.cpu().tolist()
-    scales = [(scale,) * 3] * points.size(0)
+    scales = [scale, ] * points.size(0)
 
-    # Populate point instancer
-    instancer.GetProtoIndicesAttr().Set(indices, time=time)
-    instancer.GetPositionsAttr().Set(positions, time=time)
-    instancer.GetScalesAttr().Set(scales, time=time)
+    # Populate UsdGeomPoints
+    geom_points.GetPointsAttr().Set(points.numpy(), time=time)
+    geom_points.GetWidthsAttr().Set(Vt.FloatArray(scales), time=time)
 
-    # Create a primvar to identify the point instancer as a Kaolin PointCloud
-    prim = stage.GetPrimAtPath(instancer.GetPath())
-    pv = UsdGeom.PrimvarsAPI(prim).CreatePrimvar('kaolin_type', Sdf.ValueTypeNames.String)
-    pv.Set('PointCloud')
+    if colors is not None:
+        assert colors.shape == points.shape, "Colors and points must have the same shape."
+        geom_points.GetDisplayColorAttr().Set(colors.numpy(), time=time)
 
     return stage
 
 
-def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/pointcloud_0', time=None):
+def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/pointcloud_0', color=None, time=None):
     r"""Export a single pointcloud to a USD scene.
 
     Export a single pointclouds to USD. The pointcloud will be added to the USD stage and represented
@@ -768,6 +798,8 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
         pointcloud (torch.FloatTensor): Pointcloud tensor containing ``N`` points of shape ``(N, 3)``.
         scene_path (str, optional): Absolute path of pointcloud within the USD file scene. Must be a valid Sdf.Path.
             If no path is provided, a default path is used.
+        color (torch.FloatTensor, optional): Color tensor corresponding each point in the pointcloud
+            tensor of shape ``(N, 3)``.
         time (int): Positive integer defining the time at which the supplied parameters correspond to.
     Returns:
         (Usd.Stage)
@@ -776,11 +808,11 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
         >>> points = torch.rand(100, 3)
         >>> stage = export_pointcloud('./new_stage.usd', points)
     """
-    stage = export_pointclouds(file_path, [pointcloud], [scene_path], times=[time])
+    stage = export_pointclouds(file_path, [pointcloud], [scene_path], colors=[color], times=[time])
     return stage
 
 
-def export_pointclouds(file_path, pointclouds, scene_paths=None, times=None):
+def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, times=None):
     r"""Export one or more pointclouds to a USD scene.
 
     Export one or more pointclouds to USD. The pointclouds will be added to the USD stage and represented
@@ -788,10 +820,12 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, times=None):
 
     Args:
         file_path (str): Path to usd file (\*.usd, \*.usda).
-        pointclouds (list of torch.FloatTensor): List of pointcloud tensors containing ``N`` points of shape ``(N, 3)``.
+        pointclouds (list of torch.FloatTensor): List of pointcloud tensors of length ``N`` defining N pointclouds.
         scene_paths (list of str, optional): Absolute path(s) of pointcloud(s) within the USD file scene. Must be a valid Sdf.Path.
             If no path is provided, a default path is used.
         times (list of int): Positive integers defining the time at which the supplied parameters correspond to.
+        colors (list of tensors, optional): Lits of RGB colors of length ``N``, each corresponding to a pointcloud
+            in the pointcloud list.
     Returns:
         (Usd.Stage)
 
@@ -803,11 +837,13 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, times=None):
         scene_paths = [f'/World/PointClouds/pointcloud_{i}' for i in range(len(pointclouds))]
     if times is None:
         times = [Usd.TimeCode.Default()] * len(scene_paths)
+    if colors is None:
+        colors = [None] * len(scene_paths)
 
     assert len(pointclouds) == len(scene_paths)
     stage = create_stage(file_path)
-    for scene_path, points, time in zip(scene_paths, pointclouds, times):
-        add_pointcloud(stage, points, scene_path, time=time)
+    for scene_path, points, color, time in zip(scene_paths, pointclouds, colors, times):
+        add_pointcloud(stage, points, scene_path, color, time=time)
     stage.Save()
 
     return stage

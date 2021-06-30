@@ -171,7 +171,7 @@ class StreamingGeometryHelper(object):
             return None, current_time
 
         # TODO: is there overhead to creating stage?
-        points = kaolin.io.usd.import_pointcloud(fpath, scene_path, snap_time)
+        points = kaolin.io.usd.import_pointcloud(fpath, scene_path, snap_time).points
         return point_clouds_to_binary([points.numpy()]), snap_time
 
     def parse_encode_mesh(self, category, id, target_time, current_time=None):

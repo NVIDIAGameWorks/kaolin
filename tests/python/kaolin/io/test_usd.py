@@ -58,12 +58,29 @@ def hetero_mesh_path():
 @pytest.fixture(scope='module')
 def pointcloud():
     cur_dir = os.path.dirname(os.path.realpath(__file__))
-    pointcloud = usd.import_pointcloud(
+    pointcloud, color, normals = usd.import_pointcloud(
         os.path.join(cur_dir, os.pardir, os.pardir,
-                     os.pardir, 'samples/rocket_pointcloud.usda'),
+                     os.pardir, 'samples/rocket_pointcloud_GeomPoints.usda'),
         '/World/pointcloud')
     return pointcloud
 
+@pytest.fixture(scope='module')
+def pointcloud_instancer():
+    cur_dir = os.path.dirname(os.path.realpath(__file__))
+    pointcloud, color, normals = usd.import_pointcloud(
+        os.path.join(cur_dir, os.pardir, os.pardir,
+                     os.pardir, 'samples/rocket_pointcloud.v0.9.0.usda'),
+        '/World/pointcloud')
+    return pointcloud
+
+@pytest.fixture(scope='module')
+def pointcloud_with_color():
+    cur_dir = os.path.dirname(os.path.realpath(__file__))
+    pointcloud, color, normals = usd.import_pointcloud(
+        os.path.join(cur_dir, os.pardir, os.pardir,
+                     os.pardir, 'samples/golden/pointcloud_GeomPoints_colors.usda'),
+        '/World/pointcloud')
+    return (pointcloud, color)
 
 class TestMeshes:
     def setup_method(self):
@@ -267,7 +284,7 @@ class TestPointCloud:
         usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path)
 
         # Confirm exported USD matches golden file
-        golden = os.path.join(out_dir, '../../../../samples/golden/pointcloud.usda')
+        golden = os.path.join(out_dir, '../../../../samples/golden/pointcloud_GeomPoints.usda')
         assert open(golden).read() == open(out_path).read()
 
     def test_export_multiple(self, out_dir, pointcloud):
@@ -283,7 +300,7 @@ class TestPointCloud:
 
     def test_import_single(self, out_dir, pointcloud):
         out_path = os.path.join(out_dir, 'pointcloud.usda')
-        pointcloud_in = usd.import_pointcloud(file_path=out_path, scene_path=self.scene_path)
+        pointcloud_in = usd.import_pointcloud(file_path=out_path, scene_path=self.scene_path).points
 
         # Confirm imported pointcloud matches original input
         assert torch.allclose(pointcloud, pointcloud_in)
@@ -294,9 +311,47 @@ class TestPointCloud:
 
         # Confirm imported pointcloud matches original input
         assert len(pointcloud_in_list) == self.num_multiple
-        for pointcloud_in in pointcloud_in_list:
+        for pointcloud_in, colors_in, normals_in in pointcloud_in_list:
             assert torch.allclose(pointcloud, pointcloud_in)
 
+    def test_import_single_instancer(self, out_dir, pointcloud_instancer):
+        # Test that the read from UsdPointInstancer is the same as the read from UsdGeomPoints
+        out_path = os.path.join(out_dir, 'pointcloud.usda')
+        pointcloud_in, colors_in, normals_in = usd.import_pointcloud(file_path=out_path, scene_path=self.scene_path)
+
+        # Confirm imported pointcloud matches original input
+        assert torch.allclose(pointcloud_instancer, pointcloud_in)
+
+    def test_import_multiple_instancer(self, out_dir, pointcloud_instancer):
+       # Test that the read from UsdPointInstancer is the same as the read from UsdGeomPoints
+        out_path = os.path.join(out_dir, 'pointclouds.usda')
+        pointcloud_in_list = usd.import_pointclouds(file_path=out_path)
+
+        # Confirm imported pointcloud matches original input
+        assert len(pointcloud_in_list) == self.num_multiple
+        for pointcloud_in, colors_in, normals_in in pointcloud_in_list:
+            assert torch.allclose(pointcloud_instancer, pointcloud_in)
+
+    def test_export_single_colors(self, out_dir, pointcloud_with_color):
+        # Export a single pointcloud with colors
+        pointcloud, color = pointcloud_with_color
+
+        out_path = os.path.join(out_dir, 'pointcloud_colors.usda')
+        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, color=color, scene_path=self.scene_path)
+
+        # Confirm exported USD matches golden file
+        golden = os.path.join(out_dir, '../../../../samples/golden/pointcloud_GeomPoints_colors.usda')
+        assert open(golden).read() == open(out_path).read()
+
+    def test_import_single_color(self, out_dir, pointcloud):
+        out_path = os.path.join(out_dir, 'pointcloud_colors.usda')
+        pointcloud_in, color, _ = usd.import_pointcloud(file_path=out_path, scene_path=self.scene_path)
+
+        # Confirm imported pointcloud matches original input
+        assert torch.allclose(pointcloud, pointcloud_in)
+
+        # Confirm that points have the same shape as color
+        assert pointcloud_in.shape == color.shape
 
 class TestVoxelGrid:
     def setup_method(self):
