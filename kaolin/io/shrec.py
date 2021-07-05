@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import os
 import warnings
 
 from pathlib import Path
@@ -104,7 +107,8 @@ class SHREC16(KaolinDataset):
                            specified as a string, and must be a valid `SHREC16`
                            category). If this argument is not specified, all categories
                            are loaded by default.
-        split (str): String to indicate whether to load train, test or val set.
+        split (str): String to indicate what split to load, among ["train", "val", "test"].
+                     Default: "train".
     """
 
     def __init__(self, root: str, categories: list = None, split: str = "train"):
@@ -125,8 +129,8 @@ class SHREC16(KaolinDataset):
             self.labels = [synset_to_labels[s] for s in self.synsets]
 
         # loops through desired classes
-        if split == "test_allinone":
-            class_target = self.root / "test"
+        if split == "test":
+            class_target = self.root / "test_allinone"
             # find all objects in the class
             models = sorted(class_target.glob('*'))
 
@@ -142,7 +146,8 @@ class SHREC16(KaolinDataset):
                 elif split == "val":
                     class_target = self.root / "val" / syn
                 else:
-                    raise ValueError(f'Split must be either train, test or val, got {split} instead.')
+                    raise ValueError(f'Split must be either train, test or val, '
+                                     f'got {split} instead.')
 
                 if not class_target.exists():
                     raise ValueError(
@@ -155,7 +160,7 @@ class SHREC16(KaolinDataset):
                 self.paths += models
                 self.synset_idxs += [i] * len(models)
 
-        self.names = [p.name for p in self.paths]
+        self.names = [os.path.join(p.parent.name, p.name) for p in self.paths]
 
     def __len__(self):
         return len(self.paths)

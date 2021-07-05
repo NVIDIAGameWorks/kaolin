@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import warnings
 from pathlib import Path
 
@@ -206,7 +208,7 @@ class ShapeNetV1(KaolinDataset):
             self.paths += models
             self.synset_idxs += [i] * len(models)
 
-        self.names = [p.name for p in self.paths]
+        self.names = [os.path.join(p.parent.name, p.name) for p in self.paths]
 
     def __len__(self):
         return len(self.paths)
@@ -346,7 +348,7 @@ class ShapeNetV2(KaolinDataset):
             self.paths += models
             self.synset_idxs += [i] * len(models)
 
-        self.names = [p.name for p in self.paths]
+        self.names = [os.path.join(p.parent.name, p.name) for p in self.paths]
 
     def __len__(self):
         return len(self.paths)
