@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,7 +44,18 @@ def import_mesh(path, with_face_colors=False):
     # Get metadata (number of vertices / faces (/ edges))
     for line in f:
         data = line.split()
-        if _is_void(data) or data[0] == 'OFF':
+        if _is_void(data):
+            continue
+        if data[0].startswith('OFF'):
+            # ModelNet40 have some OFFnum_vertices num_faces
+            if len(data[0][3:]) > 0:
+                num_vertices = int(data[0][3:])
+                num_faces = int(data[1])
+                break
+            elif len(data) > 1:
+                num_vertices = int(data[1])
+                num_faces = int(data[2])
+                break
             continue
         num_vertices = int(data[0])
         num_faces = int(data[1])
