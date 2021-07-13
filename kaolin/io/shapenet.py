@@ -87,10 +87,10 @@ synset_to_labels = {
 label_to_synset = {label: synset for synset, labels in synset_to_labels.items() for label in labels}
 
 def _convert_categories(categories):
-    if not (c in synset_to_label.keys() + label_to_synset.keys()
-            for c in categories):
-        warnings.warn('Some or all of the categories requested are not part of \
-            ShapeNetCore. Data loading may fail if these categories are not avaliable.')
+    for c in categories:
+        if c not in synset_to_labels.keys() and c not in label_to_synset.keys():
+            warnings.warn('Some or all of the categories requested are not part of \
+                ShapeNetCore. Data loading may fail if these categories are not avaliable.')
     synsets = [label_to_synset[c] if c in label_to_synset.keys()
                else c for c in categories]
     return synsets
@@ -181,7 +181,7 @@ class ShapeNetV1(KaolinDataset):
         self.paths = []
         self.synset_idxs = []
         if categories is None:
-            self.synsets = list(self.SUPPORTED_SYNSETS)
+            self.synsets = sorted(self.SUPPORTED_SYNSETS)
         else:
             self.synsets = _convert_categories(categories)
             for s in self.synsets:
