@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020,21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,12 +35,12 @@ def index_vertices_by_faces(vertices_features, faces):
             the face features,
             of shape :math:`(\text{batch_size}, \text{num_faces}, \text{num_vertices}, \text{knum})`
     """
+    assert vertices_features.ndim == 3, "vertices_features must have 3 dimensions of shape (batch_size, num_points, knum)"
+    assert faces.ndim == 2, "faces must have 2 dimensions of shape (num_faces, num_vertices)"
+    input = vertices_features.unsqueeze(2).expand(-1, -1, faces.shape[-1], -1)
+    indices = faces[None, ..., None].expand(vertices_features.shape[0], -1, -1, vertices_features.shape[-1])
+    return torch.gather(input=input, index=indices, dim=1)
 
-    # vertex2face
-    face_vertices_features = vertices_features[:, faces.reshape(-1)].reshape(
-        vertices_features.shape[0], faces.shape[0], faces.shape[-1], vertices_features.shape[-1])
-
-    return face_vertices_features
 
 def adjacency_matrix(num_vertices, faces, sparse=True):
     r"""Calculates a adjacency matrix of a mesh.
