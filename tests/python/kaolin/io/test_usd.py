@@ -116,10 +116,15 @@ class TestMeshes:
         with pytest.raises(ValueError):
             usd.import_meshes(out_path, ['/foo'] + scene_paths)
 
-    def test_import_hetero_fail(self, scene_paths, out_dir, hetero_mesh_path):
+    def test_import_hetero_fail_import_meshes(self, scene_paths, out_dir, hetero_mesh_path):
         """Test that import fails when importing heterogeneous mesh without handler"""
         with pytest.raises(usd.NonHomogeneousMeshError):
             usd.import_meshes(hetero_mesh_path, ['/Root'])
+
+    def test_import_hetero_fail_import_mesh(self, scene_paths, out_dir, hetero_mesh_path):
+        """Test that import fails when importing heterogeneous mesh without handler"""
+        with pytest.raises(usd.NonHomogeneousMeshError):
+            usd.import_mesh(file_path=hetero_mesh_path, scene_path='/Root')
 
     def test_import_hetero_skip(self, scene_paths, out_dir, hetero_mesh_path, mesh):
         """Test that import skips mesh when importing heterogeneous mesh with skip handler"""
@@ -136,14 +141,19 @@ class TestMeshes:
         mixed_in = usd.import_meshes(out_path, heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_skip)
         assert len(mixed_in) == 2
 
-    def test_import_hetero_empty(self, scene_paths, out_dir, hetero_mesh_path):
+    def test_import_hetero_empty_import_meshes(self, scene_paths, out_dir, hetero_mesh_path):
         """Test that imports empty mesh when importing heterogeneous mesh with empty handler"""
         mesh = usd.import_meshes(hetero_mesh_path, ['/Root'],
                                  heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_empty)
         for attr in mesh:
             assert len(attr[0]) == 0
+    
+    def test_import_hetero_empty_import_mesh(self, scene_paths, out_dir, hetero_mesh_path):
+        """Test that imports empty mesh when importing heterogeneous mesh with empty handler"""
+        mesh = usd.import_mesh(hetero_mesh_path, scene_path='/Root', heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_empty)
+        assert len(mesh[0]) == 0
 
-    def test_import_hetero_homogenize(self, scene_paths, out_dir, hetero_mesh_path):
+    def test_import_hetero_homogenize_import_meshes(self, scene_paths, out_dir, hetero_mesh_path):
         """Test that imports homogeneous mesh when importing heterogeneous mesh with naive homogenize handler"""
         # TODO(jlafleche) Render meshes before/after homogenize operation
         out_path = os.path.join(out_dir, 'homogenized.usda')
@@ -153,6 +163,21 @@ class TestMeshes:
 
         # Confirm we now have a triangle mesh
         assert mesh[0].faces.size(1) == 3
+
+        # Confirm exported USD matches golden file
+        golden = os.path.join(out_dir, '../../../../samples/golden/rocket_homogenized.usda')
+        assert open(golden).read() == open(out_path).read()
+    
+    def test_import_hetero_homogenize_import_mesh(self, scene_paths, out_dir, hetero_mesh_path):
+        """Test that imports homogeneous mesh when importing heterogeneous mesh with naive homogenize handler"""
+        # TODO(jlafleche) Render meshes before/after homogenize operation
+        out_path = os.path.join(out_dir, 'homogenized.usda')
+        mesh = usd.import_mesh(hetero_mesh_path, scene_path='/Root',
+                                 heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_naive_homogenize)
+        usd.export_mesh(out_path, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces)
+
+        # Confirm we now have a triangle mesh
+        assert mesh.faces.size(1) == 3
 
         # Confirm exported USD matches golden file
         golden = os.path.join(out_dir, '../../../../samples/golden/rocket_homogenized.usda')

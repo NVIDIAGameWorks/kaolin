@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES. 
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +22,7 @@ import os
 import re
 import warnings
 from collections import namedtuple
+import numpy as np
 
 import torch
 
@@ -83,23 +85,23 @@ def _get_flattened_mesh_attributes(stage, scene_path, time):
             mesh_uv_interpolation = mesh_st.GetInterpolation()
         mesh_face_normals = mesh.GetNormalsAttr().Get(time=time)
         if mesh_vertices:
-            vertices.append(torch.tensor(mesh_vertices))
+            vertices.append(torch.from_numpy(np.array(mesh_vertices, dtype=np.float32)))
         if mesh_vertex_indices:
-            face_vertex_counts.append(torch.tensor(mesh.GetFaceVertexCountsAttr().Get(time=time)))
-            vertex_indices.append(torch.tensor(mesh_vertex_indices) + cur_first_idx_faces)
+            face_vertex_counts.append(torch.from_numpy(np.array(mesh.GetFaceVertexCountsAttr().Get(time=time), dtype=np.int64)))
+            vertex_indices.append(torch.from_numpy(np.array(mesh_vertex_indices, dtype=np.int64)) + cur_first_idx_faces)
             if vertices:
                 cur_first_idx_faces += len(vertices[-1])
         if mesh_face_normals:
-            face_normals.append(torch.tensor(mesh_face_normals))
+            face_normals.append(torch.from_numpy(np.array(mesh_face_normals, dtype=np.float32)))
         if mesh_st and mesh_uvs:
-            uvs.append(torch.tensor(mesh_uvs))
+            uvs.append(torch.from_numpy(np.array(mesh_uvs, dtype=np.float32)))
             if mesh_uv_interpolation in ['vertex', 'varying']:
                 if not mesh_uv_indices:
                     # for vertex and varying interpolation, length of mesh_uv_indices should match
                     # length of mesh_vertex_indices
                     mesh_uv_indices = list(range(len(mesh_uvs)))
                 mesh_uv_indices = torch.tensor(mesh_uv_indices) + cur_first_idx_uvs
-                face_uvs_idx.append(mesh_uv_indices[torch.tensor(mesh_vertex_indices)])
+                face_uvs_idx.append(mesh_uv_indices[torch.from_numpy(np.array(mesh_vertex_indices, dtype=np.int64))])
             elif mesh_uv_interpolation == 'faceVarying':
                 if not mesh_uv_indices:
                     # for faceVarying interpolation, length of mesh_uv_indices should match
@@ -322,7 +324,7 @@ def heterogeneous_mesh_handler_naive_homogenize(vertices, face_vertex_counts, *a
     return (vertices, new_counts, *new_attrs)
 
 
-def import_mesh(file_path, scene_path=None, time=None):
+def import_mesh(file_path, scene_path=None, heterogeneous_mesh_handler=None, time=None):
     r"""Import a single mesh from a USD file in an unbatched representation.
 
     Supports homogeneous meshes (meshes with consistent numbers of vertices per face).
@@ -334,6 +336,11 @@ def import_mesh(file_path, scene_path=None, time=None):
         file_path (str): Path to usd file (`\*.usd`, `\*.usda`).
         scene_path (str, optional): Scene path within the USD file indicating which primitive to import.
             If not specified, the all meshes in the scene will be imported and flattened into a single mesh.
+        heterogeneous_mesh_handler (function, optional): Optional function to handle heterogeneous meshes.
+            The function's input and output must be  ``vertices`` (torch.FloatTensor), ``faces`` (torch.LongTensor),
+            ``uvs`` (torch.FloatTensor), ``face_uvs_idx`` (torch.LongTensor), and ``face_normals`` (torch.FloatTensor).
+            If the function returns ``None``, the mesh will be skipped. If no function is specified,
+            an error will be raised when attempting to import a heterogeneous mesh.
         time (int, optional): Positive integer indicating the time at which to retrieve parameters.
 
     Returns:
@@ -362,7 +369,8 @@ def import_mesh(file_path, scene_path=None, time=None):
         scene_path = get_root(file_path)
     if time is None:
         time = Usd.TimeCode.Default()
-    meshes_list = import_meshes(file_path, [scene_path], times=[time])
+    meshes_list = import_meshes(file_path, [scene_path],
+                                heterogeneous_mesh_handler=heterogeneous_mesh_handler, times=[time])
     return mesh_return_type(*meshes_list[0])
 
 
@@ -379,8 +387,8 @@ def import_meshes(file_path, scene_paths=None, heterogeneous_mesh_handler=None, 
         file_path (str): Path to usd file (`\*.usd`, `\*.usda`).
         scene_paths (list of str, optional): Scene path(s) within the USD file indicating which primitive(s)
             to import. If None, all prims of type `Mesh` will be imported.
-        heterogeneous_mesh_handler (function, optional): Optional function to handle heterogeneous meshes. The function's
-            input and output must be  ``vertices`` (torch.FloatTensor), ``faces`` (torch.LongTensor),
+        heterogeneous_mesh_handler (function, optional): Optional function to handle heterogeneous meshes.
+            The function's input and output must be  ``vertices`` (torch.FloatTensor), ``faces`` (torch.LongTensor),
             ``uvs`` (torch.FloatTensor), ``face_uvs_idx`` (torch.LongTensor), and ``face_normals`` (torch.FloatTensor).
             If the function returns ``None``, the mesh will be skipped. If no function is specified,
             an error will be raised when attempting to import a heterogeneous mesh.
