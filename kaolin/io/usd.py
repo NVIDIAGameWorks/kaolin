@@ -583,7 +583,7 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
 
     Args:
         file_path (str): Path to usd file (\*.usd, \*.usda).
-        scene_paths (list of str, optional): Absolute paths of meshes within the USD file scene. Must have the same number of 
+        scene_paths (list of str, optional): Absolute paths of meshes within the USD file scene. Must have the same number of
             paths as the number of meshes ``N``. Must be a valid Sdf.Path. If no path is provided, a default path is used.
         vertices (list of torch.FloatTensor, optional): Vertices with shape ``(num_vertices, 3)``.
         faces (list of torch.LongTensor, optional): Vertex indices for each face with shape ``(num_faces, face_size)``.
@@ -787,11 +787,11 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None):
 
     # Generate instancer parameters
     positions = points.cpu().tolist()
-    scales = [scale, ] * points.size(0)
+    scales = np.asarray([scale, ] * points.size(0))
 
     # Populate UsdGeomPoints
     geom_points.GetPointsAttr().Set(points.numpy(), time=time)
-    geom_points.GetWidthsAttr().Set(Vt.FloatArray(scales), time=time)
+    geom_points.GetWidthsAttr().Set(Vt.FloatArray.FromNumpy(scales), time=time)
 
     if colors is not None:
         assert colors.shape == points.shape, "Colors and points must have the same shape."
