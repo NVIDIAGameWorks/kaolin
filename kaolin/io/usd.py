@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES. 
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +32,8 @@ except ImportError:
     warnings.warn("Warning: module pxr not found", ImportWarning)
 
 
-
-mesh_return_type = namedtuple('mesh_return_type', ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'face_normals', 'materials'])
+mesh_return_type = namedtuple('mesh_return_type', ['vertices', 'faces',
+                                                   'uvs', 'face_uvs_idx', 'face_normals', 'materials'])
 pointcloud_return_type = namedtuple('pointcloud_return_type', ['points', 'colors', 'normals'])
 
 
@@ -64,6 +64,7 @@ def _get_stage_next_free_path(stage, scene_path):
 
     return scene_path
 
+
 def _get_flattened_mesh_attributes(stage, scene_path, time):
     """Return mesh attributes flattened into a single mesh."""
     prim = stage.GetPrimAtPath(scene_path)
@@ -87,7 +88,8 @@ def _get_flattened_mesh_attributes(stage, scene_path, time):
         if mesh_vertices:
             vertices.append(torch.from_numpy(np.array(mesh_vertices, dtype=np.float32)))
         if mesh_vertex_indices:
-            face_vertex_counts.append(torch.from_numpy(np.array(mesh.GetFaceVertexCountsAttr().Get(time=time), dtype=np.int64)))
+            face_vertex_counts.append(torch.from_numpy(
+                np.array(mesh.GetFaceVertexCountsAttr().Get(time=time), dtype=np.int64)))
             vertex_indices.append(torch.from_numpy(np.array(mesh_vertex_indices, dtype=np.int64)) + cur_first_idx_faces)
             if vertices:
                 cur_first_idx_faces += len(vertices[-1])
@@ -437,7 +439,8 @@ def import_meshes(file_path, scene_paths=None, heterogeneous_mesh_handler=None, 
                     raise NonHomogeneousMeshError(f'Mesh at {scene_path} is non-homogeneous '
                                                   f'and cannot be imported from {file_path}.')
                 else:
-                    mesh = heterogeneous_mesh_handler(vertices, face_vertex_counts, faces, uvs, face_uvs_idx, face_normals)
+                    mesh = heterogeneous_mesh_handler(vertices, face_vertex_counts,
+                                                      faces, uvs, face_uvs_idx, face_normals)
                     if mesh is None:
                         continue
                     else:
@@ -496,20 +499,20 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
     if faces is not None:
         num_faces = faces.size(0)
         face_vertex_counts = [faces.size(1)] * num_faces
-        faces_list = faces.view(-1).cpu().long().tolist()
+        faces_list = faces.view(-1).cpu().long().numpy()
         usd_mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts, time=time)
         usd_mesh.GetFaceVertexIndicesAttr().Set(faces_list, time=time)
     if vertices is not None:
-        vertices_list = vertices.cpu().float().tolist()
-        usd_mesh.GetPointsAttr().Set(Vt.Vec3fArray(vertices_list), time=time)
+        vertices_list = vertices.cpu().float().numpy()
+        usd_mesh.GetPointsAttr().Set(Vt.Vec3fArray.FromNumpy(vertices_list), time=time)
     if uvs is not None:
         interpolation = None
-        uvs_list = uvs.view(-1, 2).cpu().float().tolist()
+        uvs_list = uvs.view(-1, 2).cpu().float().numpy()
         pv = UsdGeom.PrimvarsAPI(usd_mesh.GetPrim()).CreatePrimvar(
             "st", Sdf.ValueTypeNames.Float2Array)
         pv.Set(uvs_list, time=time)
         if face_uvs_idx is not None:
-            pv.SetIndices(Vt.IntArray(face_uvs_idx.view(-1).cpu().long().tolist()), time=time)
+            pv.SetIndices(Vt.IntArray.FromNumpy(face_uvs_idx.view(-1).cpu().long().numpy()), time=time)
             interpolation = 'faceVarying'
         else:
             if vertices is not None and uvs.size(0) == vertices.size(0):
@@ -525,7 +528,7 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         raise ValueError('If providing "face_uvs_idx", "uvs" must also be provided.')
 
     if face_normals is not None:
-        face_normals = face_normals.view(-1, 3).cpu().float().tolist()
+        face_normals = face_normals.view(-1, 3).cpu().float().numpy()
         usd_mesh.GetNormalsAttr().Set(face_normals, time=time)
         UsdGeom.PointBased(usd_mesh).SetNormalsInterpolation('faceVarying')
 
@@ -620,6 +623,7 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
 
     return stage
 
+
 # Pointcloud functions
 def import_pointcloud(file_path, scene_path, time=None):
     r"""Import a single pointcloud from a USD file.
@@ -651,6 +655,7 @@ def import_pointcloud(file_path, scene_path, time=None):
     pointcloud_list = import_pointclouds(file_path, [scene_path], times=[time])
 
     return pointcloud_return_type(*pointcloud_list[0])
+
 
 def import_pointclouds(file_path, scene_paths=None, times=None):
     r"""Import one or more pointclouds from a USD file.
@@ -886,6 +891,7 @@ def import_voxelgrid(file_path, scene_path, time=None):
         time = Usd.TimeCode.Default()
     voxelgrid_list = import_voxelgrids(file_path, [scene_path], times=[time])
     return voxelgrid_list[0]
+
 
 def import_voxelgrids(file_path, scene_paths=None, times=None):
     r"""Import one or more voxelgrids from a USD file.
