@@ -21,6 +21,7 @@ from itertools import product
 import torch
 from kaolin.ops.spc.uint8 import bits_to_uint8, uint8_bits_sum, uint8_to_bits
 from kaolin.ops.random import random_spc_octrees
+from kaolin.rep import Spc
 
 from kaolin.ops import spc
 
@@ -103,24 +104,39 @@ class TestConv3D:
     def point_hierarchies(self, octrees, pyramids, exsum):
         return spc.generate_points(octrees, pyramids, exsum)
 
+    @pytest.mark.parametrize('with_spc_to_dict', [False, True])
     @pytest.mark.parametrize('jump', [0, 1, 2])
     def test_conv3d(self, height, width, depth, in_channels, out_channels, kernel_size,
                     feature_grids, sparsity_masks, dense_weight, bias,
                     octrees, lengths, coalescent_features, max_level,
                     pyramids, exsum, point_hierarchies,
-                    kernel_vectors, kernel_offset, spc_weight, jump):
+                    kernel_vectors, kernel_offset, spc_weight, jump, with_spc_to_dict):
         stride = 2 ** jump
         coalescent_features = coalescent_features.detach()
         coalescent_features.requires_grad = True
         spc_weight = spc_weight.detach()
         spc_weight.requires_grad = True
-        output_features, output_level = spc.conv3d(octrees, point_hierarchies, max_level,
-                                                   pyramids, exsum, coalescent_features,
-                                                   spc_weight, kernel_vectors, jump=jump, bias=bias)
-        output = spc.to_dense(point_hierarchies, pyramids, output_features, output_level)
-        output_sparsity_masks = spc.to_dense(point_hierarchies, pyramids,
-                                             torch.ones_like(output_features, requires_grad=False),
-                                             output_level)
+
+        if with_spc_to_dict:
+            input_spc = Spc(octrees, lengths)
+            output_features, output_level = spc.conv3d(
+                **input_spc.to_dict(), level=input_spc.max_level, input=coalescent_features,
+                weight=spc_weight, kernel_vectors=kernel_vectors, jump=jump, bias=bias)
+            output = spc.to_dense(**input_spc.to_dict(), input=output_features,
+                                  level=output_level)
+            output_sparsity_masks = spc.to_dense(
+                **input_spc.to_dict(),
+                input=torch.ones_like(output_features, requires_grad=False),
+                level=output_level)
+        else:
+            output_features, output_level = spc.conv3d(
+                octrees, point_hierarchies, max_level, pyramids, exsum, coalescent_features,
+                spc_weight, kernel_vectors, jump=jump, bias=bias)
+            output = spc.to_dense(point_hierarchies, pyramids, output_features, output_level)
+            output_sparsity_masks = spc.to_dense(
+                point_hierarchies, pyramids, torch.ones_like(output_features, requires_grad=False),
+                output_level)
+
         feature_grids = feature_grids.detach()
         feature_grids.requires_grad = True
         dense_weight = dense_weight.detach()
@@ -140,27 +156,19 @@ class TestConv3D:
         expected_output.backward(grad_output[:, :, :expected_height, :expected_width, :expected_depth])
 
         _, _, sparsified_grad = spc.feature_grids_to_spc(feature_grids.grad, sparsity_masks)
-        try:
-            assert torch.allclose(coalescent_features.grad, sparsified_grad)
-        except Exception:
-            #torch.save(coalescent_features, "coalescent_features.pt")
-            #torch.save(sparsity_masks, "sparsity_masks.pt")
-            #torch.save(bias, "bias.pt")
-            #torch.save(grad_output, "grad_output.pt")
-            #torch.save(feature_grids, "feature_grids.pt")
-            #torch.save(dense_weight, "dense_weight.pt")
-            #torch.cuda.synchronize()
-            raise ValueError("FAIL forward")
 
+        assert torch.allclose(coalescent_features.grad, sparsified_grad)
         assert torch.allclose(spc_weight.grad,
                               dense_weight.grad.reshape(out_channels, in_channels, -1).permute(2, 1, 0),
                               rtol=1e-3, atol=1e-3)
 
+    @pytest.mark.parametrize('with_spc_to_dict', [False, True])
     @pytest.mark.parametrize('jump', [0, 1, 2])
     def test_conv_transpose3d(self, height, width, depth, in_channels, out_channels,
                               sparsity_masks, dense_weight, bias,
                               octrees, lengths, max_level, pyramids, exsum, point_hierarchies,
-                              kernel_vectors, kernel_size, kernel_offset, spc_weight, jump):
+                              kernel_vectors, kernel_size, kernel_offset, spc_weight, jump,
+                              with_spc_to_dict):
         stride = 2 ** jump
 
         if stride > kernel_size:
@@ -176,25 +184,40 @@ class TestConv3D:
         dense_weight.requires_grad = True
         spc_weight  = spc_weight.detach()
         spc_weight.requires_grad = True
-
-        feature_grids = spc.to_dense(point_hierarchies, pyramids, coalescent_features, in_level)
+        if with_spc_to_dict:
+            input_spc = Spc(octrees, lengths)
+            feature_grids = spc.to_dense(**input_spc.to_dict(), input=coalescent_features,
+                                         level=in_level)
+        else:
+            feature_grids = spc.to_dense(point_hierarchies, pyramids, coalescent_features, in_level)
         feature_grids = feature_grids[:, :, :math.ceil(height / stride),
                                       :math.ceil(width / stride), :math.ceil(depth / stride)]
         feature_grids = feature_grids.detach()
         feature_grids.requires_grad = True
-        sparsity_masks = spc.to_dense(point_hierarchies, pyramids,
-                                      torch.ones_like(coalescent_features),
-                                      in_level).bool()
+        if with_spc_to_dict:
+            sparsity_masks = spc.to_dense(
+                **input_spc.to_dict(), input=torch.ones_like(coalescent_features),
+                level=in_level).bool()
+        else:
+            sparsity_masks = spc.to_dense(point_hierarchies, pyramids,
+                                          torch.ones_like(coalescent_features),
+                                          in_level).bool()
         sparsity_masks = sparsity_masks[:, 0, :math.ceil(height / stride),
                                         :math.ceil(width / stride), :math.ceil(depth / stride)]
 
         # test forward
-        output_features, output_level = spc.conv_transpose3d(
-            octrees, point_hierarchies, in_level, pyramids, exsum,
-            coalescent_features,
-            spc_weight, kernel_vectors, jump=jump, bias=bias)
+        if with_spc_to_dict:
+            output_features, output_level = spc.conv_transpose3d(
+                **input_spc.to_dict(), level=in_level, input=coalescent_features,
+                weight=spc_weight, kernel_vectors=kernel_vectors, jump=jump, bias=bias)
+            output = spc.to_dense(**input_spc.to_dict(), input=output_features, level=output_level)
+        else:
+            output_features, output_level = spc.conv_transpose3d(
+                octrees, point_hierarchies, in_level, pyramids, exsum,
+                coalescent_features,
+                spc_weight, kernel_vectors, jump=jump, bias=bias)
+            output = spc.to_dense(point_hierarchies, pyramids, output_features, output_level)
 
-        output = spc.to_dense(point_hierarchies, pyramids, output_features, output_level)
         output = output[:, :, :height, :width, :depth]
 
         expected_output = torch.nn.functional.conv_transpose3d(
@@ -217,10 +240,11 @@ class TestConv3D:
                               dense_weight.grad.reshape(out_channels, in_channels, -1).permute(2, 1, 0),
                               rtol=1e-3, atol=1e-3)
 
+    @pytest.mark.parametrize('with_spc_to_dict', [False, True])
     @pytest.mark.parametrize('jump', [0, 1, 2])
     def test_module_conv3d(self, height, width, depth, in_channels, out_channels, with_bias,
-                           octrees, coalescent_features, max_level, pyramids, exsum,
-                           point_hierarchies, kernel_vectors, jump):
+                           octrees, lengths, coalescent_features, max_level, pyramids, exsum,
+                           point_hierarchies, kernel_vectors, jump, with_spc_to_dict):
         conv = spc.Conv3d(in_channels, out_channels, kernel_vectors,
                           jump, bias=with_bias).cuda()
         params = dict(conv.named_parameters())
@@ -244,18 +268,26 @@ class TestConv3D:
         assert repr(conv) == f'Conv3d(in={in_channels}, out={out_channels}, ' \
                              f'kernel_vector_size={kernel_vectors.shape[0]})'
 
-        output, output_level = conv(
-            octrees, point_hierarchies, max_level, pyramids, exsum, coalescent_features)
+        if with_spc_to_dict:
+            input_spc = Spc(octrees, lengths)
+            output, output_level = conv(**input_spc.to_dict(), level=max_level,
+                                        input=coalescent_features)
+        else:
+            output, output_level = conv(
+                octrees, point_hierarchies, max_level, pyramids, exsum,
+                coalescent_features)
+
         expected_output, expected_output_level = spc.conv3d(
             octrees, point_hierarchies, max_level, pyramids, exsum, coalescent_features,
             weight, kernel_vectors, jump=jump, bias=bias)
         assert torch.equal(output, expected_output)
         assert output_level == expected_output_level
 
+    @pytest.mark.parametrize('with_spc_to_dict', [False, True])
     @pytest.mark.parametrize('jump', [0, 1, 2])
     def test_module_conv_transpose3d(self, height, width, depth, in_channels, out_channels, with_bias,
-                                     octrees, max_level, pyramids, exsum, point_hierarchies,
-                                     kernel_size, kernel_vectors, jump):
+                                     octrees, lengths, max_level, pyramids, exsum, point_hierarchies,
+                                     kernel_size, kernel_vectors, jump, with_spc_to_dict):
         stride = 2 ** jump
 
         if stride > kernel_size:
@@ -291,8 +323,15 @@ class TestConv3D:
                              f'out={out_channels}, ' \
                              f'kernel_vector_size={kernel_vectors.shape[0]})'
 
-        output, output_level = conv(
-            octrees, point_hierarchies, in_level, pyramids, exsum, coalescent_features)
+        if with_spc_to_dict:
+            input_spc = Spc(octrees, lengths)
+            output, output_level = conv(**input_spc.to_dict(), level=in_level,
+                                        input=coalescent_features)
+        else:
+            output, output_level = conv(
+                octrees, point_hierarchies, in_level, pyramids, exsum,
+                coalescent_features)
+
         expected_output, expected_output_level = spc.conv_transpose3d(
             octrees, point_hierarchies, in_level, pyramids, exsum, coalescent_features,
             weight, kernel_vectors, jump=jump, bias=bias)

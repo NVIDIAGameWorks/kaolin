@@ -208,7 +208,7 @@ class Conv3d(nn.Module):
             level (int):
                 level at which the ``input`` features are associated to.
 
-            pyramids(torch.IntTensor):
+            pyramids (torch.IntTensor):
                 Batched tensor containing point hierarchy structural information
                 of shape :math:`(\text{batch_size}, 2, \text{max_level}+2)`.
                 See :ref:`pyramids <spc_pyramids>`.
@@ -231,8 +231,6 @@ class Conv3d(nn.Module):
                   to level in the hierachy determined by **jump**.
 
                 - the level associated to the output features.
-
-        # TODO(cfujitsang): add Example section
         """
         remaining_kwargs = kwargs.keys() - Spc.KEYS
         if len(remaining_kwargs) > 0:
