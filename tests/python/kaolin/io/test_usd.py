@@ -312,12 +312,30 @@ class TestPointCloud:
         golden = os.path.join(out_dir, '../../../../samples/golden/pointcloud_GeomPoints.usda')
         assert open(golden).read() == open(out_path).read()
 
+    def test_export_single_instancer(self, out_dir, pointcloud):
+        out_path = os.path.join(out_dir, 'pointcloud_instancer.usda')
+        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path, points_type='point_instancer')
+
+        # Confirm exported USD matches golden file
+        golden = os.path.join(out_dir, '../../../../samples/golden/pointcloud_PointInstancer.usda')
+        assert open(golden).read() == open(out_path).read()
+
     def test_export_multiple(self, out_dir, pointcloud):
         out_path = os.path.join(out_dir, 'pointclouds.usda')
 
         # Export some meshes using default scene paths
         usd.export_pointclouds(pointclouds=[pointcloud for _ in range(self.num_multiple)],
                                file_path=out_path)
+
+        # Test that can get their scene paths later
+        scene_paths = usd.get_pointcloud_scene_paths(out_path)
+        assert len(scene_paths) == self.num_multiple
+    
+    def test_export_multiple_instancer(self, out_dir, pointcloud):
+        out_path = os.path.join(out_dir, "pointclouds_instancer.usda")
+
+        usd.export_pointclouds(pointclouds=[pointcloud for _ in range(self.num_multiple)],
+                               file_path=out_path, points_type="point_instancer")
 
         # Test that can get their scene paths later
         scene_paths = usd.get_pointcloud_scene_paths(out_path)

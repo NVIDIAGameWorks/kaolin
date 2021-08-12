@@ -190,8 +190,7 @@ def get_pointcloud_scene_paths(file_path):
     """
     # TODO(mshugrina): is passing prim_types='PointInstancer' the same as UsdGeom.PointInstancer(p) ?
     geom_points_paths = get_scene_paths(file_path, prim_types=['Points'])
-    point_instancer_paths = get_scene_paths(file_path, prim_types=['PointInstancer'],
-                                            conditional=lambda p: p.GetAttribute('primvars:kaolin_type').Get() == 'PointCloud')
+    point_instancer_paths = get_scene_paths(file_path, prim_types=['PointInstancer'])
     return geom_points_paths + point_instancer_paths
 
 
@@ -748,7 +747,7 @@ def get_pointcloud_bracketing_time_samples(stage, scene_path, target_time):
     return result
 
 
-def add_pointcloud(stage, points, scene_path, colors=None, time=None):
+def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_type="usd_geom_points"):
     r"""Add a pointcloud to an existing USD stage.
 
     Create a pointcloud represented by point instances of a sphere centered at each point coordinate.
@@ -759,8 +758,13 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None):
         points (torch.FloatTensor): Pointcloud tensor containing ``N`` points of shape ``(N, 3)``.
         scene_path (str): Absolute path of pointcloud within the USD file scene. Must be a valid Sdf.Path.
         colors (torch.FloatTensor, optional): Color tensor corresponding each point in the pointcloud
-            tensor of shape ``(N, 3)``.
+            tensor of shape ``(N, 3)``. colors only works if points_type is "usd_geom_points".
         time (int, optional): Positive integer defining the time at which the supplied parameters correspond to.
+        points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer. "usd_geom_points"
+                           indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
+                           Please refer here for UsdGeomPoints:
+                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
+                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "usd_geom_points".
     Returns:
         (Usd.Stage)
 
@@ -777,8 +781,20 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None):
     if stage.GetPrimAtPath(scene_path):
         points_prim = stage.GetPrimAtPath(scene_path)
     else:
-        points_prim = stage.DefinePrim(scene_path, 'Points')
-    geom_points = UsdGeom.Points(points_prim)
+        if points_type == "point_instancer":
+            points_prim = stage.DefinePrim(scene_path, 'PointInstancer')
+        elif points_type == "usd_geom_points":
+            points_prim = stage.DefinePrim(scene_path, 'Points')
+        else:
+            raise ValueError(f"Expected points_type to be 'usd_geom_points' or 'point_instancer', but got '{points_type}'.")
+
+    if points_type == "point_instancer":
+        geom_points = UsdGeom.PointInstancer(points_prim)
+        sphere = UsdGeom.Sphere.Define(stage, f'{scene_path}/sphere')
+        sphere.GetRadiusAttr().Set(0.5)
+        geom_points.CreatePrototypesRel().SetTargets([sphere.GetPath()])
+    elif points_type == "usd_geom_points":
+        geom_points = UsdGeom.Points(points_prim)
 
     # Calculate default point scale
     bounds = points.max(dim=0)[0] - points.min(dim=0)[0]
@@ -789,18 +805,27 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None):
     positions = points.cpu().tolist()
     scales = np.asarray([scale, ] * points.size(0))
 
-    # Populate UsdGeomPoints
-    geom_points.GetPointsAttr().Set(points.numpy(), time=time)
-    geom_points.GetWidthsAttr().Set(Vt.FloatArray.FromNumpy(scales), time=time)
+    if points_type == "point_instancer":
+        indices = [0] * points.size(0)
+        # Populate point instancer
+        geom_points.GetProtoIndicesAttr().Set(indices, time=time)
+        geom_points.GetPositionsAttr().Set(positions, time=time)
+        scales = [(scale,) * 3] * points.size(0)
+        geom_points.GetScalesAttr().Set(scales, time=time)
+    elif points_type == "usd_geom_points":
+        # Populate UsdGeomPoints
+        geom_points.GetPointsAttr().Set(points.numpy(), time=time)
+        geom_points.GetWidthsAttr().Set(Vt.FloatArray.FromNumpy(scales), time=time)
 
-    if colors is not None:
+    if colors is not None and points_type == "usd_geom_points":
         assert colors.shape == points.shape, "Colors and points must have the same shape."
         geom_points.GetDisplayColorAttr().Set(colors.numpy(), time=time)
 
     return stage
 
 
-def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/pointcloud_0', color=None, time=None):
+def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/pointcloud_0',
+                      color=None, time=None, points_type='usd_geom_points'):
     r"""Export a single pointcloud to a USD scene.
 
     Export a single pointclouds to USD. The pointcloud will be added to the USD stage and represented
@@ -812,8 +837,13 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
         scene_path (str, optional): Absolute path of pointcloud within the USD file scene. Must be a valid Sdf.Path.
             If no path is provided, a default path is used.
         color (torch.FloatTensor, optional): Color tensor corresponding each point in the pointcloud
-            tensor of shape ``(N, 3)``.
+            tensor of shape ``(N, 3)``. colors only works if points_type is "usd_geom_points".
         time (int): Positive integer defining the time at which the supplied parameters correspond to.
+        points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer. "usd_geom_points"
+                           indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
+                           Please refer here for UsdGeomPoints:
+                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
+                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "usd_geom_points".
     Returns:
         (Usd.Stage)
 
@@ -821,11 +851,11 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
         >>> points = torch.rand(100, 3)
         >>> stage = export_pointcloud('./new_stage.usd', points)
     """
-    stage = export_pointclouds(file_path, [pointcloud], [scene_path], colors=[color], times=[time])
+    stage = export_pointclouds(file_path, [pointcloud], [scene_path], colors=[color], times=[time], points_type=points_type)
     return stage
 
 
-def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, times=None):
+def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, times=None, points_type='usd_geom_points'):
     r"""Export one or more pointclouds to a USD scene.
 
     Export one or more pointclouds to USD. The pointclouds will be added to the USD stage and represented
@@ -838,7 +868,12 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, ti
             If no path is provided, a default path is used.
         times (list of int): Positive integers defining the time at which the supplied parameters correspond to.
         colors (list of tensors, optional): Lits of RGB colors of length ``N``, each corresponding to a pointcloud
-            in the pointcloud list.
+            in the pointcloud list. colors only works if points_type is "usd_geom_points".
+        points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer. "usd_geom_points"
+                           indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
+                           Please refer here for UsdGeomPoints:
+                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
+                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "usd_geom_points".
     Returns:
         (Usd.Stage)
 
@@ -856,7 +891,7 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, ti
     assert len(pointclouds) == len(scene_paths)
     stage = create_stage(file_path)
     for scene_path, points, color, time in zip(scene_paths, pointclouds, colors, times):
-        add_pointcloud(stage, points, scene_path, color, time=time)
+        add_pointcloud(stage, points, scene_path, color, time=time, points_type=points_type)
     stage.Save()
 
     return stage
