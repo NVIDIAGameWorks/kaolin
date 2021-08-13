@@ -212,6 +212,39 @@ and the output features. For convolutions, this is the number of levels to downs
 for transposed convolutions, **jump** is the number of levels to upsample. The value of **jump** must
 be positive, and may not go beyond the highest level of the octree.
 
+Examples
+--------
+
+To use convolution, you can use the functional or the torch.nn.Module version like torch.nn.functional.conv3d and torch.nn.Conv3d:
+
+>>> max_level, pyramids, exsum = kaolin.ops.spc.scan_octrees(octrees, lengths)
+>>> point_hierarchies = kaolin.ops.spc.generate_points(octrees, pyramids, exsum)
+>>> kernel_vectors = torch.tensor([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
+                                   [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]],
+                                  dtype=torch.ShortTensor, device='cuda')
+>>> conv = kaolin.ops.spc.Conv3d(in_channels, out_channels, kernel_vectors, jump=1, bias=True).cuda()
+>>> # With functional
+>>> out_features, out_level = kaolin.ops.spc.conv3d(octrees, point_hierarchies, level, pyramids,
+...                                                 exsum, coalescent_features, weight,
+...                                                 kernel_vectors, jump, bias)
+>>> # With nn.Module and container class
+>>> input_spc = kaolin.rep.Spc(octrees, lengths)
+>>> conv 
+>>> out_features, out_level = kaolin.ops.spc.conv_transpose3d(
+...     **input_spc.to_dict(), input=out_features, level=level,
+...     weight=weight, kernel_vectors=kernel_vectors, jump=jump, bias=bias)
+
+To apply ray tracing we currently only support non-batched version, for instance here with RGB values as per point features:
+
+>>> max_level, pyramids, exsum = kaolin.ops.spc.scan_octrees(
+...     octree, torch.tensor([len(octree)], dtype=torch.int32, device='cuda')
+>>> point_hierarchy = kaolin.ops.spc.generate_points(octrees, pyramids, exsum)
+>>> nuggets = kaolin.render.spc.unbatched_raytrace(octree, point_hierarchy, pyramids[0], exsum,
+...                                                origin, direction, max_level)
+>>> first_hits_mask = kaolin.render.spc.mark_first_hit(nuggets)
+>>> first_hits_nuggets = nuggets[first_hits_mask].long()
+>>> first_hits_rgb = rgb[first_hits_nuggets[:, 1] - pyramids[max_level - 2]]
+
 
 API
 ---
