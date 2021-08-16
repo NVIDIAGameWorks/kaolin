@@ -215,6 +215,16 @@ be positive, and may not go beyond the highest level of the octree.
 Examples
 --------
 
+You can create octrees from sparse feature_grids
+(of shape :math:`(\text{batch_size}, \text{feature_dim}, \text{height}, \text{width}, \text{depth)`):
+
+>>> octrees, lengths, features = kaolin.ops.spc.feature_grids_to_spc(features_grids)
+
+or from point cloud (of shape :math:`(\text{num_points, 3})`):
+
+>>> qpc = kaolin.ops.spc.quantize_points(pc, level)
+>>> octree = kaolin.ops.spc.unbatched_points_to_octree(qpc, level)
+
 To use convolution, you can use the functional or the torch.nn.Module version like torch.nn.functional.conv3d and torch.nn.Conv3d:
 
 >>> max_level, pyramids, exsum = kaolin.ops.spc.scan_octrees(octrees, lengths)
