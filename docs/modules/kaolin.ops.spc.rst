@@ -216,7 +216,7 @@ Examples
 --------
 
 You can create octrees from sparse feature_grids
-(of shape :math:`(\text{batch_size}, \text{feature_dim}, \text{height}, \text{width}, \text{depth)`):
+(of shape :math:`(\text{batch_size}, \text{feature_dim}, \text{height}, \text{width}, \text{depth})`):
 
 >>> octrees, lengths, features = kaolin.ops.spc.feature_grids_to_spc(features_grids)
 
