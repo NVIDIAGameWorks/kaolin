@@ -36,23 +36,26 @@ year = {2019}
 
 ## Contributors
 
-Project Lead: Clement Fuji Tsang
+Current Team:
 
-In alphabetical order:
+- Project Lead: Clement Fuji Tsang
+- Jean-Francois Lafleche
+- Charles Loop
+- Masha Shugrina
+- Towaki Takikawa
+- Jiehan Wang
+
+Other Majors Contributors:
 
 - Wenzheng Chen
 - Sanja Fidler
 - Jason Gorski
-- Jean-Francois Lafleche
 - Rev Lebaredian
 - Jianing Li
-- Charles Loop
+- Michael Li
 - Krishna Murthy
 - Artem Rozantsev
 - Frank Shen
-- Masha Shugrina
 - Edward Smith
 - Gavriel State
-- Towaki Takikawa
-- Jiehan Wang
 - Tommy Xiang
