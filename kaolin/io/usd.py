@@ -747,7 +747,7 @@ def get_pointcloud_bracketing_time_samples(stage, scene_path, target_time):
     return result
 
 
-def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_type="usd_geom_points"):
+def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_type="point_instancer"):
     r"""Add a pointcloud to an existing USD stage.
 
     Create a pointcloud represented by point instances of a sphere centered at each point coordinate.
@@ -764,7 +764,7 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
                            indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
                            Please refer here for UsdGeomPoints:
                            https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
-                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "usd_geom_points".
+                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "point_instancer".
     Returns:
         (Usd.Stage)
 
@@ -825,7 +825,7 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
 
 
 def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/pointcloud_0',
-                      color=None, time=None, points_type='usd_geom_points'):
+                      color=None, time=None, points_type='point_instancer'):
     r"""Export a single pointcloud to a USD scene.
 
     Export a single pointclouds to USD. The pointcloud will be added to the USD stage and represented
@@ -843,7 +843,7 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
                            indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
                            Please refer here for UsdGeomPoints:
                            https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
-                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "usd_geom_points".
+                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "point_instancer".
     Returns:
         (Usd.Stage)
 
@@ -855,7 +855,7 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
     return stage
 
 
-def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, times=None, points_type='usd_geom_points'):
+def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, times=None, points_type='point_instancer'):
     r"""Export one or more pointclouds to a USD scene.
 
     Export one or more pointclouds to USD. The pointclouds will be added to the USD stage and represented
@@ -873,7 +873,7 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, ti
                            indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
                            Please refer here for UsdGeomPoints:
                            https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
-                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "usd_geom_points".
+                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "point_instancer".
     Returns:
         (Usd.Stage)
 
