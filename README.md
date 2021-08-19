@@ -36,20 +36,23 @@ year = {2019}
 
 ## Contributors
 
+Project Lead: Clement Fuji Tsang
+
 In alphabetical order:
 
 - Wenzheng Chen
 - Sanja Fidler
-- Clement Fuji Tsang
 - Jason Gorski
 - Jean-Francois Lafleche
 - Rev Lebaredian
 - Jianing Li
+- Charles Loop
 - Krishna Murthy
 - Artem Rozantsev
 - Frank Shen
 - Masha Shugrina
 - Edward Smith
 - Gavriel State
+- Towaki Takikawa
 - Jiehan Wang
 - Tommy Xiang
