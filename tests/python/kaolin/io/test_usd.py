@@ -306,7 +306,7 @@ class TestPointCloud:
 
     def test_export_single(self, out_dir, pointcloud):
         out_path = os.path.join(out_dir, 'pointcloud.usda')
-        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path)
+        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path, points_type="usd_geom_points")
 
         # Confirm exported USD matches golden file
         golden = os.path.join(out_dir, '../../../../samples/golden/pointcloud_GeomPoints.usda')
@@ -314,7 +314,7 @@ class TestPointCloud:
 
     def test_export_single_instancer(self, out_dir, pointcloud):
         out_path = os.path.join(out_dir, 'pointcloud_instancer.usda')
-        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path, points_type='point_instancer')
+        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path)
 
         # Confirm exported USD matches golden file
         golden = os.path.join(out_dir, '../../../../samples/golden/pointcloud_PointInstancer.usda')
@@ -325,7 +325,7 @@ class TestPointCloud:
 
         # Export some meshes using default scene paths
         usd.export_pointclouds(pointclouds=[pointcloud for _ in range(self.num_multiple)],
-                               file_path=out_path)
+                               file_path=out_path, points_type="usd_geom_points")
 
         # Test that can get their scene paths later
         scene_paths = usd.get_pointcloud_scene_paths(out_path)
@@ -335,7 +335,7 @@ class TestPointCloud:
         out_path = os.path.join(out_dir, "pointclouds_instancer.usda")
 
         usd.export_pointclouds(pointclouds=[pointcloud for _ in range(self.num_multiple)],
-                               file_path=out_path, points_type="point_instancer")
+                               file_path=out_path)
 
         # Test that can get their scene paths later
         scene_paths = usd.get_pointcloud_scene_paths(out_path)
@@ -380,7 +380,7 @@ class TestPointCloud:
         pointcloud, color = pointcloud_with_color
 
         out_path = os.path.join(out_dir, 'pointcloud_colors.usda')
-        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, color=color, scene_path=self.scene_path)
+        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, color=color, scene_path=self.scene_path, points_type="usd_geom_points")
 
         # Confirm exported USD matches golden file
         golden = os.path.join(out_dir, '../../../../samples/golden/pointcloud_GeomPoints_colors.usda')

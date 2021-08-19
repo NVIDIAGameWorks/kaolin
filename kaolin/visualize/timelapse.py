@@ -43,7 +43,7 @@ class Timelapse:
                 return_params.append(v)
         return return_params
 
-    def add_pointcloud_batch(self, iteration=0, category='', pointcloud_list=None, colors=None):
+    def add_pointcloud_batch(self, iteration=0, category='', pointcloud_list=None, colors=None, points_type="point_instancer"):
         """
         Add pointclouds to visualizer output.
 
@@ -52,6 +52,12 @@ class Timelapse:
             category (str, optional): Batch name.
             pointcloud_list (list of tensors, optional): Batch of points of length N defining N pointclouds.
             colors (list of tensors, optional): Batch of RGB colors of length N.
+            points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer. 
+                               "usd_geom_points" indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
+                               Please refer here for UsdGeomPoints:
+                               https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
+                               https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. 
+                               Default: "point_instancer".
         """
         validated = self._validate_parameters(
             pointcloud_list=pointcloud_list, colors=colors,
@@ -73,7 +79,12 @@ class Timelapse:
             if not os.path.exists(ind_out_path):
                 # If sample does not exist, create it.
                 stage = io.usd.create_stage(ind_out_path)
-                stage.DefinePrim(f'/{pc_name}', 'Points')
+                if points_type == "usd_geom_points":
+                    stage.DefinePrim(f'/{pc_name}', 'Points')
+                elif points_type == "point_instancer":
+                    stage.DefinePrim(f'/{pc_name}', 'PointInstancer')
+                else:
+                    raise ValueError(f"Expected points_type to be 'usd_geom_points' or 'point_instancer', but got '{points_type}'.")
                 stage.SetDefaultPrim(stage.GetPrimAtPath(f'/{pc_name}'))
             else:
                 stage = Usd.Stage.Open(ind_out_path)
@@ -81,8 +92,7 @@ class Timelapse:
 
             # Adjust end timecode to match current iteration
             stage.SetEndTimeCode(iteration)
-
-            io.usd.add_pointcloud(stage, points, f'/{pc_name}', colors=colour, time=iteration)
+            io.usd.add_pointcloud(stage, points, f'/{pc_name}', colors=colour, time=iteration, points_type=points_type)
 
             stage.Save()
 
