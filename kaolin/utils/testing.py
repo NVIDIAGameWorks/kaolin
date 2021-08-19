@@ -1,5 +1,6 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
-# 
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -17,6 +18,7 @@ import numpy as np
 import torch
 
 import kaolin.ops.random as random
+from kaolin.ops.spc.uint8 import uint8_bits_sum
 
 BOOL_DTYPES = [torch.bool]
 INT_DTYPES = [torch.uint8, torch.short, torch.int, torch.long]
@@ -54,7 +56,7 @@ def with_seed(torch_seed=0, numpy_seed=None, random_seed=None):
             random.set_state(torch_state, random_state, np_state)
             return output
         return orig_test_wrapper
-    return decorator         
+    return decorator
 
 def check_tensor(tensor, shape=None, dtype=None, device=None, throw=True):
     """Check if :class:`torch.Tensor` is valid given set of criteria.
@@ -165,12 +167,50 @@ def check_padded_tensor(tensor, padding_value=None, shape_per_tensor=None,
             mask[[i] + [slice(dim) for dim in shape]] = False
         if any(tensor[mask] != padding_value):
             if throw:
-                first_false_coord = tuple(int(l[0]) for l in torch.where((tensor != padding_value) & mask))
+                first_false_coord = tuple(
+                    int(l[0]) for l in torch.where((tensor != padding_value) & mask))
                 raise ValueError(f"tensor padding at {first_false_coord} is {tensor[first_false_coord]}, "
                                  f"should be {padding_value}")
             return False
     return True
 
+def check_spc_octrees(octrees, lengths, batch_size=None, level=None,
+                      device=None, throw=True):
+    if batch_size is not None and (batch_size,) != lengths.shape:
+        if throw:
+            raise ValueError(f"lengths is of shape {lengths.shape}, "
+                             f"but batch_size should be {batch_size}")
+        return False
+
+    if device is not None and device != octrees.device.type:
+        if throw:
+            raise ValueError(f"octrees is on {octrees.device}, "
+                             f"should be on {device}.")
+        return False
+
+    octree_start_idx = 0
+    for i, length in enumerate(lengths):
+        cur_node_idx = 0
+        cur_num_nodes = 1
+        cur_level = 0
+        octree = octrees[octree_start_idx:octree_start_idx + length]
+        while cur_node_idx < length:
+            cur_level += 1
+            cur_level_nodes = octree[cur_node_idx:cur_node_idx + cur_num_nodes]
+            cur_node_idx += cur_num_nodes
+            cur_num_nodes = int(torch.sum(uint8_bits_sum(cur_level_nodes).long()))
+        if cur_node_idx > length:
+            if throw:
+                raise ValueError(f"lengths at {i} is {length}, "
+                                 f"but level {cur_level} ends at length {cur_node_idx}")
+            return False
+        if level is not None and level != cur_level:
+            if throw:
+                raise ValueError(f"octree {i} ends at level {cur_level}, "
+                                 f"should end at {level}")
+            return False
+        octree_start_idx += length
+    return True
 
 def tensor_info(t, name='', print_stats=False, detailed=False):
     """

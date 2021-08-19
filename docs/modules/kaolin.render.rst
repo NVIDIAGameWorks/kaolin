@@ -9,3 +9,4 @@ kaolin.render
 
    kaolin.render.mesh
    kaolin.render.camera
+   kaolin.render.spc
