@@ -31,14 +31,14 @@ else:
     import torch
     torch_ver = parse_version(torch.__version__)
     if (torch_ver < parse_version(TORCH_MIN_VER) or
-       torch_ver > parse_version(TORCH_MAX_VER)):
+        torch_ver > parse_version(TORCH_MAX_VER)):
         if IGNORE_TORCH_VER:
             warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
                           f'but found version {torch.__version__}. Continuing with the installed '
                           'version as IGNORE_TORCH_VER is set.')
         else:
             warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
-                          f'but found version {torch.__version__} instead. ' 
+                          f'but found version {torch.__version__} instead. '
                           'This will try to install a compatible version of PyTorch. '
                           'If the installation fails we recommend to first install it.')
         missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
@@ -128,11 +128,11 @@ def get_requirements():
     requirements.append('scipy>=1.2.0,<=1.5.2')
     requirements.append('Pillow>=8.0.0')
     requirements.append('tqdm>=4.51.0')
-    if sys.version_info >= (3, 8):
-        warnings.warn("usd-core is not compatible with python_version >= 3.8 "
-                      "and won't be installed, please use python_version 3.6 or 3.6 "
+    if sys.version_info >= (3, 10):
+        warnings.warn("usd-core is not compatible with python_version >= 3.10 "
+                      "and won't be installed, please use supported python_version "
                       "to use USD related features")
-    requirements.append('usd-core==20.11; python_version < "3.8"')
+    requirements.append('usd-core==21.8; python_version < "3.10"')
     if INCLUDE_EXPERIMENTAL:
         requirements.append('tornado==6.0.4')
         requirements.append('flask==1.1.2')
