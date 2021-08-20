@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, 20-21 NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,6 +78,7 @@ class PBRMaterial(Material):
         is_specular_workflow (bool): Determines whether or not to use a specular workflow. Default
             is `False` (use a metallic workflow).
     """
+
     def __init__(
         self,
         diffuse_color=(0.5, 0.5, 0.5),
@@ -172,28 +173,38 @@ class PBRMaterial(Material):
         if self.diffuse_texture is not None:
             rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}diffuse.png')
             self._write_image(self.diffuse_texture, posixpath.join(usd_dir, rel_filepath))
-            texture = self._add_texture_shader(stage, f'{scene_path}/diffuse_texture', rel_filepath, time=time, channels_out=3)
-            diffuse_input.ConnectToSource(texture, 'rgb')
+            texture = self._add_texture_shader(
+                stage, f'{scene_path}/diffuse_texture', rel_filepath, time=time, channels_out=3)
+            inputTexture = texture.CreateOutput("rgb", Sdf.ValueTypeNames.Color3f)
+            diffuse_input.ConnectToSource(inputTexture)
         if self.roughness_texture is not None:
             rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}roughness.png')
             self._write_image(self.roughness_texture, posixpath.join(usd_dir, rel_filepath))
-            texture = self._add_texture_shader(stage, f'{scene_path}/roughness_texture', rel_filepath, time=time, channels_out=1)
-            roughness_input.ConnectToSource(texture, 'r')
+            texture = self._add_texture_shader(
+                stage, f'{scene_path}/roughness_texture', rel_filepath, time=time, channels_out=1)
+            inputTexture = texture.CreateOutput("r", Sdf.ValueTypeNames.Float)
+            roughness_input.ConnectToSource(inputTexture)
         if self.specular_texture is not None:
             rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}specular.png')
             self._write_image(self.specular_texture, posixpath.join(usd_dir, rel_filepath))
-            texture = self._add_texture_shader(stage, f'{scene_path}/specular_texture', rel_filepath, time=time, channels_out=3)
-            specular_input.ConnectToSource(texture, 'rgb')
+            texture = self._add_texture_shader(
+                stage, f'{scene_path}/specular_texture', rel_filepath, time=time, channels_out=3)
+            inputTexture = texture.CreateOutput("rgb", Sdf.ValueTypeNames.Color3f)
+            specular_input.ConnectToSource(inputTexture)
         if self.metallic_texture is not None:
             rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}metallic.png')
             self._write_image(self.metallic_texture, posixpath.join(usd_dir, rel_filepath))
-            texture = self._add_texture_shader(stage, f'{scene_path}/metallic_texture', rel_filepath, time=time, channels_out=1)
-            metallic_input.ConnectToSource(texture, 'r')
+            texture = self._add_texture_shader(
+                stage, f'{scene_path}/metallic_texture', rel_filepath, time=time, channels_out=1)
+            inputTexture = texture.CreateOutput("r", Sdf.ValueTypeNames.Float)
+            metallic_input.ConnectToSource(inputTexture)
         if self.normals_texture is not None:
             rel_filepath = posixpath.join(texture_dir, f'{texture_file_prefix}normals.png')
             self._write_image(((self.normals_texture + 1.) / 2.), posixpath.join(usd_dir, rel_filepath))
-            texture = self._add_texture_shader(stage, f'{scene_path}/normals_texture', rel_filepath, time=time, channels_out=3)
-            normal_input.ConnectToSource(texture, 'rgb')
+            texture = self._add_texture_shader(
+                stage, f'{scene_path}/normals_texture', rel_filepath, time=time, channels_out=3)
+            inputTexture = texture.CreateOutput("rgb", Sdf.ValueTypeNames.Normal3f)
+            normal_input.ConnectToSource(inputTexture)
 
         # create Usd Preview Surface Shader outputs
         shader.CreateOutput('surface', Sdf.ValueTypeNames.Token)
