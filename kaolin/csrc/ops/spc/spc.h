@@ -16,6 +16,10 @@
 #ifndef KAOLIN_OPS_SPC_SPC_H_
 #define KAOLIN_OPS_SPC_SPC_H_
 
+#ifdef WITH_CUDA
+#include "../../spc_math.h"
+#endif
+
 #include <ATen/ATen.h>
 
 namespace kaolin {

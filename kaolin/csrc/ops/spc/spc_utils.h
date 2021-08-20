@@ -1,5 +1,6 @@
 /*
-* Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+* Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES
+* All rights reserved.
 *
 * NVIDIA CORPORATION and its licensors retain all intellectual property
 * and proprietary rights in and to this software, related documentation
@@ -10,18 +11,17 @@
 
 #pragma once
 
-#include <vector>
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 
-at::Tensor spc_point2morton(torch::Tensor points);
+at::Tensor spc_point2morton(at::Tensor points);
 
-at::Tensor spc_morton2point(torch::Tensor morton_codes);
+at::Tensor spc_morton2point(at::Tensor morton_codes);
 
 at::Tensor spc_point2coeff(
-    torch::Tensor x,
-    torch::Tensor pts);
+    at::Tensor x,
+    at::Tensor pts);
 
-at::Tensor spc_point2jacobian(torch::Tensor x);
+at::Tensor spc_point2jacobian(at::Tensor x);
 
-at::Tensor spc_point2corners(torch::Tensor points);
+at::Tensor spc_point2corners(at::Tensor points);
 

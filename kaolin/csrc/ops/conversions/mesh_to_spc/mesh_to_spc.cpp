@@ -32,17 +32,17 @@ using namespace std;
 using namespace at::indexing;
 
 #ifdef WITH_CUDA
-extern ulong GetStorageBytes(void* d_temp_storageA, morton_code* d_M0, morton_code* d_M1, uint max_total_points);
+uint64_t GetStorageBytes(void* d_temp_storageA, morton_code* d_M0, morton_code* d_M1, uint max_total_points);
 
 uint VoxelizeGPU(uint npnts, float3* Pnts, uint ntris, long3* Tris, uint Level,
   point_data* d_P, morton_code* d_M0, morton_code* d_M1,
   uint* d_Info, uint* d_PrefixSum, uint* d_info, uint* d_psum,
   float3* d_l0, float3* d_l1, float3* d_l2, float3* d_F,
   uchar* d_axis, ushort* d_W, ushort2* d_pmin,
-  void* d_temp_storageA, ulong temp_storage_bytesA, uchar* d_Odata, int* d_Pyramid);
+  void* d_temp_storageA, uint64_t temp_storage_bytesA, uchar* d_Odata, int* d_Pyramid);
 
 uint PointToOctree(point_data* d_points, morton_code* d_morton, uint* d_info, uint* d_psum, 
-    void* d_temp_storage, ulong temp_storage_bytes, uchar* d_octree, int* h_pyramid, 
+    void* d_temp_storage, uint64_t temp_storage_bytes, uchar* d_octree, int* h_pyramid, 
     uint psize, uint level);
 #endif
 
@@ -58,14 +58,14 @@ at::Tensor points_to_octree(
     at::Tensor pyramid = at::zeros({2, level+2}, at::device(at::kCPU).dtype(at::kInt));
   
     point_data* d_points = reinterpret_cast<point_data*>(points.data_ptr<short>());
-    morton_code* d_morton = reinterpret_cast<morton_code*>(morton.data_ptr<long>());
+    morton_code* d_morton = reinterpret_cast<morton_code*>(morton.data_ptr<int64_t>());
     uint*  d_info = reinterpret_cast<uint*>(info.data_ptr<int>());
     uint*  d_psum = reinterpret_cast<uint*>(psum.data_ptr<int>());
     uchar* d_octree = octree.data_ptr<uchar>();
     int*  h_pyramid = pyramid.data_ptr<int>();
     void* d_temp_storage = NULL;
-    ulong temp_storage_bytes = GetStorageBytes(d_temp_storage, d_morton, d_morton, KAOLIN_SPC_MAX_POINTS);
-    at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, points.options().dtype(at::kByte));
+    uint64_t temp_storage_bytes = GetStorageBytes(d_temp_storage, d_morton, d_morton, KAOLIN_SPC_MAX_POINTS);
+    at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, points.options().dtype(at::kByte));
     d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
     
     uint osize = PointToOctree(d_points, d_morton, d_info, d_psum, d_temp_storage, temp_storage_bytes,
@@ -113,8 +113,8 @@ at::Tensor mesh_to_spc(
 
   // get tensor data pointers
   point_data* d_P = reinterpret_cast<point_data*>(P.data_ptr<short>());
-  morton_code* d_M0 = reinterpret_cast<morton_code*>(M0.data_ptr<long>());
-  morton_code* d_M1 = reinterpret_cast<morton_code*>(M1.data_ptr<long>());
+  morton_code* d_M0 = reinterpret_cast<morton_code*>(M0.data_ptr<int64_t>());
+  morton_code* d_M1 = reinterpret_cast<morton_code*>(M1.data_ptr<int64_t>());
 
   uint*  d_Info = reinterpret_cast<uint*>(Info.data_ptr<int>());
   uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
@@ -122,7 +122,7 @@ at::Tensor mesh_to_spc(
   uint*  d_psum = reinterpret_cast<uint*>(psum.data_ptr<int>());
 
   float3* d_Pnts = reinterpret_cast<float3*>(vertices.data_ptr<float>());
-  tri_index* d_Tris = reinterpret_cast<tri_index*>(triangles.data_ptr<long>());
+  tri_index* d_Tris = reinterpret_cast<tri_index*>(triangles.data_ptr<int64_t>());
 
   float3* d_l0 = reinterpret_cast<float3*>(l0.data_ptr<float>());
   float3* d_l1 = reinterpret_cast<float3*>(l1.data_ptr<float>());
@@ -138,9 +138,9 @@ at::Tensor mesh_to_spc(
 
   // set up memory for DeviceScan and DeviceRadixSort calls
   void* d_temp_storageA = NULL;
-  ulong temp_storage_bytesA = GetStorageBytes(d_temp_storageA, d_M0, d_M1, KAOLIN_SPC_MAX_POINTS);
+  uint64_t temp_storage_bytesA = GetStorageBytes(d_temp_storageA, d_M0, d_M1, KAOLIN_SPC_MAX_POINTS);
 
-  at::Tensor temp_storageA = at::zeros({(long)temp_storage_bytesA}, vertices.options().dtype(at::kByte));
+  at::Tensor temp_storageA = at::zeros({(int64_t)temp_storage_bytesA}, vertices.options().dtype(at::kByte));
   d_temp_storageA = (void*)temp_storageA.data_ptr<uchar>();
 
   // do cuda

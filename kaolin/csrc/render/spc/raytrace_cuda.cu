@@ -16,8 +16,8 @@
 #define CUB_NS_PREFIX namespace kaolin {
 #define CUB_NS_POSTFIX }
 
-#include <torch/extension.h>
 #include <stdio.h>
+#include <ATen/ATen.h>
 
 #define CUB_STDERR
 #include <cub/device/device_scan.cuh>
@@ -42,9 +42,9 @@ __constant__ uint Order[8][8] = {
     { 7, 3, 5, 6, 1, 2, 4, 0 }
 };
 
-ulong GetStorageBytes(void* d_temp_storage, uint* d_Info, uint* d_PrefixSum,
+uint64_t GetStorageBytes(void* d_temp_storage, uint* d_Info, uint* d_PrefixSum,
                       uint max_total_points) {
-    ulong temp_storage_bytes = 0;
+    uint64_t temp_storage_bytes = 0;
     CubDebugExit(DeviceScan::InclusiveSum(
         d_temp_storage, temp_storage_bytes, d_Info,
         d_PrefixSum, max_total_points));
@@ -198,7 +198,7 @@ uint spc_raytrace_cuda(
     uint*  d_Info,
     uint*  d_PrefixSum,
     void* d_temp_storage,
-    ulong temp_storage_bytes) {
+    uint64_t temp_storage_bytes) {
 
   uint* PyramidSum = h_pyramid + Level + 2;
 
@@ -255,7 +255,7 @@ uint remove_duplicate_rays_cuda(
     uint*  d_Info,
     uint*  d_PrefixSum,
     void* d_temp_storage,
-    ulong temp_storage_bytes) {
+    uint64_t temp_storage_bytes) {
   uint cnt = 0;
 
   d_RemoveDuplicateRays << <(num + 1023) / 1024, 1024 >> > (num, d_Nuggets0, d_Info);
@@ -294,13 +294,11 @@ d_generate_rays(uint num, uint imageW, uint imageH, float4x4 mM,
 }
 
 
-uint generate_primary_rays_cuda(uint imageW, uint imageH, float4x4& mM,
+void generate_primary_rays_cuda(uint imageW, uint imageH, float4x4& mM,
                                 float3* d_Org, float3* d_Dir) {
   uint num = imageW*imageH;
 
   d_generate_rays<<<(num + 1023) / 1024, 1024>>>(num, imageW, imageH, mM, d_Org, d_Dir);
-
-  return num;
 }
 
 
@@ -354,7 +352,7 @@ d_SetShadowRays(uint num, float3* src, float3* dst, float3 light) {
   }
 }
 
-extern uint generate_shadow_rays_cuda(
+uint generate_shadow_rays_cuda(
     uint num,
     float3* org,
     float3* dir,
@@ -366,7 +364,7 @@ extern uint generate_shadow_rays_cuda(
     uint* info,
     uint*prefixSum,
     void* d_temp_storage,
-    ulong temp_storage_bytes) {
+    uint64_t temp_storage_bytes) {
   uint cnt = 0;
   d_plane_intersect_rays<<<(num + 1023) / 1024, 1024>>>(
       num, org, dir, dst, plane, info);
@@ -454,7 +452,7 @@ __global__ void ray_aabb_kernel(
     }
 }
 
-extern void ray_aabb_cuda(
+void ray_aabb_cuda(
     const float3* query,     // ray query array
     const float3* ray_d,     // ray direction array
     const float3* ray_inv,   // inverse ray direction array

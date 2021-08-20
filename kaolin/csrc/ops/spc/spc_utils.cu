@@ -14,9 +14,9 @@
 // limitations under the License.
 
 
+#include <ATen/ATen.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <torch/torch.h>
 #include <cuda_runtime.h>
 
 #include "../../spc_math.h"
@@ -49,9 +49,9 @@ __global__ void spc_morton2point_kernel(
     }
 }
 
-at::Tensor spc_morton2point(torch::Tensor morton_codes) {
+at::Tensor spc_morton2point(at::Tensor morton_codes) {
     int64_t num_points = morton_codes.size(0);
-    torch::Tensor points = torch::zeros({num_points, 3}, torch::device(torch::kCUDA).dtype(torch::kShort));
+    at::Tensor points = at::zeros({num_points, 3}, at::device(at::kCUDA).dtype(at::kShort));
     spc_morton2point_kernel << <(num_points + 1023) / 1024, 1024 >> > (
         reinterpret_cast<morton_code*>(morton_codes.data_ptr<int64_t>()),
         reinterpret_cast<point_data*>(points.data_ptr<short>()),
@@ -59,9 +59,9 @@ at::Tensor spc_morton2point(torch::Tensor morton_codes) {
     return points;
 }
 
-at::Tensor spc_point2morton(torch::Tensor points) {
+at::Tensor spc_point2morton(at::Tensor points) {
     int64_t num_points = points.size(0);
-    torch::Tensor morton_codes = torch::zeros({num_points}, torch::device(torch::kCUDA).dtype(torch::kInt64));
+    at::Tensor morton_codes = at::zeros({num_points}, at::device(at::kCUDA).dtype(at::kLong));
     spc_point2morton_kernel << <(num_points + 1023) / 1024, 1024 >> > (
         reinterpret_cast<point_data*>(points.data_ptr<short>()),
         reinterpret_cast<morton_code*>(morton_codes.data_ptr<int64_t>()),
@@ -94,11 +94,11 @@ __global__ void spc_point2coeff_kernel(
 }
 
 at::Tensor spc_point2coeff(
-    torch::Tensor x,
-    torch::Tensor pts 
+    at::Tensor x,
+    at::Tensor pts 
 ) {
     int64_t num = x.size(0);
-    torch::Tensor coeffs = torch::zeros({num, 8}, torch::device(torch::kCUDA).dtype(torch::kFloat32));
+    at::Tensor coeffs = at::zeros({num, 8}, at::device(at::kCUDA).dtype(at::kFloat));
     spc_point2coeff_kernel<<<(num + 1023) / 1024, 1024>>>(
         reinterpret_cast<float3*>(x.data_ptr<float>()),
         reinterpret_cast<point_data*>(pts.data_ptr<short>()),
@@ -156,10 +156,10 @@ __global__ void spc_point2jacobian_kernel(
 }
 
 at::Tensor spc_point2jacobian(
-    torch::Tensor x // N x 3 tensor of local space coordinates
+    at::Tensor x // N x 3 tensor of local space coordinates
 ) {
     int64_t num = x.size(0);
-    torch::Tensor jacobians = torch::zeros({num, 8, 3}, torch::device(torch::kCUDA).dtype(torch::kFloat32));
+    at::Tensor jacobians = at::zeros({num, 8, 3}, at::device(at::kCUDA).dtype(at::kFloat));
     spc_point2jacobian_kernel<<<(num+1023)/1024, 1024>>>(
         reinterpret_cast<float3*>(x.data_ptr<float>()),
         jacobians.data_ptr<float>(),
@@ -187,10 +187,10 @@ __global__ void spc_point2corners_kernel(
 }
 
 at::Tensor spc_point2corners(
-    torch::Tensor points
+    at::Tensor points
 ) {
     int64_t num = points.size(0);
-    torch::Tensor corners = torch::zeros({num, 8, 3}, torch::device(torch::kCUDA).dtype(torch::kShort));
+    at::Tensor corners = at::zeros({num, 8, 3}, at::device(at::kCUDA).dtype(at::kShort));
     spc_point2corners_kernel<<<(num+1023)/1024, 1024>>>(
         reinterpret_cast<point_data*>(points.data_ptr<short>()),
         reinterpret_cast<point_data*>(corners.data_ptr<short>()),

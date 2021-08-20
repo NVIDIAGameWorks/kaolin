@@ -16,13 +16,17 @@
 
 #pragma once
 
-#include <torch/torch.h>
+#ifdef WITH_CUDA
+#include "../../spc_math.h"
+#endif
 
-torch::Tensor spc_query(
-    torch::Tensor octree,
-    torch::Tensor points,
-    torch::Tensor pyramid,
-    torch::Tensor prefixsum,
-    torch::Tensor query_points,
+#include <ATen/ATen.h>
+
+at::Tensor spc_query(
+    at::Tensor octree,
+    at::Tensor points,
+    at::Tensor pyramid,
+    at::Tensor prefixsum,
+    at::Tensor query_points,
     uint targetLevel);
 

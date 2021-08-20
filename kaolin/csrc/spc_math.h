@@ -13,6 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef KAOLIN_SPC_MATH_H_
+#define KAOLIN_SPC_MATH_H_
+
 #ifdef WITH_CUDA
 
 #include <vector_types.h>
@@ -232,4 +235,5 @@ inline __host__ __device__ float3 normalize(float3 v) {
     return v * invLen;
 }
 
-#endif //WITH_CUDA
+#endif  // WITH_CUDA
+#endif  // KAOLIN_SPC_MATH_H_
