@@ -13,7 +13,7 @@ from pkg_resources import parse_version
 import warnings
 
 TORCH_MIN_VER = '1.5.0'
-TORCH_MAX_VER = '1.7.1'
+TORCH_MAX_VER = '1.9.0'
 CYTHON_MIN_VER = '0.29.20'
 INCLUDE_EXPERIMENTAL = environ.get('KAOLIN_INSTALL_EXPERIMENTAL') is not None
 IGNORE_TORCH_VER = environ.get('IGNORE_TORCH_VER') is not None
@@ -106,7 +106,7 @@ a comprehensive model zoo comprising many state-of-the-art 3D deep learning arch
 for future research endeavours.
 """
 
-version = '0.9.0'
+version = '0.9.1'
 
 
 def write_version_file():

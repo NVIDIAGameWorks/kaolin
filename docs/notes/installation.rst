@@ -44,11 +44,11 @@ To install the library. You must first clone the repository:
     $ git clone --recursive https://github.com/NVIDIAGameWorks/kaolin
     $ cd kaolin
 
-You can then select the tag if you want 0.9.0 or 0.1 specific release, example:
+If instead of the latest version you want a specific release like 0.9.0, 0.9.1 or 0.1 you can then select the tag, example:
 
 .. code-block:: bash
 
-    $ git checkout v0.9.0
+    $ git checkout v0.9.1
 
 To enable installation of experimental features, set
 environment variable
