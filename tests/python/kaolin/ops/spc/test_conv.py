@@ -27,6 +27,8 @@ from kaolin.ops import spc
 
 from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_tensor
 
+os.environ['NVIDIA_TF32_OVERRIDE'] = '0'
+
 @pytest.mark.parametrize('batch_size', [1, 3])
 @pytest.mark.parametrize('height,width,depth,threshold',
                          [(27, 37, 37, 0.7), (64, 64, 64, 0.)])
