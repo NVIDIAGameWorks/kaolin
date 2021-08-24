@@ -14,10 +14,12 @@
 
 import pytest
 import torch
+import os
 
 from kaolin.ops.gcn import sparse_bmm, normalize_adj, GraphConv
 from kaolin.utils.testing import ALL_DEVICES
 
+os.environ['NVIDIA_TF32_OVERRIDE'] = '0'
 
 @pytest.mark.parametrize('device', ALL_DEVICES)
 def test_sparse_bmm(device):
