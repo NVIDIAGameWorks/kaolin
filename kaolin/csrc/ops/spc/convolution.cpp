@@ -33,7 +33,7 @@ namespace kaolin {
 using namespace at::indexing;
 
 #ifdef WITH_CUDA
-ulong GetStorageBytesX(void* d_temp_storage, uint* d_Info, uint* d_PrefixSum, uint max_total_points);
+uint64_t GetStorageBytesX(void* d_temp_storage, uint* d_Info, uint* d_PrefixSum, uint max_total_points);
 
 void Conv3d_forward_cuda(
     point_data*  d_Proot,
@@ -51,7 +51,7 @@ void Conv3d_forward_cuda(
     uint*    d_Info,
     uint*    d_PSum,
     void*    d_temp_storageA,
-    long    temp_storage_bytesA,
+    int64_t    temp_storage_bytesA,
     int*    d_Inmap,
     int*    d_Outmap,
     int*    d_InmapX,
@@ -74,7 +74,7 @@ void Conv3d_backward_cuda(
     uint*    d_Info,
     uint*    d_PSum,
     void*    d_temp_storageA,
-    long    temp_storage_bytesA,
+    int64_t    temp_storage_bytesA,
     int*    d_Inmap,
     int*    d_Outmap,
     int*    d_InmapX,
@@ -96,7 +96,7 @@ void ConvTranspose3d_forward_cuda(
     uint*    d_Info,
     uint*    d_PSum,
     void*    d_temp_storageA,
-    long    temp_storage_bytesA,
+    int64_t    temp_storage_bytesA,
     int*    d_Inmap,
     int*    d_Outmap,
     int*    d_InmapX,
@@ -119,7 +119,7 @@ void ConvTranspose3d_backward_cuda(
     uint*    d_Info,
     uint*    d_PSum,
     void*    d_temp_storageA,
-    long    temp_storage_bytesA,
+    int64_t    temp_storage_bytesA,
     int*    d_Inmap,
     int*    d_Outmap,
     int*    d_InmapX,
@@ -191,8 +191,8 @@ std::tuple<at::Tensor, int> Conv3d_forward(
   uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
-  ulong temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
-  at::Tensor temp_storage = at::zeros({ (long)temp_storage_bytes },
+  uint64_t temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
+  at::Tensor temp_storage = at::zeros({ (int64_t)temp_storage_bytes },
                                       octree.options());
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
@@ -291,8 +291,8 @@ std::vector<at::Tensor> Conv3d_backward(
   uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
-  ulong temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
-  at::Tensor temp_storage = at::zeros({ (long)temp_storage_bytes }, octree.options());
+  uint64_t temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
+  at::Tensor temp_storage = at::zeros({ (int64_t)temp_storage_bytes }, octree.options());
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
   int* inmap = Imap.data_ptr<int>();
@@ -387,8 +387,8 @@ std::tuple<at::Tensor, int> ConvTranspose3d_forward(
   uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
-  ulong temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
-  at::Tensor temp_storage = at::zeros({ (long)temp_storage_bytes }, octree.options().dtype(at::kByte));
+  uint64_t temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
+  at::Tensor temp_storage = at::zeros({ (int64_t)temp_storage_bytes }, octree.options().dtype(at::kByte));
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
   int* inmap = Imap.data_ptr<int>();
@@ -485,8 +485,8 @@ std::vector<at::Tensor>  ConvTranspose3d_backward(
   uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
-  ulong temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
-  at::Tensor temp_storage = at::zeros({ (long)temp_storage_bytes }, octree.options());
+  uint64_t temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
+  at::Tensor temp_storage = at::zeros({ (int64_t)temp_storage_bytes }, octree.options());
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
   int* inmap = Imap.data_ptr<int>();

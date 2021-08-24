@@ -16,7 +16,6 @@
 #define CUB_NS_PREFIX namespace kaolin {
 #define CUB_NS_POSTFIX }
 
-#include <torch/extension.h>
 #include <stdio.h>
 
 #define CUB_STDERR
@@ -31,9 +30,9 @@ using namespace cub;
 using namespace std;
 
 
-ulong GetStorageBytes(void* d_temp_storageA, morton_code* d_M0, morton_code* d_M1, uint max_total_points)
+uint64_t GetStorageBytes(void* d_temp_storageA, morton_code* d_M0, morton_code* d_M1, uint max_total_points)
 {
-    ulong    temp_storage_bytesA = 0;
+    uint64_t    temp_storage_bytesA = 0;
     CubDebugExit(DeviceRadixSort::SortKeys(d_temp_storageA, temp_storage_bytesA, d_M0, d_M1, max_total_points));
     return temp_storage_bytesA;
 }
@@ -417,7 +416,7 @@ __global__ void PointToMorton(
 // space for these zero-init buffers, and for the morton buffer, to allocate the buffer from the back 
 // with the occupied positions.
 uint ConstructOctree(morton_code* d_morton_buffer, uint* d_info, uint* d_psum, 
-    void* d_temp_storage, ulong temp_storage_bytes, uchar* d_octree, int* h_pyramid, uint psize, uint level) {
+    void* d_temp_storage, uint64_t temp_storage_bytes, uchar* d_octree, int* h_pyramid, uint psize, uint level) {
     
 
     h_pyramid[level] = psize;
@@ -456,7 +455,7 @@ uint ConstructOctree(morton_code* d_morton_buffer, uint* d_info, uint* d_psum,
 }
 
 uint PointToOctree(point_data* d_points, morton_code* d_morton, uint* d_info, uint* d_psum, 
-    void* d_temp_storage, ulong temp_storage_bytes, uchar* d_octree, int* h_pyramid, 
+    void* d_temp_storage, uint64_t temp_storage_bytes, uchar* d_octree, int* h_pyramid, 
     uint psize, uint level) {
     
     // Populate from the back
@@ -472,7 +471,7 @@ uint VoxelizeGPU(uint npnts, float3* d_Pnts, uint ntris, tri_index* d_Tris, uint
     uint* d_Info, uint* d_PrefixSum, uint* d_info, uint* d_psum,
     float3* d_l0, float3* d_l1, float3* d_l2, float3* d_F,
     uchar* d_axis, ushort* d_W, ushort2* d_pmin,
-    void* d_temp_storageA, ulong temp_storage_bytesA, uchar* d_Odata, int* h_Pyramid) {
+    void* d_temp_storageA, uint64_t temp_storage_bytesA, uchar* d_Odata, int* h_Pyramid) {
 
     // Transform vertices to [0, 2^l]
     float g = (0x1<<Level) - 1.0f;

@@ -55,9 +55,9 @@ uint GetPyramid(uint* Pyramid, int batch, int k, int level, int olevel) {
   return Pyramid[(2 * batch + k) * (olevel + 2) + level];
 }
 
-ulong GetStorageBytesX(void* d_temp_storage, uint* d_Info,
+uint64_t GetStorageBytesX(void* d_temp_storage, uint* d_Info,
                        uint* d_PrefixSum, uint max_total_points) {
-  ulong temp_storage_bytes = 0;
+  uint64_t temp_storage_bytes = 0;
   CubDebugExit(DeviceScan::InclusiveSum(
       d_temp_storage, temp_storage_bytes, d_Info, d_PrefixSum, max_total_points));
   return temp_storage_bytes;
@@ -239,7 +239,7 @@ void Conv3d_forward_cuda(
     uint*    d_Info,
     uint*    d_PSum,
     void*    d_temp_storageA,
-    long    temp_storage_bytesA,
+    int64_t    temp_storage_bytesA,
     int*    d_Inmap,
     int*    d_Outmap,
     int*    d_InmapX,
@@ -326,7 +326,7 @@ void Conv3d_backward_cuda(
     uint*    d_Info,
     uint*    d_PSum,
     void*    d_temp_storageA,
-    long    temp_storage_bytesA,
+    int64_t    temp_storage_bytesA,
     int*    d_Inmap,
     int*    d_Outmap,
     int*    d_InmapX,
@@ -408,7 +408,7 @@ void ConvTranspose3d_forward_cuda(
     uint*    d_Info,
     uint*    d_PSum,
     void*    d_temp_storageA,
-    long    temp_storage_bytesA,
+    int64_t    temp_storage_bytesA,
     int*    d_Inmap,
     int*    d_Outmap,
     int*    d_InmapX,
@@ -491,7 +491,7 @@ void ConvTranspose3d_backward_cuda(
     uint*    d_Info,
     uint*    d_PSum,
     void*    d_temp_storageA,
-    long    temp_storage_bytesA,
+    int64_t    temp_storage_bytesA,
     int*    d_Inmap,
     int*    d_Outmap,
     int*    d_InmapX,

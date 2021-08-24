@@ -16,7 +16,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <torch/torch.h>
+#include <ATen/ATen.h>
 #include <cuda_runtime.h>
 
 #include "spc_query.h"
@@ -75,17 +75,17 @@ __global__ void spc_query_kernel(
     }
 }
 
-torch::Tensor spc_query(
-    torch::Tensor octree,
-    torch::Tensor points,
-    torch::Tensor pyramid, 
-    torch::Tensor prefixsum,
-    torch::Tensor query_points,
+at::Tensor spc_query(
+    at::Tensor octree,
+    at::Tensor points,
+    at::Tensor pyramid, 
+    at::Tensor prefixsum,
+    at::Tensor query_points,
     uint targetLevel) {
 
     int num_query = query_points.size(0);
     
-    torch::Tensor hit_idx = torch::zeros({ num_query }, torch::device(torch::kCUDA).dtype(torch::kInt32));
+    at::Tensor hit_idx = at::zeros({ num_query }, octree.options().dtype(at::kInt));
 
     const int threads = 256;
     const int blocks = (num_query + threads - 1) / threads;
