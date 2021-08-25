@@ -8,6 +8,7 @@
 
 from os import environ
 from setuptools import setup, find_packages, dist
+from setuptools.command.install import install as install_orig
 import importlib
 from pkg_resources import parse_version
 import warnings
@@ -132,7 +133,7 @@ def get_requirements():
         warnings.warn("usd-core is not compatible with python_version >= 3.10 "
                       "and won't be installed, please use supported python_version "
                       "to use USD related features")
-    requirements.append('usd-core==21.8; python_version < "3.10"')
+    requirements.append('usd-core>=20.11; python_version < "3.10"')
     if INCLUDE_EXPERIMENTAL:
         requirements.append('tornado==6.0.4')
         requirements.append('flask==1.1.2')
@@ -211,6 +212,11 @@ def get_include_dirs():
     else:
         return None
 
+class install(install_orig):
+    def run(self):
+        raise NotImplementedError('setup.py do not support "python setup.py install", '
+                                  'use "python setup.py develop" to install Kaolin')
+
 if __name__ == '__main__':
     setup(
         # Metadata
@@ -232,6 +238,7 @@ if __name__ == '__main__':
         zip_safe=True,
         ext_modules=get_extensions(),
         cmdclass={
-            'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)
+            'build_ext': BuildExtension.with_options(no_python_abi_suffix=True),
+            'install': install
         }
     )

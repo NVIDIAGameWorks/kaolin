@@ -20,9 +20,4 @@ if (-not($?)) {
     exit $LASTEXITCODE
 }
 
-if (Test-Path artifacts) {
-    Remove-Item -Path artifacts -Recurse -Confirm:$false -Force
-}
-docker run --rm --volume "${build_root}:c:\kaolin\mnt" $image_name Copy-Item -Recurse dist\ mnt\artifacts
-
 exit $LASTEXITCODE

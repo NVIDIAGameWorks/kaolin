@@ -58,6 +58,6 @@ COPY . .
 RUN pip install -r tools\ci_requirements.txt
 
 ENV TORCH_CUDA_ARCH_LIST "7.0 7.5+PTX"
-RUN python setup.py bdist_wheel
+RUN python setup.py develop
 
 ENTRYPOINT ["powershell.exe", "-Command"]
