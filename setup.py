@@ -132,7 +132,7 @@ def get_requirements():
         warnings.warn("usd-core is not compatible with python_version >= 3.10 "
                       "and won't be installed, please use supported python_version "
                       "to use USD related features")
-    requirements.append('usd-core==21.8; python_version < "3.10"')
+    requirements.append('usd-core>=20.11; python_version < "3.10"')
     if INCLUDE_EXPERIMENTAL:
         requirements.append('tornado==6.0.4')
         requirements.append('flask==1.1.2')

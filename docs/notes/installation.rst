@@ -11,7 +11,7 @@ Requirements
 ------------
 
 * Linux, macOS or Windows
-* Python >= 3.6 (3.6 or 3.7 recommended)
+* Python >= 3.6 (3.6 and 3.7 recommended for Windows)
 * CUDA >= 10.0 (with 'nvcc' installed)
 
 Dependencies
@@ -21,7 +21,7 @@ Dependencies
 * cython == 0.29.20
 * scipy >= 1.2.0
 * Pillow >= 8.0.0
-* usd-core == 20.11 (optional, required for USD related features such as visualization and importer / exporter)
+* usd-core >= 20.11 (optional, required for USD related features such as visualization and importer / exporter)
 
 Installation from source
 ------------------------
