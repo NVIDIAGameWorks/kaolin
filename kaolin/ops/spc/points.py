@@ -62,8 +62,9 @@ def unbatched_points_to_octree(points, level, sorted=False):
                             of shape :math:`(2^\text{level}, 2^\text{level}, 2^\text{level})`.
     """
     if not sorted:
-        morton = torch.sort(points_to_morton(torch.unique(points, dim=0)))[0]
-        points = morton_to_points(morton)
+        unique = torch.unique(points.contiguous(), dim=0).contiguous()
+        morton = torch.sort(points_to_morton(unique).contiguous())[0]
+        points = morton_to_points(morton.contiguous())
     return _C.ops.spc.points_to_octree(points.contiguous(), level)
 
 def points_to_morton(points):
