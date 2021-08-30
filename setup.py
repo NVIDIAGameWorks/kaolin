@@ -229,7 +229,7 @@ if __name__ == '__main__':
         include_package_data=True,
         install_requires=get_requirements(),
         include_dirs=get_include_dirs(),
-        zip_safe=True,
+        zip_safe=False,
         ext_modules=get_extensions(),
         cmdclass={
             'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)
