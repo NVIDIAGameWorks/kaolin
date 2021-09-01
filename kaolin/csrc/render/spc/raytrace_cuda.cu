@@ -100,9 +100,6 @@ d_Decide(uint num, point_data* points, float3* rorg, float3* rdir,
     // Radius of voxel
     float s1 = 1.0 / ((float)(0x1 << Level));
     
-    // Count # of occupied voxels for expansion
-    uchar dd = __popc(O[pidx]);
-            
     // Transform to [-1, 1]
     const float3 vc = make_float3(
         fmaf(s1, fmaf(2.0, p.x, 1.0), -1.0f),
@@ -115,7 +112,8 @@ d_Decide(uint num, point_data* points, float3* rorg, float3* rdir,
 
     // Perform AABB check
     if (ray_aabb(o, d, ray_inv, sgn, vc, s1) > 0.0){
-      info[tidx] = notDone ? dd : 1;      
+      // Count # of occupied voxels for expansion, if more levels are left
+      info[tidx] = notDone ? __popc(O[pidx]) : 1;      
     } else {
       info[tidx] = 0;
     }
