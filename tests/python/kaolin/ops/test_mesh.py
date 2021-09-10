@@ -106,7 +106,7 @@ class TestSamplePoints:
         num_0 = torch.sum(face_choices == 0, dim=1)
         assert torch.all(num_0 + torch.sum(face_choices == 1, dim=1) == num_samples)
         sampling_prob = num_samples / 3.
-        tolerance = sampling_prob * 0.1
+        tolerance = sampling_prob * 0.2
         assert torch.all(num_0 < sampling_prob + tolerance) and \
                torch.all(num_0 > sampling_prob - tolerance)
 
@@ -118,7 +118,7 @@ class TestSamplePoints:
 
         # compute distance from the point to the plan of the face picked
         face_normals = mesh.face_normals(face_vertices_choices, unit=True)
-        
+
         v0_p = points - face_vertices_choices[:, :, 0]  # batch_size x num_points x 3
         len_v0_p = torch.sqrt(torch.sum(v0_p ** 2, dim=-1))
         cos_a = torch.matmul(v0_p.reshape(-1, 1, 3),
@@ -224,7 +224,7 @@ class TestSamplePoints:
         num_0 = torch.sum(face_choices[0] == 0)
         assert num_0 + torch.sum(face_choices[0] == 1) == num_samples
         sampling_prob = num_samples / 3.
-        tolerance = sampling_prob * 0.1
+        tolerance = sampling_prob * 0.2
         assert (num_0 < sampling_prob + tolerance) and \
                (num_0 > sampling_prob - tolerance)
 
@@ -374,13 +374,13 @@ class TestUniformLaplacian:
                                  [0.5, 0.5, 0, 0, -1]], dtype=torch.float, device=device)
 
         assert torch.equal(output, expected)
-    
+
     def test_not_connected_mesh(self, device, dtype):
         num_vertices = 4
         faces = torch.tensor([[0, 1, 2]], dtype=torch.long, device=device)
 
         result = mesh.uniform_laplacian(num_vertices, faces)
-        
+
         # Any row and column related to V3 is zeros.
         assert torch.equal(result[3, :3], torch.zeros((3), device=device, dtype=torch.float))
         assert torch.equal(result[:3, 3], torch.zeros((3), device=device, dtype=torch.float))

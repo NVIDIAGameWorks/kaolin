@@ -20,6 +20,7 @@
 #include "./ops/mesh/mesh_intersection.h"
 #include "./ops/conversions/unbatched_mcube/unbatched_mcube.h"
 #include "./metrics/sided_distance.h"
+#include "./metrics/unbatched_triangle_distance.h"
 #include "./render/dibr.h"
 #include "./ops/conversions/mesh_to_spc/mesh_to_spc.h"
 #include "./ops/spc/spc.h"
@@ -62,6 +63,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   py::module metrics = m.def_submodule("metrics");
   metrics.def("sided_distance_forward_cuda", &sided_distance_forward_cuda);
   metrics.def("sided_distance_backward_cuda", &sided_distance_backward_cuda);
+  metrics.def("unbatched_triangle_distance_forward_cuda",
+              &unbatched_triangle_distance_forward_cuda);
+  metrics.def("unbatched_triangle_distance_backward_cuda",
+              &unbatched_triangle_distance_backward_cuda);
   py::module render = m.def_submodule("render");
   py::module render_mesh = render.def_submodule("mesh");
   render_mesh.def("packed_rasterize_forward_cuda", &packed_rasterize_forward_cuda);

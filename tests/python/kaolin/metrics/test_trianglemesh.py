@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,100 +18,138 @@ import torch
 import random
 
 from kaolin.metrics import trianglemesh
-from kaolin.utils.testing import FLOAT_TYPES, CUDA_FLOAT_TYPES, with_seed
-
-torch_seed = 456
-random_seed = 439
+from kaolin.ops.mesh import index_vertices_by_faces
+from kaolin.utils.testing import FLOAT_TYPES, CUDA_FLOAT_TYPES
 
 @pytest.mark.parametrize('device', ['cuda'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
-class TestTriangleDistance:
-    @pytest.fixture(autouse=True)
-    def base_pointcloud(self, device, dtype):
-        return torch.tensor([[0., -1., -1.],
-                             [1., -1., -1.],
-                             [-1., -1., -1.],
-                             [0., -1., 2.],
-                             [1., -1., 2.],
-                             [-1, -1., 2.],
-                             [0., 2., 0.5],
-                             [1., 2., 0.5],
-                             [-1., 2., 0.5],
-                             [0., -1., 0.5],
-                             [1., -1., 0.5],
-                             [-1., -1., 0.5],
-                             [0., 1., 1.],
-                             [1., 1., 1.],
-                             [-1., 1., 1.],
-                             [0., 1., 0.],
-                             [1., 1., 0.],
-                             [-1., 1., 0.],
-                             [1., 0.5, 0.5],
-                             [-1., 0.5, 0.5]],
-                            device=device, dtype=dtype)
+def test_unbatched_naive_triangle_distance(device, dtype):
+    pointcloud = torch.tensor([[0., -1., -1.],
+                               [1., -1., -1.],
+                               [-1., -1., -1.],
+                               [0., -1., 2.],
+                               [1., -1., 2.],
+                               [-1, -1., 2.],
+                               [0., 2., 0.5],
+                               [1., 2., 0.5],
+                               [-1., 2., 0.5],
+                               [0., -1., 0.5],
+                               [1., -1., 0.5],
+                               [-1., -1., 0.5],
+                               [0., 1., 1.],
+                               [1., 1., 1.],
+                               [-1., 1., 1.],
+                               [0., 1., 0.],
+                               [1., 1., 0.],
+                               [-1., 1., 0.],
+                               [1., 0.5, 0.5],
+                               [-1., 0.5, 0.5]],
+                              device=device, dtype=dtype)
 
-    @pytest.fixture(autouse=True)
-    def pointclouds(self, base_pointcloud):
-        return torch.stack([base_pointcloud,
-                            base_pointcloud * 0.2,
-                            torch.flip(base_pointcloud, dims=(-1,))],
-                           dim=0)
-
-    @pytest.fixture(autouse=True)
-    def base_vertices(self, device, dtype):
-        return torch.tensor([[0., 0., 0.],
+    vertices = torch.tensor([[0., 0., 0.],
                              [0., 0., 1.],
                              [0., 1., 0.5],
                              [0.5, 0., 0.],
                              [0.5, 0., 1.],
                              [0.5, 1., 0.5]],
-                            device=device, dtype=dtype,
-                            requires_grad=True)
+                            device=device, dtype=dtype)
+
+    faces = torch.tensor([[0, 1, 2], [3, 4, 5]], device=device, dtype=torch.long)
+
+    face_vertices = index_vertices_by_faces(vertices.unsqueeze(0), faces)[0]
+
+    expected_dist = torch.tensor(
+        [2.0000, 2.2500, 3.0000, 2.0000, 2.2500, 3.0000, 1.0000, 1.2500, 2.0000,
+         1.0000, 1.2500, 2.0000, 0.2000, 0.4500, 1.2000, 0.2000, 0.4500, 1.2000,
+         0.2500, 1.0000], device=device, dtype=dtype)
+
+    expected_face_idx = torch.tensor(
+        [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0],
+        device=device, dtype=torch.long)
+
+    expected_dist_type = torch.tensor(
+        [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 0, 0],
+        device=device, dtype=torch.int)
+
+    dist, face_idx, dist_type = trianglemesh._unbatched_naive_point_to_mesh_distance(
+        pointcloud, face_vertices)
+
+    assert torch.allclose(dist, expected_dist)
+    assert torch.equal(face_idx, expected_face_idx)
+    assert torch.equal(dist_type, expected_dist_type)
+
+@pytest.mark.parametrize('num_points', [1025])
+@pytest.mark.parametrize('num_faces', [1025])
+@pytest.mark.parametrize('dtype', [torch.float, torch.double])
+class TestUnbatchedTriangleDistanceCuda:
+    @pytest.fixture(autouse=True)
+    def pointcloud(self, num_points, dtype):
+        return torch.randn((num_points, 3), device='cuda', dtype=dtype)
 
     @pytest.fixture(autouse=True)
-    def vertices(self, base_vertices):
-        return torch.stack([base_vertices,
-                            base_vertices * 0.2,
-                            torch.flip(base_vertices, dims=(-1,))],
-                           dim=0)
+    def face_vertices(self, num_faces, dtype):
+        return torch.randn((num_faces, 3, 3), device='cuda', dtype=dtype)
 
-    @pytest.fixture(autouse=True)
-    def faces(self, device):
-        return torch.tensor([[0, 1, 2], [3, 4, 5]], device=device, dtype=torch.long)
+    def test_face_vertices(self, pointcloud, face_vertices):
+        dist, face_idx, dist_type = trianglemesh.UnbatchedTriangleDistanceCuda.apply(
+            pointcloud, face_vertices)
+        dist2, face_idx2, dist_type2 = trianglemesh._unbatched_naive_point_to_mesh_distance(
+            pointcloud, face_vertices)
+        assert torch.allclose(dist, dist2)
+        assert torch.equal(face_idx, face_idx2)
+        assert torch.equal(dist_type, dist_type2)
 
-    @pytest.fixture(autouse=True)
-    def expected_base_dist(self, device, dtype):
-        return torch.tensor([2.0000, 2.2500, 3.0000, 2.0000, 2.2500, 3.0000, 1.0000, 1.2500, 2.0000,
-            1.0000, 1.2500, 2.0000, 0.2000, 0.4500, 1.2000, 0.2000, 0.4500, 1.2000,
-            0.2500, 1.0000], device=device, dtype=dtype)
+    def test_face_vertices_grad(self, pointcloud, face_vertices):
+        pointcloud = pointcloud.detach()
+        pointcloud.requires_grad = True
+        face_vertices = face_vertices.detach()
+        face_vertices.requires_grad = True
+        pointcloud2 = pointcloud.detach()
+        pointcloud2.requires_grad = True
+        face_vertices2 = face_vertices.detach()
+        face_vertices2.requires_grad = True
+        dist, face_idx, dist_type = trianglemesh.UnbatchedTriangleDistanceCuda.apply(
+            pointcloud, face_vertices)
+        dist2, face_idx2, dist_type2 = trianglemesh._unbatched_naive_point_to_mesh_distance(
+            pointcloud2, face_vertices2)
+        grad_out = torch.rand_like(dist)
+        dist.backward(grad_out)
+        dist2.backward(grad_out)
+        diff_idxs = torch.where(~torch.isclose(pointcloud.grad, pointcloud2.grad))
+        assert torch.allclose(pointcloud.grad, pointcloud2.grad,
+                              rtol=1e-5, atol=1e-5)
+        assert torch.allclose(face_vertices.grad, face_vertices2.grad,
+                              rtol=1e-5, atol=1e-5)
 
-    @pytest.fixture(autouse=True)
-    def expected_dist(self, expected_base_dist):
-        return torch.stack([expected_base_dist,
-                            expected_base_dist * (0.2 ** 2),
-                            expected_base_dist], dim=0)
+@pytest.mark.parametrize('device', ['cuda'])
+@pytest.mark.parametrize('dtype', [torch.float, torch.double])
+@pytest.mark.parametrize('batch_size', [1, 3])
+@pytest.mark.parametrize('num_points', [11, 1025])
+@pytest.mark.parametrize('num_faces', [11, 1025])
+def test_triangle_distance(batch_size, num_points, num_faces, device, dtype):
+    pointclouds = torch.randn((batch_size, num_points, 3), device=device,
+                              dtype=dtype)
+    face_vertices = torch.randn((batch_size, num_faces, 3, 3), device=device,
+                                dtype=dtype)
+    expected_dist = []
+    expected_face_idx = []
+    expected_dist_type = []
 
-    @pytest.fixture(autouse=True)
-    def expected_face_idx(self, device, dtype):
-        face_idx = torch.tensor([[0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0]],
-                                device=device, dtype=torch.long)
-        return face_idx.repeat(3, 1)
-
-    @pytest.fixture(autouse=True)
-    def expected_dist_type(self, device, dtype):
-        dist_type = torch.tensor([[1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 0, 0]],
-                                 device=device, dtype=torch.int)
-        return dist_type.repeat(3, 1)
-
-    @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def test_triangle_distance_batch(self, pointclouds, vertices, faces,
-                                     expected_dist, expected_face_idx, expected_dist_type):
-        dist, face_idx, dist_type = trianglemesh.point_to_mesh_distance(
-            pointclouds, vertices, faces)
-
-        assert torch.allclose(dist, expected_dist)
-        assert torch.equal(face_idx, expected_face_idx)
-        assert torch.equal(dist_type, expected_dist_type)
+    for i in range(batch_size):
+        _expected_dist, _expected_face_idx, _expected_dist_type = \
+            trianglemesh._unbatched_naive_point_to_mesh_distance(
+                pointclouds[i], face_vertices[i])
+        expected_dist.append(_expected_dist)
+        expected_face_idx.append(_expected_face_idx)
+        expected_dist_type.append(_expected_dist_type)
+    expected_dist = torch.stack(expected_dist, dim=0)
+    expected_face_idx = torch.stack(expected_face_idx, dim=0)
+    expected_dist_type = torch.stack(expected_dist_type, dim=0)
+    dist, face_idx, dist_type = trianglemesh.point_to_mesh_distance(
+        pointclouds, face_vertices)
+    assert torch.allclose(dist, expected_dist)
+    assert torch.equal(face_idx, expected_face_idx)
+    assert torch.equal(dist_type, expected_dist_type)
 
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 class TestEdgeLength:

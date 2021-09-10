@@ -14,9 +14,10 @@
 # limitations under the License.
 
 import torch
-from ..ops.mesh import uniform_laplacian, index_vertices_by_faces
+from kaolin import _C
+from ..ops.mesh import uniform_laplacian
 
-def point_to_mesh_distance(pointclouds, vertices, faces):
+def point_to_mesh_distance(pointclouds, face_vertices):
     r"""Computes the distances from pointclouds to meshes (represented by vertices and faces.)
     For each point in the pointcloud, it finds the nearest triangle
     in the mesh, and calculated its distance to that triangle.
@@ -28,9 +29,11 @@ def point_to_mesh_distance(pointclouds, vertices, faces):
     Type 4 to 6 indicates the distance is from a point to an edge.
 
     Args:
-        pointclouds (torch.Tensor): pointclouds of shape (B, P, 3).
-        vertices (torch.Tensor): vertices of meshes of shape (B, V, 3).
-        faces (torch.LongTensor): faces of meshes of shape (F, 3).
+        pointclouds (torch.Tensor):
+            pointclouds, of shape :math:`(\text{batch_size}, \text{num_points}, 3)`.
+        face_vertices (torch.Tensor):
+            vertices of each face of meshes,
+            of shape :math:`(\text{batch_size}, \text{num_faces}, 3, 3})`.
 
     Returns:
         (torch.Tensor, torch.LongTensor, torch.IntTensor):
@@ -41,13 +44,15 @@ def point_to_mesh_distance(pointclouds, vertices, faces):
             - Types of distance of shape :math:`(\text{batch_size}, \text{num_points})`.
 
     Example:
-        >>> vertices = torch.tensor([[[0, 0, 0],
-        ...                           [0, 1, 0],
-        ...                           [0, 0, 1]]], device='cuda', dtype=torch.float)
-        >>> faces = torch.tensor([[0, 1, 2]], dtype=torch.long, device='cuda')
+        >>> from kaolin.ops.mesh import index_vertices_by_faces
         >>> point = torch.tensor([[[0.5, 0.5, 0.5],
-        ...                        [3, 4, 5]]], device='cuda', dtype=torch.float)
-        >>> distance, index, dist_type = point_to_mesh_distance(point, vertices, faces)
+        ...                        [3., 4., 5.]]], device='cuda')
+        >>> vertices = torch.tensor([[[0., 0., 0.],
+        ...                           [0., 1., 0.],
+        ...                           [0., 0., 1.]]], device='cuda')
+        >>> faces = torch.tensor([[0, 1, 2]], dtype=torch.long, device='cuda')
+        >>> face_vertices = index_vertices_by_faces(vertices, faces)
+        >>> distance, index, dist_type = point_to_mesh_distance(point, face_vertices)
         >>> distance
         tensor([[ 0.2500, 41.0000]], device='cuda:0')
         >>> index
@@ -66,8 +71,13 @@ def point_to_mesh_distance(pointclouds, vertices, faces):
     dist_type = []
 
     for i in range(batch_size):
-        cur_dist, cur_face_idx, cur_dist_type = _unbatched_naive_point_to_mesh_distance(
-            pointclouds[i], vertices[i], faces)
+        if pointclouds.is_cuda:
+            cur_dist, cur_face_idx, cur_dist_type = UnbatchedTriangleDistanceCuda.apply(
+                pointclouds[i], face_vertices[i])
+        else:
+            cur_dist, cur_face_idx, cur_dist_type = _unbatched_naive_point_to_mesh_distance(
+                pointclouds[i], face_vertices[i])
+
         distance.append(cur_dist)
         face_idx.append(cur_face_idx)
         dist_type.append(cur_dist_type)
@@ -98,7 +108,33 @@ def _is_not_above(vertex, edge, norm, point):
 def _point_at(vertex, edge, proj):
     return vertex + edge * proj.view(-1, 1)
 
-def _unbatched_naive_point_to_mesh_distance(points, vertices, faces):
+class UnbatchedTriangleDistanceCuda(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, points, face_vertices):
+        num_points = points.shape[0]
+        num_faces = face_vertices.shape[0]
+        min_dist = torch.zeros((num_points), device='cuda', dtype=points.dtype)
+        min_dist_idx = torch.zeros((num_points), device='cuda', dtype=torch.long)
+        dist_type = torch.zeros((num_points), device='cuda', dtype=torch.int32)
+        _C.metrics.unbatched_triangle_distance_forward_cuda(
+            points, face_vertices, min_dist, min_dist_idx, dist_type)
+        ctx.save_for_backward(points.contiguous(), face_vertices.contiguous(),
+                              min_dist_idx, dist_type)
+        ctx.mark_non_differentiable(min_dist_idx, dist_type)
+        return min_dist, min_dist_idx, dist_type
+
+    @staticmethod
+    def backward(ctx, grad_dist, grad_face_idx, grad_dist_type):
+        points, face_vertices, face_idx, dist_type = ctx.saved_tensors
+        grad_dist = grad_dist.contiguous()
+        grad_points = torch.zeros_like(points)
+        grad_face_vertices = torch.zeros_like(face_vertices)
+        _C.metrics.unbatched_triangle_distance_backward_cuda(
+            grad_dist, points, face_vertices, face_idx, dist_type,
+            grad_points, grad_face_vertices)
+        return grad_points, grad_face_vertices
+
+def _unbatched_naive_point_to_mesh_distance(points, face_vertices):
     """
     description of distance type:
         - 0: distance to face
@@ -111,8 +147,7 @@ def _unbatched_naive_point_to_mesh_distance(points, vertices, faces):
 
     Args:
         points (torch.Tensor): of shape (num_points, 3).
-        vertices (torch.Tensor): of shape (num_vertces, 3).
-        faces (torch.LongTensor): of shape (num_faces, 3).
+        faces_vertices (torch.LongTensor): of shape (num_faces, 3, 3).
 
     Returns:
         (torch.Tensor, torch.LongTensor, torch.IntTensor):
@@ -122,24 +157,18 @@ def _unbatched_naive_point_to_mesh_distance(points, vertices, faces):
             - distance_type, of shape (num_points).
     """
     num_points = points.shape[0]
-    num_vertices = vertices.shape[0]
-    num_faces = faces.shape[0]
+    num_faces = face_vertices.shape[0]
 
     device = points.device
     dtype = points.dtype
 
-    face_vertices = index_vertices_by_faces(vertices.unsqueeze(0), faces)
-
-    v1 = face_vertices[0, :, 0]
-    v2 = face_vertices[0, :, 1]
-    v3 = face_vertices[0, :, 2]
+    v1 = face_vertices[:, 0]
+    v2 = face_vertices[:, 1]
+    v3 = face_vertices[:, 2]
 
     e21 = v2 - v1
     e32 = v3 - v2
     e13 = v1 - v3
-    e21_length = _compute_dot(e21, e21)
-    e32_length = _compute_dot(e32, e32)
-    e13_length = _compute_dot(e13, e13)
 
     normals = -torch.cross(e21, e13)
 
@@ -186,11 +215,12 @@ def _unbatched_naive_point_to_mesh_distance(points, vertices, faces):
 
     _, min_dist_idx = torch.min(all_dist, dim=-1)
     dist_type = all_types[torch.arange(num_points, device=device), min_dist_idx]
+    torch.cuda.synchronize()
 
     # Recompute the shortest distances
     # This reduce the backward pass to the closest faces instead of all faces
     # O(num_points) vs O(num_points * num_faces)
-    selected_face_vertices = face_vertices[0, min_dist_idx]
+    selected_face_vertices = face_vertices[min_dist_idx]
     v1 = selected_face_vertices[:, 0]
     v2 = selected_face_vertices[:, 1]
     v3 = selected_face_vertices[:, 2]
