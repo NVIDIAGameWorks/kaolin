@@ -82,7 +82,7 @@ def _compute_dot(p1, p2):
 def _project_edge(vertex, edge, point):
     point_vec = point - vertex
     length = _compute_dot(edge, edge)
-    return _compute_dot(point_vec, edge) / length;
+    return _compute_dot(point_vec, edge) / length
 
 def _project_plane(vertex, normal, point):
     point_vec = point - vertex
@@ -143,9 +143,10 @@ def _unbatched_naive_point_to_mesh_distance(points, vertices, faces):
 
     normals = -torch.cross(e21, e13)
 
-    uab = _project_edge(v1, e21, points)
-    ubc = _project_edge(v2, e32, points)
-    uca = _project_edge(v3, e13, points)
+    uab = _project_edge(v1.view(1, -1, 3), e21.view(1, -1, 3), points.view(-1, 1, 3))
+    ubc = _project_edge(v2.view(1, -1, 3), e32.view(1, -1, 3), points.view(-1, 1, 3))
+    uca = _project_edge(v3.view(1, -1, 3), e13.view(1, -1, 3), points.view(-1, 1, 3))
+
     is_type1 = (uca > 1.) & (uab < 0.)
     is_type2 = (uab > 1.) & (ubc < 0.)
     is_type3 = (ubc > 1.) & (uca < 0.)
