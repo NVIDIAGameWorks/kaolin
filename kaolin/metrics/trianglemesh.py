@@ -79,24 +79,24 @@ def _compute_dot(p1, p2):
         p1[..., 1] * p2[..., 1] + \
         p1[..., 2] * p2[..., 2]
 
-def _project_edge(orig, vec, point):
-    point_vec = point.view(-1, 1, 3) - orig.view(1, -1, 3)
-    length = _compute_dot(vec, vec)
-    return _compute_dot(point_vec, vec.view(1, -1, 3)) / length.view(1, -1)
+def _project_edge(vertex, edge, point):
+    point_vec = point - vertex
+    length = _compute_dot(edge, edge)
+    return _compute_dot(point_vec, edge) / length;
 
-def _project_plane(orig, normal, point):
-    point_vec = point - orig
+def _project_plane(vertex, normal, point):
+    point_vec = point - vertex
     unit_normal = normal / torch.norm(normal, dim=-1, keepdim=True)
     dist = _compute_dot(point_vec, unit_normal)
     return point - unit_normal * dist.view(-1, 1)
 
-def _is_not_above(orig, vec, norm, point):
-    edge_norm = torch.cross(norm, vec, dim=-1)
+def _is_not_above(vertex, edge, norm, point):
+    edge_norm = torch.cross(norm, edge, dim=-1)
     return _compute_dot(edge_norm.view(1, -1, 3),
-                        point.view(-1, 1, 3) - orig.view(1, -1, 3)) <= 0
+                        point.view(-1, 1, 3) - vertex.view(1, -1, 3)) <= 0
 
-def _point_at(orig, vec, proj):
-    return orig + vec * proj.view(-1, 1)
+def _point_at(vertex, edge, proj):
+    return vertex + edge * proj.view(-1, 1)
 
 def _unbatched_naive_point_to_mesh_distance(points, vertices, faces):
     """
@@ -151,7 +151,7 @@ def _unbatched_naive_point_to_mesh_distance(points, vertices, faces):
     is_type3 = (ubc > 1.) & (uca < 0.)
     is_type4 = (uab >= 0.) & (uab <= 1.) & _is_not_above(v1, e21, normals, points)
     is_type5 = (ubc >= 0.) & (ubc <= 1.) & _is_not_above(v2, e32, normals, points)
-    is_type6 = (uca >= 0.) & (uca <= 1.) & _is_not_above(v3, e13, normals, points)    
+    is_type6 = (uca >= 0.) & (uca <= 1.) & _is_not_above(v3, e13, normals, points)
     is_type0 = ~(is_type1 | is_type2 | is_type3 | is_type4 | is_type5 | is_type6)
 
     face_idx = torch.zeros(num_points, device=device, dtype=torch.long)
@@ -182,10 +182,54 @@ def _unbatched_naive_point_to_mesh_distance(points, vertices, faces):
                                                   uca[all_type6_idx])
     all_vec = (all_closest_points - points.view(-1, 1, 3))
     all_dist = _compute_dot(all_vec, all_vec)
-    min_dist, min_dist_idx = torch.min(all_dist, dim=-1)
+
+    _, min_dist_idx = torch.min(all_dist, dim=-1)
     dist_type = all_types[torch.arange(num_points, device=device), min_dist_idx]
 
+    # Recompute the shortest distances
+    # This reduce the backward pass to the closest faces instead of all faces
+    # O(num_points) vs O(num_points * num_faces)
+    selected_face_vertices = face_vertices[0, min_dist_idx]
+    v1 = selected_face_vertices[:, 0]
+    v2 = selected_face_vertices[:, 1]
+    v3 = selected_face_vertices[:, 2]
+
+    e21 = v2 - v1
+    e32 = v3 - v2
+    e13 = v1 - v3
+
+    normals = -torch.cross(e21, e13)
+
+    uab = _project_edge(v1, e21, points)
+    ubc = _project_edge(v2, e32, points)
+    uca = _project_edge(v3, e13, points)
+
+    counter_p = torch.zeros((num_points, 3), device=device, dtype=dtype)
+
+    cond = (dist_type == 1)
+    counter_p[cond] = v1[cond]
+
+    cond = (dist_type == 2)
+    counter_p[cond] = v2[cond]
+
+    cond = (dist_type == 3)
+    counter_p[cond] = v3[cond]
+
+    cond = (dist_type == 4)
+    counter_p[cond] = _point_at(v1, e21, uab)[cond]
+
+    cond = (dist_type == 5)
+    counter_p[cond] = _point_at(v2, e32, ubc)[cond]
+
+    cond = (dist_type == 6)
+    counter_p[cond] = _point_at(v3, e13, uca)[cond]
+
+    cond = (dist_type == 0)
+    counter_p[cond] = _project_plane(v1, normals, points)[cond]
+    min_dist = torch.sum((counter_p - points) ** 2, dim=-1)
+
     return min_dist, min_dist_idx, dist_type
+
 
 def average_edge_length(vertices, faces):
     r"""Returns the average length of each faces in a mesh.
