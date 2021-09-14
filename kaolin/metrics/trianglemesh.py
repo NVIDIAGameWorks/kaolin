@@ -28,16 +28,16 @@ def point_to_mesh_distance(pointclouds, vertices, faces):
     Type 4 to 6 indicates the distance is from a point to an edge.
 
     Args:
-        pointclouds (torch.Tensor): pointclouds of shape (B, P, 3)
-        vertices (torch.Tensor): vertices of meshes of shape (B, V, 3)
-        faces (torch.LongTensor): faces of meshes of shape (F, 3)
+        pointclouds (torch.Tensor): pointclouds of shape (B, P, 3).
+        vertices (torch.Tensor): vertices of meshes of shape (B, V, 3).
+        faces (torch.LongTensor): faces of meshes of shape (F, 3).
 
     Returns:
         (torch.Tensor, torch.LongTensor, torch.IntTensor):
 
             - Distances between pointclouds and meshes,
-            of shape :math:`(\text{batch_size}, \text{num_points})`,
-            - face indices selected, of shape :math:`(\text{batch_size}, \text{num_points})`,
+              of shape :math:`(\text{batch_size}, \text{num_points})`.
+            - face indices selected, of shape :math:`(\text{batch_size}, \text{num_points})`.
             - Types of distance of shape :math:`(\text{batch_size}, \text{num_points})`.
 
     Example:
