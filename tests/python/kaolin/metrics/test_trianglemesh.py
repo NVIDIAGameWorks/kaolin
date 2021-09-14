@@ -22,266 +22,95 @@ from kaolin.utils.testing import FLOAT_TYPES, CUDA_FLOAT_TYPES, with_seed
 torch_seed = 456
 random_seed = 439
 
-
-@pytest.mark.parametrize('device', ['cuda'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-class Test_UnbatchedTriangleDistance:
-
-    @pytest.fixture(autouse=True)
-    def get_tol(self, device, dtype):
-        if dtype == torch.float:
-            return 1e-5, 1e-4
-        elif dtype == torch.double:
-            return 1e-6, 1e-5
-
-    @pytest.fixture(autouse=True)
-    @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def input_random_data(self, dtype, device):
-        V = 100
-        F = 50
-        P = 80
-        vertices = torch.randint(0, 10, (V, 3), device=device, dtype=dtype)
-        vertices = torch.unique(vertices, dim=0)
-        vertices.requires_grad = True
-
-        V = vertices.shape[0]
-        faces = []
-        for i in range(F):
-            faces.append(random.sample(range(V), 3))
-
-        faces = torch.tensor(faces, device='cuda', dtype=torch.long)
-
-        points =  torch.randint(0, 10, (P, 3), device=device, dtype=dtype)
-
-        return points, vertices, faces
-
-    @pytest.fixture(autouse=True)
-    @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def input_double_data(self, device):
-        """
-        We choose the input data on purpose, so that when grad check offset the input points a little bit,
-        it won't change the vertices it corresponds to. If the gradcheck offset changes vertices that this point
-        corresponds to, the gradcheck will fail.
-        """
-        V = 200
-        F = 200
-        vertices = torch.randint(0, 20, (V, 3), device='cuda', dtype=torch.double)
-        vertices = torch.unique(vertices, dim=0)
-        vertices.requires_grad = True
-
-        V = vertices.shape[0]
-        faces = []
-        for i in range(F):
-            faces.append(random.sample(range(V), 3))
-
-        faces = torch.tensor(faces, device='cuda', dtype=torch.long)
-
-        v1 = torch.index_select(vertices, 0, faces[:, 0])
-        v2 = torch.index_select(vertices, 0, faces[:, 1])
-        v3 = torch.index_select(vertices, 0, faces[:, 2])
-
-        v21 = v2 - v1  # (F, 3)
-        v32 = v3 - v2
-        v13 = v1 - v3
-
-        all_edges = torch.stack((v21, v32, v13))
-
-        all_vertices_by_faces = torch.stack((v1, v2, v3))
-        # Select point that is closer to the edge
-        random_split = torch.rand((F, 3), device='cuda')
-        random_split = torch.clamp(random_split, 0.3, 0.7)
-
-        cases = torch.randint(0, 3, size=(F, 1), dtype=torch.long, device='cuda')
-        order = torch.arange(0, F, dtype=torch.long, device='cuda').view(F, 1)
-
-        cases_idx = torch.cat((cases, order), dim=-1)
-
-        noise = (-1 - 1) * torch.rand((F, 3), device='cuda') + 1
-
-        selected_points = all_edges[cases[:, 0], cases_idx[:, 1]] * random_split + all_vertices_by_faces[cases[:, 0], cases_idx[:, 1]] + noise
-        selected_points = selected_points.detach()
-        selected_points.requires_grad=True
-
-        return selected_points, vertices, faces
-
-    @pytest.fixture(autouse=True)# Use for choose seed, will remove once ready to merge
-    @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def target_grad_double(self, input_double_data):
-        # if test_gradcheck passed the gradient using torch.double inputs is trustable
-        points, vertices, faces = input_double_data
-    
-        points = points.detach()
-        points.requires_grad = True
-
-        v1 = torch.index_select(vertices, 0, faces[:, 0])
-        v2 = torch.index_select(vertices, 0, faces[:, 1])
-        v3 = torch.index_select(vertices, 0, faces[:, 2])
-
-        v1 = v1.detach()
-        v2 = v2.detach()
-        v3 = v3.detach()
-
-        v1.requires_grad = True
-        v2.requires_grad = True
-        v3.requires_grad = True
-
-        outputs = torch.sum(trianglemesh._UnbatchedTriangleDistance.apply(points, v1, v2, v3)[0])
-        outputs.backward()
-        return points.grad.clone(), v1.grad.clone(), v2.grad.clone(), v3.grad.clone()
-
-    @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def test_random_data(self, device, dtype, input_random_data, get_tol):
-        points, vertices, faces = input_random_data
-        atol, rtol = get_tol
-
-        v1 = torch.index_select(vertices, 0, faces[:, 0])
-        v2 = torch.index_select(vertices, 0, faces[:, 1])
-        v3 = torch.index_select(vertices, 0, faces[:, 2])
-
-        output_dist, output_idx, output_dist_type = \
-            trianglemesh._UnbatchedTriangleDistance.apply(points, v1, v2, v3)
-        expected_dist, expected_idx, expected_dist_type = \
-            trianglemesh._point_to_mesh_distance_cpu(points, vertices, faces)
-
-        assert torch.allclose(output_dist, expected_dist.unsqueeze(0), atol=atol, rtol=rtol)
-
-        # Make sure every distance type is tested.
-        for i in range(4):
-            assert i in output_dist_type
-
-    @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def test_grad_check(self, device, dtype, input_double_data):
-        if dtype != torch.double:
-            pytest.skip("Gradient check only works in double.")
-
-        points, vertices, faces = input_double_data
-
-        v1 = torch.index_select(vertices, 0, faces[:, 0])
-        v2 = torch.index_select(vertices, 0, faces[:, 1])
-        v3 = torch.index_select(vertices, 0, faces[:, 2])
-
-        v1 = v1.detach()
-        v2 = v2.detach()
-        v3 = v3.detach()
-
-        v1.requires_grad = True
-        v2.requires_grad = True
-        v3.requires_grad = True
-
-        grad_result = torch.autograd.gradcheck(trianglemesh._UnbatchedTriangleDistance.apply,
-                                               (points, v1, v2, v3), eps=1e-8, atol=1e-6)
-
-        assert grad_result
-
-    @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def test_grad_check_other_type(self, device, dtype, input_double_data, target_grad_double):
-        if dtype == torch.double:
-            pytest.skip("Gradient check for double already tested.")
-        
-        points, vertices, faces = input_double_data
-        points = points.to(dtype).detach()
-        vertices = vertices.to(dtype).detach()
-        faces = faces.detach()
-
-        points.requires_grad = True
-        
-        v1 = torch.index_select(vertices, 0, faces[:, 0])
-        v2 = torch.index_select(vertices, 0, faces[:, 1])
-        v3 = torch.index_select(vertices, 0, faces[:, 2])
-
-        v1 = v1.detach()
-        v2 = v2.detach()
-        v3 = v3.detach()
-
-        v1.requires_grad = True
-        v2.requires_grad = True
-        v3.requires_grad = True
-
-        output = trianglemesh._UnbatchedTriangleDistance.apply(points, v1, v2, v3)[0]
-        torch.sum(output).backward()
-        target_grad_points, target_grad_v1, target_grad_v2, target_grad_v3 = target_grad_double
-
-        target_grad_points = target_grad_points.to(dtype)
-        target_grad_v1 = target_grad_v1.to(dtype)
-        target_grad_v2 = target_grad_v2.to(dtype)
-        target_grad_v3 = target_grad_v3.to(dtype)
-
-        assert torch.allclose(target_grad_points, points.grad, rtol=1e-2, atol=5e-2)
-
 @pytest.mark.parametrize('device', ['cuda'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
 class TestTriangleDistance:
+    @pytest.fixture(autouse=True)
+    def base_pointcloud(self, device, dtype):
+        return torch.tensor([[0., -1., -1.],
+                             [1., -1., -1.],
+                             [-1., -1., -1.],
+                             [0., -1., 2.],
+                             [1., -1., 2.],
+                             [-1, -1., 2.],
+                             [0., 2., 0.5],
+                             [1., 2., 0.5],
+                             [-1., 2., 0.5],
+                             [0., -1., 0.5],
+                             [1., -1., 0.5],
+                             [-1., -1., 0.5],
+                             [0., 1., 1.],
+                             [1., 1., 1.],
+                             [-1., 1., 1.],
+                             [0., 1., 0.],
+                             [1., 1., 0.],
+                             [-1., 1., 0.],
+                             [1., 0.5, 0.5],
+                             [-1., 0.5, 0.5]],
+                            device=device, dtype=dtype)
 
     @pytest.fixture(autouse=True)
-    def get_tol(self, device, dtype):
-        if dtype == torch.float:
-            return 1e-5, 1e-4
-        elif dtype == torch.double:
-            return 1e-6, 1e-5
+    def pointclouds(self, base_pointcloud):
+        return torch.stack([base_pointcloud,
+                            base_pointcloud * 0.2,
+                            torch.flip(base_pointcloud, dims=(-1,))],
+                           dim=0)
 
     @pytest.fixture(autouse=True)
+    def base_vertices(self, device, dtype):
+        return torch.tensor([[0., 0., 0.],
+                             [0., 0., 1.],
+                             [0., 1., 0.5],
+                             [0.5, 0., 0.],
+                             [0.5, 0., 1.],
+                             [0.5, 1., 0.5]],
+                            device=device, dtype=dtype,
+                            requires_grad=True)
+
+    @pytest.fixture(autouse=True)
+    def vertices(self, base_vertices):
+        return torch.stack([base_vertices,
+                            base_vertices * 0.2,
+                            torch.flip(base_vertices, dims=(-1,))],
+                           dim=0)
+
+    @pytest.fixture(autouse=True)
+    def faces(self, device):
+        return torch.tensor([[0, 1, 2], [3, 4, 5]], device=device, dtype=torch.long)
+
+    @pytest.fixture(autouse=True)
+    def expected_base_dist(self, device, dtype):
+        return torch.tensor([2.0000, 2.2500, 3.0000, 2.0000, 2.2500, 3.0000, 1.0000, 1.2500, 2.0000,
+            1.0000, 1.2500, 2.0000, 0.2000, 0.4500, 1.2000, 0.2000, 0.4500, 1.2000,
+            0.2500, 1.0000], device=device, dtype=dtype)
+
+    @pytest.fixture(autouse=True)
+    def expected_dist(self, expected_base_dist):
+        return torch.stack([expected_base_dist,
+                            expected_base_dist * (0.2 ** 2),
+                            expected_base_dist], dim=0)
+
+    @pytest.fixture(autouse=True)
+    def expected_face_idx(self, device, dtype):
+        face_idx = torch.tensor([[0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0]],
+                                device=device, dtype=torch.long)
+        return face_idx.repeat(3, 1)
+
+    @pytest.fixture(autouse=True)
+    def expected_dist_type(self, device, dtype):
+        dist_type = torch.tensor([[1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 0, 0]],
+                                 device=device, dtype=torch.int)
+        return dist_type.repeat(3, 1)
+
     @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def input_random_data(self, dtype, device):
-        V = 100
-        F = 50
-        P = 80
-        vertices = torch.randint(0, 10, (V, 3), device=device, dtype=dtype)
-        vertices = torch.unique(vertices, dim=0)
-        vertices.requires_grad = True
+    def test_triangle_distance_batch(self, pointclouds, vertices, faces,
+                                     expected_dist, expected_face_idx, expected_dist_type):
+        dist, face_idx, dist_type = trianglemesh.point_to_mesh_distance(
+            pointclouds, vertices, faces)
 
-        V = vertices.shape[0]
-        faces = []
-        for i in range(F):
-            faces.append(random.sample(range(V), 3))
-
-        faces = torch.tensor(faces, device='cuda', dtype=torch.long)
-
-        points =  torch.randint(0, 10, (P, 3), device=device, dtype=dtype)
-
-        return points, vertices, faces
-
-    @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def test_triangle_distance_batch(self, device, dtype):
-        vertices = torch.tensor([[[0, 0, 0],
-                                  [0, 1, 0],
-                                  [0, 0, 1]],
-                                 
-                                 [[0, 0, 0],
-                                  [0, 1, 1],
-                                  [1, 0, 1]]], device=device, dtype=dtype)
-            
-        faces = torch.tensor([[0, 1, 2]], dtype=torch.long, device=device)
-
-        point1 = torch.tensor([[[2, 0.5, 0]],
-                               [[0.5, 0.5, 0.5]]], device=device, dtype=dtype)
-        
-        dist, idx, dist_type = trianglemesh.point_to_mesh_distance(point1, vertices, faces)
-
-        # Distance is not square rooted.
-        expected_dist = torch.tensor([[4], [0.0833]], dtype=dtype, device=device)
-        expected_idx = torch.tensor([[0], [0]], dtype=torch.long, device=device)
-        # closest to the edge 0-1
-        expected_dist_type = torch.tensor([[0], [3]], dtype=torch.int, device=device)
-
-        assert torch.allclose(dist, expected_dist, atol=1e-4, rtol=1e-4)
-        assert torch.equal(idx, expected_idx)
+        assert torch.allclose(dist, expected_dist)
+        assert torch.equal(face_idx, expected_face_idx)
         assert torch.equal(dist_type, expected_dist_type)
-
-    @with_seed(torch_seed=torch_seed, random_seed=random_seed)
-    def test_random_data(self, device, dtype, input_random_data, get_tol):
-        points, vertices, faces = input_random_data
-        atol, rtol = get_tol
-
-        output_dist, output_idx, output_dist_type = \
-            trianglemesh.point_to_mesh_distance(points.unsqueeze(0), vertices.unsqueeze(0), faces)
-        expected_dist, expected_idx, expected_dist_type = \
-            trianglemesh._point_to_mesh_distance_cpu(points, vertices, faces)
-
-        assert torch.allclose(output_dist, expected_dist.unsqueeze(0), atol=atol, rtol=rtol)
-
-        # Make sure every distance type is tested.
-        for i in range(4):
-            assert i in output_dist_type
 
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 class TestEdgeLength:
