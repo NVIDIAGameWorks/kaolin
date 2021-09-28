@@ -244,6 +244,7 @@ def unbatched_query(octree, exsum, query_points, level):
 
     Given a point hierarchy, this function will efficiently find the corresponding indices of the
     points in the points tensor. For each input in query_points, returns a index to the points tensor.
+    Returns -1 if the point does not exist.
 
     Args:
         octree (torch.ByteTensor): The octree, of shape :math:`(\text{num_bytes})`.
@@ -255,4 +256,4 @@ def unbatched_query(octree, exsum, query_points, level):
         level (int): The level of the octree to query from.
     """
     return _C.ops.spc.spc_query(octree.contiguous(), exsum.contiguous(),
-                                query_points.contiguous(), level)
+                                query_points.contiguous(), level).long()

@@ -23,6 +23,7 @@ from kaolin.ops.random import random_spc_octrees
 from kaolin.rep import Spc
 
 from kaolin.ops.spc import scan_octrees, generate_points, to_dense, feature_grids_to_spc
+from kaolin.ops.spc import unbatched_query, unbatched_points_to_octree
 
 from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_tensor
 
@@ -157,6 +158,35 @@ class TestBase:
         expected_point_hierarchies = torch.cat(expected_point_hierarchies,
                                                dim=0).cuda().short()
         assert torch.equal(point_hierarchies, expected_point_hierarchies)
+
+class TestQuery:
+    def test_query(self):
+        points = torch.tensor(
+            [[3,2,0],
+             [3,1,1],
+             [0,0,0],
+             [3,3,3]], device='cuda', dtype=torch.short)
+        octree = unbatched_points_to_octree(points, 2)
+        length = torch.tensor([len(octree)], dtype=torch.int32)
+        _, pyramid, prefix = scan_octrees(octree, length)
+
+        query_points = torch.tensor(
+            [[3,2,0],
+             [3,1,1],
+             [0,0,0],
+             [3,3,3],
+             [2,2,2],
+             [1,1,1]], device='cuda', dtype=torch.short)
+
+        point_hierarchy = generate_points(octree, pyramid, prefix)
+
+        results = unbatched_query(octree, prefix, query_points, 2)
+        
+        expected_results = torch.tensor(
+            [7,6,5,8,-1,-1], dtype=torch.long, device='cuda')
+
+        assert torch.equal(point_hierarchy[results[:-2]], query_points[:-2])
+        assert torch.equal(expected_results, results)
 
 class TestToDense:
     @pytest.mark.parametrize('with_spc_to_dict', [False, True])
