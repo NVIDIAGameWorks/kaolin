@@ -502,11 +502,11 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         usd_mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts, time=time)
         usd_mesh.GetFaceVertexIndicesAttr().Set(faces_list, time=time)
     if vertices is not None:
-        vertices_list = vertices.cpu().float().numpy()
+        vertices_list = vertices.detach().cpu().float().numpy()
         usd_mesh.GetPointsAttr().Set(Vt.Vec3fArray.FromNumpy(vertices_list), time=time)
     if uvs is not None:
         interpolation = None
-        uvs_list = uvs.view(-1, 2).cpu().float().numpy()
+        uvs_list = uvs.view(-1, 2).detach().cpu().float().numpy()
         pv = UsdGeom.PrimvarsAPI(usd_mesh.GetPrim()).CreatePrimvar(
             "st", Sdf.ValueTypeNames.Float2Array)
         pv.Set(uvs_list, time=time)
@@ -802,7 +802,7 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
     scale = (min_bound / points.size(0) ** (1 / 3)).item()
 
     # Generate instancer parameters
-    positions = points.cpu().tolist()
+    positions = points.detach().cpu().tolist()
     scales = np.asarray([scale, ] * points.size(0))
 
     if points_type == "point_instancer":
@@ -1031,7 +1031,7 @@ def add_voxelgrid(stage, voxelgrid, scene_path, time=None):
 
     # Generate instancer parameters
     indices = [0] * points.shape[0]
-    positions = points.cpu().tolist()
+    positions = points.detach().cpu().tolist()
     scales = [(1.,) * 3] * points.size(0)
 
     # Populate point instancer

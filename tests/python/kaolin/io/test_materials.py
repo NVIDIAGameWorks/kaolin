@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, 20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,6 +73,18 @@ def mesh():
 
 
 class TestPBRMaterial:
+    def test_separate_texture_path(self, out_dir, material_values):
+        file_path = os.path.join(out_dir, 'pbr_test.usda')
+        material_values.write_to_usd(file_path, '/World/Looks/pbr', texture_dir='texture')
+
+        material_in = materials.PBRMaterial().read_from_usd(file_path, '/World/Looks/pbr', texture_path='texture')
+
+        assert material_values.diffuse_color == pytest.approx(material_in.diffuse_color, 0.1)
+        assert material_values.roughness_value == pytest.approx(material_in.roughness_value, 0.1)
+        assert material_values.metallic_value == pytest.approx(material_in.metallic_value, 0.1)
+        assert material_values.specular_color == pytest.approx(material_in.specular_color, 0.1)
+        assert material_values.is_specular_workflow == material_in.is_specular_workflow
+
     def test_cycle_values(self, out_dir, material_values):
         file_path = os.path.join(out_dir, 'pbr_test.usda')
         material_values.write_to_usd(file_path, '/World/Looks/pbr')

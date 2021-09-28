@@ -1,4 +1,5 @@
-# Copyright (c) 2019, 20-21 NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, 20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -268,7 +269,7 @@ class PBRMaterial(Material):
             texture_file_path = os.path.dirname(file_path)
         else:
             usd_dir = os.path.dirname(file_path)
-            texture_file_path = posixpath.join(usd_dir, texture_file_path)
+            texture_file_path = posixpath.join(usd_dir, texture_path)
         stage = Usd.Stage.Open(file_path)
         material = UsdShade.Material(stage.GetPrimAtPath(scene_path))
         assert material

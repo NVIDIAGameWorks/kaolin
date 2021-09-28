@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,126 +14,31 @@
 # limitations under the License.
 
 import torch
-from ..ops.mesh import uniform_laplacian
-from kaolin import _C
-
-class _UnbatchedTriangleDistance(torch.autograd.Function):
-    """torch.autograd.Function for triangle_distance.
-
-    Refer to :func:`triangle_distance`.
-    """
-
-    @staticmethod
-    def forward(ctx, pointcloud, v1, v2, v3):
-        device = pointcloud.device
-        dtype = pointcloud.dtype
-
-        if not pointcloud.is_cuda:
-            raise NotImplementedError("Triangle Distance currently does not support CPU.")
-
-        # For now we don't support half because it will cause issue when backward gradients.
-        if pointcloud.dtype == torch.half:
-            raise NotImplementedError("Currently it doesn't support torch.half.")
-
-        pointcloud = pointcloud.contiguous()
-        v1 = v1.contiguous()
-        v2 = v2.contiguous()
-        v3 = v3.contiguous()
-
-        n, _ = pointcloud.size()
-
-        dist = torch.zeros(n, device=device, dtype=dtype)
-        idx = torch.zeros(n, device=device, dtype=torch.long)
-        dist_type = torch.zeros(n, device=device, dtype=torch.int)
-
-        _C.metrics.unbatched_triangle_distance_forward_cuda(pointcloud, v1, v2, v3, dist, idx, dist_type)
-
-        ctx.save_for_backward(pointcloud, v1, v2, v3, idx, dist_type)
-        ctx.mark_non_differentiable(idx, dist_type)
-
-        return dist, idx, dist_type
-
-    @staticmethod
-    def backward(ctx, grad_output_dist, grad_output_idx, grad_output_type):
-        pointcloud, v1, v2, v3, idx, dist_type = ctx.saved_tensors
-
-        v1 = v1.contiguous()
-        v2 = v2.contiguous()
-        v3 = v3.contiguous()
-
-        grad_input_p = torch.zeros_like(pointcloud)
-        grad_input_v1 = torch.zeros_like(v1)
-        grad_input_v2 = torch.zeros_like(v2)
-        grad_input_v3 = torch.zeros_like(v3)
-
-        grad_output_dist = grad_output_dist.contiguous()
-
-        _C.metrics.unbatched_triangle_distance_backward_cuda(
-            grad_output_dist, pointcloud, v1, v2, v3, idx, dist_type, grad_input_p,
-            grad_input_v1, grad_input_v2, grad_input_v3)
-
-        return grad_input_p, grad_input_v1, grad_input_v2, grad_input_v3
-
-def _point_to_mesh_distance_cuda(pointcloud, vertices, faces):
-    r"""Returns the distance between pointclouds and meshes.
-    For each point in the pointcloud, it finds the nearest triangle
-    in the mesh, and calculated its distance to that triangle. There 
-    are three kind of distances. Type 0 to 2 indicates which edge the point is closest to. 
-    Type 3 indicates the distance is from a point on the surface of the triangle, not an edge.
-
-    Args:
-        pointcloud (torch.Tensor): Batched Pointcloud of shape (B, P, 3)
-        vertices (torch.Tensor): Batched Vertices of shape (B, V, 3) of a Mesh
-        faces (torch.LongTensor): Faces of shape (F, 3) of a Mesh
-
-    Returns:
-        (torch.Tensor, torch.LongTensor, torch.IntTensor): Distance of shape (B, P), corresponding indices of shape (P) in faces,
-        and type of shape (B, P) of distances. 
-    """
-    vertices_dtype = vertices.dtype
-    batch_size = pointcloud.shape[0]
-
-    if vertices.shape[0] != batch_size:
-        raise ValueError(f"Expect pointcloud and vertices to have same batch size, "
-                         f"but got {vertices.shape[0]} for vertices and {batch_size} for pointcloud.")
-
-    # TODO: Move the type casting into cuda backward functions
-    # TODO: Right now this function is sensitive to half datatype when doing compare gradients with double's
-    # gradient. Currently we fix the seed to pass the random half gradients comparision with double gradients.
-    #  need to find a better way in the future.
-
-    all_dists = []
-    all_idx = []
-    all_dist_type = []
-    for i in range(batch_size):
-        v1 = torch.index_select(vertices[i], 0, faces[:, 0])
-        v2 = torch.index_select(vertices[i], 0, faces[:, 1])
-        v3 = torch.index_select(vertices[i], 0, faces[:, 2])
-
-        dist, idx, dist_type = _UnbatchedTriangleDistance.apply(pointcloud[i], v1, v2, v3)
-
-        all_dists.append(dist)
-        all_idx.append(idx)
-        all_dist_type.append(dist_type)
-
-    return torch.stack(all_dists), torch.stack(all_idx), torch.stack(all_dist_type)
+from ..ops.mesh import uniform_laplacian, index_vertices_by_faces
 
 def point_to_mesh_distance(pointclouds, vertices, faces):
     r"""Computes the distances from pointclouds to meshes (represented by vertices and faces.)
     For each point in the pointcloud, it finds the nearest triangle
-    in the mesh, and calculated its distance to that triangle. There 
-    are three kind of distances. Type 0 to 2 indicates which edge the point is closest to. 
-    Type 3 indicates the distance is from a point on the surface of the triangle, not an edge.
+    in the mesh, and calculated its distance to that triangle.
+
+    Type 0 indicates the distance is from a point on the surface of the triangle.
+
+    Type 1 to 3 indicates the distance is from a point to a vertices.
+
+    Type 4 to 6 indicates the distance is from a point to an edge.
 
     Args:
-        pointclouds (torch.Tensor): pointclouds of shape (B, P, 3)
-        vertices (torch.Tensor): vertices of meshes of shape (B, V, 3)
-        faces (torch.LongTensor): faces of meshes of shape (F, 3)
+        pointclouds (torch.Tensor): pointclouds of shape (B, P, 3).
+        vertices (torch.Tensor): vertices of meshes of shape (B, V, 3).
+        faces (torch.LongTensor): faces of meshes of shape (F, 3).
 
     Returns:
-        (torch.Tensor, torch.LongTensor, torch.IntTensor): distance between pointclouds and meshes of shape (B, P),
-                                                           corresponding indices of shape (B, P) in faces,
-                                                           and type of shape (B, P) of distances.  
+        (torch.Tensor, torch.LongTensor, torch.IntTensor):
+
+            - Distances between pointclouds and meshes,
+              of shape :math:`(\text{batch_size}, \text{num_points})`.
+            - face indices selected, of shape :math:`(\text{batch_size}, \text{num_points})`.
+            - Types of distance of shape :math:`(\text{batch_size}, \text{num_points})`.
 
     Example:
         >>> vertices = torch.tensor([[[0, 0, 0],
@@ -147,129 +53,184 @@ def point_to_mesh_distance(pointclouds, vertices, faces):
         >>> index
         tensor([[0, 0]], device='cuda:0')
         >>> dist_type
-        tensor([[1, 1]], device='cuda:0', dtype=torch.int32)
+        tensor([[5, 5]], device='cuda:0', dtype=torch.int32)
     """
+
+    batch_size = pointclouds.shape[0]
+    num_points = pointclouds.shape[1]
     device = pointclouds.device
     dtype = pointclouds.dtype
 
-    batch_size = pointclouds.shape[0]
+    distance = []
+    face_idx = []
+    dist_type = []
 
-    if pointclouds.is_cuda:
-        distance, idx, dist_type = _point_to_mesh_distance_cuda(pointclouds, vertices, faces)
-    else:
-        P = pointclouds.shape[1]
-        distance = torch.zeros((batch_size, P), device=device, dtype=dtype)
-        idx = torch.zeros((batch_size, P), device=device, dtype=torch.long)
-        dist_type = torch.zeros((batch_size, P), device=device, dtype=torch.int)
-
-        for i in range(batch_size):
-            curr_dist, curr_index, curr_dist_type = _point_to_mesh_distance_cpu(pointclouds[i], vertices[i], faces)
-            distance[i] = curr_dist
-            idx[i] = curr_index
-            dist_type[i] = curr_dist_type
-
-    return distance, idx, dist_type
+    for i in range(batch_size):
+        cur_dist, cur_face_idx, cur_dist_type = _unbatched_naive_point_to_mesh_distance(
+            pointclouds[i], vertices[i], faces)
+        distance.append(cur_dist)
+        face_idx.append(cur_face_idx)
+        dist_type.append(cur_dist_type)
+    return torch.stack(distance, dim=0), torch.stack(face_idx, dim=0), \
+        torch.stack(dist_type, dim=0)
 
 def _compute_dot(p1, p2):
-    # batched dot product
-    return torch.bmm(p1.view(p1.shape[0], 1, 3),
-                     p2.view(p2.shape[0], 3, 1)).view(-1)
+    return p1[..., 0] * p2[..., 0] + \
+        p1[..., 1] * p2[..., 1] + \
+        p1[..., 2] * p2[..., 2]
 
-def _compute_planar_dist(normal, point):
-    # batched distance between a point and a tiangle
-    if normal.shape[0] == 0:
-        return normal
-    dot = _compute_dot(normal, point)
-    dot_div = _compute_dot(normal, normal)
-    return dot * dot / dot_div
+def _project_edge(vertex, edge, point):
+    point_vec = point - vertex
+    length = _compute_dot(edge, edge)
+    return _compute_dot(point_vec, edge) / length
 
-def _point_to_mesh_distance_cpu(points, vertices, faces):
-    P = points.shape[0]
-    V = vertices.shape[0]
-    F = faces.shape[0]
+def _project_plane(vertex, normal, point):
+    point_vec = point - vertex
+    unit_normal = normal / torch.norm(normal, dim=-1, keepdim=True)
+    dist = _compute_dot(point_vec, unit_normal)
+    return point - unit_normal * dist.view(-1, 1)
+
+def _is_not_above(vertex, edge, norm, point):
+    edge_norm = torch.cross(norm, edge, dim=-1)
+    return _compute_dot(edge_norm.view(1, -1, 3),
+                        point.view(-1, 1, 3) - vertex.view(1, -1, 3)) <= 0
+
+def _point_at(vertex, edge, proj):
+    return vertex + edge * proj.view(-1, 1)
+
+def _unbatched_naive_point_to_mesh_distance(points, vertices, faces):
+    """
+    description of distance type:
+        - 0: distance to face
+        - 1: distance to vertice 0
+        - 2: distance to vertice 1
+        - 3: distance to vertice 2
+        - 4: distance to edge 0-1
+        - 5: distance to edge 1-2
+        - 6: distance to edge 2-0
+
+    Args:
+        points (torch.Tensor): of shape (num_points, 3).
+        vertices (torch.Tensor): of shape (num_vertces, 3).
+        faces (torch.LongTensor): of shape (num_faces, 3).
+
+    Returns:
+        (torch.Tensor, torch.LongTensor, torch.IntTensor):
+
+            - distance, of shape (num_points).
+            - face_idx, of shape (num_points).
+            - distance_type, of shape (num_points).
+    """
+    num_points = points.shape[0]
+    num_vertices = vertices.shape[0]
+    num_faces = faces.shape[0]
 
     device = points.device
     dtype = points.dtype
 
-    v1 = torch.index_select(vertices, 0, faces[:, 0])
-    v2 = torch.index_select(vertices, 0, faces[:, 1])
-    v3 = torch.index_select(vertices, 0, faces[:, 2])
+    face_vertices = index_vertices_by_faces(vertices.unsqueeze(0), faces)
 
-    v21 = v2 - v1
-    v32 = v3 - v2
-    v13 = v1 - v3
+    v1 = face_vertices[0, :, 0]
+    v2 = face_vertices[0, :, 1]
+    v3 = face_vertices[0, :, 2]
 
-    normals = torch.cross(v21, v13)
+    e21 = v2 - v1
+    e32 = v3 - v2
+    e13 = v1 - v3
+    e21_length = _compute_dot(e21, e21)
+    e32_length = _compute_dot(e32, e32)
+    e13_length = _compute_dot(e13, e13)
 
-    # make more of them, one set for each sampled point
-    v1 = v1.unsqueeze(0).expand(P, F, 3).contiguous().view(-1, 3)
-    v2 = v2.unsqueeze(0).expand(P, F, 3).contiguous().view(-1, 3)
-    v3 = v3.unsqueeze(0).expand(P, F, 3).contiguous().view(-1, 3)
+    normals = -torch.cross(e21, e13)
 
-    v21 = v21.unsqueeze(0).expand(P, F, 3).contiguous().view(-1, 3)
-    v32 = v32.unsqueeze(0).expand(P, F, 3).contiguous().view(-1, 3)
-    v13 = v13.unsqueeze(0).expand(P, F, 3).contiguous().view(-1, 3)
+    uab = _project_edge(v1.view(1, -1, 3), e21.view(1, -1, 3), points.view(-1, 1, 3))
+    ubc = _project_edge(v2.view(1, -1, 3), e32.view(1, -1, 3), points.view(-1, 1, 3))
+    uca = _project_edge(v3.view(1, -1, 3), e13.view(1, -1, 3), points.view(-1, 1, 3))
 
-    normals = normals.unsqueeze(0).expand(P, F, 3).contiguous().view(-1, 3)
+    is_type1 = (uca > 1.) & (uab < 0.)
+    is_type2 = (uab > 1.) & (ubc < 0.)
+    is_type3 = (ubc > 1.) & (uca < 0.)
+    is_type4 = (uab >= 0.) & (uab <= 1.) & _is_not_above(v1, e21, normals, points)
+    is_type5 = (ubc >= 0.) & (ubc <= 1.) & _is_not_above(v2, e32, normals, points)
+    is_type6 = (uca >= 0.) & (uca <= 1.) & _is_not_above(v3, e13, normals, points)
+    is_type0 = ~(is_type1 | is_type2 | is_type3 | is_type4 | is_type5 | is_type6)
 
-    p = points.unsqueeze(1).expand(P, F, 3).contiguous().view(-1, 3)
+    face_idx = torch.zeros(num_points, device=device, dtype=torch.long)
+    all_closest_points = torch.zeros((num_points, num_faces, 3), device=device,
+                                     dtype=dtype)
 
-    p1 = p - v1  # shape (P * F, 3)
-    p2 = p - v2
-    p3 = p - v3
+    all_type0_idx = torch.where(is_type0)
+    all_type1_idx = torch.where(is_type1)
+    all_type2_idx = torch.where(is_type2)
+    all_type3_idx = torch.where(is_type3)
+    all_type4_idx = torch.where(is_type4)
+    all_type5_idx = torch.where(is_type5)
+    all_type6_idx = torch.where(is_type6)
 
-    sign1 = _compute_sign(v21, normals, p1)
-    sign2 = _compute_sign(v32, normals, p2)
-    sign3 = _compute_sign(v13, normals, p3)
+    all_types = is_type1.int() + is_type2.int() * 2 + is_type3.int() * 3 + \
+        is_type4.int() * 4 + is_type5.int() * 5 + is_type6.int() * 6
 
-    outside_triangle = torch.le(torch.abs(sign1 + sign2 + sign3), 2)
-    inside_triangle = torch.logical_not(outside_triangle)
+    all_closest_points[all_type0_idx] = _project_plane(
+        v1[all_type0_idx[1]], normals[all_type0_idx[1]], points[all_type0_idx[0]])
+    all_closest_points[all_type1_idx] = v1.view(-1, 3)[all_type1_idx[1]]
+    all_closest_points[all_type2_idx] = v2.view(-1, 3)[all_type2_idx[1]]
+    all_closest_points[all_type3_idx] = v3.view(-1, 3)[all_type3_idx[1]]
+    all_closest_points[all_type4_idx] = _point_at(v1[all_type4_idx[1]], e21[all_type4_idx[1]],
+                                                  uab[all_type4_idx])
+    all_closest_points[all_type5_idx] = _point_at(v2[all_type5_idx[1]], e32[all_type5_idx[1]],
+                                                  ubc[all_type5_idx])
+    all_closest_points[all_type6_idx] = _point_at(v3[all_type6_idx[1]], e13[all_type6_idx[1]],
+                                                  uca[all_type6_idx])
+    all_vec = (all_closest_points - points.view(-1, 1, 3))
+    all_dist = _compute_dot(all_vec, all_vec)
 
-    outside_triangle = torch.where(outside_triangle)
-    inside_triangle = torch.where(inside_triangle)
+    _, min_dist_idx = torch.min(all_dist, dim=-1)
+    dist_type = all_types[torch.arange(num_points, device=device), min_dist_idx]
 
-    distances = torch.zeros(P * F, device=device, dtype=dtype)
-    distances_type = torch.zeros(P * F, device=device, dtype=torch.int)
+    # Recompute the shortest distances
+    # This reduce the backward pass to the closest faces instead of all faces
+    # O(num_points) vs O(num_points * num_faces)
+    selected_face_vertices = face_vertices[0, min_dist_idx]
+    v1 = selected_face_vertices[:, 0]
+    v2 = selected_face_vertices[:, 1]
+    v3 = selected_face_vertices[:, 2]
 
-    dist1 = _compute_edge_dist(v21[outside_triangle], p1[outside_triangle])
-    dist2 = _compute_edge_dist(v32[outside_triangle], p2[outside_triangle])
-    dist3 = _compute_edge_dist(v13[outside_triangle], p3[outside_triangle])
-    all_distances = torch.cat((dist1, dist2, dist3), dim=1)
-    edge_distance, edge_distance_index = torch.min(all_distances, dim=1)
+    e21 = v2 - v1
+    e32 = v3 - v2
+    e13 = v1 - v3
 
-    distances[outside_triangle] = edge_distance
-    distances_type[outside_triangle] = edge_distance_index.int()
+    normals = -torch.cross(e21, e13)
 
-    face_distance = _compute_planar_dist(normals[inside_triangle], p1[inside_triangle])
+    uab = _project_edge(v1, e21, points)
+    ubc = _project_edge(v2, e32, points)
+    uca = _project_edge(v3, e13, points)
 
-    distances[inside_triangle] = face_distance
-    distances_type[inside_triangle] = 3
+    counter_p = torch.zeros((num_points, 3), device=device, dtype=dtype)
 
-    distances = distances.view(P, F)
+    cond = (dist_type == 1)
+    counter_p[cond] = v1[cond]
 
-    min_distances, distances_index = torch.min(distances, dim=1)
+    cond = (dist_type == 2)
+    counter_p[cond] = v2[cond]
 
-    distances_type = distances_type.view(P, F)
-    distances_type = distances_type.gather(dim=1, index=distances_index.view(-1, 1)).squeeze(-1)
+    cond = (dist_type == 3)
+    counter_p[cond] = v3[cond]
 
-    return min_distances, distances_index, distances_type
+    cond = (dist_type == 4)
+    counter_p[cond] = _point_at(v1, e21, uab)[cond]
 
-def _compute_sign(v, nor, p):
-    sign = torch.cross(v, nor)
-    sign = _compute_dot(sign, p)
-    sign = sign.sign()
-    return sign
+    cond = (dist_type == 5)
+    counter_p[cond] = _point_at(v2, e32, ubc)[cond]
 
-def _compute_edge_dist(v, p):
-    if v.shape[0] == 0:
-        return v
+    cond = (dist_type == 6)
+    counter_p[cond] = _point_at(v3, e13, uca)[cond]
 
-    dotter = _compute_dot(v, p)
-    dotter_div = _compute_dot(v, v)
-    dotter = torch.clamp(dotter / dotter_div, 0.0, 1.0).view(-1, 1)
-    dotter = (v * dotter) - p
-    dist = _compute_dot(dotter, dotter)
-    return dist.view(-1, 1)
+    cond = (dist_type == 0)
+    counter_p[cond] = _project_plane(v1, normals, points)[cond]
+    min_dist = torch.sum((counter_p - points) ** 2, dim=-1)
+
+    return min_dist, min_dist_idx, dist_type
+
 
 def average_edge_length(vertices, faces):
     r"""Returns the average length of each faces in a mesh.
