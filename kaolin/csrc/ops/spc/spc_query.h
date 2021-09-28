@@ -24,8 +24,6 @@
 
 at::Tensor spc_query(
     at::Tensor octree,
-    at::Tensor points,
-    at::Tensor pyramid,
     at::Tensor prefixsum,
     at::Tensor query_points,
     uint targetLevel);

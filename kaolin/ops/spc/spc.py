@@ -239,20 +239,15 @@ def feature_grids_to_spc(feature_grids, masks=None):
     coalescent_features = torch.cat(coalescent_features, dim=0)
     return octrees, lengths, coalescent_features
 
-def unbatched_query(octree, point_hierarchy, pyramid, exsum, query_points, level):
+def unbatched_query(octree, exsum, query_points, level):
     r"""Query point indices from the octree.
 
     Given a point hierarchy, this function will efficiently find the corresponding indices of the
     points in the points tensor. For each input in query_points, returns a index to the points tensor.
+    Returns -1 if the point does not exist.
 
     Args:
         octree (torch.ByteTensor): The octree, of shape :math:`(\text{num_bytes})`.
-        point_hierarchy (torch.ShortTensor):
-            The points hierarchy, of shape :math:`(\text{num_points}, 3)`.
-            See :ref:`spc_points` for more details.
-        pyramid (torch.IntTensor): The pyramid info of the point hierarchy,
-                                   of shape :math:`(2, \text{max_level} + 2)`.
-                                   See :ref:`spc_pyramids` for more details.
         exsum (torch.IntTensor): The exclusive sum of the octree bytes,
                                  of shape :math:`(\text{num_bytes} + 1)`.
                                  See :ref:`spc_pyramids` for more details.
@@ -260,6 +255,5 @@ def unbatched_query(octree, point_hierarchy, pyramid, exsum, query_points, level
                                           of shape :math:`(\text{num_query}, 3)`.
         level (int): The level of the octree to query from.
     """
-    return _C.ops.spc.spc_query(octree.contiguous(), point_hierarchy.contiguous(),
-                                pyramid.contiguous(), exsum.contiguous(),
-                                query_points.contiguous(), level)
+    return _C.ops.spc.spc_query(octree.contiguous(), exsum.contiguous(),
+                                query_points.contiguous(), level).long()
