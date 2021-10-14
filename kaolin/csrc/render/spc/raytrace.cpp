@@ -136,12 +136,11 @@ std::vector<at::Tensor> generate_primary_rays(
   float ar = (float)imageW / (float)imageH;
   float tanHalfFov = tanf(0.5f * fov);
 
-  // version where pixel origin is upper left
   float4x4 mPvpInv = make_float4x4(
       2.0f * ar * tanHalfFov / imageW, 0.0f, 0.0f, 0.0f,
-      0.0f, -2.0f * tanHalfFov / imageH, 0.0f, 0.0f,
+      0.0f, 2.0f * tanHalfFov / imageH, 0.0f, 0.0f,
       0.0f, 0.0f, 0.0f, 1.0f,
-      ar * tanHalfFov * (1.0f - imageW) / imageW, tanHalfFov * (imageH - 1.0f) / imageH, -1.0f, 0.0f);
+      ar * tanHalfFov * (1.0f - imageW) / imageW, tanHalfFov * (1.0f - imageH) / imageH, -1.0f, 0.0f);
 
   float3 z = normalize(at - eye);
   float3 x = normalize(crs3(z, up));
@@ -153,12 +152,7 @@ std::vector<at::Tensor> generate_primary_rays(
     -z.x, -z.y, -z.z, 0.0f,
     eye.x, eye.y, eye.z, 1.0f);
 
-  float4x4 mCubeInv = make_float4x4(0.5f, 0.0f, 0.0f, 0.0f,
-                                    0.0f, 0.5f, 0.0f, 0.0f,
-                                    0.0f, 0.0f, 0.5f, 0.0f,
-                                    0.5f, 0.5f, 0.5f, 1.0f);
-
-  float4x4 mWVPInv = mPvpInv * mViewInv * mWorldInv * mCubeInv;
+  float4x4 mWVPInv = mPvpInv * mViewInv * mWorldInv;
 
   generate_primary_rays_cuda(imageW, imageH, mWVPInv, d_org, d_dir);
 
