@@ -225,7 +225,7 @@ at::Tensor spc_raytrace(
   void* d_temp_storage = NULL;
   uint64_t temp_storage_bytes = GetStorageBytes(
       d_temp_storage, d_Info, d_PrefixSum, KAOLIN_SPC_MAX_POINTS);
-  at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, octree.options());
+  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, octree.options());
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
   // do cuda
@@ -260,7 +260,7 @@ at::Tensor remove_duplicate_rays(
 
   void* d_temp_storage = NULL;
   uint64_t temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
-  at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, nuggets.options().dtype(at::kByte));
+  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, nuggets.options().dtype(at::kByte));
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
 
@@ -319,7 +319,7 @@ std::vector<at::Tensor> generate_shadow_rays(
   // set up memory for DeviceScan calls
   void* d_temp_storage = NULL;
   uint64_t temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
-  at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, Org.options().dtype(at::kByte));
+  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, Org.options().dtype(at::kByte));
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
 
