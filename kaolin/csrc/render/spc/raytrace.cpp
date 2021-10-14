@@ -32,7 +32,7 @@ using namespace at::indexing;
 
 #ifdef WITH_CUDA
 
-uint64_t GetStorageBytes(
+ulong GetStorageBytes(
   void* d_temp_storage,
   uint* d_Info,
   uint* d_PrefixSum,
@@ -59,7 +59,7 @@ uint spc_raytrace_cuda(
     uint*  d_Info,
     uint*  d_PrefixSum,
     void* d_temp_storage,
-    uint64_t temp_storage_bytes);
+    ulong temp_storage_bytes);
 
 uint remove_duplicate_rays_cuda(
   uint num,
@@ -68,7 +68,7 @@ uint remove_duplicate_rays_cuda(
   uint* d_Info,
   uint* d_PrefixSum,
   void* d_temp_storage,
-  uint64_t temp_storage_bytes);
+  ulong temp_storage_bytes);
 
 void mark_first_hit_cuda(
   uint num,
@@ -87,7 +87,7 @@ uint generate_shadow_rays_cuda(
   uint* info,
   uint* prefixSum,
   void* d_temp_storage,
-  uint64_t temp_storage_bytes);
+  ulong temp_storage_bytes);
 
 
 void ray_aabb_cuda(
@@ -136,12 +136,11 @@ std::vector<at::Tensor> generate_primary_rays(
   float ar = (float)imageW / (float)imageH;
   float tanHalfFov = tanf(0.5f * fov);
 
-  // version where pixel origin is upper left
   float4x4 mPvpInv = make_float4x4(
       2.0f * ar * tanHalfFov / imageW, 0.0f, 0.0f, 0.0f,
-      0.0f, -2.0f * tanHalfFov / imageH, 0.0f, 0.0f,
+      0.0f, 2.0f * tanHalfFov / imageH, 0.0f, 0.0f,
       0.0f, 0.0f, 0.0f, 1.0f,
-      ar * tanHalfFov * (1.0f - imageW) / imageW, tanHalfFov * (imageH - 1.0f) / imageH, -1.0f, 0.0f);
+      ar * tanHalfFov * (1.0f - imageW) / imageW, tanHalfFov * (1.0f - imageH) / imageH, -1.0f, 0.0f);
 
   float3 z = normalize(at - eye);
   float3 x = normalize(crs3(z, up));
@@ -153,12 +152,7 @@ std::vector<at::Tensor> generate_primary_rays(
     -z.x, -z.y, -z.z, 0.0f,
     eye.x, eye.y, eye.z, 1.0f);
 
-  float4x4 mCubeInv = make_float4x4(0.5f, 0.0f, 0.0f, 0.0f,
-                                    0.0f, 0.5f, 0.0f, 0.0f,
-                                    0.0f, 0.0f, 0.5f, 0.0f,
-                                    0.5f, 0.5f, 0.5f, 1.0f);
-
-  float4x4 mWVPInv = mPvpInv * mViewInv * mWorldInv * mCubeInv;
+  float4x4 mWVPInv = mPvpInv * mViewInv * mWorldInv;
 
   generate_primary_rays_cuda(imageW, imageH, mWVPInv, d_org, d_dir);
 
@@ -229,9 +223,9 @@ at::Tensor spc_raytrace(
 
   // set up memory for DeviceScan calls
   void* d_temp_storage = NULL;
-  uint64_t temp_storage_bytes = GetStorageBytes(
+  ulong temp_storage_bytes = GetStorageBytes(
       d_temp_storage, d_Info, d_PrefixSum, KAOLIN_SPC_MAX_POINTS);
-  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, octree.options());
+  at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, octree.options());
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
   // do cuda
@@ -265,8 +259,8 @@ at::Tensor remove_duplicate_rays(
   uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
-  uint64_t temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
-  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, nuggets.options().dtype(at::kByte));
+  ulong temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
+  at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, nuggets.options().dtype(at::kByte));
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
 
@@ -324,8 +318,8 @@ std::vector<at::Tensor> generate_shadow_rays(
 
   // set up memory for DeviceScan calls
   void* d_temp_storage = NULL;
-  uint64_t temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
-  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, Org.options().dtype(at::kByte));
+  ulong temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
+  at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, Org.options().dtype(at::kByte));
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
 
