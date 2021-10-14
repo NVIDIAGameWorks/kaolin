@@ -32,7 +32,7 @@ using namespace at::indexing;
 
 #ifdef WITH_CUDA
 
-ulong GetStorageBytes(
+uint64_t GetStorageBytes(
   void* d_temp_storage,
   uint* d_Info,
   uint* d_PrefixSum,
@@ -59,7 +59,7 @@ uint spc_raytrace_cuda(
     uint*  d_Info,
     uint*  d_PrefixSum,
     void* d_temp_storage,
-    ulong temp_storage_bytes);
+    uint64_t temp_storage_bytes);
 
 uint remove_duplicate_rays_cuda(
   uint num,
@@ -68,7 +68,7 @@ uint remove_duplicate_rays_cuda(
   uint* d_Info,
   uint* d_PrefixSum,
   void* d_temp_storage,
-  ulong temp_storage_bytes);
+  uint64_t temp_storage_bytes);
 
 void mark_first_hit_cuda(
   uint num,
@@ -87,7 +87,7 @@ uint generate_shadow_rays_cuda(
   uint* info,
   uint* prefixSum,
   void* d_temp_storage,
-  ulong temp_storage_bytes);
+  uint64_t temp_storage_bytes);
 
 
 void ray_aabb_cuda(
@@ -223,7 +223,7 @@ at::Tensor spc_raytrace(
 
   // set up memory for DeviceScan calls
   void* d_temp_storage = NULL;
-  ulong temp_storage_bytes = GetStorageBytes(
+  uint64_t temp_storage_bytes = GetStorageBytes(
       d_temp_storage, d_Info, d_PrefixSum, KAOLIN_SPC_MAX_POINTS);
   at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, octree.options());
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
@@ -259,7 +259,7 @@ at::Tensor remove_duplicate_rays(
   uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
-  ulong temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
+  uint64_t temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
   at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, nuggets.options().dtype(at::kByte));
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
@@ -318,7 +318,7 @@ std::vector<at::Tensor> generate_shadow_rays(
 
   // set up memory for DeviceScan calls
   void* d_temp_storage = NULL;
-  ulong temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
+  uint64_t temp_storage_bytes = GetStorageBytes(d_temp_storage, d_Info, d_PrefixSum, num);
   at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, Org.options().dtype(at::kByte));
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
