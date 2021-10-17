@@ -60,7 +60,11 @@ def _base_points_to_voxelgrids(points, resolution, return_sparse=False):
     pc_index = pc_index[row_cond, :]
     pc_index = pc_index.reshape(-1, 4)
 
-    vg = torch.sparse.FloatTensor(pc_index.T, torch.ones(pc_index.shape[0], device=pc_index.device), vg_size)
+    vg = torch.sparse.FloatTensor(
+        pc_index.T,
+        torch.ones(pc_index.shape[0], device=pc_index.device, dtype=dtype),
+        vg_size
+    )
 
     if not return_sparse:
         vg = vg.to_dense().to(dtype)
