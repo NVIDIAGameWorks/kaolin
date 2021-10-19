@@ -20,10 +20,8 @@ from kaolin.ops.conversions import trianglemeshes_to_voxelgrids
 from kaolin.utils.testing import FLOAT_TYPES
 
 
-@pytest.mark.parametrize(
-    'device, dtype, return_sparse',
-    [x + (return_sparse, ) for x in FLOAT_TYPES for return_sparse in [True, False]]
-)
+@pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
+@pytest.mark.parametrize('return_sparse', [True, False])
 class TestTriangleMeshToVoxelgrid:
 
     def test_resolution_type(self, device, dtype, return_sparse):
