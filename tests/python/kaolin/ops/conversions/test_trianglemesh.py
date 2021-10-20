@@ -19,10 +19,12 @@ import torch
 from kaolin.ops.conversions import trianglemeshes_to_voxelgrids
 from kaolin.utils.testing import FLOAT_TYPES
 
+
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
+@pytest.mark.parametrize('return_sparse', [True, False])
 class TestTriangleMeshToVoxelgrid:
 
-    def test_resolution_type(self, device, dtype):
+    def test_resolution_type(self, device, dtype, return_sparse):
         vertices = torch.tensor([[[0, 0, 0],
                                   [1, 0, 0],
                                   [0, 0, 1]]], dtype=dtype, device=device)
@@ -35,9 +37,11 @@ class TestTriangleMeshToVoxelgrid:
 
         with pytest.raises(TypeError, match=r"Expected resolution to be int "
                                             r"but got .*"):
-            trianglemeshes_to_voxelgrids(vertices, faces, 2.3, origins, scale)
+            trianglemeshes_to_voxelgrids(
+                vertices, faces, 2.3, origins, scale, return_sparse
+            )
 
-    def test_mesh_to_voxel_batched(self, device, dtype):
+    def test_mesh_to_voxel_batched(self, device, dtype, return_sparse):
         vertices = torch.tensor([[[0, 0, 0],
                                   [1, 0, 0],
                                   [0, 0, 1]],
@@ -52,7 +56,9 @@ class TestTriangleMeshToVoxelgrid:
 
         scale = torch.ones((2), dtype=dtype, device=device)
 
-        output = trianglemeshes_to_voxelgrids(vertices, faces, 3, origins, scale)
+        output = trianglemeshes_to_voxelgrids(
+            vertices, faces, 3, origins, scale, return_sparse
+        )
 
         # output voxelgrid should have value around the corner
         expected = torch.tensor([[[[1., 1., 1.],
@@ -79,9 +85,11 @@ class TestTriangleMeshToVoxelgrid:
                                    [0., 0., 0.],
                                    [0., 0., 0.]]]],device=device, dtype=dtype)
 
+        if return_sparse:
+            output = output.to_dense()
         assert torch.equal(output, expected)
 
-    def test_mesh_to_voxel_origins(self, device, dtype):
+    def test_mesh_to_voxel_origins(self, device, dtype, return_sparse):
         vertices = torch.tensor([[[0, 0, 0],
                                   [1, 0, 0],
                                   [0, 0, 1]]], dtype=dtype, device=device)
@@ -93,7 +101,9 @@ class TestTriangleMeshToVoxelgrid:
 
         scale = torch.ones((1), dtype=dtype, device=device)
 
-        output = trianglemeshes_to_voxelgrids(vertices, faces, 3, origins, scale)
+        output = trianglemeshes_to_voxelgrids(
+            vertices, faces, 3, origins, scale, return_sparse
+        )
 
         expected = torch.tensor([[[[1., 1., 0.],
                                    [0., 0., 0.],
@@ -106,9 +116,12 @@ class TestTriangleMeshToVoxelgrid:
                                   [[0., 0., 0.],
                                    [0., 0., 0.],
                                    [0., 0., 0.]]]], device=device, dtype=dtype)
+
+        if return_sparse:
+            output = output.to_dense()
         assert torch.equal(output, expected)
 
-    def test_mesh_to_voxel_scale(self, device, dtype):
+    def test_mesh_to_voxel_scale(self, device, dtype, return_sparse):
         vertices = torch.tensor([[[0, 0, 0],
                                   [1, 0, 0],
                                   [0, 0, 1]]], dtype=dtype, device=device)
@@ -119,7 +132,9 @@ class TestTriangleMeshToVoxelgrid:
 
         scale = torch.ones((1), dtype=dtype, device=device) * 2
 
-        output = trianglemeshes_to_voxelgrids(vertices, faces, 3, origins, scale)
+        output = trianglemeshes_to_voxelgrids(
+            vertices, faces, 3, origins, scale, return_sparse
+        )
 
         expected = torch.tensor([[[[1., 1., 0.],
                                    [0., 0., 0.],
@@ -133,9 +148,11 @@ class TestTriangleMeshToVoxelgrid:
                                    [0., 0., 0.],
                                    [0., 0., 0.]]]], device=device, dtype=dtype)
 
+        if return_sparse:
+            output = output.to_dense()
         assert torch.equal(output, expected)
 
-    def test_mesh_to_voxel_resolution_3(self, device, dtype):
+    def test_mesh_to_voxel_resolution_3(self, device, dtype, return_sparse):
         vertices = torch.tensor([[[0, 0, 0],
                                   [1, 0, 0],
                                   [0, 0, 1]]], dtype=dtype, device=device)
@@ -146,7 +163,9 @@ class TestTriangleMeshToVoxelgrid:
 
         scale = torch.ones((1), dtype=dtype, device=device)
 
-        output = trianglemeshes_to_voxelgrids(vertices, faces, 3, origins, scale)
+        output = trianglemeshes_to_voxelgrids(
+            vertices, faces, 3, origins, scale, return_sparse
+        )
 
         expected = torch.tensor([[[[1., 1., 1.],
                                    [0., 0., 0.],
@@ -160,9 +179,11 @@ class TestTriangleMeshToVoxelgrid:
                                    [0., 0., 0.],
                                    [0., 0., 0.]]]], device=device, dtype=dtype)
 
+        if return_sparse:
+            output = output.to_dense()
         assert torch.equal(output, expected)
     
-    def test_rectangle(self, device, dtype):
+    def test_rectangle(self, device, dtype, return_sparse):
         vertices = torch.tensor([[0, 0, 0],
                                  [8, 0, 0],
                                  [0, 8, 0],
@@ -191,7 +212,9 @@ class TestTriangleMeshToVoxelgrid:
 
         scale = torch.ones((1), dtype=dtype, device=device) * 8
 
-        output = trianglemeshes_to_voxelgrids(vertices.unsqueeze(0), faces, 4, origin, scale)
+        output = trianglemeshes_to_voxelgrids(
+            vertices.unsqueeze(0), faces, 4, origin, scale, return_sparse
+        )
 
         expected = torch.tensor([[[[1., 1., 1., 1.],
                                    [1., 1., 1., 1.],
@@ -213,4 +236,6 @@ class TestTriangleMeshToVoxelgrid:
                                    [1., 1., 1., 1.],
                                    [1., 1., 1., 1.]]]], device=device, dtype=dtype)
 
+        if return_sparse:
+            output = output.to_dense()
         assert torch.equal(output, expected)
