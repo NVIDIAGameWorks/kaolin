@@ -108,43 +108,39 @@ class TestDownsample:
         expected = torch.ones((2, 2, 2, 2), device=device, dtype=expected_dtype) * 0.5
         assert torch.equal(output, expected)
 
-# Don't test for torch.bool because extract_surface uses avg_pool, which doesn't support bool.
+
 @pytest.mark.parametrize('device,dtype', FLOAT_TYPES + BOOL_TYPES)
+@pytest.mark.parametrize('mode', ['wide', 'thin'])
 class TestExtractSurface:
 
-    def test_input_size(self, device, dtype):
+    def test_valid_mode(self, device, dtype, mode):
+        voxelgrids = torch.ones((1, 1, 1, 1), device=device, dtype=dtype)
+        with pytest.raises(ValueError, match='mode "this is not a valid mode" is not supported.'):
+            vg.extract_surface(voxelgrids, mode="this is not a valid mode")
+
+    def test_input_size(self, device, dtype, mode):
         voxelgrids = torch.ones((3, 3, 3), device=device, dtype=dtype)
         with pytest.raises(ValueError, 
                            match="Expected voxelgrids to have 4 dimensions " 
                                  "but got 3 dimensions."):
-            vg.extract_surface(voxelgrids)
+            vg.extract_surface(voxelgrids, mode=mode)
 
-    def test_output_value(self, device, dtype):
+    def test_output_value(self, device, dtype, mode):
         voxelgrids = torch.ones((2, 4, 4, 4), device=device, dtype=dtype)
-        surface = vg.extract_surface(voxelgrids)
+        voxelgrids[0, 0, 0, 0] = 0  # Remove a voxel on a corner
+        voxelgrids[1, 1, 0, 0] = 0  # Remove a voxel on an edge
+        expected = voxelgrids.clone().bool()
 
-        expected = torch.ones((2, 4, 4, 4), device=device, dtype=torch.bool)
-        expected[0, 1:3, 1:3, 1:3] = torch.zeros((2, 2, 2))
-        expected[1, 1:3, 1:3, 1:3] = torch.zeros((2, 2, 2))
+        surface = vg.extract_surface(voxelgrids, mode=mode)
 
+        expected[0, 1:3, 1:3, 1:3] = 0
+        expected[1, 1:3, 1:3, 1:3] = 0
+        if mode == 'wide':
+            expected[0, 1, 1, 1] = 1
+            expected[1, 1:3, 1, 1] = 1
 
         assert torch.equal(surface, expected)
 
-
-    def test_output_batch(self, device, dtype):
-        # The size and value of the batched input shoud be correct.
-        voxelgrid1 = torch.ones([3, 3, 3], device=device, dtype=dtype)
-        voxelgrid2 = torch.ones((3, 3, 3), device=device, dtype=dtype)
-
-        batched_voxelgrids = torch.stack((voxelgrid1, voxelgrid2))
-        output = vg.extract_surface(batched_voxelgrids)
-
-        expected1 = torch.ones((3, 3, 3), device=device, dtype=torch.bool)
-        expected1[1, 1, 1] = 0
-        expected2 = torch.ones((3, 3, 3), device=device, dtype=torch.bool)
-        expected2[1, 1, 1] = 0
-        expected = torch.stack((expected1, expected2))
-        assert torch.equal(output, expected)
 
 @pytest.mark.parametrize('device,dtype', FLOAT_TYPES + BOOL_TYPES)
 class TestExtractOdms:

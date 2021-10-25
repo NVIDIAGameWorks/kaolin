@@ -87,12 +87,16 @@ def downsample(voxelgrids, scale):
     return output.squeeze(1)
 
 
-def extract_surface(voxelgrids):
+def extract_surface(voxelgrids, mode="wide"):
     r"""Removes any internal structure(s) from a voxelgrids.
 
     Args:
         voxelgrids (torch.Tensor): Binary voxelgrids of shape (N, X, Y ,Z)
                                    from which to extract surface
+        mode (str): Either "wide" or "thin". Each voxel can be seen as a cube in a grid.
+                    "wide" mode keeps each filled voxel with at least one vertex in contact
+                    with an empty voxel. "thin" mode keeps each filled voxel with at least
+                    one face in contact with an empty voxel.
 
     Returns:
         torch.BoolTensor: binary surface voxelgrids tensor
@@ -115,22 +119,23 @@ def extract_surface(voxelgrids):
     """
     voxelgrids = _force_float(voxelgrids)
 
-    try:
-        output = F.avg_pool3d(voxelgrids.unsqueeze(1), 
-                              kernel_size=(3, 3, 3), padding=1, stride=1).squeeze(1)
-    except RuntimeError as err:
-        if voxelgrids.ndim != 4:
-            voxelgrids_dim = voxelgrids.ndim
-            raise ValueError(f"Expected voxelgrids to have 4 dimensions " 
-                             f"but got {voxelgrids_dim} dimensions.")
+    if voxelgrids.ndim != 4:
+        voxelgrids_dim = voxelgrids.ndim
+        raise ValueError(f"Expected voxelgrids to have 4 dimensions "
+                         f"but got {voxelgrids_dim} dimensions.")
 
-
-        raise err  # Unknown error
-
-    output = (output < 1) * voxelgrids.bool()
+    if mode == "wide":
+        output = F.avg_pool3d(voxelgrids.unsqueeze(1), kernel_size=(3, 3, 3), padding=1, stride=1).squeeze(1)
+        output = (output < 1) * voxelgrids.bool()
+    elif mode == "thin":
+        output_x = F.avg_pool3d(voxelgrids.unsqueeze(1), kernel_size=(3, 1, 1), padding=(1, 0, 0), stride=1).squeeze(1)
+        output_y = F.avg_pool3d(voxelgrids.unsqueeze(1), kernel_size=(1, 3, 1), padding=(0, 1, 0), stride=1).squeeze(1)
+        output_z = F.avg_pool3d(voxelgrids.unsqueeze(1), kernel_size=(1, 1, 3), padding=(0, 0, 1), stride=1).squeeze(1)
+        output = ((output_x < 1) | (output_y < 1) | (output_z < 1)) * voxelgrids.bool()
+    else:
+        raise ValueError(f'mode "{mode}" is not supported.')
 
     return output
-
 
 
 def fill(voxelgrids):
