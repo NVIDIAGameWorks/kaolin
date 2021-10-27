@@ -149,14 +149,16 @@ def get_scripts():
 def get_extensions():
     extra_compile_args = {'cxx': ['-O3']}
     define_macros = []
+    include_dirs = []
     sources = glob.glob('kaolin/csrc/**/*.cpp', recursive=True)
     # FORCE_CUDA is for cross-compilation in docker build
     if torch.cuda.is_available() or os.getenv('FORCE_CUDA', '0') == '1':
         with_cuda = True
-        define_macros += [("WITH_CUDA", None)]
+        define_macros += [("WITH_CUDA", None), ("THRUST_IGNORE_CUB_VERSION_CHECK", None)]
         sources += glob.glob('kaolin/csrc/**/*.cu', recursive=True)
         extension = CUDAExtension
         extra_compile_args.update({'nvcc': ['-O3']})
+        include_dirs = get_include_dirs()
     else:
         extension = CppExtension
         with_cuda = False
@@ -166,7 +168,8 @@ def get_extensions():
             name='kaolin._C',
             sources=sources,
             define_macros=define_macros,
-            extra_compile_args=extra_compile_args
+            extra_compile_args=extra_compile_args,
+            include_dirs=include_dirs
         )
     )
 
@@ -228,7 +231,6 @@ if __name__ == '__main__':
         scripts=get_scripts(),
         include_package_data=True,
         install_requires=get_requirements(),
-        include_dirs=get_include_dirs(),
         zip_safe=False,
         ext_modules=get_extensions(),
         cmdclass={
