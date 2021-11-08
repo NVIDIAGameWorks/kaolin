@@ -99,9 +99,136 @@ except for code under [csrc](kaolin/csrc) or [experimental](kaolin/experimental)
 * [tests](tests/) - Tests for all Kaolin
 
 #### C++ coding style
-We follow [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html)
+We follow [Google C++ Style Guide](https://google.github.io/styleguide/cppguide.html), with exception on naming for functions / methods, where we use **snake_case**.
 
-It is enforced using [Clang-Tidy](https://clang.llvm.org/extra/clang-tidy/index.html)
+Files structure should be:
+- ``*.cuh`` files are for reusable device functions (using ``static inline __device__`` for definition)
+
+```cpp
+// file is kaolin/csrc/ops/add.cuh
+
+#ifndef KAOLIN_OPS_ADD_CUH_
+#define KAOLIN_OPS_ADD_CUH_
+
+namespace kaolin {
+
+static inline __device__ float add(float a, float b) {
+  return a + b;
+}
+
+static inline __device__ double add(double a, double b) {
+  return a + b;
+}
+
+}  // namespace kaolin
+
+#endif  // KAOLIN_OPS_ADD_CUH_
+```
+
+- ``*.cpp`` files (except specific files like [bindings.cpp](kaolin/csrc/bindings.cpp)) should be used for defining the functions that will be directly binded to python, those functions should only be responsible for checking inputs device / memory layout / size, generating output (if possible) and call the base function in the ``_cuda.cu`` or ``_cpu.cpp``. The kernel launcher should be declared at the beginning of the file or from an included header (if reused).
+
+```cpp
+// file is kaolin/csrc/ops/foo.cpp
+
+#include <ATen/ATen.h>
+
+namespace kaolin {
+
+#if WITH_CUDA
+void foo_cuda_impl(
+    at::Tensor lhs,
+    at::Tensor rhs,
+    at::Tensor output);
+#endif  // WITH_CUDA
+
+at::Tensor foo_cuda(
+    at::Tensor lhs,
+    at::Tensor rhs) {
+#if WITH_CUDA
+  at::TensorArg lhs_arg{lhs, "lhs", 1}, rhs_arg{rhs, "rhs", 2};
+  at::checkSameGPU("foo_cuda", lhs_arg, rhs_arg);
+  at::checkAllContiguous("foo_cuda", {lhs_arg, rhs_arg});
+  at::checkSameSize("foo_cuda", lhs_arg, rhs_arg);
+  at::checkSameType("foo_cuda", lhs_arg, rhs_arg);
+
+  at::Tensor output = at::zeros_like(lhs);
+
+  foo_cuda_impl(lhs, rhs, output);
+
+  return output;
+#else
+  AT_ERROR("In foo_cuda: Kaolin built without CUDA, cannot run with GPU tensors");
+#endif  // WITH_CUDA
+}
+
+}  // namespace kaolin
+```
+
+- ``*_cuda.cu`` files are for dispatching given the inputs types and implementing the operations on GPU, by using the Torch C++ API and/or launching a custom cuda kernel.
+
+```cpp
+// file is kaolin/csrc/ops/foo_cuda.cu
+
+#include <ATen/ATen.h>
+#include <c10/cuda/CUDAGuard.h>
+#include "./add.cuh"
+
+namespace kaolin {
+
+template<typename scalar_t>
+__global__
+void foo_cuda_kernel(
+    const scalar_t* __restrict__ lhs,
+    const scalar_t* __restrict__ rhs,
+    const int numel,
+    scalar_t* __restrict__ output) {
+  for (int i = threadIdx.x + blockIdx.x * blockDim.x;
+       i < numel; i++) {
+    output[i] = add(lhs[i], rhs[i]);
+  }
+}
+
+void foo_cuda_impl(
+    at::Tensor lhs,
+    at::Tensor rhs,
+    at::Tensor output) {
+  const int threads = 1024;
+  const int blocks = 64;
+  AT_DISPATCH_FLOATING_TYPES(lhs.scalar_type(), "foo_cuda", [&] {
+    const at::cuda::OptionalCUDAGuard device_guard(at::device_of(output));
+    auto stream = at::cuda::getCurrentCUDAStream();
+    foo_cuda_kernel<<<blocks, threads, 0, stream>>>(
+        lhs.data_ptr<scalar_t>(),
+        rhs.data_ptr<scalar_t>(),
+        lhs.numel(),
+        output.data_ptr<scalar_t>());
+  });
+}
+
+}  // namespace kaolin
+```
+
+- ``*.h`` files are for declaring functions that will be binded to Python, those header files are to be included in [bindings.cpp](kaolin/csrc/bindings.cpp).
+
+```cpp
+// file is kaolin/csrc/ops/foo.h
+
+#ifndef KAOLIN_OPS_FOO_H_
+#define KAOLIN_OPS_FOO_H_
+
+#include <ATen/ATen.h>
+
+namespace kaolin {
+
+at::Tensor foo_cuda(
+    at::Tensor lhs,
+    at::Tensor rhs);
+
+}  // namespace kaolin
+
+#endif  // KAOLIN_OPS_FOO_H_
+```
+
 
 #### Python coding style
 We follow [PEP8 Style Guide](https://www.python.org/dev/peps/pep-0008/) with some exceptions listed in [flake8 config file](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/.flake8) and generally follow PyTorch naming conventions.
