@@ -1,4 +1,5 @@
-# Copyright (c) 2020,21 NVIDIA CORPORATION & AFFILIATES.. All rights reserved.
+# Copyright (c) 2020,21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -74,6 +75,7 @@ class Cache(object):
         return self._read(fpath)
 
     def _write(self, x, fpath):
+        fpath.parent.mkdir(parents=True, exist_ok=True)
         torch.save(x, fpath)
 
     def _read(self, fpath):
