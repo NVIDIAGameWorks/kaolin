@@ -252,7 +252,6 @@ class ProcessedDataset(KaolinDataset):
 
     def get_data(self, index):
         """Returns the data at the given index. """
-        print(index)
         data = (self._get_base_data(index) if self.cache_convert is None else
                 self.cache_convert.try_get(self.get_cache_key(index)))
 
