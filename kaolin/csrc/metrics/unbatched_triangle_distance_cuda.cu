@@ -14,9 +14,9 @@
 // limitations under the License.
 
 #include <math.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
+
 #include <ATen/ATen.h>
+#include <c10/cuda/CUDAGuard.h>
 #include <THC/THCAtomics.cuh>
 
 #include "../utils.h"
@@ -396,31 +396,22 @@ __global__ void unbatched_triangle_distance_backward_cuda_kernel(
 
 }
 
-#define DISPATCH_INPUT_TYPES(TYPE, TYPE_NAME, SCOPE_NAME, ...) \
-  [&] { \
-    switch(TYPE) \
-    { \
-      PRIVATE_CASE_TYPE(at::ScalarType::Float, float, TYPE_NAME, __VA_ARGS__) \
-      PRIVATE_CASE_TYPE(at::ScalarType::Double, double, TYPE_NAME, __VA_ARGS__) \
-      default: \
-        AT_ERROR(#SCOPE_NAME, " not implemented for '", toString(TYPE), "'"); \
-    } \
-  }()
-
-
-void unbatched_triangle_distance_forward_cuda_kernel_launcher(
+void unbatched_triangle_distance_forward_cuda_impl(
     at::Tensor points,
     at::Tensor face_vertices,
     at::Tensor dist,
     at::Tensor face_idx,
     at::Tensor dist_type) {
-  DISPATCH_INPUT_TYPES(points.scalar_type(), scalar_t,
-                       "unbatched_triangle_distance_forward_cuda_kernel", [&] {
-    const int num_threads = 512;
-    const int num_points = points.size(0);
-    const int num_blocks = (num_points + num_threads - 1) / num_threads;
-    using vector_t = ScalarTypeToVec3<scalar_t>::type; 
-    unbatched_triangle_distance_forward_cuda_kernel<scalar_t, vector_t, 512><<<num_blocks, num_threads>>>(
+  const int num_threads = 512;
+  const int num_points = points.size(0);
+  const int num_blocks = (num_points + num_threads - 1) / num_threads;
+  AT_DISPATCH_FLOATING_TYPES(points.scalar_type(), scalar_t,
+                             "unbatched_triangle_distance_forward_cuda", [&] {
+    using vector_t = ScalarTypeToVec3<scalar_t>::type;
+    const at::cuda::OptionalCUDAGuard device_guard(at::device_of(points));
+    auto stream = at::cuda::getCurrentCUDAStream();
+    unbatched_triangle_distance_forward_cuda_kernel<scalar_t, vector_t, 512><<<
+      num_blocks, num_threads, 0, stream>>>(
         reinterpret_cast<vector_t*>(points.data_ptr<scalar_t>()),
         reinterpret_cast<vector_t*>(face_vertices.data_ptr<scalar_t>()),
         points.size(0),
@@ -428,12 +419,11 @@ void unbatched_triangle_distance_forward_cuda_kernel_launcher(
         dist.data_ptr<scalar_t>(),
         face_idx.data_ptr<int64_t>(),
         dist_type.data_ptr<int32_t>());
-    cudaDeviceSynchronize();
     CUDA_CHECK(cudaGetLastError());
   });
 }
 
-void unbatched_triangle_distance_backward_cuda_kernel_launcher(
+void unbatched_triangle_distance_backward_cuda_impl(
     at::Tensor grad_dist,
     at::Tensor points,
     at::Tensor face_vertices,
@@ -444,10 +434,13 @@ void unbatched_triangle_distance_backward_cuda_kernel_launcher(
   const int num_threads = 1024;
   const int num_points = points.size(0);
   const int num_blocks = (num_points + num_threads - 1) / num_threads;
-  DISPATCH_INPUT_TYPES(points.scalar_type(), scalar_t,
-                       "unbatched_triangle_distance_backward_cuda_kernel", [&] {
+  AT_DISPATCH_FLOATING_TYPES(points.scalar_type(), scalar_t,
+                             "unbatched_triangle_distance_backward_cuda", [&] {
     using vector_t = ScalarTypeToVec3<scalar_t>::type;
-    unbatched_triangle_distance_backward_cuda_kernel<scalar_t, vector_t><<<num_blocks, num_threads>>>(
+    const at::cuda::OptionalCUDAGuard device_guard(at::device_of(points));
+    auto stream = at::cuda::getCurrentCUDAStream();
+    unbatched_triangle_distance_backward_cuda_kernel<scalar_t, vector_t><<<
+      num_blocks, num_threads, 0, stream>>>(
         grad_dist.data_ptr<scalar_t>(),
         reinterpret_cast<vector_t*>(points.data_ptr<scalar_t>()),
         reinterpret_cast<vector_t*>(face_vertices.data_ptr<scalar_t>()),
@@ -457,9 +450,8 @@ void unbatched_triangle_distance_backward_cuda_kernel_launcher(
         face_vertices.size(0),
         grad_points.data_ptr<scalar_t>(),
         grad_face_vertices.data_ptr<scalar_t>());
+    CUDA_CHECK(cudaGetLastError());
   });
 }
-
-#undef DISPATCH_INPUT_TYPES
 
 }  // namespace kaolin

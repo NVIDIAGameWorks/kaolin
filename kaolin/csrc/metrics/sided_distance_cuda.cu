@@ -1,4 +1,5 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+// All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,10 +38,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
 // SOFTWARE.
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <device_atomic_functions.h>
 #include <ATen/ATen.h>
+#include <c10/cuda/CUDAGuard.h>
 #include <THC/THCAtomics.cuh>
 
 #include "../utils.h"
@@ -50,9 +49,10 @@
 namespace kaolin {
 
 template<typename scalar_t>
-__global__ void SidedDistanceKernel(int b, int n, const scalar_t * xyz,
-                                    int m, const scalar_t * xyz2,
-                                    scalar_t * result, int64_t * result_i) {
+__global__ void sided_distance_forward_cuda_kernel(
+    int b, int n, const scalar_t * xyz,
+    int m, const scalar_t * xyz2,
+    scalar_t * result, int64_t * result_i) {
   const int batch=512;
   __shared__ scalar_t buf[batch*3];
 
@@ -200,7 +200,7 @@ __global__ void SidedDistanceKernel(int b, int n, const scalar_t * xyz,
 }
 
 template<typename scalar_t>
-__global__ void SidedDistanceBackwardKernel(
+__global__ void sided_distance_backward_cuda_kernel(
     const scalar_t* grad_output,
     const int b,
     const int n,
@@ -240,38 +240,61 @@ __global__ void SidedDistanceBackwardKernel(
   }
 }
 
-void sided_distance_forward_cuda_kernel_launcher(
-    const at::Tensor xyz1,
-    const at::Tensor xyz2,
-    const at::Tensor dist1,
-    const at::Tensor idx1) {
-  DISPATCH_NUM_TYPES(xyz1.scalar_type(), scalar_t, "sided_distance", [&] {
-    SidedDistanceKernel<scalar_t><<<dim3(32,16,1), 512>>>(xyz1.size(0), xyz1.size(1), xyz1.data_ptr<scalar_t>(),
-                                                          xyz2.size(1), xyz2.data_ptr<scalar_t>(),
-                                                          dist1.data_ptr<scalar_t>(), idx1.data_ptr<int64_t>());
-    }
-  );
+void sided_distance_forward_cuda_impl(
+    const at::Tensor p1,
+    const at::Tensor p2,
+    at::Tensor dist,
+    at::Tensor idx) {
+  const int batch_size = p1.size(0);
+  const int num_p1 = p1.size(1);
+  const int num_p2 = p2.size(1);
+  DISPATCH_NUM_TYPES(p1.scalar_type(), scalar_t,
+                     "sided_distance_forward_cuda", [&] {
+    const at::cuda::OptionalCUDAGuard device_guard(at::device_of(p1));
+    auto stream = at::cuda::getCurrentCUDAStream();
+    sided_distance_forward_cuda_kernel<scalar_t><<<
+      dim3(32, 16, 1), 512, 0, stream>>>(
+        batch_size,
+        num_p1,
+        p1.data_ptr<scalar_t>(),
+        num_p2,
+        p2.data_ptr<scalar_t>(),
+        dist.data_ptr<scalar_t>(),
+        idx.data_ptr<int64_t>());
+    CUDA_CHECK(cudaGetLastError());
+  });
 }
 
-void sided_distance_backward_cuda_kernel_launcher(
+void sided_distance_backward_cuda_impl(
     const at::Tensor grad_output,
     const at::Tensor p1,
     const at::Tensor p2,
     const at::Tensor idx,
     const at::Tensor grad_input1,
     const at::Tensor grad_input2) {
-
-  int n = p1.size(1);
-  int m = p2.size(1);
-  int b = p1.size(0);
-  int num_blocks = (max(n, m) + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  DISPATCH_NUM_TYPES(p1.scalar_type(), scalar_t, "sided_distance_backward", [&] {
-    SidedDistanceBackwardKernel<scalar_t><<<dim3(num_blocks, b, 1), BLOCK_SIZE>>>(
-        grad_output.data_ptr<scalar_t>(), b, n, p1.data_ptr<scalar_t>(), m,
-        p2.data_ptr<scalar_t>(), idx.data_ptr<int64_t>(), grad_input1.data_ptr<scalar_t>(),
+  const int batch_size = p1.size(0);
+  const int num_p1 = p1.size(1);
+  const int num_p2 = p2.size(1);
+  const int num_blocks = (max(num_p1, num_p2) + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  DISPATCH_NUM_TYPES(p1.scalar_type(), scalar_t,
+                     "sided_distance_backward_cuda", [&] {
+    const at::cuda::OptionalCUDAGuard device_guard(at::device_of(p1));
+    auto stream = at::cuda::getCurrentCUDAStream();
+    sided_distance_backward_cuda_kernel<scalar_t><<<
+      dim3(num_blocks, batch_size, 1), BLOCK_SIZE, 0, stream>>>(
+        grad_output.data_ptr<scalar_t>(),
+        batch_size,
+        num_p1,
+        p1.data_ptr<scalar_t>(),
+        num_p2,
+        p2.data_ptr<scalar_t>(),
+        idx.data_ptr<int64_t>(),
+        grad_input1.data_ptr<scalar_t>(),
         grad_input2.data_ptr<scalar_t>());
-    }
-  );
+    CUDA_CHECK(cudaGetLastError());
+  });
 }
+
+#undef BLOCK_SIZE
 
 }  // namespace kaolin

@@ -33,7 +33,6 @@
 namespace kaolin {
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-#ifdef WITH_CUDA
   py::module ops = m.def_submodule("ops");
   ops.def("packed_simple_sum_cuda", &packed_simple_sum_cuda);
   ops.def("packed_simple_sum_out_cuda", &packed_simple_sum_out_cuda);
@@ -79,7 +78,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   render_spc.def("remove_duplicate_rays", &remove_duplicate_rays);
   render_spc.def("mark_first_hit", &mark_first_hit);
   render_spc.def("generate_shadow_rays", &generate_shadow_rays);
-#endif
 }
 
 }  // namespace kaolin
