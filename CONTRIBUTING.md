@@ -144,7 +144,6 @@ void foo_cuda_impl(
 at::Tensor foo_cuda(
     at::Tensor lhs,
     at::Tensor rhs) {
-#if WITH_CUDA
   at::TensorArg lhs_arg{lhs, "lhs", 1}, rhs_arg{rhs, "rhs", 2};
   at::checkSameGPU("foo_cuda", lhs_arg, rhs_arg);
   at::checkAllContiguous("foo_cuda", {lhs_arg, rhs_arg});
@@ -153,12 +152,13 @@ at::Tensor foo_cuda(
 
   at::Tensor output = at::zeros_like(lhs);
 
+#if WITH_CUDA
   foo_cuda_impl(lhs, rhs, output);
 
-  return output;
 #else
-  AT_ERROR("In foo_cuda: Kaolin built without CUDA, cannot run with GPU tensors");
+  KAOLIN_NO_CUDA_ERROR(__func__);
 #endif  // WITH_CUDA
+  return output;
 }
 
 }  // namespace kaolin
