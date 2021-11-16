@@ -27,11 +27,3 @@ Error Handler
 
 .. autofunction:: skip_error_handler
 .. autofunction:: default_error_handler
-
-Exceptions
-----------
-
-.. autoclass:: MaterialError
-.. autoclass:: MaterialLoadError
-.. autoclass:: MaterialFileError
-.. autoclass:: MaterialNotFoundError
