@@ -44,12 +44,14 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ops_conversions.def("unbatched_mcube_forward_cuda", &unbatched_mcube_forward_cuda);
     ops_conversions.def("mesh_to_spc", &mesh_to_spc);
     py::module ops_spc = ops.def_submodule("spc");
+#if WITH_CUDA
     ops_spc.def("spc_query", &spc_query);
     ops_spc.def("spc_point2morton", &spc_point2morton);
     ops_spc.def("spc_morton2point", &spc_morton2point);
     ops_spc.def("spc_point2coeff", &spc_point2coeff);
     ops_spc.def("spc_point2jacobian", &spc_point2jacobian);
     ops_spc.def("spc_point2corners", &spc_point2corners);
+#endif  // WITH_CUDA
     ops_spc.def("points_to_octree", &points_to_octree);
     ops_spc.def("ScanOctrees", &ScanOctrees);
     ops_spc.def("GeneratePoints", &GeneratePoints);
