@@ -1,4 +1,5 @@
-// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+// All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,19 +20,15 @@
 
 namespace kaolin {
 
-void sided_distance_forward_cuda(
+std::vector<at::Tensor> sided_distance_forward_cuda(
+    const at::Tensor p1,
+    const at::Tensor p2);
+
+std::vector<at::Tensor> sided_distance_backward_cuda(
+    const at::Tensor grad_output,
     const at::Tensor p1,
     const at::Tensor p2,
-    const at::Tensor dist,
     const at::Tensor idx);
-
-void sided_distance_backward_cuda(
-    torch::Tensor grad_output,
-    torch::Tensor p1,
-    torch::Tensor p2,
-    torch::Tensor idx,
-    torch::Tensor grad_input1,
-    torch::Tensor grad_input2);
 
 }  // namespace kaolin
 

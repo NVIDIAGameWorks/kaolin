@@ -124,7 +124,9 @@ class TestSidedDistance:
     def test_directed_distance_batch_size(self, device, dtype):
 
         with pytest.raises(RuntimeError,
-                           match="p1 and p2's batch size must be the same."):
+                match=r"Expected tensor of size \[3, 3, 3\], but got tensor "
+                      r"of size \[2, 3, 3\] for argument #2 'p2' "
+                      r"\(while checking arguments for sided_distance_forward_cuda\)"):
             p1 = torch.randint(0, 10, (3, 2, 3), dtype=dtype, device=device)
             p2 = torch.randint(0, 10, (2, 3, 3), dtype=dtype, device=device)
             pc.sided_distance(p1, p2)
@@ -133,13 +135,17 @@ class TestSidedDistance:
     def test_directed_distance_dims(self, device, dtype):
 
         with pytest.raises(RuntimeError,
-                           match="p1 must have a dimension of 3."):
+                           match="Expected 3-dimensional tensor, but got "
+                                 "4-dimensional tensor for argument #1 'p1' "
+                                 r"\(while checking arguments for sided_distance_forward_cuda\)"):
             p1 = torch.randint(0, 10, (3, 2, 3, 4), dtype=dtype, device=device)
             p2 = torch.randint(0, 10, (2, 3, 3), dtype=dtype, device=device)
             pc.sided_distance(p1, p2)
 
         with pytest.raises(RuntimeError,
-                           match="p1's last dimension must be 3."):
+                           match=r"Expected tensor of size \[2, 2, 3\], but got "
+                                 r"tensor of size \[2, 2, 2\] for argument #1 'p1' "
+                                 r"\(while checking arguments for sided_distance_forward_cuda\)"):
             p1 = torch.randint(0, 10, (2, 2, 2), dtype=dtype, device=device)
             p2 = torch.randint(0, 10, (2, 3, 3), dtype=dtype, device=device)
             pc.sided_distance(p1, p2)

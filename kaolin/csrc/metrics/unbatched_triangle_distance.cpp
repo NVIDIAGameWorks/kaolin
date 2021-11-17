@@ -20,14 +20,15 @@
 namespace kaolin {
 
 #ifdef WITH_CUDA
-void unbatched_triangle_distance_forward_cuda_kernel_launcher(
+
+void unbatched_triangle_distance_forward_cuda_impl(
     at::Tensor points,
     at::Tensor face_vertices,
     at::Tensor dist,
     at::Tensor face_idx,
     at::Tensor dist_type);
 
-void unbatched_triangle_distance_backward_cuda_kernel_launcher(
+void unbatched_triangle_distance_backward_cuda_impl(
     at::Tensor grad_dist,
     at::Tensor points,
     at::Tensor face_vertices,
@@ -63,7 +64,7 @@ void unbatched_triangle_distance_forward_cuda(
   CHECK_SIZES(face_idx, num_points);
   CHECK_SIZES(dist_type, num_points);
 #if WITH_CUDA
-  unbatched_triangle_distance_forward_cuda_kernel_launcher(
+  unbatched_triangle_distance_forward_cuda_impl(
       points, face_vertices, dist, face_idx, dist_type);
 #else
   AT_ERROR("unbatched_triangle_distance not built with CUDA");
@@ -104,7 +105,7 @@ void unbatched_triangle_distance_backward_cuda(
   CHECK_SIZES(grad_face_vertices, num_faces, 3, 3);
 
 #if WITH_CUDA
-  unbatched_triangle_distance_backward_cuda_kernel_launcher(
+  unbatched_triangle_distance_backward_cuda_impl(
       grad_dist, points, face_vertices, face_idx, dist_type,
       grad_points, grad_face_vertices);
 #else

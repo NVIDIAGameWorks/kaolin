@@ -1,4 +1,5 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+// All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,68 +38,87 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
 // SOFTWARE.
 
-#include <torch/extension.h>
+#include <ATen/ATen.h>
 
 #include "../check.h"
 
 namespace kaolin {
 
 #ifdef WITH_CUDA
-void sided_distance_forward_cuda_kernel_launcher(
+void sided_distance_forward_cuda_impl(
     const at::Tensor p1,
     const at::Tensor p2,
     const at::Tensor dist,
     const at::Tensor idx);
 
-void sided_distance_backward_cuda_kernel_launcher(
-    torch::Tensor grad_output,
-    torch::Tensor p1,
-    torch::Tensor p2,
-    torch::Tensor idx,
-    torch::Tensor grad_input1,
-    torch::Tensor grad_input2);
+void sided_distance_backward_cuda_impl(
+    at::Tensor grad_output,
+    at::Tensor p1,
+    at::Tensor p2,
+    at::Tensor idx,
+    at::Tensor grad_input1,
+    at::Tensor grad_input2);
 
 #endif  // WITH_CUDA
 
 
-void sided_distance_forward_cuda(
+std::vector<at::Tensor> sided_distance_forward_cuda(
     const at::Tensor p1,
-    const at::Tensor p2,
-    const at::Tensor dist,
-    const at::Tensor idx) {
-  CHECK_CUDA(p1);
-  CHECK_CUDA(p2);
-  TORCH_CHECK(p1.dim() == 3, "p1 must have a dimension of 3.");
-  TORCH_CHECK(p2.dim() == 3, "p2 must have a dimension of 3.");
+    const at::Tensor p2) {
+  at::TensorArg p1_arg{p1, "p1", 1}, p2_arg{p2, "p2", 2};
+  at::checkSameGPU(__func__, p1_arg, p2_arg);
+  at::checkAllContiguous(__func__, {p1_arg, p2_arg});
+  at::checkSameType(__func__, p1_arg, p2_arg);
 
-  TORCH_CHECK(p1.size(0) == p2.size(0), "p1 and p2's batch size must be the same.");
+  const int batch_size = p1.size(0);
+  const int num_p1 = p1.size(1);
+  const int num_p2 = p2.size(1);
 
-  TORCH_CHECK(p1.size(2) == 3, "p1's last dimension must be 3.");
-  TORCH_CHECK(p2.size(2) == 3, "p2's last dimension must be 3.");
+  at::checkSize(__func__, p1_arg, {batch_size, num_p1, 3});
+  at::checkSize(__func__, p2_arg, {batch_size, num_p2, 3});
 
-  TORCH_CHECK(p1.dtype() == p2.dtype(), "p1 and p2's dtype must be the same.");
+  auto dist = at::zeros({batch_size, num_p1}, p1.options());
+  auto idx = at::zeros({batch_size, num_p1}, p1.options().dtype(at::kLong));
 
 #ifdef WITH_CUDA
-  sided_distance_forward_cuda_kernel_launcher(p1, p2, dist, idx);
+  sided_distance_forward_cuda_impl(p1, p2, dist, idx);
 #else
-  AT_ERROR("sided_distance_forward not built with CUDA");
+  KAOLIN_NO_CUDA_ERROR(__func__);
 #endif
+  return {dist, idx};
 }
 
-void sided_distance_backward_cuda(
-    torch::Tensor grad_output,
-    torch::Tensor p1,
-    torch::Tensor p2,
-    torch::Tensor idx,
-    torch::Tensor grad_input1,
-    torch::Tensor grad_input2) {
-  CHECK_CUDA(p1);
-  CHECK_CUDA(p2);
+std::vector<at::Tensor> sided_distance_backward_cuda(
+    at::Tensor grad_output,
+    at::Tensor p1,
+    at::Tensor p2,
+    at::Tensor idx) {
+  at::TensorArg grad_output_arg{grad_output, "grad_output", 1};
+  at::TensorArg p1_arg{p1, "p1", 2};
+  at::TensorArg p2_arg{p2, "p2", 3};
+  at::TensorArg idx_arg{idx, "idx", 4};
+
+  at::checkAllSameGPU(__func__, {grad_output_arg, p1_arg, p2_arg, idx_arg});
+  at::checkAllContiguous(__func__, {grad_output_arg, p1_arg, p2_arg, idx_arg});
+
+  const int batch_size = p1.size(0);
+  const int num_p1 = p1.size(1);
+  const int num_p2 = p2.size(1);
+
+  at::checkSize(__func__, idx_arg, {batch_size, num_p1});
+  at::checkSize(__func__, p1_arg, {batch_size, num_p1, 3});
+  at::checkSize(__func__, p2_arg, {batch_size, num_p2, 3});
+  at::checkSameSize(__func__, idx_arg, grad_output_arg);
+
+  auto grad_input1 = at::zeros_like(p1);
+  auto grad_input2 = at::zeros_like(p2);
+
 #ifdef WITH_CUDA
-  sided_distance_backward_cuda_kernel_launcher(grad_output, p1, p2, idx, grad_input1, grad_input2);
+  sided_distance_backward_cuda_impl(grad_output, p1, p2, idx, grad_input1, grad_input2);
 #else
-  AT_ERROR("sided_distance_backward not built with CUDA");
+  KAOLIN_NO_CUDA_ERROR(__func__);
 #endif
+  return {grad_input1, grad_input2};
 }
 
 }  // namespace kaolin

@@ -39,7 +39,7 @@
   TORCH_CHECK(x.sizes() == std::vector<int64_t>({__VA_ARGS__}), \
       #x " must of size {" #__VA_ARGS__ "}")
 
-#define KAOLIN_NO_CUDA_ERROR(func_name)                 \
+#define KAOLIN_NO_CUDA_ERROR(func_name)                       \
   AT_ERROR("In ", func_name, ": Kaolin built without CUDA, "  \
            "cannot run with GPU tensors")
 

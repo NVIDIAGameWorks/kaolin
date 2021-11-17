@@ -24,19 +24,11 @@ class _SidedDistanceFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, p1, p2):
-        p1_dtype = p1.dtype
-        p1_device = p1.device
 
         p1 = p1.contiguous()
         p2 = p2.contiguous()
 
-        batchsize = p1.shape[0]
-        n = p1.shape[1]
-
-        dist = torch.zeros(batchsize, n, device=p1_device, dtype=p1_dtype, requires_grad=True)
-        idx = torch.zeros(batchsize, n, device=p1_device, dtype=torch.long)
-
-        _C.metrics.sided_distance_forward_cuda(p1, p2, dist, idx)
+        dist, idx = _C.metrics.sided_distance_forward_cuda(p1, p2)
 
         ctx.save_for_backward(p1, p2, idx)
         ctx.mark_non_differentiable(idx)
@@ -50,10 +42,8 @@ class _SidedDistanceFunction(torch.autograd.Function):
 
         p1, p2, idx = ctx.saved_tensors
 
-        grad_p1 = torch.zeros_like(p1)
-        grad_p2 = torch.zeros_like(p2)
-
-        _C.metrics.sided_distance_backward_cuda(grad_output_dist, p1, p2, idx, grad_p1, grad_p2)
+        grad_p1, grad_p2 = _C.metrics.sided_distance_backward_cuda(
+            grad_output_dist, p1, p2, idx)
 
         return grad_p1, grad_p2
 
