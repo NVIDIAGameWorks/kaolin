@@ -405,7 +405,7 @@ void unbatched_triangle_distance_forward_cuda_impl(
   const int num_threads = 512;
   const int num_points = points.size(0);
   const int num_blocks = (num_points + num_threads - 1) / num_threads;
-  AT_DISPATCH_FLOATING_TYPES(points.scalar_type(), scalar_t,
+  AT_DISPATCH_FLOATING_TYPES(points.scalar_type(),
                              "unbatched_triangle_distance_forward_cuda", [&] {
     using vector_t = ScalarTypeToVec3<scalar_t>::type;
     const at::cuda::OptionalCUDAGuard device_guard(at::device_of(points));
@@ -434,7 +434,7 @@ void unbatched_triangle_distance_backward_cuda_impl(
   const int num_threads = 1024;
   const int num_points = points.size(0);
   const int num_blocks = (num_points + num_threads - 1) / num_threads;
-  AT_DISPATCH_FLOATING_TYPES(points.scalar_type(), scalar_t,
+  AT_DISPATCH_FLOATING_TYPES(points.scalar_type(),
                              "unbatched_triangle_distance_backward_cuda", [&] {
     using vector_t = ScalarTypeToVec3<scalar_t>::type;
     const at::cuda::OptionalCUDAGuard device_guard(at::device_of(points));
