@@ -33,6 +33,7 @@ def run_apidoc(_):
             "kaolin/ops/conversions/sdf.py",
             "kaolin/ops/conversions/trianglemesh.py",
             "kaolin/ops/conversions/voxelgrid.py",
+            "kaolin/ops/conversions/tetmesh.py",
             "kaolin/ops/mesh/check_sign.py",
             "kaolin/ops/mesh/mesh.py",
             "kaolin/ops/mesh/trianglemesh.py",
