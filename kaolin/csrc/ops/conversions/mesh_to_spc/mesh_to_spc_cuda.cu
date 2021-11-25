@@ -323,7 +323,7 @@ d_ProcessVoxels(uint nvxls, float3* l0, float3* l1, float3* l2, float3* F, uchar
         break;
       }
 
-      M[tidx] = ToMorton(v);
+      M[tidx] = to_morton(v);
       Info[tidx] = 1;
     } else {
       Info[tidx] = 0;
@@ -398,7 +398,7 @@ __global__ void MortonToPointa(
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < Psize)
-    Pdata[tidx] = ToPoint(Mdata[tidx]);
+    Pdata[tidx] = to_point(Mdata[tidx]);
 }
 
 __global__ void PointToMorton(
@@ -409,7 +409,7 @@ __global__ void PointToMorton(
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < Psize)
-    Mdata[tidx] = ToMorton(Pdata[tidx]);
+    Mdata[tidx] = to_morton(Pdata[tidx]);
 }
 
 // Uses the morton buffer to construct an octree. It is the user's responsibility to allocate

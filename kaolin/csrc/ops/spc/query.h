@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-#pragma once
+#ifndef KAOLIN_OPS_SPC_QUERY_H_
+#define KAOLIN_OPS_SPC_QUERY_H_
 
 #ifdef WITH_CUDA
 #include "../../spc_math.h"
@@ -22,9 +22,15 @@
 
 #include <ATen/ATen.h>
 
-at::Tensor spc_query(
+namespace kaolin {
+
+at::Tensor query_cuda(
     at::Tensor octree,
-    at::Tensor prefixsum,
+    at::Tensor prefix_sum,
     at::Tensor query_points,
-    uint targetLevel);
+    uint target_level);
+
+} // namespace kaolin
+
+#endif // KAOLIN_OPS_SPC_QUERY_H_
 

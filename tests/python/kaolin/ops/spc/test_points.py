@@ -21,7 +21,7 @@ import itertools
 import torch
 
 from kaolin.ops.spc import points_to_morton, morton_to_points, points_to_corners, \
-                           points_to_coeffs, quantize_points
+                           coords_to_trilinear, quantize_points
 
 class TestPoints:
     @pytest.fixture(autouse=True)
@@ -73,7 +73,7 @@ class TestPoints:
         expected_corners = torch.stack(expected_corners, dim=-2)
         assert torch.equal(points_to_corners(points), expected_corners)
 
-    def test_points_to_coeffs(self, points):
+    def test_coords_to_trilinear(self, points):
         w = torch.rand(points.shape, device='cuda')
         x = points + w
         expected_coeffs = torch.stack([
@@ -86,4 +86,4 @@ class TestPoints:
             w[:, 0] * w[:, 1] * (1 - w[:, 2]),
             w[:, 0] * w[:, 1] * w[:, 2]
         ], dim=-1)
-        assert torch.allclose(points_to_coeffs(x, points), expected_coeffs)
+        assert torch.allclose(coords_to_trilinear(x, points), expected_coeffs)

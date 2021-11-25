@@ -18,7 +18,7 @@ __all__ = [
     'points_to_morton',
     'morton_to_points',
     'points_to_corners',
-    'points_to_coeffs',
+    'coords_to_trilinear',
     'unbatched_points_to_octree',
     'quantize_points'
 ]
@@ -93,7 +93,7 @@ def points_to_morton(points):
     """
     shape = list(points.shape)[:-1]
     points = points.reshape(-1, 3)
-    return _C.ops.spc.spc_point2morton(points.contiguous()).reshape(*shape)
+    return _C.ops.spc.points_to_morton_cuda(points.contiguous()).reshape(*shape)
 
 def morton_to_points(morton):
     r"""Convert morton codes to points.
@@ -119,7 +119,7 @@ def morton_to_points(morton):
     shape = list(morton.shape)
     shape.append(3)
     morton = morton.reshape(-1)
-    return _C.ops.spc.spc_morton2point(morton.contiguous()).reshape(*shape)
+    return _C.ops.spc.morton_to_points_cuda(morton.contiguous()).reshape(*shape)
 
 def points_to_corners(points):
     r"""Calculates the corners of the points assuming each point is the 0th bit corner.
@@ -157,9 +157,9 @@ def points_to_corners(points):
     """
     shape = list(points.shape)
     shape.insert(-1, 8)
-    return _C.ops.spc.spc_point2corners(points.contiguous()).reshape(*shape)
+    return _C.ops.spc.points_to_corners_cuda(points.contiguous()).reshape(*shape)
 
-def points_to_coeffs(x, points):
+def coords_to_trilinear(coords, points):
     r"""Calculates the coefficients for trilinear interpolation.
 
     To interpolate with the coefficients, do:
@@ -167,8 +167,8 @@ def points_to_coeffs(x, points):
     with ``features`` of shape :math:`(\text{num_points}, 8)`
 
     Args:
-        x (torch.FloatTensor): Floating point 3D points,
-                               of shape :math:`(\text{num_points}, 3)`.
+        coords (torch.FloatTensor): Floating point 3D points,
+                                    of shape :math:`(\text{num_points}, 3)`.
         points (torch.ShortTensor): Quantized 3D points (the 0th bit of the voxel x is in),
                                     of shape :math:`(\text{num_points}, 3)`.
 
@@ -179,5 +179,5 @@ def points_to_coeffs(x, points):
     shape = list(points.shape)
     shape[-1] = 8
     points = points.reshape(-1, 3)
-    x = x.reshape(-1, 3)
-    return _C.ops.spc.spc_point2coeff(x.contiguous(), points.contiguous()).reshape(*shape)
+    coords = coords.reshape(-1, 3)
+    return _C.ops.spc.coords_to_trilinear_cuda(coords.contiguous(), points.contiguous()).reshape(*shape)

@@ -26,9 +26,8 @@
 #include "./ops/spc/spc.h"
 #include "./ops/spc/feature_grids.h"
 #include "./render/spc/raytrace.h"
-#include "./ops/spc/spc_query.h"
-#include "./ops/spc/spc_utils.h"
-
+#include "./ops/spc/query.h"
+#include "./ops/spc/point_utils.h"
 
 namespace kaolin {
 
@@ -45,16 +44,16 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ops_conversions.def("mesh_to_spc", &mesh_to_spc);
     py::module ops_spc = ops.def_submodule("spc");
 #if WITH_CUDA
-    ops_spc.def("spc_query", &spc_query);
-    ops_spc.def("spc_point2morton", &spc_point2morton);
-    ops_spc.def("spc_morton2point", &spc_morton2point);
-    ops_spc.def("spc_point2coeff", &spc_point2coeff);
-    ops_spc.def("spc_point2jacobian", &spc_point2jacobian);
-    ops_spc.def("spc_point2corners", &spc_point2corners);
+    ops_spc.def("query_cuda", &query_cuda);
+    ops_spc.def("points_to_morton_cuda", &points_to_morton_cuda);
+    ops_spc.def("morton_to_points_cuda", &morton_to_points_cuda);
+    ops_spc.def("coords_to_trilinear_cuda", &coords_to_trilinear_cuda);
+    //ops_spc.def("coord_to_trilinear_jacobian_cuda", &coord_to_trilinear_jacobian_cuda);
+    ops_spc.def("points_to_corners_cuda", &points_to_corners_cuda);
 #endif  // WITH_CUDA
     ops_spc.def("points_to_octree", &points_to_octree);
-    ops_spc.def("ScanOctrees", &ScanOctrees);
-    ops_spc.def("GeneratePoints", &GeneratePoints);
+    ops_spc.def("scan_octrees_cuda", &scan_octrees_cuda);
+    ops_spc.def("generate_points_cuda", &generate_points_cuda);
     ops_spc.def("Conv3d_forward", &Conv3d_forward);
     ops_spc.def("Conv3d_backward", &Conv3d_backward);
     ops_spc.def("ConvTranspose3d_forward", &ConvTranspose3d_forward);
@@ -74,12 +73,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   render_mesh.def("generate_soft_mask_cuda", &generate_soft_mask_cuda);
   render_mesh.def("rasterize_backward_cuda", &rasterize_backward_cuda);
   py::module render_spc = render.def_submodule("spc");
-  render_spc.def("ray_aabb", &spc_ray_aabb);
-  render_spc.def("raytrace", &spc_raytrace);
-  render_spc.def("generate_primary_rays", &generate_primary_rays);
-  render_spc.def("remove_duplicate_rays", &remove_duplicate_rays);
-  render_spc.def("mark_first_hit", &mark_first_hit);
-  render_spc.def("generate_shadow_rays", &generate_shadow_rays);
+  render_spc.def("ray_aabb", &spc_ray_aabb); // Deprecate soon
+  render_spc.def("raytrace_cuda", &raytrace_cuda);
+  render_spc.def("generate_primary_rays_cuda", &generate_primary_rays_cuda); // Deprecate soon
+  render_spc.def("remove_duplicate_rays_cuda", &remove_duplicate_rays_cuda);
+  render_spc.def("mark_first_hit_cuda", &mark_first_hit_cuda);
+  render_spc.def("generate_shadow_rays_cuda", &generate_shadow_rays_cuda); // Deprecate soon
 }
 
 }  // namespace kaolin

@@ -13,15 +13,19 @@
 
 #include <ATen/ATen.h>
 
-at::Tensor spc_point2morton(at::Tensor points);
+namespace kaolin {
 
-at::Tensor spc_morton2point(at::Tensor morton_codes);
+at::Tensor points_to_morton_cuda(at::Tensor points);
 
-at::Tensor spc_point2coeff(
-    at::Tensor x,
-    at::Tensor pts);
+at::Tensor morton_to_points_cuda(at::Tensor morton_codes);
 
-at::Tensor spc_point2jacobian(at::Tensor x);
+at::Tensor coords_to_trilinear_cuda(
+    at::Tensor coords,
+    at::Tensor points);
 
-at::Tensor spc_point2corners(at::Tensor points);
+at::Tensor coords_to_trilinear_jacobian_cuda(at::Tensor coords);
+
+at::Tensor points_to_corners_cuda(at::Tensor points);
+
+} // namespace kaolin
 
