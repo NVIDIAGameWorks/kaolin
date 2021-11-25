@@ -23,6 +23,7 @@
 
 #include "../../spc_math.h"
 #include "../../utils.h"
+#include "../../spc_utils.cuh"
 
 #define THREADS_PER_BLOCK 64
 
@@ -30,85 +31,56 @@ namespace kaolin {
 
 using namespace cub;
 
-__global__ void NodesToMortonX(
-    const uint Psize,
-    const uchar* Odata,
-    const uint* PrefixSum,
-    const morton_code* MdataIn,
-    morton_code* MdataOut) {
-  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx < Psize) {
-     uchar bits = Odata[tidx];
-     morton_code code = MdataIn[tidx];
-     int addr = PrefixSum[tidx];
-
-     for (int i = 7; i >= 0; i--) {
-       if (bits&(0x1 << i))
-         MdataOut[addr--] = 8 * code + i;
-     }
-  }
-}
-
-__global__ void MortonToPointX(
-    const uint Psize,
-    morton_code* Mdata,
-    point_data* Pdata) {
-  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx < Psize)
-    Pdata[tidx] = ToPoint(Mdata[tidx]);
-}
-
-void generate_points_cuda_kernel_launch(
+void generate_points_cuda_impl(
     at::Tensor octrees,
     at::Tensor points,
     at::Tensor morton,
-    at::Tensor pyramids,
+    at::Tensor pyramid,
     at::Tensor prefix_sum) {
-  int batch_size = pyramids.size(0);
-  int level = pyramids.size(2) - 2;
+  int batch_size = pyramid.size(0);
+  int max_level = pyramid.size(2) - 2;
 
-  point_data* P0 = reinterpret_cast<point_data*>(points.data_ptr<int16_t>());
-  morton_code* M0 = reinterpret_cast<morton_code*>(morton.data_ptr<int64_t>());
-  uint* EX0 = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
-  uchar* O0 = octrees.data_ptr<uint8_t>();
-  uint* h0 = reinterpret_cast<uint*>(pyramids.data_ptr<int>());
+  point_data* points_ptr = reinterpret_cast<point_data*>(points.data_ptr<int16_t>());
+  morton_code* morton_ptr = reinterpret_cast<morton_code*>(morton.data_ptr<int64_t>());
+  uint* prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
+  uchar* octree_ptr = octrees.data_ptr<uint8_t>();
+  uint* pyramid_ptr = reinterpret_cast<uint*>(pyramid.data_ptr<int>());
   int l;
 
   for (int batch = 0; batch < batch_size; batch++) {
-    uint* Pmid = h0;
-    uint* PmidSum = h0 + level + 2;
+    uint* curr_pyramid_ptr = pyramid_ptr;
+    uint* curr_pyramid_sum_ptr = pyramid_ptr + max_level + 2;
 
-    morton_code*  M = M0;
-    uchar*      O = O0;
-    uint*       S = EX0 + 1;
-    uint      osize = PmidSum[level];
+    morton_code* curr_morton_ptr = morton_ptr;
+    uchar*       curr_octree_ptr = octree_ptr;
+    uint*        curr_prefix_sum_ptr = prefix_sum_ptr + 1;
+    uint         osize = curr_pyramid_sum_ptr[max_level];
 
     morton_code m0 = 0;
-    cudaMemcpy(M, &m0, sizeof(morton_code), cudaMemcpyHostToDevice);
+    cudaMemcpy(curr_morton_ptr, &m0, sizeof(morton_code), cudaMemcpyHostToDevice);
     CUDA_CHECK(cudaGetLastError());
 
     l = 0;
-    while (l < level) {
-      int Lsize = Pmid[l++];
-      NodesToMortonX<<<(Lsize + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK,
-                       THREADS_PER_BLOCK>>>(Lsize, O, S, M, M0);
-      O += Lsize;
-      S += Lsize;
-      M += Lsize;
+    while (l < max_level) {
+      int points_in_level = curr_pyramid_ptr[l++];
+      nodes_to_morton_cuda_kernel<<<(points_in_level + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK,
+                                    THREADS_PER_BLOCK>>>(curr_octree_ptr, curr_prefix_sum_ptr, 
+                                            curr_morton_ptr, morton_ptr, points_in_level);
+      curr_octree_ptr += points_in_level;
+      curr_prefix_sum_ptr += points_in_level;
+      curr_morton_ptr += points_in_level;
     }
 
-    uint totalPoints = PmidSum[l + 1];
+    uint total_points = curr_pyramid_sum_ptr[l + 1];
 
-    MortonToPointX<<<(totalPoints + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK,
-                     THREADS_PER_BLOCK>>>(totalPoints, M0, P0);
+    morton_to_points_cuda_kernel<<<(total_points + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK,
+                                   THREADS_PER_BLOCK>>>(morton_ptr, points_ptr, total_points);
     CUDA_CHECK(cudaGetLastError());
 
-    P0 += totalPoints;
-    O0 += osize;
-    EX0 += (osize + 1);
-    h0 += 2 * (level + 2);
+    points_ptr += total_points;
+    octree_ptr += osize;
+    prefix_sum_ptr += (osize + 1);
+    pyramid_ptr += 2 * (max_level + 2);
   }
 
   CUDA_CHECK(cudaGetLastError());

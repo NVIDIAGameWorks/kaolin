@@ -62,7 +62,7 @@ def scan_octrees(octrees, lengths):
         The returned tensor of exclusive sums is padded with an extra element for each
         item in the batch.
     """
-    return _C.ops.spc.ScanOctrees(octrees.contiguous(), lengths.contiguous())
+    return _C.ops.spc.scan_octrees_cuda(octrees.contiguous(), lengths.contiguous())
 
 def generate_points(octrees, pyramids, exsum):
     r"""Generate the point data for a structured point cloud.
@@ -83,9 +83,9 @@ def generate_points(octrees, pyramids, exsum):
         (torch.Tensor);
             A tensor containing batched point hierachies derived from a batch of octrees
     """
-    return _C.ops.spc.GeneratePoints(octrees.contiguous(),
-                                     pyramids.contiguous(),
-                                     exsum.contiguous())
+    return _C.ops.spc.generate_points_cuda(octrees.contiguous(),
+                                           pyramids.contiguous(),
+                                           exsum.contiguous())
 
 class ToDenseFunction(Function):
     @staticmethod
@@ -255,5 +255,5 @@ def unbatched_query(octree, exsum, query_points, level):
                                           of shape :math:`(\text{num_query}, 3)`.
         level (int): The level of the octree to query from.
     """
-    return _C.ops.spc.spc_query(octree.contiguous(), exsum.contiguous(),
-                                query_points.contiguous(), level).long()
+    return _C.ops.spc.query_cuda(octree.contiguous(), exsum.contiguous(),
+                                 query_points.contiguous(), level).long()

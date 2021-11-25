@@ -42,7 +42,7 @@ def unbatched_raytrace(octree, point_hierarchy, pyramid, exsum, origin, directio
                            of shape :math:`(\text{num_intersection}, 2)` representing pairs
                            :math:`(\text{index_to_ray}, \text{index_to_points})`.
     """
-    return _C.render.spc.raytrace(
+    return _C.render.spc.raytrace_cuda(
         octree.contiguous(),
         point_hierarchy.contiguous(),
         pyramid.contiguous(),
@@ -62,7 +62,7 @@ def mark_first_hit(nuggets):
         first_hits (torch.BoolTensor): the boolean mask marking the first hit by depth.
     """
     # TODO(cfujitsang): directly output boolean
-    return _C.render.spc.mark_first_hit(nuggets.contiguous()).bool()
+    return _C.render.spc.mark_first_hit_cuda(nuggets.contiguous()).bool()
 
 def unbatched_ray_aabb(nuggets, point_hierarchy, ray_o, ray_d, level,
                        info=None, info_idxes=None, mask=None):

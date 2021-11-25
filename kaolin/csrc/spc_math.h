@@ -70,7 +70,7 @@ static __inline__ __host__ __device__ point_data mul_point_data(int s, point_dat
   return p;
 }
 
-static __inline__ __host__ __device__ point_data div_point_data(point_data a,int s) {
+static __inline__ __host__ __device__ point_data div_point_data(point_data a, int s) {
   point_data p;
   p.x = a.x / s;
   p.y = a.y / s;
@@ -78,7 +78,7 @@ static __inline__ __host__ __device__ point_data div_point_data(point_data a,int
   return p;
 }
 
-static __inline__ __host__ __device__ morton_code ToMorton(point_data V) {
+static __inline__ __host__ __device__ morton_code to_morton(point_data V) {
   morton_code mcode = 0;
 
   for (uint i = 0; i < KAOLIN_SPC_MAX_LEVELS; i++) {
@@ -96,7 +96,7 @@ static __inline__ __host__ __device__ morton_code ToMorton(point_data V) {
 }
 
 
-static __inline__ __host__ __device__ point_data ToPoint(morton_code mcode) {
+static __inline__ __host__ __device__ point_data to_point(morton_code mcode) {
   point_data p = make_point_data(0, 0, 0);
 
   for (int i = 0; i < KAOLIN_SPC_MAX_LEVELS; i++) {
@@ -155,7 +155,7 @@ static __inline__ __host__ __device__ float4x4 make_float4x4(
   return a;
 }
 
-static __inline__ __host__ __device__ void  MMmul(const float4x4& a, const float4x4& b, float4x4& c)
+static __inline__ __host__ __device__ void  matmul4x4(const float4x4& a, const float4x4& b, float4x4& c)
 {
     c.m[0][0] = a.m[0][0] * b.m[0][0] + a.m[0][1] * b.m[1][0] + a.m[0][2] * b.m[2][0] + a.m[0][3] * b.m[3][0];
     c.m[0][1] = a.m[0][0] * b.m[0][1] + a.m[0][1] * b.m[1][1] + a.m[0][2] * b.m[2][1] + a.m[0][3] * b.m[3][1];
@@ -180,7 +180,7 @@ static __inline__ __host__ __device__ void  MMmul(const float4x4& a, const float
 
 static __inline__ __host__ __device__ float4x4 operator* (const float4x4& ma, const float4x4& mb)
 {
-    float4x4 mc; MMmul(ma, mb, mc); return mc;
+    float4x4 mc; matmul4x4(ma, mb, mc); return mc;
 }
 
 static __inline__ __host__ __device__ float4x4 transpose(const float4x4& a) {

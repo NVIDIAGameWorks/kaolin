@@ -25,20 +25,14 @@ namespace kaolin {
 
 #ifdef WITH_CUDA
 
-int scan_octrees_cuda_kernel_launcher(
+int scan_octrees_cuda_impl(
     at::Tensor octrees,
     at::Tensor lengths,
     at::Tensor num_childrens_per_node,
     at::Tensor prefix_sum,
-    at::Tensor pyramid,
-    at::Tensor temp_storage);
+    at::Tensor pyramid);
 
-size_t GetScanOctreesTmpStorageBytes(
-    at::Tensor octrees,
-    at::Tensor prefix_sum,
-    int max_total_points);
-
-void generate_points_cuda_kernel_launch(
+void generate_points_cuda_impl(
     at::Tensor octrees,
     at::Tensor points,
     at::Tensor morton,
@@ -53,10 +47,9 @@ void generate_points_cuda_kernel_launch(
 #define CHECK_POINTS(x) CHECK_SHORT(x); CHECK_TRIPLE(x); CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 #define CHECK_INPUT(x) CHECK_FLOAT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 
-
 using namespace at::indexing;
 
-std::tuple<int, at::Tensor, at::Tensor> ScanOctrees(
+std::tuple<int, at::Tensor, at::Tensor> scan_octrees_cuda(
     at::Tensor octrees,
     at::Tensor lengths) {
 #ifdef WITH_CUDA
@@ -76,14 +69,9 @@ std::tuple<int, at::Tensor, at::Tensor> ScanOctrees(
   at::Tensor pyramid = at::zeros({ batch_size, 2, KAOLIN_SPC_MAX_LEVELS + 2 },
                                  at::device(at::kCPU).dtype(at::kInt));
 
-  int temp_storage_bytes = GetScanOctreesTmpStorageBytes(num_childrens_per_node, prefix_sum,
-                                                         max_num_nodes + 1);
 
-  at::Tensor temp_storage = at::zeros({ temp_storage_bytes },
-                                      octrees.options().dtype(at::kByte));
-
-  int level = scan_octrees_cuda_kernel_launcher(octrees, lengths, num_childrens_per_node,
-                                                prefix_sum, pyramid, temp_storage);
+  int level = scan_octrees_cuda_impl(octrees, lengths, num_childrens_per_node,
+                                     prefix_sum, pyramid);
   return {level,
           pyramid.index({ Slice(None), Slice(None), Slice(None, level + 2) }).contiguous(),
           prefix_sum};
@@ -92,7 +80,7 @@ std::tuple<int, at::Tensor, at::Tensor> ScanOctrees(
 #endif  // WITH_CUDA
 }
 
-at::Tensor GeneratePoints(
+at::Tensor generate_points_cuda(
     at::Tensor octrees,
     at::Tensor pyramid,
     at::Tensor exsum) {
@@ -112,7 +100,7 @@ at::Tensor GeneratePoints(
   at::Tensor points = at::zeros({ psum, 3 }, octrees.options().dtype(at::kShort));
   at::Tensor morton = at::zeros({ pmax }, octrees.options().dtype(at::kLong));
 
-  generate_points_cuda_kernel_launch(octrees, points, morton, pyramid, exsum);
+  generate_points_cuda_impl(octrees, points, morton, pyramid, exsum);
   return points;
 #else
   AT_ERROR("generate_points not build with CUDA");

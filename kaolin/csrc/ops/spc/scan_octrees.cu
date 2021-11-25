@@ -23,6 +23,7 @@
 
 #include "../../spc_math.h"
 #include "../../utils.h"
+#include "../../spc_utils.cuh"
 
 #define THREADS_PER_BLOCK 64
 
@@ -30,44 +31,36 @@ namespace kaolin {
 
 using namespace cub;
 
-__global__ void d_ScanNodesX(
-    const uint numBytes,
-    const uint8_t *d_octree,
+__global__ void scan_nodes_cuda_kernel(
+    const uint num_bytes,
+    const uint8_t *octree,
     uint *octrees_ptr) {
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-  if (tidx < numBytes)
-    octrees_ptr[tidx] = __popc(d_octree[tidx]);
+  if (tidx < num_bytes)
+    octrees_ptr[tidx] = __popc(octree[tidx]);
 }
 
-size_t GetScanOctreesTmpStorageBytes(at::Tensor num_childrens_per_node,
-                                     at::Tensor prefix_sum, int max_total_points) {
-  size_t temp_storage_bytes = 0;
-  void* d_tmp = NULL;
-  CubDebugExit(DeviceScan::InclusiveSum(
-      d_tmp, temp_storage_bytes,
-      reinterpret_cast<uint*>(num_childrens_per_node.data_ptr<int>()),
-      reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()),
-      max_total_points));
-  return temp_storage_bytes;
-}
-
-int scan_octrees_cuda_kernel_launcher(
+int scan_octrees_cuda_impl(
     at::Tensor octrees,
     at::Tensor lengths,
     at::Tensor num_childrens_per_node,
     at::Tensor prefix_sum,
-    at::Tensor pyramid,
-    at::Tensor temp_storage) {
+    at::Tensor pyramid) {
   int batch_size = lengths.size(0);
   // get tensor data pointers
   uint8_t* octrees_ptr = octrees.data_ptr<uint8_t>();
   uint* num_childrens_per_node_ptr = reinterpret_cast<uint*>(num_childrens_per_node.data_ptr<int>());
   uint* prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
   int* pyramid_ptr = pyramid.data_ptr<int>();
+  
+  void* temp_storage_ptr = NULL;
+  uint64_t temp_storage_bytes = get_cub_storage_bytes(
+        temp_storage_ptr, num_childrens_per_node_ptr, prefix_sum_ptr, num_childrens_per_node.size(0) + 1);
+  at::Tensor temp_storage = at::zeros({(int64_t) temp_storage_bytes },
+                                      octrees.options().dtype(at::kByte));
+  temp_storage_ptr = (void*) temp_storage.data_ptr<uint8_t>();
 
-  void* d_temp_storage = (void*) temp_storage.data_ptr<uint8_t>();
-  size_t temp_storage_bytes = temp_storage.size(0);
-
+  // TODO: document better
   uint* EX0 = prefix_sum_ptr;
   uint8_t* O0 = octrees_ptr;
   int* h0 = pyramid_ptr;
@@ -79,10 +72,10 @@ int scan_octrees_cuda_kernel_launcher(
     uint  osize = lengths[batch].item<int>();
 
     // compute exclusive sum 1 element beyond end of list to get inclusive sum starting at prefix_sum_ptr+1
-    d_ScanNodesX<<< (osize + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >>>(
+    scan_nodes_cuda_kernel<<< (osize + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >>>(
         osize, O0, num_childrens_per_node_ptr);
     CubDebugExit(DeviceScan::ExclusiveSum(
-        d_temp_storage, temp_storage_bytes, num_childrens_per_node_ptr,
+        temp_storage_ptr, temp_storage_bytes, num_childrens_per_node_ptr,
         EX0, osize + 1)); // carful with the +1
 
     int* Pmid = h0;

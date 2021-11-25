@@ -24,14 +24,14 @@
 
 namespace kaolin {
 
-std::tuple<int, at::Tensor, at::Tensor> ScanOctrees(
+std::tuple<int, at::Tensor, at::Tensor> scan_octrees_cuda(
     at::Tensor octrees,
     at::Tensor lengths);
 
-std::tuple<int, at::Tensor, at::Tensor> ScanOctree(
+std::tuple<int, at::Tensor, at::Tensor> scan_octree_cuda(
     at::Tensor octree);
 
-at::Tensor GeneratePoints(
+at::Tensor generate_points_cuda(
   at::Tensor octrees,
   at::Tensor pyramids,
   at::Tensor exsum);

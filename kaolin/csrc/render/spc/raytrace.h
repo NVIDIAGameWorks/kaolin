@@ -24,29 +24,29 @@
 
 namespace kaolin {
 
-std::vector<at::Tensor> generate_primary_rays(
-    uint imageH,
-    uint imageW,
+std::vector<at::Tensor> generate_primary_rays_cuda(
+    uint height,
+    uint width,
     at::Tensor Eye,
     at::Tensor At,
     at::Tensor Up,
     float fov,
     at::Tensor World);
 
-at::Tensor spc_raytrace(
+at::Tensor raytrace_cuda(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
-    at::Tensor exsum,
-    at::Tensor Org,
-    at::Tensor Dir,
-    uint targetLevel) ;
+    at::Tensor exclusive_sum,
+    at::Tensor ray_o,
+    at::Tensor ray_d,
+    uint target_level) ;
 
 
-at::Tensor remove_duplicate_rays(
+at::Tensor remove_duplicate_rays_cuda(
     at::Tensor nuggets);
 
-at::Tensor mark_first_hit(
+at::Tensor mark_first_hit_cuda(
     at::Tensor nuggets);
 
 std::vector<torch::Tensor> spc_ray_aabb(
@@ -60,11 +60,11 @@ std::vector<torch::Tensor> spc_ray_aabb(
     torch::Tensor cond,
     bool init);
 
-std::vector<at::Tensor> generate_shadow_rays(
-    at::Tensor Org,
-    at::Tensor Dir,
-    at::Tensor Light,
-    at::Tensor Plane);
+std::vector<at::Tensor> generate_shadow_rays_cuda(
+    at::Tensor ray_o,
+    at::Tensor ray_d,
+    at::Tensor light,
+    at::Tensor plane);
 
 }  // namespace kaolin
 

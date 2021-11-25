@@ -23,7 +23,8 @@
 #include <cub/device/device_scan.cuh>
 
 #include "../../spc_math.h"
-#include "spc_render_utils.h"
+#include "../../spc_utils.cuh"
+#include "spc_render_utils.cuh"
 
 namespace kaolin {
 
@@ -31,7 +32,11 @@ using namespace cub;
 using namespace std;
 using namespace at::indexing;
 
-__constant__ uint Order[8][8] = {
+////////////////////////////////////////////////////////////////////////////////////////////////
+/// Constants
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+__constant__ uint VOXEL_ORDER[8][8] = {
     { 0, 1, 2, 4, 3, 5, 6, 7 },
     { 1, 0, 3, 5, 2, 4, 7, 6 },
     { 2, 0, 3, 6, 1, 4, 7, 5 },
@@ -42,103 +47,99 @@ __constant__ uint Order[8][8] = {
     { 7, 3, 5, 6, 1, 2, 4, 0 }
 };
 
-uint64_t GetStorageBytes(void* d_temp_storage, uint* d_Info, uint* d_PrefixSum,
-                      uint max_total_points) {
-    uint64_t temp_storage_bytes = 0;
-    CubDebugExit(DeviceScan::InclusiveSum(
-        d_temp_storage, temp_storage_bytes, d_Info,
-        d_PrefixSum, max_total_points));
-    return temp_storage_bytes;
-}
+////////////////////////////////////////////////////////////////////////////////////////////////
+/// Kernels
+////////////////////////////////////////////////////////////////////////////////////////////////
 
-
+// This function will initialize the nuggets array with each ray pointing to the octree root
 __global__ void
-d_InitNuggets(uint num, uint2* nuggets) {
+init_nuggets_cuda_kernel(
+    uint num, 
+    uint2* nuggets) {
+  
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num) {
-    nuggets[tidx].x = tidx; //ray idx
-    nuggets[tidx].y = 0;
+    nuggets[tidx].x = tidx; // ray idx
+    nuggets[tidx].y = 0;    // point idx
   }
-}
-
-__device__ bool
-d_FaceEval(ushort i, ushort j, float a, float b, float c) {
-  float result[4];
-
-  result[0] = a*i + b*j + c;
-  result[1] = result[0] + a;
-  result[2] = result[0] + b;
-  result[3] = result[1] + b;
-
-  float min = 1;
-  float max = -1;
-
-  for (int i = 0; i < 4; i++) {
-    if (result[i] < min) min = result[i];
-    if (result[i] > max) max = result[i];
-  }
-
-  return (min <= 0.0f && max >= 0.0f);
 }
 
 // This function will iterate over the nuggets (ray intersection proposals) and determine if they 
 // result in an intersection. If they do, the info tensor is populated with the # of child nodes
 // as determined by the input octree.
 __global__ void
-d_Decide(uint num, point_data* points, float3* rorg, float3* rdir,
-         uint2* nuggets, uint* info, uchar* O, uint Level, uint notDone) {
+decide_cuda_kernel(
+    uint num, 
+    point_data* points, 
+    float3* ray_o, 
+    float3* ray_d,
+    uint2* nuggets, 
+    uint* info, 
+    uint8_t* octree, 
+    uint level, 
+    uint not_done) {
+
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num) {
     uint ridx = nuggets[tidx].x;
     uint pidx = nuggets[tidx].y;
     point_data p = points[pidx];
-    float3 o = rorg[ridx];
-    float3 d = rdir[ridx];
+    float3 o = ray_o[ridx];
+    float3 d = ray_d[ridx];
 
     // Radius of voxel
-    float s1 = 1.0 / ((float)(0x1 << Level));
+    float r = 1.0 / ((float)(0x1 << level));
     
     // Transform to [-1, 1]
     const float3 vc = make_float3(
-        fmaf(s1, fmaf(2.0, p.x, 1.0), -1.0f),
-        fmaf(s1, fmaf(2.0, p.y, 1.0), -1.0f),
-        fmaf(s1, fmaf(2.0, p.z, 1.0), -1.0f));
+        fmaf(r, fmaf(2.0, p.x, 1.0), -1.0f),
+        fmaf(r, fmaf(2.0, p.y, 1.0), -1.0f),
+        fmaf(r, fmaf(2.0, p.z, 1.0), -1.0f));
 
     // Compute aux info (precompute to optimize)
     float3 sgn = ray_sgn(d);
     float3 ray_inv = make_float3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
 
     // Perform AABB check
-    if (ray_aabb(o, d, ray_inv, sgn, vc, s1) > 0.0){
+    if (ray_aabb(o, d, ray_inv, sgn, vc, r) > 0.0){
       // Count # of occupied voxels for expansion, if more levels are left
-      info[tidx] = notDone ? __popc(O[pidx]) : 1;      
+      info[tidx] = not_done ? __popc(octree[pidx]) : 1;      
     } else {
       info[tidx] = 0;
     }
   }
 }
 
-
+// This function will iterate over the nugget array, and for each nuggets stores the child indices of the
+// nuggets (as defined by the octree tensor) 
 __global__ void
-d_Subdivide(uint num, uint2* nuggetsIn, uint2* nuggetsOut, float3* rorg,
-            point_data* points, uchar* O, uint* S, uint* info,
-            uint* prefix_sum, uint Level) {
+subdivide_cuda_kernel(
+    uint num, 
+    uint2* nuggets_in, 
+    uint2* nuggets_out, 
+    float3* ray_o,
+    point_data* points, 
+    uint8_t* octree, 
+    uint* exclusive_sum, 
+    uint* info,
+    uint* prefix_sum, 
+    uint level) {
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num && info[tidx]) {
-    uint ridx = nuggetsIn[tidx].x;
-    int pidx = nuggetsIn[tidx].y;
+    uint ridx = nuggets_in[tidx].x;
+    int pidx = nuggets_in[tidx].y;
     point_data p = points[pidx];
 
-    uint IdxBase = prefix_sum[tidx];
+    uint base_idx = prefix_sum[tidx];
 
-    uchar o = O[pidx];
-    uint s = S[pidx];
+    uint8_t o = octree[pidx];
+    uint s = exclusive_sum[pidx];
 
-    float scale = 1.0 / ((float)(0x1 << Level));
-    float3 org = rorg[ridx];
+    float scale = 1.0 / ((float)(0x1 << level));
+    float3 org = ray_o[ridx];
     float x = (0.5f * org.x + 0.5f) - scale*((float)p.x + 0.5);
     float y = (0.5f * org.y + 0.5f) - scale*((float)p.y + 0.5);
     float z = (0.5f * org.z + 0.5f) - scale*((float)p.z + 0.5);
@@ -149,19 +150,22 @@ d_Subdivide(uint num, uint2* nuggetsIn, uint2* nuggetsOut, float3* rorg,
     if (z > 0) code += 1;
 
     for (uint i = 0; i < 8; i++) {
-      uint j = Order[code][i];
+      uint j = VOXEL_ORDER[code][i];
       if (o&(0x1 << j)) {
         uint cnt = __popc(o&((0x2 << j) - 1)); // count set bits up to child - inclusive sum
-        nuggetsOut[IdxBase].y = s + cnt;
-        nuggetsOut[IdxBase++].x = ridx;
+        nuggets_out[base_idx].y = s + cnt;
+        nuggets_out[base_idx++].x = ridx;
       }
     }
   }
 }
 
-
 __global__ void
-d_RemoveDuplicateRays(uint num, uint2* nuggets, uint* info) {
+remove_duplicate_rays_cuda_kernel(
+    uint num, 
+    uint2* nuggets, 
+    uint* info) {
+
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num) {
@@ -172,68 +176,94 @@ d_RemoveDuplicateRays(uint num, uint2* nuggets, uint* info) {
   }
 }
 
-
+// This function will take the nugget array, and remove the zero pads
 __global__ void
-d_Compactify(uint num, uint2* nuggetsIn, uint2* nuggetsOut,
-             uint* info, uint* prefix_sum) {
+compactify_cuda_kernel(
+    uint num, 
+    uint2* nuggets_in, 
+    uint2* nuggets_out,
+    uint* info, 
+    uint* prefix_sum) {
+
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num && info[tidx])
-    nuggetsOut[prefix_sum[tidx]] = nuggetsIn[tidx];
+    nuggets_out[prefix_sum[tidx]] = nuggets_in[tidx];
 }
 
-uint spc_raytrace_cuda(
-    uchar* d_octree,
-    uint Level,
-    uint targetLevel,
-    point_data* d_points,
-    uint* h_pyramid,
-    uint* d_exsum,
-    uint num,
-    float3* d_Org,
-    float3* d_Dir,
-    uint2*  d_NuggetBuffers,
-    uint*  d_Info,
-    uint*  d_PrefixSum,
-    void* d_temp_storage,
-    uint64_t temp_storage_bytes) {
+////////////////////////////////////////////////////////////////////////////////////////////////
+/// CUDA Implementations
+////////////////////////////////////////////////////////////////////////////////////////////////
 
-  uint* PyramidSum = h_pyramid + Level + 2;
+uint raytrace_cuda_impl(
+    at::Tensor octree,
+    at::Tensor points,
+    at::Tensor pyramid,
+    at::Tensor exclusive_sum,
+    at::Tensor ray_o,
+    at::Tensor ray_d,
+    at::Tensor nugget_buffers,
+    uint max_level,
+    uint target_level) {
 
-  uint2*  d_Nuggets[2];
-  d_Nuggets[0] = d_NuggetBuffers;
-  d_Nuggets[1] = d_NuggetBuffers + KAOLIN_SPC_MAX_POINTS;
+  uint num = ray_o.size(0);
+  at::Tensor info = at::zeros({KAOLIN_SPC_MAX_POINTS}, octree.options().dtype(at::kInt));
+  at::Tensor prefix_sum = at::zeros({KAOLIN_SPC_MAX_POINTS}, octree.options().dtype(at::kInt));
+  
+  uint8_t* octree_ptr = octree.data_ptr<uint8_t>();
+  point_data* points_ptr = reinterpret_cast<point_data*>(points.data_ptr<short>());
+  uint* pyramid_ptr = (uint*)pyramid.data_ptr<int>();
+  uint* pyramid_sum = pyramid_ptr + max_level + 2;
+  uint*  exclusive_sum_ptr = reinterpret_cast<uint*>(exclusive_sum.data_ptr<int>());
+  float3* ray_o_ptr = reinterpret_cast<float3*>(ray_o.data_ptr<float>());
+  float3* ray_d_ptr = reinterpret_cast<float3*>(ray_d.data_ptr<float>());
+  uint2* nugget_buffers_ptr = reinterpret_cast<uint2*>(nugget_buffers.data_ptr<int>());
 
-  int osize = PyramidSum[Level];
+  uint*  prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
+  uint* info_ptr = reinterpret_cast<uint*>(info.data_ptr<int>());
+  
+  void* temp_storage_ptr = NULL;
+  uint64_t temp_storage_bytes = get_cub_storage_bytes(
+          temp_storage_ptr, info_ptr, prefix_sum_ptr, KAOLIN_SPC_MAX_POINTS);
+  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, octree.options());
+  temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
+  
+  uint2*  nuggets[2];
+  nuggets[0] = nugget_buffers_ptr;
+  nuggets[1] = nugget_buffers_ptr + KAOLIN_SPC_MAX_POINTS;
 
-  d_InitNuggets<<<(num + 1023) / 1024, 1024>>>(num, d_Nuggets[0]);
+  int osize = pyramid_sum[max_level];
+
+  // Generate proposals (first proposal is root node)
+  init_nuggets_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(num, nuggets[0]);
 
   uint cnt, buffer = 0;
 
   // set first element to zero
-  CubDebugExit(cudaMemcpy(d_PrefixSum, &buffer, sizeof(uint),
+  CubDebugExit(cudaMemcpy(prefix_sum_ptr, &buffer, sizeof(uint),
                           cudaMemcpyHostToDevice));
 
-  for (uint l = 0; l <= targetLevel; l++) {
-    d_Decide<<<(num + 1023) / 1024, 1024>>>(
-        num, d_points, d_Org, d_Dir, d_Nuggets[buffer], d_Info, d_octree, l,
-        targetLevel - l);
+  for (uint l = 0; l <= target_level; l++) {
+    // Do the proposals hit?
+    decide_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+        num, points_ptr, ray_o_ptr, ray_d_ptr, nuggets[buffer], info_ptr, octree_ptr, l, target_level - l);
     CubDebugExit(DeviceScan::InclusiveSum(
-        d_temp_storage, temp_storage_bytes, d_Info,
-        d_PrefixSum + 1, num));//start sum on second element
-    cudaMemcpy(&cnt, d_PrefixSum + num, sizeof(uint), cudaMemcpyDeviceToHost);
+        temp_storage_ptr, temp_storage_bytes, info_ptr,
+        prefix_sum_ptr + 1, num)); //start sum on second element
+    cudaMemcpy(&cnt, prefix_sum_ptr + num, sizeof(uint), cudaMemcpyDeviceToHost);
 
     if (cnt == 0 || cnt > KAOLIN_SPC_MAX_POINTS)
       break; // either miss everything, or exceed memory allocation
 
-    if (l < targetLevel) {
-      d_Subdivide<<<(num + 1023) / 1024, 1024>>>(
-          num, d_Nuggets[buffer], d_Nuggets[(buffer + 1) % 2], d_Org, d_points,
-          d_octree, d_exsum, d_Info, d_PrefixSum, l);
+    // Subdivide if more levels remain, repeat
+    if (l < target_level) {
+      subdivide_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+          num, nuggets[buffer], nuggets[(buffer + 1) % 2], ray_o_ptr, points_ptr,
+          octree_ptr, exclusive_sum_ptr, info_ptr, prefix_sum_ptr, l);
     } else {
-      d_Compactify<<<(num + 1023) / 1024, 1024>>>(
-          num, d_Nuggets[buffer], d_Nuggets[(buffer + 1) % 2],
-          d_Info, d_PrefixSum);
+      compactify_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+          num, nuggets[buffer], nuggets[(buffer + 1) % 2],
+          info_ptr, prefix_sum_ptr);
     }
 
     CubDebugExit(cudaGetLastError());
@@ -245,58 +275,80 @@ uint spc_raytrace_cuda(
   return cnt;
 }
 
+uint remove_duplicate_rays_cuda_impl(
+    at::Tensor nuggets,
+    at::Tensor output) {
+  
+  int num = nuggets.size(0);
+  at::Tensor info = at::zeros({num}, nuggets.options().dtype(at::kInt));
+  at::Tensor prefix_sum = at::zeros({num}, nuggets.options().dtype(at::kInt));
+  
+  uint2* nuggets_ptr = reinterpret_cast<uint2*>(nuggets.data_ptr<int>());
+  uint2* output_ptr = reinterpret_cast<uint2*>(output.data_ptr<int>());
+  uint* info_ptr = reinterpret_cast<uint*>(info.data_ptr<int>());
+  uint* prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
+  
+  void* temp_storage_ptr = NULL;
+  uint64_t temp_storage_bytes = get_cub_storage_bytes(
+          temp_storage_ptr, info_ptr, prefix_sum_ptr, KAOLIN_SPC_MAX_POINTS);
+  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, nuggets.options());
+  temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
 
-uint remove_duplicate_rays_cuda(
-    uint num,
-    uint2*  d_Nuggets0,
-    uint2*  d_Nuggets1,
-    uint*  d_Info,
-    uint*  d_PrefixSum,
-    void* d_temp_storage,
-    uint64_t temp_storage_bytes) {
   uint cnt = 0;
-
-  d_RemoveDuplicateRays << <(num + 1023) / 1024, 1024 >> > (num, d_Nuggets0, d_Info);
-  CubDebugExit(DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_Info, d_PrefixSum, num+1));
-  cudaMemcpy(&cnt, d_PrefixSum + num, sizeof(uint), cudaMemcpyDeviceToHost);
-  d_Compactify << <(num + 1023) / 1024, 1024 >> > (num, d_Nuggets0, d_Nuggets1, d_Info, d_PrefixSum);
+  remove_duplicate_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(num, nuggets_ptr, info_ptr);
+  CubDebugExit(DeviceScan::ExclusiveSum(temp_storage_ptr, temp_storage_bytes, info_ptr, prefix_sum_ptr, num+1));
+  cudaMemcpy(&cnt, prefix_sum_ptr + num, sizeof(uint), cudaMemcpyDeviceToHost);
+  compactify_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(num, nuggets_ptr, output_ptr, info_ptr, prefix_sum_ptr);
 
   return cnt;
+
 }
 
-void mark_first_hit_cuda(
-    uint num,
-    uint2* d_Nuggets,
-    uint* d_Info) {
-    d_RemoveDuplicateRays << <(num + 1023) / 1024, 1024 >> > (num, d_Nuggets, d_Info);
+void mark_first_hit_cuda_impl(
+    at::Tensor nuggets,
+    at::Tensor info) {
+    int num = nuggets.size(0);
+    remove_duplicate_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+        num,
+        reinterpret_cast<uint2*>(nuggets.data_ptr<int>()),
+        reinterpret_cast<uint*>(info.data_ptr<int>()));
 }
 
 ////////// generate rays //////////////////////////////////////////////////////////////////////////
 
 __global__ void
-d_generate_rays(uint num, uint imageW, uint imageH, float4x4 mM,
-                float3* rayorg, float3* raydir) {
+generate_rays_cuda_kernel(
+    uint num, 
+    uint width, 
+    uint height, 
+    float4x4 tf,
+    float3* ray_o, 
+    float3* ray_d) {
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num) {
-    uint px = tidx % imageW;
-    uint py = tidx / imageW;
+    uint px = tidx % width;
+    uint py = tidx / height;
 
-    float4 a = mul4x4(make_float4(0.0f, 0.0f, 1.0f, 0.0f), mM);
-    float4 b = mul4x4(make_float4(px, py, 0.0f, 1.0f), mM);
+    float4 a = mul4x4(make_float4(0.0f, 0.0f, 1.0f, 0.0f), tf);
+    float4 b = mul4x4(make_float4(px, py, 0.0f, 1.0f), tf);
     // float3 org = make_float3(M.m[3][0], M.m[3][1], M.m[3][2]);
 
-    rayorg[tidx] = make_float3(a.x, a.y, a.z);
-    raydir[tidx] = make_float3(b.x, b.y, b.z);
+    ray_o[tidx] = make_float3(a.x, a.y, a.z);
+    ray_d[tidx] = make_float3(b.x, b.y, b.z);
   }
 }
 
 
-void generate_primary_rays_cuda(uint imageW, uint imageH, float4x4& mM,
-                                float3* d_Org, float3* d_Dir) {
-  uint num = imageW*imageH;
+void generate_primary_rays_cuda_impl(
+    uint width, 
+    uint height, 
+    float4x4& tf,
+    float3* ray_o, 
+    float3* ray_d) {
+  uint num = width*height;
 
-  d_generate_rays<<<(num + 1023) / 1024, 1024>>>(num, imageW, imageH, mM, d_Org, d_Dir);
+  generate_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(num, width, height, tf, ray_o, ray_d);
 }
 
 
@@ -304,13 +356,18 @@ void generate_primary_rays_cuda(uint imageW, uint imageH, float4x4& mM,
 
 
 __global__ void
-d_plane_intersect_rays(uint num, float3* d_Org, float3* d_Dir,
-                       float3* d_Dst, float4 plane, uint* info) {
+plane_intersect_rays_cuda_kernel(
+    uint num, 
+    float3* ray_o, 
+    float3* ray_d,
+    float3* output, 
+    float4 plane, 
+    uint* info) {
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num) {
-    float3 org = d_Org[tidx];
-    float3 dir = d_Dir[tidx];
+    float3 org = ray_o[tidx];
+    float3 dir = ray_d[tidx];
 
     float a = org.x*plane.x +  org.y*plane.y +  org.z*plane.z +  plane.w;
     float b = dir.x*plane.x +  dir.y*plane.y +  dir.z*plane.z;
@@ -318,7 +375,7 @@ d_plane_intersect_rays(uint num, float3* d_Org, float3* d_Dir,
     if (fabs(b) > 1e-3) {
       float t = - a / b;
       if (t > 0.0f) {
-        d_Dst[tidx] = make_float3(org.x + t*dir.x, org.y + t*dir.y, org.z + t*dir.z);
+        output[tidx] = make_float3(org.x + t*dir.x, org.y + t*dir.y, org.z + t*dir.z);
         info[tidx] = 1;
       } else {
         info[tidx] = 0;
@@ -330,18 +387,29 @@ d_plane_intersect_rays(uint num, float3* d_Org, float3* d_Dir,
 }
 
 __global__ void
-d_Compactify2(uint num, float3* pIn, float3* pOut, uint* map,
-              uint* info, uint* prefix_sum) {
+compactify_shadow_rays_cuda_kernel(
+    uint num, 
+    float3* p_in, 
+    float3* p_out, 
+    uint* map,
+    uint* info, 
+    uint* prefix_sum) {
+
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num && info[tidx]) {
-    pOut[prefix_sum[tidx]] = pIn[tidx];
+    p_out[prefix_sum[tidx]] = p_in[tidx];
     map[prefix_sum[tidx]] = tidx;
   }
 }
 
 __global__ void
-d_SetShadowRays(uint num, float3* src, float3* dst, float3 light) {
+set_shadow_rays_cuda_kernel(
+    uint num, 
+    float3* src, 
+    float3* dst, 
+    float3 light) {
+
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num) {
@@ -350,32 +418,38 @@ d_SetShadowRays(uint num, float3* src, float3* dst, float3 light) {
   }
 }
 
-uint generate_shadow_rays_cuda(
+uint generate_shadow_rays_cuda_impl(
     uint num,
-    float3* org,
-    float3* dir,
+    float3* ray_o,
+    float3* ray_d,
     float3* src,
     float3* dst,
     uint* map,
     float3& light,
     float4& plane,
     uint* info,
-    uint*prefixSum,
-    void* d_temp_storage,
-    uint64_t temp_storage_bytes) {
+    uint* prefix_sum) {
+  
+  // set up memory for DeviceScan calls
+  void* temp_storage_ptr = NULL;
+  uint64_t temp_storage_bytes = get_cub_storage_bytes(temp_storage_ptr, info, prefix_sum, num);
+  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, device(at::DeviceType::CUDA).dtype(at::kByte));
+  temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
+
   uint cnt = 0;
-  d_plane_intersect_rays<<<(num + 1023) / 1024, 1024>>>(
-      num, org, dir, dst, plane, info);
+  plane_intersect_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+      num, ray_o, ray_d, dst, plane, info);
   CubDebugExit(DeviceScan::ExclusiveSum(
-      d_temp_storage, temp_storage_bytes, info, prefixSum, num));
-  cudaMemcpy(&cnt, prefixSum + num - 1, sizeof(uint), cudaMemcpyDeviceToHost);
-  d_Compactify2<<<(num + 1023) / 1024, 1024>>>(
-      num, dst, src, map, info, prefixSum);
-  d_SetShadowRays<<<(cnt + 1023) / 1024, 1024>>>(cnt, src, dst, light);
+      temp_storage_ptr, temp_storage_bytes, info, prefix_sum, num));
+  cudaMemcpy(&cnt, prefix_sum + num - 1, sizeof(uint), cudaMemcpyDeviceToHost);
+  compactify_shadow_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+      num, dst, src, map, info, prefix_sum);
+  set_shadow_rays_cuda_kernel<<<(cnt + 1023) / 1024, 1024>>>(cnt, src, dst, light);
 
   return cnt;
 }
 
+// Note: this function will be removed
 // This kernel will iterate over Nuggets, instead of iterating over rays
 __global__ void ray_aabb_kernel(
     const float3* __restrict__ query,     // ray query array
