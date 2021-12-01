@@ -33,32 +33,20 @@ std::vector<at::Tensor> generate_primary_rays_cuda(
     float fov,
     at::Tensor World);
 
-at::Tensor raytrace_cuda(
+std::vector<at::Tensor> raytrace_cuda(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
     at::Tensor exclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
-    uint target_level) ;
+    uint target_level,
+    bool return_depth,
+    bool with_exit);
 
 
-at::Tensor remove_duplicate_rays_cuda(
-    at::Tensor nuggets);
-
-at::Tensor mark_first_hit_cuda(
-    at::Tensor nuggets);
-
-std::vector<torch::Tensor> spc_ray_aabb(
-    torch::Tensor nuggets,
-    torch::Tensor points,
-    torch::Tensor ray_query,
-    torch::Tensor ray_d,
-    uint targetLevel,
-    torch::Tensor info,
-    torch::Tensor info_idxes,
-    torch::Tensor cond,
-    bool init);
+at::Tensor mark_pack_boundary_cuda(
+    at::Tensor pack_ids);
 
 std::vector<at::Tensor> generate_shadow_rays_cuda(
     at::Tensor ray_o,

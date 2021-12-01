@@ -73,11 +73,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   render_mesh.def("generate_soft_mask_cuda", &generate_soft_mask_cuda);
   render_mesh.def("rasterize_backward_cuda", &rasterize_backward_cuda);
   py::module render_spc = render.def_submodule("spc");
-  render_spc.def("ray_aabb", &spc_ray_aabb); // Deprecate soon
   render_spc.def("raytrace_cuda", &raytrace_cuda);
   render_spc.def("generate_primary_rays_cuda", &generate_primary_rays_cuda); // Deprecate soon
-  render_spc.def("remove_duplicate_rays_cuda", &remove_duplicate_rays_cuda);
-  render_spc.def("mark_first_hit_cuda", &mark_first_hit_cuda);
+  render_spc.def("mark_pack_boundary_cuda", &mark_pack_boundary_cuda);
   render_spc.def("generate_shadow_rays_cuda", &generate_shadow_rays_cuda); // Deprecate soon
 }
 

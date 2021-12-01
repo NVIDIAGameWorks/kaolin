@@ -14,9 +14,9 @@
 // limitations under the License.
 
 #include <ATen/ATen.h>
+#include <vector>
 
 #include "../../check.h"
-
 #ifdef WITH_CUDA
 #include "../../utils.h"
 #include "../../spc_math.h"
@@ -40,16 +40,15 @@ uint raytrace_cuda_impl(
     at::Tensor ray_o,
     at::Tensor ray_d,
     at::Tensor nugget_buffers,
+    at::Tensor depth_buffers,
     uint max_level,
-    uint target_level);
+    uint target_level,
+    bool return_depth,
+    bool with_exit);
 
-uint remove_duplicate_rays_cuda_impl(
-    at::Tensor nuggets,
-    at::Tensor output);
-
-void mark_first_hit_cuda_impl(
-    at::Tensor nuggets,
-    at::Tensor info);
+void mark_pack_boundary_cuda_impl(
+    at::Tensor pack_ids,
+    at::Tensor boundaries);
 
 void generate_primary_rays_cuda_impl(
     uint width,
@@ -69,23 +68,6 @@ uint generate_shadow_rays_cuda_impl(
   float4& plane,
   uint* info,
   uint* prefix_sum);
-
-
-void ray_aabb_cuda(
-    const float3* query,     // ray query array
-    const float3* ray_d,     // ray direction array
-    const float3* ray_inv,   // inverse ray direction array
-    const int2*  nuggets,    // nugget array (ray-aabb correspondences)
-    const float3* points,    // 3d coord array
-    const int* info,         // binary array denoting beginning of nugget group
-    const int* info_idxes,   // array of active nugget indices
-    const float r,           // radius of aabb
-    const bool init,         // first run?
-    float* d,                // distance
-    bool* cond,              // true if hit
-    int* pidx,               // index of 3d coord array
-    const int num_nuggets,   // # of nugget indices
-    const int n);            // # of active nugget indices
 
 #endif
 
@@ -146,18 +128,20 @@ std::vector<at::Tensor> generate_primary_rays_cuda(
 
   return {Org, Dir};
 #else
-  KAOLIN_NO_CUDA_ERROR("generate_primary_rays not built with CUDA");
+  KAOLIN_NO_CUDA_ERROR(__func__);
 #endif
 }
 
-at::Tensor raytrace_cuda(
+std::vector<at::Tensor> raytrace_cuda(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
     at::Tensor exclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
-    uint target_level) {
+    uint target_level,
+    bool return_depth,
+    bool with_exit) {
 #ifdef WITH_CUDA
   at::TensorArg octree_arg{octree, "octree", 1};
   at::TensorArg points_arg{points, "points", 2};
@@ -188,48 +172,40 @@ at::Tensor raytrace_cuda(
   // allocate local GPU storage
   at::Tensor nuggets = at::zeros({2 * KAOLIN_SPC_MAX_POINTS, 2}, octree.options().dtype(at::kInt));
 
+  uint depth_dim = with_exit ? 2 : 1;
+  at::Tensor depth = at::zeros({2 * KAOLIN_SPC_MAX_POINTS, depth_dim}, octree.options().dtype(at::kFloat));
+
   // do cuda
-  uint num = raytrace_cuda_impl(octree, points, pyramid, exclusive_sum, 
-                                    ray_o, ray_d, nuggets, max_level, target_level);
+  uint num = raytrace_cuda_impl(octree, points, pyramid, exclusive_sum, ray_o, ray_d, nuggets, depth, 
+                                max_level, target_level, return_depth, with_exit);
 
   uint pad = ((target_level + 1) % 2) * KAOLIN_SPC_MAX_POINTS;
-
-  return nuggets.index({Slice(pad, pad+num)}).contiguous();
+ 
+  if (return_depth) {
+    return { nuggets.index({Slice(pad, pad+num)}).contiguous(),
+             depth.index({Slice(pad, pad+num)}).contiguous() };
+  } else {
+    return { nuggets.index({Slice(pad, pad+num)}).contiguous() };
+  }
 #else
-  KAOLIN_NO_CUDA_ERROR("raytrace not built with CUDA");
+  KAOLIN_NO_CUDA_ERROR(__func__);
 #endif  // WITH_CUDA
 }
 
-
-at::Tensor remove_duplicate_rays_cuda(
-    at::Tensor nuggets) {
+at::Tensor mark_pack_boundary_cuda(
+    at::Tensor pack_ids) {
 #ifdef WITH_CUDA
-  at::TensorArg nuggets_arg{nuggets, "nuggets", 1};
-  at::checkAllSameGPU(__func__, {nuggets_arg});
-  at::checkAllContiguous(__func__,  {nuggets_arg});
-  int num = nuggets.size(0);
-  at::Tensor output = at::zeros({num, 2}, nuggets.options().dtype(at::kInt));
-
-  uint cnt = remove_duplicate_rays_cuda_impl(nuggets, output);
-
-  return output.index({Slice(None, cnt)}).contiguous();
+  at::TensorArg pack_ids_arg{pack_ids, "pack_ids", 1};
+  at::checkDim(__func__, pack_ids_arg, 1);
+  at::checkAllSameGPU(__func__, {pack_ids_arg});
+  at::checkAllContiguous(__func__,  {pack_ids_arg});
+  at::checkScalarTypes(__func__, pack_ids_arg, {at::kByte, at::kChar, at::kInt, at::kLong, at::kShort});
+  int num_ids = pack_ids.size(0);
+  at::Tensor boundaries = at::zeros({num_ids}, pack_ids.options().dtype(at::kInt));
+  mark_pack_boundary_cuda_impl(pack_ids, boundaries);
+  return boundaries;
 #else
-  KAOLIN_NO_CUDA_ERROR("remove_duplicate_rays not built with CUDA");
-#endif  // WITH_CUDA
-}
-
-at::Tensor mark_first_hit_cuda(
-    at::Tensor nuggets) {
-#ifdef WITH_CUDA
-  at::TensorArg nuggets_arg{nuggets, "nuggets", 1};
-  at::checkAllSameGPU(__func__, {nuggets_arg});
-  at::checkAllContiguous(__func__,  {nuggets_arg});
-  int num_nuggets = nuggets.size(0);
-  at::Tensor info = at::zeros({num_nuggets}, nuggets.options().dtype(at::kInt));
-  mark_first_hit_cuda_impl(nuggets, info);
-  return info;
-#else
-  KAOLIN_NO_CUDA_ERROR("mark_first_hit not built with CUDA");
+  KAOLIN_NO_CUDA_ERROR(__func__);
 #endif  // WITH_CUDA
 }
 
@@ -283,57 +259,7 @@ std::vector<at::Tensor> generate_shadow_rays_cuda(
 
   return result;
 #else
-  KAOLIN_NO_CUDA_ERROR("generate_shadow_rays not built with CUDA");
-#endif  // WITH_CUDA
-}
-
-std::vector<at::Tensor> spc_ray_aabb(
-    at::Tensor nuggets,
-    at::Tensor points,
-    at::Tensor ray_query,
-    at::Tensor ray_d,
-    uint targetLevel,
-    at::Tensor info,
-    at::Tensor info_idxes,
-    at::Tensor cond,
-    bool init) {
-#ifdef WITH_CUDA
-    int nr = ray_query.size(0); // # rays
-    int nn = nuggets.size(0);
-
-    at::Tensor fpoints = points.to(at::kFloat);
-
-    int n_iidx = info_idxes.size(0);
-    at::Tensor ray_inv = 1.0 / ray_d;
-
-    auto f_opt = at::TensorOptions().dtype(at::kFloat).device(ray_query.device());
-    at::Tensor d = at::zeros({ nr, 1 }, f_opt);
-
-    auto i_opt = at::TensorOptions().dtype(at::kInt).device(ray_query.device());
-    at::Tensor pidx = at::zeros({ nr }, i_opt) - 1;
-    
-    int voxel_res = pow(2, targetLevel);
-    float voxel_radius = (1.0 / voxel_res);
-
-    ray_aabb_cuda(
-        reinterpret_cast<float3*>(ray_query.data_ptr<float>()),
-        reinterpret_cast<float3*>(ray_d.data_ptr<float>()),
-        reinterpret_cast<float3*>(ray_inv.data_ptr<float>()),
-        reinterpret_cast<int2*>(nuggets.data_ptr<int>()),
-        reinterpret_cast<float3*>(fpoints.data_ptr<float>()),
-        info.data_ptr<int>(),
-        info_idxes.data_ptr<int>(),
-        voxel_radius,
-        init,
-        d.data_ptr<float>(),
-        cond.data_ptr<bool>(),
-        pidx.data_ptr<int>(),
-        nn,
-        n_iidx);
-
-    return { d, pidx, cond };
-#else
-  KAOLIN_NO_CUDA_ERROR("ray_aabb not built with CUDA");
+  KAOLIN_NO_CUDA_ERROR(__func__);
 #endif  // WITH_CUDA
 }
 

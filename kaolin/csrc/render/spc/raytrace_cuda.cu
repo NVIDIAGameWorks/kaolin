@@ -54,7 +54,7 @@ __constant__ uint VOXEL_ORDER[8][8] = {
 // This function will initialize the nuggets array with each ray pointing to the octree root
 __global__ void
 init_nuggets_cuda_kernel(
-    uint num, 
+    const uint num, 
     uint2* nuggets) {
   
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -70,17 +70,19 @@ init_nuggets_cuda_kernel(
 // as determined by the input octree.
 __global__ void
 decide_cuda_kernel(
-    uint num, 
-    point_data* points, 
-    float3* ray_o, 
-    float3* ray_d,
-    uint2* nuggets, 
+    const uint num, 
+    const point_data* points, 
+    const float3* ray_o, 
+    const float3* ray_d,
+    const uint2* nuggets, 
+    float* depth,
     uint* info, 
-    uint8_t* octree, 
-    uint level, 
-    uint not_done) {
+    const uint8_t* octree, 
+    const uint level, 
+    const uint not_done) {
 
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
+  const float eps = 1e-8;
 
   if (tidx < num) {
     uint ridx = nuggets[tidx].x;
@@ -90,7 +92,7 @@ decide_cuda_kernel(
     float3 d = ray_d[ridx];
 
     // Radius of voxel
-    float r = 1.0 / ((float)(0x1 << level));
+    float r = 1.0 / ((float)(0x1 << level)) + eps;
     
     // Transform to [-1, 1]
     const float3 vc = make_float3(
@@ -102,8 +104,58 @@ decide_cuda_kernel(
     float3 sgn = ray_sgn(d);
     float3 ray_inv = make_float3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
 
+    depth[tidx] = ray_aabb(o, d, ray_inv, sgn, vc, r);
+
     // Perform AABB check
-    if (ray_aabb(o, d, ray_inv, sgn, vc, r) > 0.0){
+    if (depth[tidx] > 0.0){
+      // Count # of occupied voxels for expansion, if more levels are left
+      info[tidx] = not_done ? __popc(octree[pidx]) : 1;      
+    } else {
+      info[tidx] = 0;
+    }
+  }
+}
+
+__global__ void
+decide_cuda_kernel(
+    const uint num, 
+    const point_data* points, 
+    const float3* ray_o, 
+    const float3* ray_d,
+    const uint2* nuggets, 
+    float2* depth,
+    uint* info, 
+    const uint8_t* octree, 
+    const uint level, 
+    const uint not_done) {
+
+  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
+  const float eps = 1e-8;
+
+  if (tidx < num) {
+    uint ridx = nuggets[tidx].x;
+    uint pidx = nuggets[tidx].y;
+    point_data p = points[pidx];
+    float3 o = ray_o[ridx];
+    float3 d = ray_d[ridx];
+
+    // Radius of voxel
+    float r = 1.0 / ((float)(0x1 << level)) + eps;
+    
+    // Transform to [-1, 1]
+    const float3 vc = make_float3(
+        fmaf(r, fmaf(2.0, p.x, 1.0), -1.0f),
+        fmaf(r, fmaf(2.0, p.y, 1.0), -1.0f),
+        fmaf(r, fmaf(2.0, p.z, 1.0), -1.0f));
+
+    // Compute aux info (precompute to optimize)
+    float3 sgn = ray_sgn(d);
+    float3 ray_inv = make_float3(1.0 / d.x, 1.0 / d.y, 1.0 / d.z);
+
+    depth[tidx] = ray_aabb_with_exit(o, d, ray_inv, vc, r);
+
+    // Perform AABB check
+    if (depth[tidx].x > 0.0 && depth[tidx].y > 0.0){
       // Count # of occupied voxels for expansion, if more levels are left
       info[tidx] = not_done ? __popc(octree[pidx]) : 1;      
     } else {
@@ -116,16 +168,16 @@ decide_cuda_kernel(
 // nuggets (as defined by the octree tensor) 
 __global__ void
 subdivide_cuda_kernel(
-    uint num, 
-    uint2* nuggets_in, 
+    const uint num, 
+    const uint2* nuggets_in, 
     uint2* nuggets_out, 
-    float3* ray_o,
-    point_data* points, 
-    uint8_t* octree, 
-    uint* exclusive_sum, 
-    uint* info,
-    uint* prefix_sum, 
-    uint level) {
+    const float3* ray_o,
+    const point_data* points, 
+    const uint8_t* octree, 
+    const uint* exclusive_sum, 
+    const uint* info,
+    const uint* prefix_sum, 
+    const uint level) {
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num && info[tidx]) {
@@ -160,35 +212,39 @@ subdivide_cuda_kernel(
   }
 }
 
+template<typename scalar_t>
 __global__ void
-remove_duplicate_rays_cuda_kernel(
-    uint num, 
-    uint2* nuggets, 
-    uint* info) {
+mark_pack_boundary_cuda_kernel(
+    const int64_t num, 
+    const scalar_t* __restrict__ pack_ids, 
+    uint* __restrict__ boundaries) {
 
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num) {
-    if (tidx == 0)
-      info[tidx] = 1;
-    else
-      info[tidx] = nuggets[tidx - 1].x == nuggets[tidx].x ? 0 : 1;
+    if (tidx == 0) {
+      boundaries[tidx] = 1;
+    } else {
+      boundaries[tidx] = pack_ids[tidx - 1] == pack_ids[tidx] ? 0 : 1;
+    }
   }
 }
 
-// This function will take the nugget array, and remove the zero pads
+// This function will take a buffer and remove the zero pads
+template<typename scalar_t>
 __global__ void
 compactify_cuda_kernel(
-    uint num, 
-    uint2* nuggets_in, 
-    uint2* nuggets_out,
-    uint* info, 
-    uint* prefix_sum) {
+    const uint num, 
+    const scalar_t* buffer_in, 
+    scalar_t* buffer_out,
+    const uint* info, 
+    const uint* prefix_sum) {
 
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
-  if (tidx < num && info[tidx])
-    nuggets_out[prefix_sum[tidx]] = nuggets_in[tidx];
+  if (tidx < num && info[tidx]) { 
+    buffer_out[prefix_sum[tidx]] = buffer_in[tidx];
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -203,8 +259,11 @@ uint raytrace_cuda_impl(
     at::Tensor ray_o,
     at::Tensor ray_d,
     at::Tensor nugget_buffers,
+    at::Tensor depth_buffers,
     uint max_level,
-    uint target_level) {
+    uint target_level,
+    bool return_depth,
+    bool with_exit) {
 
   uint num = ray_o.size(0);
   at::Tensor info = at::zeros({KAOLIN_SPC_MAX_POINTS}, octree.options().dtype(at::kInt));
@@ -218,19 +277,25 @@ uint raytrace_cuda_impl(
   float3* ray_o_ptr = reinterpret_cast<float3*>(ray_o.data_ptr<float>());
   float3* ray_d_ptr = reinterpret_cast<float3*>(ray_d.data_ptr<float>());
   uint2* nugget_buffers_ptr = reinterpret_cast<uint2*>(nugget_buffers.data_ptr<int>());
+  float* depth_buffers_ptr = depth_buffers.data_ptr<float>();
 
-  uint*  prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
+  uint* prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
   uint* info_ptr = reinterpret_cast<uint*>(info.data_ptr<int>());
   
   void* temp_storage_ptr = NULL;
   uint64_t temp_storage_bytes = get_cub_storage_bytes(
-          temp_storage_ptr, info_ptr, prefix_sum_ptr, KAOLIN_SPC_MAX_POINTS);
+    temp_storage_ptr, info_ptr, prefix_sum_ptr, KAOLIN_SPC_MAX_POINTS);
   at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, octree.options());
   temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
   
   uint2*  nuggets[2];
   nuggets[0] = nugget_buffers_ptr;
   nuggets[1] = nugget_buffers_ptr + KAOLIN_SPC_MAX_POINTS;
+
+  const uint depth_dim = with_exit ? 2 : 1;
+  float* depths[2];
+  depths[0] = depth_buffers_ptr;
+  depths[1] = depth_buffers_ptr + (depth_dim * KAOLIN_SPC_MAX_POINTS);
 
   int osize = pyramid_sum[max_level];
 
@@ -245,8 +310,16 @@ uint raytrace_cuda_impl(
 
   for (uint l = 0; l <= target_level; l++) {
     // Do the proposals hit?
-    decide_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
-        num, points_ptr, ray_o_ptr, ray_d_ptr, nuggets[buffer], info_ptr, octree_ptr, l, target_level - l);
+    if (with_exit) {
+        decide_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+            num, points_ptr, ray_o_ptr, ray_d_ptr, nuggets[buffer], 
+            reinterpret_cast<float2*>(depths[buffer]),
+            info_ptr, octree_ptr, l, target_level - l);
+    } else {
+        decide_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+            num, points_ptr, ray_o_ptr, ray_d_ptr, nuggets[buffer], 
+            depths[buffer], info_ptr, octree_ptr, l, target_level - l);
+    }
     CubDebugExit(DeviceScan::InclusiveSum(
         temp_storage_ptr, temp_storage_bytes, info_ptr,
         prefix_sum_ptr + 1, num)); //start sum on second element
@@ -261,9 +334,21 @@ uint raytrace_cuda_impl(
           num, nuggets[buffer], nuggets[(buffer + 1) % 2], ray_o_ptr, points_ptr,
           octree_ptr, exclusive_sum_ptr, info_ptr, prefix_sum_ptr, l);
     } else {
-      compactify_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+      compactify_cuda_kernel<uint2><<<(num + 1023) / 1024, 1024>>>(
           num, nuggets[buffer], nuggets[(buffer + 1) % 2],
           info_ptr, prefix_sum_ptr);
+      if (return_depth) {
+          if (with_exit) {
+            compactify_cuda_kernel<float2><<<(num + 1023) / 1024, 1024>>>(
+                num, reinterpret_cast<float2*>(depths[buffer]), 
+                reinterpret_cast<float2*>(depths[(buffer + 1) % 2]),
+                info_ptr, prefix_sum_ptr);
+          } else {
+            compactify_cuda_kernel<float><<<(num + 1023) / 1024, 1024>>>(
+                num, depths[buffer], depths[(buffer + 1) % 2],
+                info_ptr, prefix_sum_ptr);
+          }
+      }
     }
 
     CubDebugExit(cudaGetLastError());
@@ -275,43 +360,16 @@ uint raytrace_cuda_impl(
   return cnt;
 }
 
-uint remove_duplicate_rays_cuda_impl(
-    at::Tensor nuggets,
-    at::Tensor output) {
-  
-  int num = nuggets.size(0);
-  at::Tensor info = at::zeros({num}, nuggets.options().dtype(at::kInt));
-  at::Tensor prefix_sum = at::zeros({num}, nuggets.options().dtype(at::kInt));
-  
-  uint2* nuggets_ptr = reinterpret_cast<uint2*>(nuggets.data_ptr<int>());
-  uint2* output_ptr = reinterpret_cast<uint2*>(output.data_ptr<int>());
-  uint* info_ptr = reinterpret_cast<uint*>(info.data_ptr<int>());
-  uint* prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
-  
-  void* temp_storage_ptr = NULL;
-  uint64_t temp_storage_bytes = get_cub_storage_bytes(
-          temp_storage_ptr, info_ptr, prefix_sum_ptr, KAOLIN_SPC_MAX_POINTS);
-  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, nuggets.options());
-  temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
-
-  uint cnt = 0;
-  remove_duplicate_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(num, nuggets_ptr, info_ptr);
-  CubDebugExit(DeviceScan::ExclusiveSum(temp_storage_ptr, temp_storage_bytes, info_ptr, prefix_sum_ptr, num+1));
-  cudaMemcpy(&cnt, prefix_sum_ptr + num, sizeof(uint), cudaMemcpyDeviceToHost);
-  compactify_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(num, nuggets_ptr, output_ptr, info_ptr, prefix_sum_ptr);
-
-  return cnt;
-
-}
-
-void mark_first_hit_cuda_impl(
-    at::Tensor nuggets,
-    at::Tensor info) {
-    int num = nuggets.size(0);
-    remove_duplicate_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
-        num,
-        reinterpret_cast<uint2*>(nuggets.data_ptr<int>()),
-        reinterpret_cast<uint*>(info.data_ptr<int>()));
+void mark_pack_boundary_cuda_impl(
+    at::Tensor pack_ids,
+    at::Tensor boundaries) {
+    int64_t num = pack_ids.size(0);
+    AT_DISPATCH_INTEGRAL_TYPES(pack_ids.type(), "mark_pack_boundary_kernel", ([&] {
+        mark_pack_boundary_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+            num,
+            pack_ids.data_ptr<scalar_t>(),
+            reinterpret_cast<uint*>(boundaries.data_ptr<int>()));
+    }));
 }
 
 ////////// generate rays //////////////////////////////////////////////////////////////////////////
@@ -449,101 +507,5 @@ uint generate_shadow_rays_cuda_impl(
   return cnt;
 }
 
-// Note: this function will be removed
-// This kernel will iterate over Nuggets, instead of iterating over rays
-__global__ void ray_aabb_kernel(
-    const float3* __restrict__ query,     // ray query array
-    const float3* __restrict__ ray_d,     // ray direction array
-    const float3* __restrict__ ray_inv,   // inverse ray direction array
-    const int2* __restrict__ nuggets,     // nugget array (ray-aabb correspondences)
-    const float3* __restrict__ points,    // 3d coord array
-    const int* __restrict__ info,         // binary array denoting beginning of nugget group
-    const int* __restrict__  info_idxes,  // array of active nugget indices
-    const float r,                        // radius of aabb
-    const bool init,                      // first run?
-    float* __restrict__ d,                // distance
-    bool* __restrict__ cond,              // true if hit
-    int* __restrict__ pidx,               // index of 3d coord array
-    const int num_nuggets,                // # of nugget indices
-    const int n                           // # of active nugget indices
-){
-    
-    int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    int stride = blockDim.x*gridDim.x;
-    if (idx > n) return;
+} // namespace kaolin
 
-    for (int _i=idx; _i<n; _i+=stride) {
-        // Get index of corresponding nugget
-        int i = info_idxes[_i];
-        
-        // Get index of ray
-        uint ridx = nuggets[i].x;
-
-        // If this ray is already terminated, continue
-        if (!cond[ridx] && !init) continue;
-
-        bool _hit = false;
-        
-        // Sign bit
-        const float3 sgn = ray_sgn(ray_d[ridx]);
-        
-        int j = 0;
-        // In order traversal of the voxels
-        do {
-            // Get the vc from the nugget
-            uint _pidx = nuggets[i].y; // Index of points
-
-            // Center of voxel
-            const float3 vc = make_float3(
-                fmaf(r, fmaf(2.0, points[_pidx].x, 1.0), -1.0f),
-                fmaf(r, fmaf(2.0, points[_pidx].y, 1.0), -1.0f),
-                fmaf(r, fmaf(2.0, points[_pidx].z, 1.0), -1.0f));
-
-            float _d = ray_aabb(query[ridx], ray_d[ridx], ray_inv[ridx], sgn, vc, r);
-
-            if (_d != 0.0) {
-                _hit = true;
-                pidx[ridx] = _pidx;
-                cond[ridx] = _hit;
-                if (_d > 0.0) {
-                    d[ridx] = _d;
-                }
-            } 
-           
-            ++i;
-            ++j;
-            
-        } while (i < num_nuggets && info[i] != 1 && _hit == false);
-
-        if (!_hit) {
-            // Should only reach here if it misses
-            cond[ridx] = false;
-            d[ridx] = 100;
-        }
-        
-    }
-}
-
-void ray_aabb_cuda(
-    const float3* query,     // ray query array
-    const float3* ray_d,     // ray direction array
-    const float3* ray_inv,   // inverse ray direction array
-    const int2*  nuggets,    // nugget array (ray-aabb correspondences)
-    const float3* points,    // 3d coord array
-    const int* info,         // binary array denoting beginning of nugget group
-    const int* info_idxes,   // array of active nugget indices
-    const float r,           // radius of aabb
-    const bool init,         // first run?
-    float* d,                // distance
-    bool* cond,              // true if hit
-    int* pidx,               // index of 3d coord array
-    const int num_nuggets,   // # of nugget indices
-    const int n){            // # of active nugget indices
-
-    const int threads = 128;
-    const int blocks = (n + threads - 1) / threads;
-    ray_aabb_kernel<<<blocks, threads>>>(
-        query, ray_d, ray_inv, nuggets, points, info, info_idxes, r, init, d, cond, pidx, num_nuggets, n);
-}
-
-}  // namespace kaolin
