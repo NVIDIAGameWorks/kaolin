@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import torch
+import warnings
 from kaolin import _C
 
-def unbatched_raytrace(octree, point_hierarchy, pyramid, exsum, origin, direction, level):
+def unbatched_raytrace(octree, point_hierarchy, pyramid, exsum, origin, direction, level,
+                       return_depth=True, with_exit=False):
     r"""Apply ray tracing over an unbatched SPC structure.
 
     The SPC model will be always normalized between -1 and 1 for each axis.
@@ -37,22 +37,62 @@ def unbatched_raytrace(octree, point_hierarchy, pyramid, exsum, origin, directio
                                        of shape :math:`(\text{num_rays}, 3)`.
         level (int): level to use from the octree.
 
+        return_depth (bool): return the depth of each voxel intersection. (Default: True)
+
+        with_exit (bool): return also the exit intersection depth. (Default: False)
+
     Returns:
-        (torch.IntTensor): Nuggets of intersections sorted by depth,
-                           of shape :math:`(\text{num_intersection}, 2)` representing pairs
-                           :math:`(\text{index_to_ray}, \text{index_to_points})`.
+        (torch.IntTensor, torch.IntTensor, (optional) torch.FloatTensor):
+
+            - Ray index of intersections sorted by depth of shape :math:`(\text{num_intersection})` 
+            - Point hierarchy index of intersections sorted by depth of shape :math:`(\text{num_intersection})` 
+              These indices will be `IntTensor`s, but they can be used for indexing with `torch.index_select`.
+            - If return_depth is true:
+              Float tensor of shape :math:`(\text{num_intersection}), 1` of entry
+              depths to each AABB intersection. When `with_exit` is set, returns 
+              shape :math:`(\text{num_intersection}), 2` of entry and exit depths.
     """
-    return _C.render.spc.raytrace_cuda(
+    output = _C.render.spc.raytrace_cuda(
         octree.contiguous(),
         point_hierarchy.contiguous(),
         pyramid.contiguous(),
         exsum.contiguous(),
         origin.contiguous(),
         direction.contiguous(),
-        level)
+        level,
+        return_depth,
+        with_exit)
+    nuggets = output[0]
+    ray_index = nuggets[..., 0]
+    point_index = nuggets[..., 1]
 
-def mark_first_hit(nuggets):
+    if return_depth:
+        return ray_index, point_index, output[1]
+    else:
+        return ray_index, point_index
+
+def mark_pack_boundary(pack_ids):
+    r"""Mark the boundaries of pack IDs.
+
+    Pack IDs are sorted tensors which mark the ID of the pack each element belongs in.
+
+    For example, the SPC ray trace kernel will return the ray index tensor which marks the ID of the ray
+    that each intersection belongs in. This kernel will mark the beginning of each of those packs of
+    intersections with a boolean mask (`True` where the beginning is).
+
+    Args:
+        pack_ids (torch.Tensor): pack ids of shape :math:`(\text{num_elems})`
+                                 This can be any integral (n-bit integer) type.
+    Returns:
+        first_hits (torch.BoolTensor): the boolean mask marking the boundaries.
+    """
+    return _C.render.spc.mark_pack_boundary_cuda(pack_ids.contiguous()).bool()
+
+def mark_first_hit(ridx):
     r"""Mark the first hit in the nuggets.
+
+    .. deprecated:: 0.10.0
+       This function is deprecated. Use `mark_pack_boundary`.
 
     The nuggets are a packed tensor containing correspondences from ray index to point index, sorted
     within each ray pack by depth. This will mark True for each first hit (by depth) for a pack of
@@ -61,53 +101,5 @@ def mark_first_hit(nuggets):
     Returns:
         first_hits (torch.BoolTensor): the boolean mask marking the first hit by depth.
     """
-    # TODO(cfujitsang): directly output boolean
-    return _C.render.spc.mark_first_hit_cuda(nuggets.contiguous()).bool()
-
-def unbatched_ray_aabb(nuggets, point_hierarchy, ray_o, ray_d, level,
-                       info=None, info_idxes=None, mask=None):
-    r"""Ray AABB intersection with points.
-
-    Raytrace will already get correspondences, but this will additionally compute distances.
-
-    .. note::
-
-      This function is likely to be folded into raytrace in a future version.
-
-    Args:
-        nuggets (torch.IntTensor): the ray-point correspondences,
-                                   of shape :math:`(\text{num_nuggets}, 2)`.
-        point_hierarchy (torch.ShortTensor): the point_hierarchy associated to the octree,
-                                             of shape :math:`(\text{num_points}, 3)`.
-        ray_o (torch.FloatTensor): ray origins, of shape :math:`(\text{num_rays}, 3)`.
-        ray_d (torch.FloatTensor): ray directions, of shape :math:`(\text{num_rays}, 3)`.
-        level (int): level of the SPC to trace.
-        info (torch.BoolTensor): First hits. Default: Computed internally.
-        info_idxes (torch.IntTensor): Packed indices of first hits.
-                                      Default: Computed internally.
-        mask (torch.BoolTensor): Mask to determine if the ray is still alive.
-                                 Default: zeros mask.
-
-    Returns:
-        (torch.FloatTensor, torch.LongTensor, torch.BoolTensor):
-
-
-            - Distance from ray origin to ray-aabb intersection,
-              of shape :math:`(\text{num_rays}, 1)`.
-
-            - Corresponding point index, of shape :math:`(\text{num_rays})`.
-
-            - New mask. :math:`(\text{num_rays})`.
-    """
-    if info is None:
-        info = mark_first_hit(nuggets.contiguous())
-    if info_idxes is None:
-        info_idxes = torch.nonzero(info, as_tuple=False).int()
-    init = mask is None
-    if mask is None:
-        num_rays = ray_o.shape[0]
-        mask = torch.zeros(num_rays, dtype=torch.bool, device=ray_o.device)
-    return _C.render.spc.ray_aabb(nuggets.contiguous(), point_hierarchy.contiguous(),
-                                  ray_o.contiguous(), ray_d.contiguous(), level,
-                                  info.contiguous().int(), info_idxes.contiguous(),
-                                  mask.contiguous(), init)
+    warnings.warn("mark_first_hit has been deprecated, please use mark_pack_boundary instead")
+    return mark_pack_boundary(ridx)

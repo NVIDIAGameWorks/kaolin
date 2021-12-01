@@ -249,11 +249,11 @@ To apply ray tracing we currently only support non-batched version, for instance
 >>> max_level, pyramids, exsum = kaolin.ops.spc.scan_octrees(
 ...     octree, torch.tensor([len(octree)], dtype=torch.int32, device='cuda')
 >>> point_hierarchy = kaolin.ops.spc.generate_points(octrees, pyramids, exsum)
->>> nuggets = kaolin.render.spc.unbatched_raytrace(octree, point_hierarchy, pyramids[0], exsum,
-...                                                origin, direction, max_level)
->>> first_hits_mask = kaolin.render.spc.mark_first_hit(nuggets)
->>> first_hits_nuggets = nuggets[first_hits_mask].long()
->>> first_hits_rgb = rgb[first_hits_nuggets[:, 1] - pyramids[max_level - 2]]
+>>> ridx, pidx, depth = kaolin.render.spc.unbatched_raytrace(octree, point_hierarchy, pyramids[0], exsum,
+...                                                          origin, direction, max_level)
+>>> first_hits_mask = kaolin.render.spc.mark_pack_boundary(ridx)
+>>> first_hits_point = pidx[first_hits_mask]
+>>> first_hits_rgb = rgb[first_hits_point - pyramids[max_level - 2]]
 
 
 API

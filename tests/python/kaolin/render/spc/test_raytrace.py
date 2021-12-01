@@ -18,8 +18,7 @@ import torch
 
 from kaolin.ops.spc import scan_octrees, generate_points, bits_to_uint8
 
-from kaolin.render.spc import unbatched_raytrace, mark_first_hit, \
-                              unbatched_ray_aabb
+from kaolin.render.spc import unbatched_raytrace, mark_pack_boundary
 
 class TestRaytrace:
     @pytest.fixture(autouse=True)
@@ -68,8 +67,8 @@ class TestRaytrace:
         direction = torch.tensor([[0., 0., 1.]], dtype=torch.float,
                                  device='cuda').repeat(height * width , 1)
         origin = self._generate_rays_origin(height, width, -3)
-        nuggets = unbatched_raytrace(
-            octree, point_hierarchy, pyramid, exsum, origin, direction, 2)
+        ridx, pidx = unbatched_raytrace(
+            octree, point_hierarchy, pyramid, exsum, origin, direction, 2, return_depth=False)
 
         expected_nuggets = torch.tensor([
             [ 0,  5],
@@ -82,8 +81,9 @@ class TestRaytrace:
             [ 4,  9],
             [ 4, 10],
             [ 5, 11],
-            [ 5, 12]], device='cuda', dtype=torch.int32)
-        assert torch.equal(nuggets, expected_nuggets)
+            [ 5, 12]], device='cuda', dtype=torch.int)
+        assert torch.equal(ridx, expected_nuggets[...,0])
+        assert torch.equal(pidx, expected_nuggets[...,1])
 
     def test_raytrace_negative(self, octree, point_hierarchy, pyramid, exsum):
         height = 4
@@ -91,8 +91,8 @@ class TestRaytrace:
         direction = torch.tensor([[0., 0., -1.]], dtype=torch.float,
                                  device='cuda').repeat(height * width , 1)
         origin = self._generate_rays_origin(height, width, 3)
-        nuggets = unbatched_raytrace(
-            octree, point_hierarchy, pyramid, exsum, origin, direction, 2)
+        ridx, pidx = unbatched_raytrace(
+            octree, point_hierarchy, pyramid, exsum, origin, direction, 2, return_depth=False)
 
         expected_nuggets = torch.tensor([
             [ 0, 14],
@@ -105,8 +105,9 @@ class TestRaytrace:
             [ 4, 10],
             [ 4,  9],
             [ 5, 12],
-            [ 5, 11]], device='cuda', dtype=torch.int32)
-        assert torch.equal(nuggets, expected_nuggets)
+            [ 5, 11]], device='cuda', dtype=torch.int)
+        assert torch.equal(ridx, expected_nuggets[...,0])
+        assert torch.equal(pidx, expected_nuggets[...,1])
 
     def test_raytrace_none(self, octree, point_hierarchy, pyramid, exsum):
         height = 4
@@ -114,11 +115,14 @@ class TestRaytrace:
         direction = torch.tensor([[0., 0., 1.]], dtype=torch.float,
                                  device='cuda').repeat(height * width , 1)
         origin = self._generate_rays_origin(height, width, 3)
-        nuggets = unbatched_raytrace(
-            octree, point_hierarchy, pyramid, exsum, origin, direction, 2)
+        ridx, pidx, depth = unbatched_raytrace(
+            octree, point_hierarchy, pyramid, exsum, origin, direction, 2, return_depth=True, with_exit=True)
 
-        expected_nuggets = torch.zeros((0, 2), device='cuda', dtype=torch.int32)
-        assert torch.equal(nuggets, expected_nuggets)
+        expected_nuggets = torch.zeros((0, 2), device='cuda', dtype=torch.int)
+        expected_depths = torch.zeros((0, 2), device='cuda', dtype=torch.float) 
+        assert torch.equal(ridx, expected_nuggets[...,0])
+        assert torch.equal(pidx, expected_nuggets[...,1])
+        assert torch.equal(depth, expected_depths)
 
     def test_raytrace_coarser(self, octree, point_hierarchy, pyramid, exsum):
         height = 4
@@ -126,8 +130,8 @@ class TestRaytrace:
         direction = torch.tensor([[0., 0., 1.]], dtype=torch.float,
                                  device='cuda').repeat(height * width , 1)
         origin = self._generate_rays_origin(height, width, -3)
-        nuggets = unbatched_raytrace(
-            octree, point_hierarchy, pyramid, exsum, origin, direction, 1)
+        ridx, pidx = unbatched_raytrace(
+            octree, point_hierarchy, pyramid, exsum, origin, direction, 1, return_depth=False)
 
         expected_nuggets = torch.tensor([
             [ 0,  1],
@@ -145,11 +149,98 @@ class TestRaytrace:
             [ 8,  4],
             [ 9,  4],
             [12,  4],
-            [13,  4]], device='cuda', dtype=torch.int32)
-        assert torch.equal(nuggets, expected_nuggets)
+            [13,  4]], device='cuda', dtype=torch.int)
+        assert torch.equal(ridx, expected_nuggets[...,0])
+        assert torch.equal(pidx, expected_nuggets[...,1])
+
+    def test_raytrace_with_depth(self, octree, point_hierarchy, pyramid, exsum):
+        height = 4
+        width = 4
+        direction = torch.tensor([[0., 0., -1.]], dtype=torch.float,
+                                 device='cuda').repeat(height * width , 1)
+        origin = self._generate_rays_origin(height, width, 3)
+        ridx, pidx, depth = unbatched_raytrace(
+            octree, point_hierarchy, pyramid, exsum, origin, direction, 2, return_depth=True)
+
+        expected_nuggets = torch.tensor([
+            [ 0, 14],
+            [ 0, 13],
+            [ 0,  6],
+            [ 0,  5],
+            [ 1,  8],
+            [ 1,  7],
+            [ 2, 15],
+            [ 4, 10],
+            [ 4,  9],
+            [ 5, 12],
+            [ 5, 11]], device='cuda', dtype=torch.int)
+        assert torch.equal(ridx, expected_nuggets[...,0])
+        assert torch.equal(pidx, expected_nuggets[...,1])
+
+        expected_depth = torch.tensor([
+            [2.0],
+            [2.5],
+            [3.0],
+            [3.5],
+            [3.0],
+            [3.5],
+            [3.5],
+            [3.0],
+            [3.5],
+            [3.0],
+            [3.5]], device='cuda', dtype=torch.float)
+        assert torch.equal(depth, expected_depth)
+
+    def test_raytrace_with_depth_with_exit(self, octree, point_hierarchy, pyramid, exsum):
+        height = 4
+        width = 4
+        direction = torch.tensor([[0., 0., -1.]], dtype=torch.float,
+                                 device='cuda').repeat(height * width , 1)
+        origin = self._generate_rays_origin(height, width, 3)
+        ridx, pidx, depth = unbatched_raytrace(
+            octree, point_hierarchy, pyramid, exsum, origin, direction, 2, return_depth=True, with_exit=True)
+
+        expected_nuggets = torch.tensor([
+            [ 0, 14],
+            [ 0, 13],
+            [ 0,  6],
+            [ 0,  5],
+            [ 1,  8],
+            [ 1,  7],
+            [ 2, 15],
+            [ 4, 10],
+            [ 4,  9],
+            [ 5, 12],
+            [ 5, 11]], device='cuda', dtype=torch.int)
+        assert torch.equal(ridx, expected_nuggets[...,0])
+        assert torch.equal(pidx, expected_nuggets[...,1])
+        
+        expected_depth = torch.tensor([
+            [2.0, 2.5],
+            [2.5, 3.0],
+            [3.0, 3.5],
+            [3.5, 4.0],
+            [3.0, 3.5],
+            [3.5, 4.0],
+            [3.5, 4.0],
+            [3.0, 3.5],
+            [3.5, 4.0],
+            [3.0, 3.5],
+            [3.5, 4.0]], device='cuda', dtype=torch.float)
+        
+        assert torch.equal(depth, expected_depth)
 
     def test_ambiguous_raytrace(self):
-        # TODO(cfujitsang): Is this actually desirable behavior?)
+        # TODO(ttakikawa):
+        # Since 0.10.0, the behaviour of raytracing exactly between voxels 
+        # has been changed from no hits at all to hitting all adjacent voxels.
+        # This has numerical ramifications because it may cause instability / error 
+        # in the estimation of optical thickness in the volume rendering process 
+        # among other issues. However, we have found that this doesn't lead to any 
+        # obvious visual errors, whereas the no hit case causes speckle noise.
+        # We will eventually do a more thorough analysis of the numerical consideration of this
+        # behaviour, but for now we choose to prevent obvious visual errors.
+
         octree = torch.tensor([255], dtype=torch.uint8, device='cuda')
         length = torch.tensor([1], dtype=torch.int32)
         max_level, pyramids, exsum = scan_octrees(octree, length)
@@ -160,10 +251,21 @@ class TestRaytrace:
         direction = torch.tensor([
             [0., 0., -1.],
             [-1. / 3., -1. / 3., -1. / 3.]], dtype=torch.float, device='cuda')
-        nuggets = unbatched_raytrace(
-            octree, point_hierarchy, pyramids[0], exsum, origin, direction, 1)
-        expected_nuggets = torch.tensor([[1, 8], [1, 1]], device='cuda', dtype=torch.int32)
-        assert torch.equal(nuggets, expected_nuggets)
+        ridx, pidx, depth = unbatched_raytrace(
+            octree, point_hierarchy, pyramids[0], exsum, origin, direction, 1, return_depth=True)
+        expected_nuggets = torch.tensor([
+            [0, 2],
+            [0, 1],
+            [0, 4],
+            [0, 6],
+            [0, 3],
+            [0, 5],
+            [0, 8],
+            [0, 7],
+            [1, 8], 
+            [1, 1]], device='cuda', dtype=torch.int)
+        assert torch.equal(ridx, expected_nuggets[...,0])
+        assert torch.equal(pidx, expected_nuggets[...,1])
 
     def test_mark_first_positive(self, octree, point_hierarchy, pyramid, exsum):
         height = 4
@@ -171,9 +273,9 @@ class TestRaytrace:
         direction = torch.tensor([[0., 0., 1.]], dtype=torch.float,
                                  device='cuda').repeat(height * width , 1)
         origin = self._generate_rays_origin(height, width, -3)
-        nuggets = unbatched_raytrace(
-            octree, point_hierarchy, pyramid, exsum, origin, direction, 2)
-        first_hits = mark_first_hit(nuggets)
+        ridx, pidx = unbatched_raytrace(
+            octree, point_hierarchy, pyramid, exsum, origin, direction, 2, return_depth=False)
+        first_hits = mark_pack_boundary(ridx)
         expected_first_hits = torch.tensor([1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0],
                                            device='cuda', dtype=torch.bool)
         assert torch.equal(first_hits, expected_first_hits)
@@ -184,85 +286,10 @@ class TestRaytrace:
         direction = torch.tensor([[0., 0., -1.]], dtype=torch.float,
                                  device='cuda').repeat(height * width , 1)
         origin = self._generate_rays_origin(height, width, 3)
-        nuggets = unbatched_raytrace(
-            octree, point_hierarchy, pyramid, exsum, origin, direction, 2)
-        first_hits = mark_first_hit(nuggets)
+        ridx, pidx = unbatched_raytrace(
+            octree, point_hierarchy, pyramid, exsum, origin, direction, 2, return_depth=False)
+        first_hits = mark_pack_boundary(ridx)
         expected_first_hits = torch.tensor([1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0],
                                            device='cuda', dtype=torch.bool)
         assert torch.equal(first_hits, expected_first_hits)
 
-    @pytest.mark.parametrize('with_first_hits', [False, True])
-    @pytest.mark.parametrize('with_first_hits_idxes', [False, True])
-    def test_ray_aabb(self, octree, point_hierarchy, pyramid, exsum,
-                      with_first_hits, with_first_hits_idxes):
-        height = 4
-        width = 4
-        direction = torch.tensor([[0., 0., 1.]], dtype=torch.float,
-                                 device='cuda').repeat(height * width , 1)
-        origin = self._generate_rays_origin(height, width, -3)
-        nuggets = unbatched_raytrace(
-            octree, point_hierarchy, pyramid, exsum, origin, direction, 2)
-
-        if with_first_hits:
-            first_hits = mark_first_hit(nuggets)
-        else:
-            first_hits = None
-
-        if with_first_hits_idxes:
-            tmp_first_hits = mark_first_hit(nuggets)
-            first_hit_idxes = torch.nonzero(tmp_first_hits, as_tuple=False).int()
-        else:
-            first_hit_idxes = None
-
-        dist, corresp, out_mask = unbatched_ray_aabb(nuggets, point_hierarchy, origin,
-                                                     direction, 2, info=first_hits,
-                                                     info_idxes=first_hit_idxes)
-        expected_dist = torch.tensor([[2.], [2.], [2.], [0.], [2.], [2.], [0.], [0.],
-                                      [0.], [0.], [0.], [0.], [0.], [0.], [0.], [0.]],
-                                     device='cuda')
-        expected_corresp = torch.tensor([5, 7, 15, -1, 9, 11, -1, -1, -1, -1, -1, -1, -1,
-                                         -1, -1, -1], dtype=torch.int32, device='cuda')
-        expected_out_mask = torch.tensor([1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                                         dtype=torch.bool, device='cuda')
-        assert torch.equal(dist, expected_dist)
-        assert torch.equal(corresp, expected_corresp)
-        assert torch.equal(out_mask, expected_out_mask)
-
-    @pytest.mark.parametrize('with_first_hits', [False, True])
-    @pytest.mark.parametrize('with_first_hits_idxes', [False, True])
-    def test_ray_aabb_with_mask(self, octree, point_hierarchy, pyramid, exsum,
-                                with_first_hits, with_first_hits_idxes):
-        height = 4
-        width = 4
-        direction = torch.tensor([[0., 0., 1.]], dtype=torch.float,
-                                 device='cuda').repeat(height * width , 1)
-        origin = self._generate_rays_origin(height, width, -3)
-        mask = torch.tensor([0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                            dtype=torch.bool, device='cuda')
-        nuggets = unbatched_raytrace(
-            octree, point_hierarchy, pyramid, exsum, origin, direction, 2)
-
-        if with_first_hits:
-            first_hits = mark_first_hit(nuggets)
-        else:
-            first_hits = None
-
-        if with_first_hits_idxes:
-            tmp_first_hits = mark_first_hit(nuggets)
-            first_hit_idxes = torch.nonzero(tmp_first_hits, as_tuple=False).int()
-        else:
-            first_hit_idxes = None
-
-        dist, corresp, out_mask = unbatched_ray_aabb(nuggets, point_hierarchy, origin,
-                                                     direction, 2, info=first_hits,
-                                                     info_idxes=first_hit_idxes, mask=mask)
-        expected_dist = torch.tensor([[0.], [0.], [2.], [0.], [2.], [2.], [0.], [0.],
-                                      [0.], [0.], [0.], [0.], [0.], [0.], [0.], [0.]],
-                                     device='cuda')
-        expected_corresp = torch.tensor([-1, -1, 15, -1, 9, 11, -1, -1, -1, -1, -1, -1, -1,
-                                         -1, -1, -1], dtype=torch.int32, device='cuda')
-        expected_out_mask = torch.tensor([0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                                         dtype=torch.bool, device='cuda')
-        assert torch.equal(dist, expected_dist)
-        assert torch.equal(corresp, expected_corresp)
-        assert torch.equal(out_mask, expected_out_mask)
