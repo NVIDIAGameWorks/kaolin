@@ -54,6 +54,29 @@ std::vector<at::Tensor> generate_shadow_rays_cuda(
     at::Tensor light,
     at::Tensor plane);
 
+at::Tensor diff_cuda(
+    at::Tensor feats,
+    at::Tensor pack_indices);
+
+at::Tensor inclusive_sum_cuda(
+    at::Tensor info);
+
+at::Tensor sum_reduce_cuda(
+    at::Tensor feats,
+    at::Tensor inclusive_sum);
+
+at::Tensor cumsum_cuda(
+    at::Tensor feats,
+    at::Tensor pack_indices,
+    bool exclusive,
+    bool reverse);
+
+at::Tensor cumprod_cuda(
+    at::Tensor feats,
+    at::Tensor pack_indices,
+    bool exclusive,
+    bool reverse);
+
 }  // namespace kaolin
 
 #endif  // KAOLIN_OPS_RENDER_SPC_RAYTRACE_H_

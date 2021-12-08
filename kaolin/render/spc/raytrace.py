@@ -15,6 +15,18 @@
 
 import warnings
 from kaolin import _C
+import torch
+
+__all__ = [
+    'unbatched_raytrace',
+    'mark_pack_boundary',
+    'mark_first_hit',
+    'diff',
+    'sum_reduce',
+    'cumsum',
+    'cumprod',
+    'exponential_integration'
+]
 
 def unbatched_raytrace(octree, point_hierarchy, pyramid, exsum, origin, direction, level,
                        return_depth=True, with_exit=False):
@@ -85,6 +97,11 @@ def mark_pack_boundary(pack_ids):
                                  This can be any integral (n-bit integer) type.
     Returns:
         first_hits (torch.BoolTensor): the boolean mask marking the boundaries.
+    
+    Examples:
+        >>> pack_ids = torch.IntTensor([1,1,1,1,2,2,2])
+        >>> mark_pack_boundary(pack_ids)
+        tensor([1,0,0,0,1,0,0])
     """
     return _C.render.spc.mark_pack_boundary_cuda(pack_ids.contiguous()).bool()
 
@@ -103,3 +120,177 @@ def mark_first_hit(ridx):
     """
     warnings.warn("mark_first_hit has been deprecated, please use mark_pack_boundary instead")
     return mark_pack_boundary(ridx)
+
+def diff(feats, boundaries):
+    r"""Find the delta between each of the features in a pack.
+
+    The deltas are given by `out[i] = feats[i+1] - feats[i]`.
+
+    The behavior is similar to torch.diff for non-packed tensors, but :func:`torch.diff` will reduce the
+    number of features by 1. This function will instead populate the last diff with 0.
+
+    Args:
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays}) `.
+            Given some index array marking the pack IDs, the boundaries can be calculated with
+            :func:`mark_pack_boundaries`.
+    Returns:
+        (torch.FloatTensor): diffed features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+    """
+
+    feats_shape = feats.shape
+
+    feat_dim = feats.shape[-1]
+
+    pack_idxes = torch.nonzero(boundaries).contiguous()[..., 0]
+
+    return _C.render.spc.diff_cuda(feats.reshape(-1, feat_dim).contiguous(), pack_idxes.contiguous()).reshape(*feats_shape)
+
+class SumReduce(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, feats, info):
+        inclusive_sum = _C.render.spc.inclusive_sum_cuda(info.int())
+        ctx.save_for_backward(inclusive_sum)
+        return _C.render.spc.sum_reduce_cuda(feats, inclusive_sum.contiguous())
+   
+    @staticmethod 
+    def backward(ctx, grad_output):
+        inclusive_sum = ctx.saved_tensors[0]
+        grad_feats = None
+        if ctx.needs_input_grad[0]:
+            grad_feats = grad_output[(inclusive_sum - 1).long()]
+        return grad_feats, None
+
+class Cumprod(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, feats, info, exclusive, reverse):
+        nonzero = torch.nonzero(info).int().contiguous()[..., 0]
+        prod = _C.render.spc.cumprod_cuda(feats, nonzero, exclusive, reverse)
+        ctx.save_for_backward(feats, nonzero, prod)
+        ctx.flags = (exclusive, reverse)
+        return prod
+
+    @staticmethod
+    def backward(ctx, grad_output):
+
+        prod = ctx.saved_tensors
+        feats, nonzero, prod = ctx.saved_tensors
+        exclusive, reverse = ctx.flags
+        out = _C.render.spc.cumsum_cuda(prod * grad_output, nonzero, exclusive, not reverse)
+
+        grad_feats = None
+        if ctx.needs_input_grad[0]:
+            # Approximate gradient (consistent with TensorFlow)
+            grad_feats = out / feats
+            grad_feats[grad_feats.isnan()] = 0
+
+        return grad_feats, None, None, None
+
+class Cumsum(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, feats, info, exclusive, reverse):
+        nonzero = torch.nonzero(info).int().contiguous()[..., 0]
+        ctx.save_for_backward(nonzero)
+        ctx.flags = (exclusive, reverse)
+        cumsum = _C.render.spc.cumsum_cuda(feats, nonzero, exclusive, reverse)
+        return cumsum
+        
+    @staticmethod
+    def backward(ctx, grad_output):
+        nonzero,  = ctx.saved_tensors
+        exclusive, reverse = ctx.flags
+        cumsum = _C.render.spc.cumsum_cuda(grad_output.contiguous(), nonzero, exclusive, not reverse)
+        return cumsum, None, None, None
+
+def sum_reduce(feats, boundaries):
+    r"""Sum the features of packs.
+
+    Args:
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+        boundaries (torch.BoolTensor): bools to mark pack boundaries of shape :math:`(\text{num_rays}) `.
+            Given some index array marking the pack IDs, the boundaries can be calculated with
+            `mark_pack_boundaries`.
+    Returns:
+        (torch.FloatTensor): summed features of shape :math:`(\text{num_packs}, \text{num_feats}) `.
+    """
+    return SumReduce.apply(feats.contiguous(), boundaries.contiguous())
+
+def cumsum(feats, boundaries, exclusive=False, reverse=False):
+    r"""Cumulative sum across packs of features.
+
+    This function is similar to `tf.math.cumsum` with the same options, but for packed tensors.
+    Refer to the TensorFlow docs for numerical examples of the options.
+
+    Args:
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays}) `.
+            Given some index array marking the pack IDs, the boundaries can be calculated with
+            `mark_pack_boundaries`.
+        exclusive (bool): Compute exclusive cumsum if true. Exclusive means the current index won't be used
+                        for the calculation of the cumulative sum. (Default: False)
+        reverse (bool): Compute reverse cumsum if true, i.e. the cumulative sum will start from the end of 
+                        each pack, not from the beginning. (Default: False)
+    Returns:
+        (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+    """
+    return Cumsum.apply(feats.contiguous(), boundaries.contiguous(), exclusive, reverse)
+
+def cumprod(feats, boundaries, exclusive=False, reverse=False):
+    r"""Cumulative product across packs of features.
+    
+    This function is similar to `tf.math.cumprod` with the same options, but for packed tensors.
+    Refer to the TensorFlow docs for numerical examples of the options.
+
+    Note that the backward gradient follows the same behaviour in TensorFlow, which is to
+    replace NaNs by zeros, which is different from the behaviour in PyTorch. To be safe,
+    add an epsilon to feats which will make the behaviour consistent.
+
+    Args:
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays}) `.
+            Given some index array marking the pack IDs, the boundaries can be calculated with
+            `mark_pack_boundaries`.
+        exclusive (bool): Compute exclusive cumprod if true. Exclusive means the current index won't be used
+                        for the calculation of the cumulative product. (Default: False)
+        reverse (bool): Compute reverse cumprod if true, i.e. the cumulative product will start from the end of 
+                        each pack, not from the beginning. (Default: False)
+    Returns:
+        (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+    """
+    return Cumprod.apply(feats.contiguous(), boundaries.contiguous(), exclusive, reverse)
+
+def exponential_integration(feats, tau, boundaries, exclusive=False):
+    r"""Exponential transmittance integration across packs using the optical thickness (tau).
+
+    Exponential transmittance is derived from the Beer-Lambert law. Typical implementations of
+    exponential transmittance is calculated with `cumprod`, but the exponential allows a reformulation
+    as a `cumsum` which its gradient is more stable and faster to compute. We opt to use the `cumsum`
+    formulation.
+
+    For more details, we recommend "Monte Carlo Methods for Volumetric Light Transport" by Novak et al.
+
+    Args:
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+        tau (torch.FloatTensor): optical thickness of shape :math:`(\text{num_rays}, 1) `.
+        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays}) `.
+            Given some index array marking the pack IDs, the boundaries can be calculated with
+            `mark_pack_boundaries`.
+        exclusive (bool): Compute exclusive exponential integration if true.
+    
+    Returns:
+        (torch.FloatTensor, torch.FloatTensor)
+        - Integrated features of shape :math:`(\text{num_packs}, \text{num_feats})`.
+        - Transmittance of shape :math:`(\text{num_rays}, 1)`.
+
+    """
+    # TODO(ttakikawa): This should be a fused kernel... we're iterating over packs, so might as well
+    #                  also perform the integration in the same manner.
+    alpha = 1.0 - torch.exp(-tau.contiguous())
+    # Uses the reformulation as a cumsum and not a cumprod (faster and more stable gradients)
+    transmittance = torch.exp(-1.0 * cumsum(tau.contiguous(), boundaries.contiguous(), exclusive=exclusive))
+    transmittance = transmittance * alpha
+    feats_out = sum_reduce(transmittance * feats.contiguous(), boundaries.contiguous())
+    return feats_out, transmittance
