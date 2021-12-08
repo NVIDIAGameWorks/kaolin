@@ -77,6 +77,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   render_spc.def("generate_primary_rays_cuda", &generate_primary_rays_cuda); // Deprecate soon
   render_spc.def("mark_pack_boundary_cuda", &mark_pack_boundary_cuda);
   render_spc.def("generate_shadow_rays_cuda", &generate_shadow_rays_cuda); // Deprecate soon
+  render_spc.def("inclusive_sum_cuda", &inclusive_sum_cuda);
+  render_spc.def("diff_cuda", &diff_cuda);
+  render_spc.def("sum_reduce_cuda", &sum_reduce_cuda);
+  render_spc.def("cumsum_cuda", &cumsum_cuda);
+  render_spc.def("cumprod_cuda", &cumprod_cuda);
 }
 
 }  // namespace kaolin
