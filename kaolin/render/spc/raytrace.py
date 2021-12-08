@@ -97,7 +97,7 @@ def mark_pack_boundary(pack_ids):
                                  This can be any integral (n-bit integer) type.
     Returns:
         first_hits (torch.BoolTensor): the boolean mask marking the boundaries.
-    
+
     Examples:
         >>> pack_ids = torch.IntTensor([1,1,1,1,2,2,2])
         >>> mark_pack_boundary(pack_ids)
@@ -153,7 +153,7 @@ class SumReduce(torch.autograd.Function):
         inclusive_sum = _C.render.spc.inclusive_sum_cuda(info.int())
         ctx.save_for_backward(inclusive_sum)
         return _C.render.spc.sum_reduce_cuda(feats, inclusive_sum.contiguous())
-   
+
     @staticmethod 
     def backward(ctx, grad_output):
         inclusive_sum = ctx.saved_tensors[0]
@@ -197,10 +197,10 @@ class Cumsum(torch.autograd.Function):
         ctx.flags = (exclusive, reverse)
         cumsum = _C.render.spc.cumsum_cuda(feats, nonzero, exclusive, reverse)
         return cumsum
-        
+
     @staticmethod
     def backward(ctx, grad_output):
-        nonzero,  = ctx.saved_tensors
+        nonzero, = ctx.saved_tensors
         exclusive, reverse = ctx.flags
         cumsum = _C.render.spc.cumsum_cuda(grad_output.contiguous(), nonzero, exclusive, not reverse)
         return cumsum, None, None, None
@@ -240,7 +240,7 @@ def cumsum(feats, boundaries, exclusive=False, reverse=False):
 
 def cumprod(feats, boundaries, exclusive=False, reverse=False):
     r"""Cumulative product across packs of features.
-    
+
     This function is similar to `tf.math.cumprod` with the same options, but for packed tensors.
     Refer to the TensorFlow docs for numerical examples of the options.
 
@@ -279,7 +279,7 @@ def exponential_integration(feats, tau, boundaries, exclusive=False):
             Given some index array marking the pack IDs, the boundaries can be calculated with
             `mark_pack_boundaries`.
         exclusive (bool): Compute exclusive exponential integration if true.
-    
+
     Returns:
         (torch.FloatTensor, torch.FloatTensor)
         - Integrated features of shape :math:`(\text{num_packs}, \text{num_feats})`.
