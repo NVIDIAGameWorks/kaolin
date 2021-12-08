@@ -107,6 +107,44 @@ void cumprod_cuda_impl(
     bool exclusive, 
     bool reverse);
 
+void diff_cuda_impl(
+    int64_t num_packs, 
+    int64_t num_feats,
+    int64_t feat_dim,
+    at::Tensor feats_in,
+    at::Tensor feats_out,
+    at::Tensor pack_indices); 
+
+void inclusive_sum_cuda_impl(
+    int64_t num,
+    at::Tensor info,
+    at::Tensor inclusive_sum);
+
+uint sum_reduce_cuda_impl(
+    int64_t num_feats,
+    int64_t feat_dim,
+    at::Tensor feats_in,
+    at::Tensor feats_out,
+    at::Tensor inclusive_sum);  
+
+void cumsum_cuda_impl(
+    int64_t num_feats,
+    int64_t feat_dim,
+    at::Tensor feats_in,
+    at::Tensor feats_out,
+    at::Tensor pack_indices,
+    bool exclusive, 
+    bool reverse);
+
+void cumprod_cuda_impl(
+    int64_t num_feats,
+    int64_t feat_dim,
+    at::Tensor feats_in,
+    at::Tensor feats_out,
+    at::Tensor pack_indices,
+    bool exclusive, 
+    bool reverse);
+
 #endif
 
 std::vector<at::Tensor> generate_primary_rays_cuda(

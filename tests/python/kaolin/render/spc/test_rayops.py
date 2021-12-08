@@ -51,12 +51,12 @@ class TestRaytrace:
         boundary = torch.tensor([1,0,1,0,0,1], device='cuda', dtype=torch.bool)
         return boundary
 
-    def test_mark_pack_boundaries(self):
+    def test_mark_pack_boundary(self):
         ridx = torch.tensor([1,1,1,1,2,2,3,3,3], device='cuda', dtype=torch.int)
         
         expected_boundary = torch.tensor([1,0,0,0,1,0,1,0,0], device='cuda', dtype=torch.bool)
 
-        output = spc_render.mark_pack_boundaries(ridx)
+        output = spc_render.mark_pack_boundary(ridx)
 
         assert torch.equal(output, expected_boundary)
 
@@ -74,7 +74,7 @@ class TestRaytrace:
         fdim = feats_big.shape[-1]
         sum_reduce = spc_render.sum_reduce(feats_big.reshape(-1, fdim), boundaries_big)
         expected = feats_big.sum(1)
-        assert torch.allclose(sum_reduce, expected, atol=1e-5)
+        assert torch.allclose(sum_reduce, expected)
     
     def test_sum_reduce_big_backward(self, feats_big, boundaries_big):
 
@@ -97,7 +97,7 @@ class TestRaytrace:
         loss.backward()
         grad1 = feats_big.grad.clone()
 
-        assert torch.allclose(grad0, grad1, atol=1e-5)
+        assert torch.allclose(grad0, grad1)
 
     def test_cumsum(self, feats, boundaries):
         cumsum = spc_render.cumsum(feats, boundaries)
@@ -108,7 +108,7 @@ class TestRaytrace:
         fdim = feats_big.shape[-1]
         cumsum = spc_render.cumsum(feats_big.reshape(-1, fdim), boundaries_big)
         expected = torch.cumsum(feats_big, dim=1).reshape(-1, fdim)
-        assert torch.allclose(cumsum, expected, atol=1e-5)
+        assert torch.allclose(cumsum, expected)
 
     def test_cumsum_big_backward(self, feats_big, boundaries_big):
 
@@ -131,7 +131,7 @@ class TestRaytrace:
         loss.backward()
         grad1 = feats_big.grad.clone()
 
-        assert torch.allclose(grad0, grad1, atol=1e-4)
+        assert torch.allclose(grad0, grad1)
 
     def test_cumsum_reverse(self, feats, boundaries):
         cumsum = spc_render.cumsum(feats, boundaries, reverse=True)
@@ -157,11 +157,11 @@ class TestRaytrace:
         fdim = feats_big.shape[-1]
         cumprod = spc_render.cumprod(feats_big.reshape(-1, fdim), boundaries_big)
         expected = torch.cumprod(feats_big, dim=1).reshape(-1, fdim)
-        assert torch.allclose(cumprod, expected, atol=1e-4)
+        assert torch.allclose(cumprod, expected)
     
     def test_cumprod_big_backward(self, feats_big, boundaries_big):
 
-        feats_big += 1e-3
+        feats_big += 1e-7
         feats_big.requires_grad = True
         fdim = feats_big.shape[-1]
 
@@ -181,7 +181,7 @@ class TestRaytrace:
         loss.backward()
         grad1 = feats_big.grad.clone()
     
-        assert torch.allclose(grad0, grad1, atol=1e-2)
+        assert torch.allclose(grad0, grad1)
 
     def test_cumprod_reverse(self, feats, boundaries):
         cumprod = spc_render.cumprod(feats, boundaries, reverse=True)
@@ -199,7 +199,7 @@ class TestRaytrace:
         assert torch.equal(cumprod, expected)
        
     def test_exponential_integration(self, feats, tau, boundaries):
-        integrated_feats, transmittance = spc_render.exponential_integration(feats, tau, boundaries, exclusive=False)
+        integrated_feats, transmittance = spc_render.exponential_integration(feats, tau, boundaries)
         expected_feats = torch.tensor([[0,0], [0.4651,0.4651], [1.1627, 1.1627]], device='cuda', dtype=torch.float)
         expected_transmittance = torch.tensor([[0.0],[0.0],[0.0],[0.2325],[0.0],[0.2325]], device='cuda', dtype=torch.float)
         assert torch.allclose(integrated_feats, expected_feats, atol=1e-4)

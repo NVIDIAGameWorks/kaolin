@@ -19,7 +19,7 @@ import torch
 
 __all__ = [
     'unbatched_raytrace',
-    'mark_pack_boundaries',
+    'mark_pack_boundary',
     'mark_first_hit',
     'diff',
     'sum_reduce',
@@ -99,9 +99,9 @@ def mark_pack_boundaries(pack_ids):
         first_hits (torch.BoolTensor): the boolean mask marking the boundaries.
 
     Examples:
-        >>> pack_ids = torch.IntTensor([1,1,1,1,2,2,2]).to('cuda:0')
-        >>> mark_pack_boundaries(pack_ids)
-        tensor([ True, False, False, False,  True, False, False], device='cuda:0')
+        >>> pack_ids = torch.IntTensor([1,1,1,1,2,2,2])
+        >>> mark_pack_boundary(pack_ids)
+        tensor([1,0,0,0,1,0,0])
     """
     return _C.render.spc.mark_pack_boundaries_cuda(pack_ids.contiguous()).bool()
 
@@ -109,7 +109,7 @@ def mark_first_hit(ridx):
     r"""Mark the first hit in the nuggets.
 
     .. deprecated:: 0.10.0
-       This function is deprecated. Use :func:`mark_pack_boundaries`.
+       This function is deprecated. Use :func:`mark_pack_boundary`.
 
     The nuggets are a packed tensor containing correspondences from ray index to point index, sorted
     within each ray pack by depth. This will mark true for each first hit (by depth) for a pack of
@@ -118,8 +118,8 @@ def mark_first_hit(ridx):
     Returns:
         first_hits (torch.BoolTensor): the boolean mask marking the first hit by depth.
     """
-    warnings.warn("mark_first_hit has been deprecated, please use mark_pack_boundaries instead")
-    return mark_pack_boundaries(ridx)
+    warnings.warn("mark_first_hit has been deprecated, please use mark_pack_boundary instead")
+    return mark_pack_boundary(ridx)
 
 def diff(feats, boundaries):
     r"""Find the delta between each of the features in a pack.
@@ -262,7 +262,7 @@ def cumprod(feats, boundaries, exclusive=False, reverse=False):
     """
     return Cumprod.apply(feats.contiguous(), boundaries.contiguous(), exclusive, reverse)
 
-def exponential_integration(feats, tau, boundaries, exclusive=True):
+def exponential_integration(feats, tau, boundaries, exclusive=False):
     r"""Exponential transmittance integration across packs using the optical thickness (tau).
 
     Exponential transmittance is derived from the Beer-Lambert law. Typical implementations of
@@ -278,7 +278,7 @@ def exponential_integration(feats, tau, boundaries, exclusive=True):
         boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays})`.
             Given some index array marking the pack IDs, the boundaries can be calculated with
             :func:`mark_pack_boundaries`.
-        exclusive (bool): Compute exclusive exponential integration if true. (default: True)
+        exclusive (bool): Compute exclusive exponential integration if true.
 
     Returns:
         (torch.FloatTensor, torch.FloatTensor)
