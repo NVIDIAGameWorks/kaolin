@@ -90,7 +90,7 @@ def mark_pack_boundary(pack_ids):
 
     For example, the SPC ray trace kernel will return the ray index tensor which marks the ID of the ray
     that each intersection belongs in. This kernel will mark the beginning of each of those packs of
-    intersections with a boolean mask (`True` where the beginning is).
+    intersections with a boolean mask (true where the beginning is).
 
     Args:
         pack_ids (torch.Tensor): pack ids of shape :math:`(\text{num_elems})`
@@ -109,10 +109,10 @@ def mark_first_hit(ridx):
     r"""Mark the first hit in the nuggets.
 
     .. deprecated:: 0.10.0
-       This function is deprecated. Use `mark_pack_boundary`.
+       This function is deprecated. Use :func:`mark_pack_boundary`.
 
     The nuggets are a packed tensor containing correspondences from ray index to point index, sorted
-    within each ray pack by depth. This will mark True for each first hit (by depth) for a pack of
+    within each ray pack by depth. This will mark true for each first hit (by depth) for a pack of
     nuggets.
 
     Returns:
@@ -124,18 +124,18 @@ def mark_first_hit(ridx):
 def diff(feats, boundaries):
     r"""Find the delta between each of the features in a pack.
 
-    The deltas are given by `out[i] = feats[i+1] - feats[i]`.
+    The deltas are given by `out[i] = feats[i+1] - feats[i]`
 
-    The behavior is similar to torch.diff for non-packed tensors, but :func:`torch.diff` will reduce the
-    number of features by 1. This function will instead populate the last diff with 0.
+    The behavior is similar to :func:`torch.diff` for non-packed tensors, but :func:`torch.diff` 
+    will reduce the number of features by 1. This function will instead populate the last diff with 0.
 
     Args:
-        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
-        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays}) `.
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats})`
+        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays})`
             Given some index array marking the pack IDs, the boundaries can be calculated with
-            :func:`mark_pack_boundaries`.
+            :func:`mark_pack_boundaries`
     Returns:
-        (torch.FloatTensor): diffed features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+        (torch.FloatTensor): diffed features of shape :math:`(\text{num_rays}, \text{num_feats})`
     """
 
     feats_shape = feats.shape
@@ -209,39 +209,39 @@ def sum_reduce(feats, boundaries):
     r"""Sum the features of packs.
 
     Args:
-        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
-        boundaries (torch.BoolTensor): bools to mark pack boundaries of shape :math:`(\text{num_rays}) `.
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats})`.
+        boundaries (torch.BoolTensor): bools to mark pack boundaries of shape :math:`(\text{num_rays})`.
             Given some index array marking the pack IDs, the boundaries can be calculated with
-            `mark_pack_boundaries`.
+            :func:`mark_pack_boundaries`.
     Returns:
-        (torch.FloatTensor): summed features of shape :math:`(\text{num_packs}, \text{num_feats}) `.
+        (torch.FloatTensor): summed features of shape :math:`(\text{num_packs}, \text{num_feats})`.
     """
     return SumReduce.apply(feats.contiguous(), boundaries.contiguous())
 
 def cumsum(feats, boundaries, exclusive=False, reverse=False):
     r"""Cumulative sum across packs of features.
 
-    This function is similar to `tf.math.cumsum` with the same options, but for packed tensors.
+    This function is similar to :func:`tf.math.cumsum` with the same options, but for packed tensors.
     Refer to the TensorFlow docs for numerical examples of the options.
 
     Args:
-        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
-        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays}) `.
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats})`.
+        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays})`.
             Given some index array marking the pack IDs, the boundaries can be calculated with
-            `mark_pack_boundaries`.
+            :func:`mark_pack_boundaries`.
         exclusive (bool): Compute exclusive cumsum if true. Exclusive means the current index won't be used
                         for the calculation of the cumulative sum. (Default: False)
         reverse (bool): Compute reverse cumsum if true, i.e. the cumulative sum will start from the end of 
                         each pack, not from the beginning. (Default: False)
     Returns:
-        (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+        (torch.FloatTensor): features of shape :math:`(\text{num_rays}\, \text{num_feats})`.
     """
     return Cumsum.apply(feats.contiguous(), boundaries.contiguous(), exclusive, reverse)
 
 def cumprod(feats, boundaries, exclusive=False, reverse=False):
     r"""Cumulative product across packs of features.
 
-    This function is similar to `tf.math.cumprod` with the same options, but for packed tensors.
+    This function is similar to :func:`tf.math.cumprod` with the same options, but for packed tensors.
     Refer to the TensorFlow docs for numerical examples of the options.
 
     Note that the backward gradient follows the same behaviour in TensorFlow, which is to
@@ -249,16 +249,16 @@ def cumprod(feats, boundaries, exclusive=False, reverse=False):
     add an epsilon to feats which will make the behaviour consistent.
 
     Args:
-        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
-        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays}) `.
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats})`.
+        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays})`.
             Given some index array marking the pack IDs, the boundaries can be calculated with
-            `mark_pack_boundaries`.
+            :func:`mark_pack_boundaries`.
         exclusive (bool): Compute exclusive cumprod if true. Exclusive means the current index won't be used
                         for the calculation of the cumulative product. (Default: False)
         reverse (bool): Compute reverse cumprod if true, i.e. the cumulative product will start from the end of 
                         each pack, not from the beginning. (Default: False)
     Returns:
-        (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
+        (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats})`.
     """
     return Cumprod.apply(feats.contiguous(), boundaries.contiguous(), exclusive, reverse)
 
@@ -266,18 +266,18 @@ def exponential_integration(feats, tau, boundaries, exclusive=False):
     r"""Exponential transmittance integration across packs using the optical thickness (tau).
 
     Exponential transmittance is derived from the Beer-Lambert law. Typical implementations of
-    exponential transmittance is calculated with `cumprod`, but the exponential allows a reformulation
-    as a `cumsum` which its gradient is more stable and faster to compute. We opt to use the `cumsum`
+    exponential transmittance is calculated with :func:`cumprod`, but the exponential allows a reformulation
+    as a :func:`cumsum` which its gradient is more stable and faster to compute. We opt to use the :func:`cumsum`
     formulation.
 
     For more details, we recommend "Monte Carlo Methods for Volumetric Light Transport" by Novak et al.
 
     Args:
-        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats}) `.
-        tau (torch.FloatTensor): optical thickness of shape :math:`(\text{num_rays}, 1) `.
-        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays}) `.
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats})`.
+        tau (torch.FloatTensor): optical thickness of shape :math:`(\text{num_rays}, 1)`.
+        boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays})`.
             Given some index array marking the pack IDs, the boundaries can be calculated with
-            `mark_pack_boundaries`.
+            :func:`mark_pack_boundaries`.
         exclusive (bool): Compute exclusive exponential integration if true.
 
     Returns:
