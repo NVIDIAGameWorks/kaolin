@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -243,7 +244,7 @@ class TestSidedDistance:
 @pytest.mark.parametrize('device', ['cuda'])
 class TestChamferDistance:
     @pytest.fixture(autouse=True)
-    def get_tol(self, device, dtype):
+    def tolerances(self, device, dtype):
         if dtype == torch.half:
             return 1e-3, 1e-3
         elif dtype == torch.float:
@@ -252,37 +253,42 @@ class TestChamferDistance:
             return 1e-6, 1e-5
 
     @pytest.fixture(autouse=True)
-    def get_input(self, device, dtype):
-        p1 = torch.tensor([[[8.8977, 4.1709, 1.2839],
-                            [8.5640, 7.7767, 9.4214]],
-                           [[0.5431, 6.4495, 11.4914],
-                            [3.2126, 8.0865, 3.1018]]], dtype=dtype, device=device)
+    def p1(self, device, dtype):
+        return torch.tensor([[[8.8977, 4.1709, 1.2839],
+                              [8.5640, 7.7767, 9.4214]],
+                             [[0.5431, 6.4495, 11.4914],
+                              [3.2126, 8.0865, 3.1018]]],
+                            dtype=dtype, device=device)
 
-        p2 = torch.tensor([[[6.9340, 6.1152, 3.4435],
-                            [0.1032, 9.8181, 11.3350]],
-                           [[11.4006, 2.2154, 7.9589],
-                            [4.2586, 1.4133, 7.2606]]], dtype=dtype, device=device)
+    @pytest.fixture(autouse=True)
+    def p2(self, device, dtype):
+        return torch.tensor([[[6.9340, 6.1152, 3.4435],
+                              [0.1032, 9.8181, 11.3350]],
+                             [[11.4006, 2.2154, 7.9589],
+                              [4.2586, 1.4133, 7.2606]]],
+                            dtype=dtype, device=device)
+
+    def test_chamfer_distance(self, device, dtype, p1, p2, tolerances):
+        output = pc.chamfer_distance(p1, p2)
+
+        expected = torch.tensor([72.5838, 151.0809], dtype=dtype, device=device)
+
+        atol, rtol = tolerances
+        assert torch.allclose(output, expected, atol=atol, rtol=rtol)
+
+    def test_weighted_chamfer_distance(self, device, dtype, p1, p2, tolerances):
+        output = pc.chamfer_distance(p1, p2, w1=1.3, w2=0.8)
+        expected = torch.tensor([71.4303, 150.8620], dtype=dtype, device=device)
+
+        atol, rtol = tolerances
+        assert torch.allclose(output, expected, atol=atol, rtol=rtol)
+
+    def test_chamfer_distance_not_squared(self, device, dtype, p1, p2, tolerances):
+        output = pc.chamfer_distance(p1, p2, squared=False)
+        expected = torch.tensor([11.1704, 17.1130], dtype=dtype, device=device)
         
-        return p1, p2
-
-    def test_chamfer_distance1(self, device, dtype, get_input, get_tol):
-        p1, p2 = get_input
-        output1 = pc.chamfer_distance(p1, p2)
-        output2 = pc.chamfer_distance(p2, p1)
-
-        expected1 = torch.tensor([72.5838, 151.0809], dtype=dtype, device=device)
-
-        atol, rtol = get_tol
-        assert torch.allclose(output1, expected1, atol=atol, rtol=rtol)
-
-    def test_chamfer_distance2(self, device, dtype, get_input, get_tol):
-        p1, p2 = get_input
-
-        output2 = pc.chamfer_distance(p1, p2, w1=1.3, w2=0.8)
-        expected2 = torch.tensor([71.4303, 150.8620], dtype=dtype, device=device)
-
-        atol, rtol = get_tol
-        assert torch.allclose(output2, expected2, atol=atol, rtol=rtol)
+        atol, rtol = tolerances
+        assert torch.allclose(output, expected, atol=atol, rtol=rtol)
 
 @pytest.mark.parametrize('dtype', FLOAT_DTYPES)
 @pytest.mark.parametrize('device', ['cuda'])

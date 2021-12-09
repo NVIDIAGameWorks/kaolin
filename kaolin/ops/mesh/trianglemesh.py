@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -175,13 +176,25 @@ def packed_sample_points(vertices, first_idx_vertices,
 
     Args:
         vertices (torch.Tensor):
-            The vertices of the meshes, of shape ``(num_vertices, 3)``
+            The packed vertices of the meshes, of shape :math:`(\\text{num_vertices}, 3)`.
+        first_idx_vertices (torch.Tensor):
+            The :ref:`first_idx<packed_first_idx>` associated to vertices,
+            of shape :math:`(\\text{batch_size})`.
         faces (torch.LongTensor):
-            The faces of the mesh, of shape ``(num_faces, 3)``
+            The packed faces of the meshes, of shape :math:`(\\text{num_faces}, 3)`.
+        num_faces_per_mesh:
+            The number of faces per mesh, of shape :math:`(\\text{batch_size})`.
+        num_samples (int):
+            The number of point sampled per mesh.
+        areas (torch.Tensor, optional):
+            The areas of each face, of shape :math:`(\\text{num_faces})`,
+            can be preprocessed, for fast on-the-fly sampling,
+            will be computed if None (default).
 
     Returns:
         (torch.Tensor, torch.LongTensor):
-            the pointclouds of shape ``(batch_size, num_points, 3)``,
+            the pointclouds
+            of shape :math:`(\\text{batch_size}, \\text{num_points}, 3)``,
             and the indexes of the faces selected (as merged faces),
             of shape ``(batch_size, num_points)``
     """
