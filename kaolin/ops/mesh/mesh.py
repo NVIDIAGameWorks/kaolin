@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020,21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -82,7 +82,7 @@ def adjacency_matrix(num_vertices, faces, sparse=True):
 
 def uniform_laplacian(num_vertices, faces):
     r"""Calculates the uniform laplacian of a mesh.
-    :math:`L[i, j] = \frac{1}{(number of neighbouring vertices of i)}` if i, j are neighbours.
+    :math:`L[i, j] = \frac{1}{num\_neighbours(i)}` if i, j are neighbours.
     :math:`L[i, j] = -1` if i == j. 
     :math:`L[i, j] = 0` otherwise.
 
