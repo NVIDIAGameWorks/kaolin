@@ -89,11 +89,9 @@ Users can freely define their own feature data to be stored alongside SPC.
 Conversions
 ===========
 
-Structured point clouds can be derived from multiple sources. Using 
-:func:`kaolin.ops.conversions.trianglemeshes_to_spcs`
-will
-convert batched triangle mesh models into ``octrees``.
-We can also construct ``octrees``
+Structured point clouds can be derived from multiple sources.
+
+We can construct ``octrees``
 from unstructured point cloud data, from sparse voxelgrids 
 or from the level set of an implicit function :math:`f(x, y, z)`. 
 
@@ -134,7 +132,7 @@ Since ``octrees`` use :ref:`packed` batching, we need ``lengths`` a 1D tensor of
 ``point_hierarchies:``
 ----------------------
 
-:class:`torch.IntTensor` of shape :math:`(\text{num_nodes}, 3)` correspond to the sparse coordinates at all levels. We refer to this :ref:`packed` tensor as the **structured point hierarchies**.
+:class:`torch.ShortTensor` of shape :math:`(\text{num_nodes}, 3)` correspond to the sparse coordinates at all levels. We refer to this :ref:`packed` tensor as the **structured point hierarchies**.
 
 The image below show an analogous 2D example.
 
@@ -143,10 +141,10 @@ The image below show an analogous 2D example.
 
 the corresponding ``point_hierarchies`` would be:
 
->>> torch.IntTensor([[0, 0], [1, 1],
-                     [1, 0], [2, 2],
-                     [2, 1], [3, 1], [5, 5]
-                    ])
+>>> torch.ShortTensor([[0, 0], [1, 1],
+                       [1, 0], [2, 2],
+                       [2, 1], [3, 1], [5, 5]
+                      ])
 
 
 .. note::
