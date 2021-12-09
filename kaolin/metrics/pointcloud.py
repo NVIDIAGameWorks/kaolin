@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,17 +50,22 @@ class _SidedDistanceFunction(torch.autograd.Function):
 
 
 def sided_distance(p1, p2):
-    r"""For every point in p1 find the indices and euclidean 
-    distances of the closest point in p2.
+    r"""For each point in :math:`p_{1i} \in P_1` will find the indices and squared euclidean 
+    distances of the closest point :math:`P_2`, as following:
+
+    :math:`sided\_distance(p_{1i}, P_2) = \min\limits_{p_{2j}\in{P_2}}(||p_{1i} - p_{2j}||_2^2)`
 
     Args:
-        p1 (torch.Tensor) : pointclouds of shape (B, N, 3)
-        p2 (torch.Tensor) : pointclouds of shape (B, M, 3)
+        p1 (torch.Tensor): Pointclouds, of shape
+                           :math:`(\text{batch_size}, \text{num_points1}, 3)`.
+        p2 (torch.Tensor): Pointclouds, of shape
+                           :math:`(\text{batch_size}, \text{num_points2}, 3)`.
 
     Returns:
-        (torch.Tensor, torch.Tensor): the indices and distances from points in p1 to the
-        corresponding closest points in p2, both have shape of
-        (B, N)
+        (torch.Tensor, torch.Tensor):
+            The indices and distances from points in p1 to the
+            corresponding closest points in p2, both have shape of
+            :math:`(\text{batch_size}, \text{num_points1})`.
 
     Example:
         >>> p1 = torch.tensor([[[5.9336, 4.9742, 8.1047]],
@@ -80,17 +86,26 @@ def sided_distance(p1, p2):
 
     return dist, idx
 
-def chamfer_distance(p1, p2, w1=1., w2=1.):
-    r"""Computes the chamfer distance between two pointclouds
+def chamfer_distance(p1, p2, w1=1., w2=1., squared=True):
+    r"""Computes the chamfer distance between two pointclouds, defined as following:
+
+    :math:`\dfrac{w_1}{|P_1|}\sum\limits_{p_{1i} \in P_1}\min\limits_{p_{2j} \in P_2}(||p_{1i} - p_{2j}||_2^2) +
+    \dfrac{w_2}{|P_2|}\sum\limits_{p_{2j} \in P_2}\min\limits_{p_{1i} \in P_1}(||p_{2j} - p_{1i}||_2^2)`
 
     Args:
-        p1 (torch.Tensor): pointclouds of shape (B, N, 3)
-        p2 (torch.Tensor): pointclouds of shape (B, M, 3)
-        w1 (float): weighting of forward direction. Default: 1.
-        w2 (float): weighting of backward direction. Default: 1.
+        p1 (torch.Tensor): Pointclouds, of shape
+                           :math:`(\text{batch_size}, \text{num_points1}, 3)`.
+        p2 (torch.Tensor): Pointclouds, of shape
+                           :math:`(\text{batch_size}, \text{num_points2}, 3)`.
+        w1 (float, optional): Weighting of forward direction. Default: 1.
+        w2 (float, optional): Weighting of backward direction. Default: 1.
+        squared (bool, optional): Use the squared sided distance.
+                                  Default: True.
 
     Returns:
-        (torch.Tensor): chamfer distance between two pointclouds p1 and p2 of shape (B)
+        (torch.Tensor):
+            Chamfer distance between two pointclouds p1 and p2,
+            of shape :math:`(\text{batch_size})`.
     Example:
         >>> p1 = torch.tensor([[[8.8977, 4.1709, 1.2839],
         ...                     [8.5640, 7.7767, 9.4214]],
@@ -103,8 +118,15 @@ def chamfer_distance(p1, p2, w1=1., w2=1.):
         >>> chamfer_distance(p1, p2)
         tensor([ 72.5838, 151.0809], device='cuda:0')
     """
-    dist_to_p2 = sided_distance(p1, p2)[0].mean(dim=-1)
-    dist_to_p1 = sided_distance(p2, p1)[0].mean(dim=-1)
+    sdist1 = sided_distance(p1, p2)[0]
+    sdist2 = sided_distance(p2, p1)[0]
+
+    if not squared:
+        sdist1 = torch.sqrt(sdist1)
+        sdist2 = torch.sqrt(sdist2)
+
+    dist_to_p2 = sdist1.mean(dim=-1)
+    dist_to_p1 = sdist2.mean(dim=-1)
 
     if (w1 == 1 and w2 == 1):
         distance = dist_to_p2 + dist_to_p1
@@ -114,17 +136,23 @@ def chamfer_distance(p1, p2, w1=1., w2=1.):
     return distance
 
 def f_score(gt_points, pred_points, radius=0.01, eps=1e-8):
-    r"""Computes the f-score of two sets of points, with a hit defined by two point existing within a defined radius of each other
+    r"""Computes the f-score of two sets of points, with a hit defined
+    by two point existing within a defined radius of each other.
 
     Args:
-        gt_points (torch.Tensor): ground truth pointclouds of shape (B, N, 3)
-        pred_points (torch.Tensor): predicted points pointclouds of shape (B, M, 3)
-        radius (float): radius from a point to define a hit
+        gt_points (torch.Tensor): Ground truth pointclouds, of shape
+                                  :math:`(\text{batch_size}, \text{num_gt_points}, 3)`.
+        pred_points (torch.Tensor): Predicted points pointclouds, of shape
+                                    :math:`(\text{batch_size}, \text{num_points}, 3)`.
+        radius (float): Radius from a point to define a hit.
                         Default: 0.01
-        eps (float): epsilon used to calculate f score.
+        eps (float): Epsilon used to calculate f score.
+                     Default: 1e-8.
 
     Returns:
-        (torch.Tensor): computed f-score tensor of shape (B), which has the same dtype as input pred_points.
+        (torch.Tensor):
+            Computed f-score tensor of shape :math:`(\text{batch_size})`,
+            of same dtype as input pred_points.
 
     Example:
         >>> p1 = torch.tensor([[[8.8977, 4.1709, 1.2839],
