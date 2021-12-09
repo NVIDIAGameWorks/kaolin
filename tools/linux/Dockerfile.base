@@ -21,9 +21,22 @@ RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-p
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated ca-certificates \
     && rm /etc/apt/apt.conf.d/99verify-peer.conf \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-         build-essential curl git unzip gfortran \
-         libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 \
-         libnss3 libxss1 libasound2 libxtst6 xauth xvfb \
+         build-essential \
+         curl \
+         git \
+         unzip \
+         gfortran \
+         libgtk2.0-0 \
+         libgtk-3-0 \
+         libgbm-dev \
+         libnotify-dev \
+         libgconf-2-4 \
+         libnss3 \
+         libxss1 \
+         libasound2 \
+         libxtst6 \
+         xauth \
+         xvfb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

@@ -43,12 +43,12 @@ class TestSimpleDeftetSparseRender:
         # Mesh 1:
         # three faces, fully overlapped (will have intersection)
         return torch.tensor(
-            [[[[-1.,  0.], [ 0., -1.], [0.,  1.]],
-              [[-1.,  0.], [ 0.,  1.], [0., -1.]],
-              [[ 0., -1 ], [ 0.,  1.], [1.,  0.]]],
-             [[[-1., -1.], [1.,  -1.], [-1., 1.]],
-              [[-1., -1.], [1.,  -1.], [-1., 1.]],
-              [[-1., -1.], [1.,  -1.], [-1., 1.]]]],
+            [[[[-1.,  0. ], [0., -1.], [ 0.,  1.]],
+              [[-1.,  0. ], [0.,  1.], [ 0., -1.]],
+              [[ 0., -1.],  [0.,  1.], [ 1.,  0.]]],
+             [[[-1., -1.],  [1., -1.], [-1.,  1.]],
+              [[-1., -1.],  [1., -1.], [-1.,  1.]],
+              [[-1., -1.],  [1., -1.], [-1.,  1.]]]],
             device=device, dtype=dtype)
 
     @pytest.fixture(autouse=True)
@@ -180,6 +180,7 @@ class TestSimpleDeftetSparseRender:
             interpolated_features, face_idx = deftet_sparse_render(
                 pixel_coords, render_ranges, face_vertices_z,
                 face_vertices_image, face_features, 5)
+
         gt_face_idx = torch.tensor(
             [[[0, -1, -1, -1, -1],
               [0, -1, -1, -1, -1],
@@ -262,6 +263,70 @@ class TestSimpleDeftetSparseRender:
             assert torch.allclose(interpolated_features[0], gt_interpolated_features0)
             assert torch.allclose(interpolated_features[1], gt_interpolated_features1,
                                   atol=3e-3, rtol=1e-5)
+
+    @pytest.mark.parametrize('cat_features', [False, True])
+    def test_with_valid_faces(self, pixel_coords, face_vertices_image, face_vertices_z,
+                              face_features, device, dtype, cat_features):
+        render_ranges = torch.tensor([[[-4., 0.]]], device='cuda',
+                                     dtype=dtype).repeat(2, 7, 1)
+        valid_faces = torch.tensor([[False, True, True], [True, False, True]], device='cuda',
+                                   dtype=torch.bool)
+        if cat_features:
+            face_features = torch.cat(face_features, dim=-1)
+        interpolated_features, face_idx = _naive_deftet_sparse_render(
+            pixel_coords, render_ranges, face_vertices_z,
+            face_vertices_image, face_features, 3, valid_faces=valid_faces)
+
+        gt_face_idx = torch.tensor(
+            [[[1, -1, -1],
+              [1, -1, -1],
+              [2, -1, -1],
+              [2, -1, -1],
+              [1, -1, -1],
+              [2, -1, -1],
+              [-1, -1, -1]],
+             [[0, 2, -1],
+              [0, 2, -1],
+              [2, 0, -1],
+              [2, 0, -1],
+              [0, 2, -1],
+              [2, 0, -1],
+              [-1, -1, -1]]],
+            device=device, dtype=torch.long)
+        assert torch.equal(face_idx, gt_face_idx)
+
+        gt_interpolated_features0 = (
+            gt_face_idx + torch.arange(2, device=device).view(2, 1, 1) * face_vertices_image.shape[1]
+        ).to(dtype).unsqueeze(-1)
+        gt_interpolated_features0[gt_face_idx == -1] = 0.
+
+        gt_interpolated_features1 = torch.tensor(
+            [[[[3.],    [0.],   [0.]],
+              [[5.],    [0.],   [0.]],
+              [[7.],    [0.],   [0.]],
+              [[8.],    [0.],   [0.]],
+              [[3.825], [0.],   [0.]],
+              [[7.175], [0.],   [0.]],
+              [[0.],    [0.],   [0.]]],
+             [[[9.],    [15.],  [0.]],
+              [[10.],   [16.],  [0.]],
+              [[17.],   [11.],  [0.]],
+              [[16.5],  [10.5], [0.]],
+              [[9.5],   [15.5], [0.]],
+              [[16.],   [10.],  [0.]],
+              [[0.],    [0.],   [0.]]]],
+            device=device, dtype=dtype)
+
+        if cat_features:
+            gt_interpolated_features = torch.cat(
+                [gt_interpolated_features0, gt_interpolated_features1], dim=-1)
+            assert torch.allclose(interpolated_features, gt_interpolated_features,
+                                  atol=3e-3, rtol=1e-5)
+        else:
+            assert torch.allclose(interpolated_features[0], gt_interpolated_features0)
+            assert torch.allclose(interpolated_features[1], gt_interpolated_features1,
+                                  atol=3e-3, rtol=1e-5)
+
 
 @pytest.mark.parametrize("dtype", [torch.float, torch.double])
 @pytest.mark.parametrize("batch_size", [1, 3])
@@ -425,10 +490,10 @@ class TestDeftetSparseRender:
         assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
         assert torch.allclose(face_vertices_image.grad,
                               face_vertices_image2.grad,
-                              rtol=1e-3, atol=1e-3)
+                              rtol=5e-3, atol=5e-3)
         assert torch.allclose(face_uvs.grad,
                               face_uvs2.grad,
-                              rtol=1e-5, atol=1e-5)
+                              rtol=1e-3, atol=1e-3)
 
     @pytest.mark.parametrize('knum', [20, 30])
     def test_backward_with_mask(self, pixel_coords, render_ranges,
@@ -477,10 +542,10 @@ class TestDeftetSparseRender:
         assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
         assert torch.allclose(face_vertices_image.grad,
                               face_vertices_image2.grad,
-                              rtol=1e-3, atol=1e-3)
+                              rtol=5e-3, atol=5e-3)
         assert torch.allclose(face_uvs.grad,
                               face_uvs2.grad,
-                              rtol=1e-5, atol=1e-5)
+                              rtol=1e-3, atol=1e-3)
         assert torch.allclose(face_mask.grad,
                               face_mask2.grad,
-                              rtol=1e-5, atol=1e-5)
+                              rtol=1e-3, atol=1e-3)

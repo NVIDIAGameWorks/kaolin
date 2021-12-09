@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,19 +21,21 @@
 namespace kaolin {
 
 std::vector<at::Tensor> deftet_sparse_render_forward_cuda(
-    at::Tensor points3d,
-    at::Tensor points2d,
-    at::Tensor pointsbbox,
-    at::Tensor imcoords,
-    at::Tensor imdeprange,
-    int knum);
+    const at::Tensor points3d,
+    const at::Tensor points2d,
+    const at::Tensor pointsbbox,
+    const at::Tensor imcoords,
+    const at::Tensor imdeprange,
+    const int knum,
+    const float eps);
 
 std::vector<at::Tensor> deftet_sparse_render_backward_cuda(
-    at::Tensor grad_interpolated_features,
-    at::Tensor face_idx,
-    at::Tensor weights,
-    at::Tensor face_vertices_image,
-    at::Tensor face_features);
+    const at::Tensor grad_interpolated_features,
+    const at::Tensor face_idx,
+    const at::Tensor weights,
+    const at::Tensor face_vertices_image,
+    const at::Tensor face_features,
+    const float eps);
 
 }
 
