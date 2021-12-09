@@ -247,28 +247,27 @@ def packed_sample_points(vertices, first_idx_vertices,
 
     Args:
         vertices (torch.Tensor):
-            The packed vertices of the meshes, of shape :math:`(\text{num_vertices}, 3)`.
+            The packed vertices of the meshes, of shape :math:`(\\text{num_vertices}, 3)`.
         first_idx_vertices (torch.Tensor):
             The :ref:`first_idx<packed_first_idx>` associated to vertices,
-            of shape :math:`(\text{batch_size})`.
+            of shape :math:`(\\text{batch_size})`.
         faces (torch.LongTensor):
-            The packed faces of the meshes, of shape :math:`(\text{num_faces}, 3)`.
+            The packed faces of the meshes, of shape :math:`(\\text{num_faces}, 3)`.
         num_faces_per_mesh:
-            The number of faces per mesh, of shape :math:`(\text{batch_size})`.
+            The number of faces per mesh, of shape :math:`(\\text{batch_size})`.
         num_samples (int):
             The number of point sampled per mesh.
         areas (torch.Tensor, optional):
-            The areas of each face, of shape :math:`(\text{num_faces})`,
+            The areas of each face, of shape :math:`(\\text{num_faces})`,
             can be preprocessed, for fast on-the-fly sampling,
             will be computed if None (default).
 
     Returns:
         (torch.Tensor, torch.LongTensor):
-
-            - The pointclouds, of shape
-              :math:`(\text{batch_size}, \text{num_points}, 3)``.
-            - The indexes of the faces selected (as merged faces), of shape
-              :math:`(\text{batch_size}, \text{num_points}).`
+            the pointclouds
+            of shape :math:`(\\text{batch_size}, \\text{num_points}, 3)``,
+            and the indexes of the faces selected (as merged faces),
+            of shape ``(batch_size, num_points)``
     """
     if faces.shape[-1] != 3:
         raise NotImplementedError("packed_sample_points is only implemented for triangle meshes")
