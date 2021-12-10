@@ -121,6 +121,7 @@ def _naive_deftet_sparse_render(pixel_coords,
             of shapes :math:`(\text{batch_size}, \text{num_faces}, 3, \text{feature_dim[i]})`
         knum (int):
             Maximum number of faces that influence one pixel. Default: 300.
+
     Returns:
         (torch.Tensor or list of torch.Tensor, torch.LongTensor):
 
@@ -338,6 +339,7 @@ def deftet_sparse_render(pixel_coords, render_ranges, face_vertices_z,
             of shapes :math:`(\text{batch_size}, \text{num_faces}, 3, \text{feature_dim[i]})`.
         knum (int):
             Maximum number of faces that influence one pixel. Default: 300.
+
     Returns:
         (torch.Tensor or list of torch.Tensor, torch.LongTensor):
 
@@ -348,6 +350,9 @@ def deftet_sparse_render(pixel_coords, render_ranges, face_vertices_z,
               :math:`(\text{batch_size}, \text{num_pixels}, \text{knum}, \text{feature_dim[i]})`.
             - The rendered face index, -1 is void, of shape
               :math:`(\text{batch_size}, \text{num_pixels}, \text{knum})`.
+
+    .. _Learning Deformable Tetrahedral Meshes for 3D Reconstruction:
+            https://arxiv.org/abs/2011.01437
     """
     _face_features = torch.cat(
         face_features, dim=-1
