@@ -264,7 +264,7 @@ class DeftetSparseRenderer(Function):
         sorted_w2 = (sorted_face_idx != -1).float() - (sorted_w0 + sorted_w1)
         _idx = sorted_face_idx + 1
         _idx = _idx.reshape(batch_size, -1, 1, 1).expand(
-            batch_size, pixel_num * knum, 3, feat_dim)
+          batch_size, pixel_num * knum, 3, feat_dim)
         selected_features = torch.gather(
             torch.nn.functional.pad(face_features, (0, 0, 0, 0, 1, 0), value=0.), 1, _idx).reshape(
             batch_size, pixel_num, knum, 3, feat_dim)
