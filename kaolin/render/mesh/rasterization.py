@@ -60,7 +60,7 @@ class DIBRasterization(Function):
         points_min = torch.min(face_vertices_image, dim=2)[0]
         points_max = torch.max(face_vertices_image, dim=2)[0]
         face_bboxes = torch.cat((points_min, points_max), dim=2)
-        are_faces_valid = face_normals_z.squeeze(-1) >= 0
+        are_faces_valid = face_normals_z >= 0
         valid_faces = torch.where(are_faces_valid)
         valid_face_bboxes = face_bboxes[valid_faces[0], valid_faces[1]]
         valid_face_vertices_image = face_vertices_image[valid_faces[0], valid_faces[1]]

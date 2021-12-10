@@ -22,6 +22,7 @@
 #include "./metrics/sided_distance.h"
 #include "./metrics/unbatched_triangle_distance.h"
 #include "./render/dibr.h"
+#include "./render/mesh/deftet.h"
 #include "./ops/conversions/mesh_to_spc/mesh_to_spc.h"
 #include "./ops/spc/spc.h"
 #include "./ops/spc/feature_grids.h"
@@ -72,6 +73,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   render_mesh.def("packed_rasterize_forward_cuda", &packed_rasterize_forward_cuda);
   render_mesh.def("generate_soft_mask_cuda", &generate_soft_mask_cuda);
   render_mesh.def("rasterize_backward_cuda", &rasterize_backward_cuda);
+  render_mesh.def("deftet_sparse_render_forward_cuda", &deftet_sparse_render_forward_cuda);
+  render_mesh.def("deftet_sparse_render_backward_cuda", &deftet_sparse_render_backward_cuda);
   py::module render_spc = render.def_submodule("spc");
   render_spc.def("raytrace_cuda", &raytrace_cuda);
   render_spc.def("generate_primary_rays_cuda", &generate_primary_rays_cuda); // Deprecate soon
