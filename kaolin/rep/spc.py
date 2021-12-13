@@ -22,12 +22,72 @@ import torch
 from ..ops.batch import list_to_packed
 
 class Spc(object):
-    """Class containing all the Structured point clouds information"""
+    """Data class holding all :ref:`Structured Point Cloud (SPC)<spc>` information.
+
+    This class supports batching through :ref:`packed<packed>` representation:
+    a single Spc object can pack multiple SPC structures of variable sizes.
+
+    SPC data structures are represented through the combination various tensors detailed below:
+
+    ``octrees`` compress the information required to build a full SPC.
+    In practice, they are a low level structure which also constitute the
+    :ref:`core part<spc_octree>` of the SPC data structure.
+
+    ``octrees`` are kept as a torch.ByteTensor, where each byte represents a single octree parent cell,
+    and each bit represents the occupancy of a child octree cell.
+    e.g: 8 bits for 8 cells.
+
+    Bits describe the octree cells in Morton Order::
+
+         . . . . . . . .
+         | .   3  .  7  | .                    3   7
+         |   . . . . . . . .           ===>    1   5
+         |   | .   1  . | 5   .
+         |   |   . . . . . . . .
+         |   |    |     |       |              2   6
+          . .|. . | . . .       |      ===>    0   4
+            .| 2  |.  6   .     |
+              . . | . . . . .   |
+                . | 0  .  4   . |
+                  . . . . . . . .
+
+    If a cell is occupied, an additional cell byte may be generated in the next level,
+    up till the argument ``level``.
+
+    For example, a ``SPC.octrees`` field may, look as follows::
+
+            tensor([255, 128,  64,  32,  16,   8,   4,   2,  23], dtype=torch.uint8)
+
+    Here "octrees" represents an octree of 9 nodes.
+    The binary representation should be interpreted as follows::
+
+            Level #1, Path*,      11111111    (All cells are occupied, therefore 8 bytes are allocated for level 2)
+            Level #2, Path*-1,    10000000
+            Level #2, Path*-2,    01000000
+            Level #2, Path*-3,    00100000
+            Level #2, Path*-4,    00010000
+            Level #2, Path*-5,    00001000
+            Level #2, Path*-6,    00000100
+            Level #2, Path*-7,    00000010
+            Level #2, Path*-8,    00010111
+
+    ``lengths`` is a tensor of integers required to support batching. Since we assume a packed representation,
+    all octree cells are shaped as a single stacked 1D tensor. ``lengths`` specifies the number of cells (bytes) each
+    octree uses.
+
+    ``features`` represent an optional per-point feature vector.
+    When ``features`` is not ``None``, a feature is kept for each point at the highest-resolution level in the octree.
+
+    ``max_level`` is an integer which specifies how many recursive levels an octree should have.
+
+    ``point_hierarchies``, ``pyramid``, ``exsum`` are auxilary structures, which are generated upon request and
+    enable efficient indexing to SPC entries.
+    """
 
     KEYS = {'octrees', 'lengths', 'max_level', 'pyramids', 'exsum', 'point_hierarchies'}
 
     def __init__(self, octrees, lengths, max_level=None, pyramids=None,
-                 exsum=None, point_hierarchies=None):
+                 exsum=None, point_hierarchies=None, features=None):
         assert (isinstance(octrees, torch.Tensor) and octrees.dtype == torch.uint8 and
                 octrees.ndim == 1), "octrees must be a 1D ByteTensor."
         assert (isinstance(lengths, torch.Tensor) and lengths.dtype == torch.int and
@@ -64,12 +124,19 @@ class Spc(object):
             assert point_hierarchies.device == octrees.device, \
                 "point_hierarchies must be on the same device than octrees."
 
+        if features is not None:
+            assert isinstance(features, torch.Tensor), \
+                "features must be a torch.Tensor"
+            assert features.device == octrees.device, \
+                "features must be on the same device as octrees."
+
         self.octrees = octrees
         self.lengths = lengths
         self._max_level = max_level
         self._pyramids = pyramids
         self._exsum = exsum
         self._point_hierarchies = point_hierarchies
+        self.features = features
 
     # TODO(cfujitsang): could be interesting to separate into multiple functions
     def _apply_scan_octrees(self):
