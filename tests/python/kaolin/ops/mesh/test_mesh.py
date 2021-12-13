@@ -72,31 +72,47 @@ class TestSamplePoints:
 
     @pytest.fixture(autouse=True)
     def vertices(self, device, dtype):
-         vertices = torch.tensor([[[0., 0., 0.],
-                                  [0., 0., 1.],
-                                  [0., 1., 0.],
-                                  [2., 0., 0.2]],
-                                 [[-1., -1., -1.],
-                                  [-1., -1., 1.],
-                                  [-1, 1., -1.],
-                                  [3, -1., -0.6]]],
-                                device=device, dtype=dtype)
+         # TODO(cfujitsang): extend the test with Z variation
+         return torch.tensor([[[0.,   0.,  0.],
+                               [0.,   1.,  0.],
+                               [1.,   0.,  0.],
+                               [-1,   0.,  0.]],
+                              [[1.,   1.,  3.],
+                               [1.,   1.5, 3.],
+                               [1.5,  1.,  3.],
+                               [0.5,  1.,  3.]]],
+                             device=device, dtype=dtype)
          return vertices
 
     @pytest.fixture(autouse=True)
     def faces(self, device, dtype):
-        faces = torch.tensor([[0, 1, 2],
-                              [1, 0, 3]],
-                             device=device, dtype=torch.long)
-        return faces
+        return torch.tensor([[0, 1, 2],
+                             [1, 0, 3]],
+                            device=device, dtype=torch.long)
+
+    @pytest.fixture(autouse=True)
+    def face_features(self, device, dtype):
+        return torch.tensor(
+            [[[[0., 0.], [0., 1.],  [0., 2.]],
+              [[1., 3.], [1., 4.],  [1., 5.]]],
+             [[[2., 6.], [2., 7.],  [2., 8.]],
+              [[3., 9.], [3., 10.], [3., 11.]]]],
+            device=device, dtype=torch.long)
 
     ######## FIXED ########
-    def test_sample_points(self, vertices, faces, device, dtype):
+    @pytest.mark.parametrize('use_features', [False, True])
+    def test_sample_points(self, vertices, faces, face_features,
+                           use_features, device, dtype):
         batch_size, num_vertices = vertices.shape[:2]
         num_faces = faces.shape[0]
         num_samples = 1000
 
-        points, face_choices = mesh.sample_points(vertices, faces, num_samples)
+        if use_features:
+            points, face_choices, interpolated_features = mesh.sample_points(
+                vertices, faces, num_samples, face_features=face_features)
+        else:
+            points, face_choices = mesh.sample_points(
+                vertices, faces, num_samples)
 
         check_tensor(points, shape=(batch_size, num_samples, 3),
                      dtype=dtype, device=device)
@@ -106,7 +122,7 @@ class TestSamplePoints:
         # check that all faces are sampled
         num_0 = torch.sum(face_choices == 0, dim=1)
         assert torch.all(num_0 + torch.sum(face_choices == 1, dim=1) == num_samples)
-        sampling_prob = num_samples / 3.
+        sampling_prob = num_samples / 2
         tolerance = sampling_prob * 0.2
         assert torch.all(num_0 < sampling_prob + tolerance) and \
                torch.all(num_0 > sampling_prob - tolerance)
@@ -136,7 +152,8 @@ class TestSamplePoints:
 
         # check that the point is close to the plan
         assert torch.allclose(point_to_face_dist,
-                              torch.zeros((batch_size, num_samples), device=device, dtype=dtype),
+                              torch.zeros((batch_size, num_samples),
+                              device=device, dtype=dtype),
                               atol=atol, rtol=rtol)
 
         # check that the point lie in the triangle
@@ -160,6 +177,47 @@ class TestSamplePoints:
                                       face_normals.reshape(-1, 3, 1)) >= margin)
         assert torch.all(torch.matmul(normals3.reshape(-1, 1, 3),
                                       face_normals.reshape(-1, 3, 1)) >= margin)
+        if use_features:
+            feat_dim = face_features.shape[-1]
+            check_tensor(interpolated_features, shape=(batch_size, num_samples, feat_dim),
+                         dtype=dtype, device=device)
+            # face_vertices_choices (batch_size, num_samples, 3, 3)
+            # points (batch_size, num_samples, 3)
+            ax = face_vertices_choices[:, :, 0, 0]
+            ay = face_vertices_choices[:, :, 0, 1]
+            bx = face_vertices_choices[:, :, 1, 0]
+            by = face_vertices_choices[:, :, 1, 1]
+            cx = face_vertices_choices[:, :, 2, 0]
+            cy = face_vertices_choices[:, :, 2, 1]
+            m = bx - ax
+            p = by - ay
+            n = cx - ax
+            q = cy - ay
+            s = points[:, :, 0] - ax
+            t = points[:, :, 1] - ay
+
+            # sum_weights = torch.sum(weights, dim=-1)
+            # zeros_idxs = torch.where(sum_weights == 0)
+            #weights = weights / torch.sum(weights, keepdims=True, dim=-1)
+            k1 = s * q - n * t
+            k2 = m * t - s * p
+            k3 = m * q - n * p
+            w1 = k1 / (k3 + 1e-7)
+            w2 = k2 / (k3 + 1e-7)
+            w0 = (1. - w1) - w2
+            weights = torch.stack([w0, w1, w2], dim=-1)
+
+            gt_points = torch.sum(
+                face_vertices_choices * weights.unsqueeze(-1), dim=-2)
+            assert torch.allclose(points, gt_points, atol=atol, rtol=rtol)
+
+            _face_choices = face_choices[..., None, None].repeat(1, 1, 3, feat_dim)
+            face_features_choices = torch.gather(face_features, 1, _face_choices)
+
+            gt_interpolated_features = torch.sum(
+                face_features_choices * weights.unsqueeze(-1), dim=-2)
+            assert torch.allclose(interpolated_features, gt_interpolated_features,
+                                  atol=atol, rtol=rtol)
 
     def test_sample_points_with_areas(self, vertices, faces, dtype, device):
         num_samples = 1000
@@ -170,6 +228,20 @@ class TestSamplePoints:
             mesh.sample_points)(vertices, faces, num_samples)
         assert torch.allclose(points1, points2)
         assert torch.equal(face_choices1, face_choices2)
+
+    def test_sample_points_with_areas_with_features(self, vertices, faces,
+                                                    face_features, dtype, device):
+        num_samples = 1000
+        face_areas = mesh.face_areas(vertices, faces)
+        points1, face_choices1, interpolated_features1 = with_seed(1234)(
+            mesh.sample_points)(vertices, faces, num_samples, face_areas,
+                                face_features=face_features)
+        points2, face_choices2, interpolated_features2 = with_seed(1234)(
+            mesh.sample_points)(vertices, faces, num_samples,   
+                                face_features=face_features)
+        assert torch.allclose(points1, points2)
+        assert torch.equal(face_choices1, face_choices2)
+        assert torch.allclose(interpolated_features1, interpolated_features2)
 
     def test_diff_sample_points(self, vertices, faces, device, dtype):
         num_samples = 1000
