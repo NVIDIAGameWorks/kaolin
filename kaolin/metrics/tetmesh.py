@@ -14,56 +14,67 @@
 # limitations under the License.
 
 import torch
-from kaolin.ops.mesh.tetmesh import _validate_tetrahedrons
+from kaolin.ops.mesh.tetmesh import _validate_tet_vertices
 
 
-def tetrahedron_volume(tetrahedrons):
+def tetrahedron_volume(tet_vertices):
     r"""Compute the volume of tetrahedrons.
 
     Args:
-        tetrahedrons (torch.Tensor): Batched tetrahedrons of shape :math:`(\text{batch_size}, \text{num_tetrahedrons}, 4, 3)`.
+        tet_vertices (torch.Tensor):
+            Batched tetrahedrons, of shape
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 4, 3)`.
     Returns:
-        (torch.Tensor): volume of each tetrahedron in each mesh.
-        The shape of the output is :math:`(\text{batch_size}, \text{num_tetrahedrons})`.
+        (torch.Tensor):
+            volume of each tetrahedron in each mesh, of shape
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons})`.
 
     Example:
-        >>> tetrahedrons = torch.tensor([[[[0.5000, 0.5000, 0.4500],
+        >>> tet_vertices = torch.tensor([[[[0.5000, 0.5000, 0.4500],
         ...                                [0.4500, 0.5000, 0.5000],
         ...                                [0.4750, 0.4500, 0.4500],
         ...                                [0.5000, 0.5000, 0.5000]]]])
-        >>> tetrahedron_volume(tetrahedrons)
+        >>> tetrahedron_volume(tet_vertices)
         tensor([[2.0833e-05]])
     """
-    _validate_tetrahedrons(tetrahedrons)
+    _validate_tet_vertices(tet_vertices)
 
     # split the tensor
-    A, B, C, D = [split.squeeze(2) for split in torch.split(tetrahedrons, split_size_or_sections=1, dim=2)]
+    A, B, C, D = [split.squeeze(2) for split in
+                  torch.split(tet_vertices, split_size_or_sections=1, dim=2)]
 
     # compute the volume of each tetrahedron directly by using V = |(a - d) * ((b - d) x (c - d))| / 6
-    volumes = torch.div(torch.abs(((A - D) * torch.cross(input=(B - D), other=(C - D), dim=2)).sum(dim=2)), 6)
+    volumes = torch.div(
+        torch.abs(((A - D) * torch.cross(input=(B - D), other=(C - D), dim=2)).sum(dim=2)), 6)
 
     return volumes
 
-
-def equivolume(tetrahedrons, tetrahedrons_mean=None, pow=4):
+def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
     r"""Compute the EquiVolume loss as devised by *Gao et al.* in `Learning Deformable Tetrahedral Meshes for 3D
     Reconstruction <https://nv-tlabs.github.io/DefTet/>`_ NeurIPS 2020.
     See `supplementary material <https://nv-tlabs.github.io/DefTet/files/supplement.pdf>`_ for the definition of the loss function.
 
     Args:
-        tetrahedrons (torch.Tensor): Batched tetrahedrons of shape :math:`(\text{batch_size}, \text{num_tetrahedrons}, 4, 3)`.
-        tetrahedrons_mean (torch.FloatTensor): Mean volume of all tetrahedrons in a grid of shape :math:`(1, 1)`.
-        pow (int): Power for the equivolume loss. Increasing power puts more emphasis on the larger 
-        tetrahedron deformation. The default value for `pow` is 4.
+        tet_vertices (torch.Tensor):
+            Batched tetrahedrons, of shape
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 4, 3)`.
+        tetrahedrons_mean (torch.Tensor):
+            Mean volume of all tetrahedrons in a grid, of shape :math:`(1, 1)`.
+        pow (int):
+            Power for the equivolume loss.
+            Increasing power puts more emphasis on the larger tetrahedron deformation.
+            Default: 4.
+
     Returns:
-        (torch.Tensor): EquiVolume loss for each mesh. The output is of shape :math:`(\text{batch_size}, 1)`.
+        (torch.Tensor):
+            EquiVolume loss for each mesh, of shape :math:`(\\text{batch_size})`.
 
     Example:
-        >>> tetrahedrons = torch.tensor([[[[0.5000, 0.5000, 0.7500],
+        >>> tet_vertices = torch.tensor([[[[0.5000, 0.5000, 0.7500],
         ...                                [0.4500, 0.8000, 0.6000],
         ...                                [0.4750, 0.4500, 0.2500],
         ...                                [0.5000, 0.3000, 0.3000]],
-        ...                                [[0.4750, 0.4500, 0.2500],
+        ...                               [[0.4750, 0.4500, 0.2500],
         ...                                [0.5000, 0.9000, 0.3000],
         ...                                [0.4500, 0.4000, 0.9000],
         ...                                [0.4500, 0.4500, 0.7000]]],
@@ -71,30 +82,32 @@ def equivolume(tetrahedrons, tetrahedrons_mean=None, pow=4):
         ...                                [0.4800, 0.2000, 0.3000],
         ...                                [0.9000, 0.4500, 0.4500],
         ...                                [0.2000, 0.5000, 0.1000]],
-        ...                                [[0.3750, 0.4500, 0.2500],
+        ...                               [[0.3750, 0.4500, 0.2500],
         ...                                [0.9000, 0.8000, 0.7000],
         ...                                [0.6000, 0.9000, 0.3000],
         ...                                [0.5500, 0.3500, 0.9000]]]])
-        >>> equivolume(tetrahedrons, pow=4)
+        >>> equivolume(tet_vertices, pow=4)
         tensor([[2.2898e-15],
                 [2.9661e-10]])
     """
-    _validate_tetrahedrons(tetrahedrons)
+    _validate_tet_vertices(tet_vertices)
 
     # compute the volume of each tetrahedron
-    volumes = tetrahedron_volume(tetrahedrons)
+    volumes = tetrahedron_volume(tet_vertices)
 
     if tetrahedrons_mean is None:
         # finding the mean volume of all tetrahedrons in the tetrahedron grid
         tetrahedrons_mean = torch.mean(volumes, dim=-1, keepdim=True)
 
     # compute EquiVolume loss
-    equivolume_loss = torch.mean(torch.pow(torch.abs(volumes - tetrahedrons_mean), exponent=pow), dim=-1, keepdim=True)
+    equivolume_loss = torch.mean(torch.pow(
+        torch.abs(volumes - tetrahedrons_mean), exponent=pow),
+        dim=-1, keepdim=True)
 
     return equivolume_loss
 
 
-def amips(tetrahedrons, inverse_offset_matrix):
+def amips(tet_vertices, inverse_offset_matrix):
     r"""Compute the AMIPS (Advanced MIPS) loss as devised by *Fu et al.* in
     `Computing Locally Injective Mappings by Advanced MIPS. \
     <https://www.microsoft.com/en-us/research/publication/computing-locally-injective-mappings-advanced-mips/>`_
@@ -106,15 +119,18 @@ def amips(tetrahedrons, inverse_offset_matrix):
     This is because the AMIPS Loss is only defined for tetrahedrons whose determinant of the Jacobian is positive.
 
     Args:
-        tetrahedrons (torch.Tensor): Batched tetrahedrons of shape :math:`(\text{batch_size}, \text{num_tetrahedrons}, 4, 3)`.
+        tet_vertices (torch.Tensor):
+            Batched tetrahedrons, of shape
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 4, 3)`.
         inverse_offset_matrix (torch.LongTensor): The inverse of the offset matrix is of shape
-            :math:`(\text{batch_size}, \text{num_tetrahedrons}, 3, 3)`. Refer to
-            :func:`kaolin.ops.mesh.tetmesh.inverse_vertices_offset`.
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 3, 3)`.
+            Refer to :func:`kaolin.ops.mesh.tetmesh.inverse_vertices_offset`.
     Returns:
-        (torch.Tensor): AMIPS loss for each mesh. The output is of shape :math:`(\text{batch_size}, 1)`.
+        (torch.Tensor):
+            AMIPS loss for each mesh, of shape :math:`(\\text{batch_size})`.
 
     Example:
-        >>> tetrahedrons = torch.tensor([[[[1.7000, 2.3000, 4.4500],
+        >>> tet_vertices = torch.tensor([[[[1.7000, 2.3000, 4.4500],
         ...                                [3.4800, 0.2000, 5.3000],
         ...                                [4.9000, 9.4500, 6.4500],
         ...                                [6.2000, 8.5000, 7.1000]],
@@ -142,34 +158,35 @@ def amips(tetrahedrons, inverse_offset_matrix):
         ...                                        [[-1.1077, -1.2441,  1.8037],
         ...                                         [-0.5722, 0.1755, -2.4364],
         ...                                         [-0.5263,  1.5765,  1.5607]]]])
-        >>> amips(tetrahedrons, inverse_offset_matrix)
+        >>> amips(tet_vertices, inverse_offset_matrix)
         tensor([[13042.3408],
                 [ 2376.2517]])
     """
-    _validate_tetrahedrons(tetrahedrons)
+    _validate_tet_vertices(tet_vertices)
 
     # split the tensor
-    A, B, C, D = torch.split(tetrahedrons, split_size_or_sections=1, dim=2)
+    A, B, C, D = torch.split(tet_vertices, split_size_or_sections=1, dim=2)
 
     # compute the offset matrix of the tetrahedrons w.r.t. vertex A.
     offset_matrix = torch.cat([B - A, C - A, D - A], dim=2)
 
     # compute the Jacobian for each tetrahedron - the Jacobian represents the unique 3D deformation that transforms the
     # tetrahedron t into a regular tetrahedron.
-    Jacobian = torch.matmul(offset_matrix, inverse_offset_matrix)
+    jacobian = torch.matmul(offset_matrix, inverse_offset_matrix)
 
     # compute determinant of Jacobian
-    J_det = torch.det(Jacobian)
+    j_det = torch.det(jacobian)
 
     # compute the trace of J * J.T
-    Jacobian_squared = torch.matmul(Jacobian, torch.transpose(Jacobian, -2, -1))
-    trace = torch.diagonal(Jacobian_squared, dim1=-2, dim2=-1).sum(-1)
+    jacobian_squared = torch.matmul(jacobian, torch.transpose(jacobian, -2, -1))
+    trace = torch.diagonal(jacobian_squared, dim1=-2, dim2=-1).sum(-1)
 
     # compute the determinant of the Jacobian to the 2/3
     EPS = 1e-10
-    denominator = torch.pow(torch.pow(J_det, 2) + EPS, 1 / 3)
+    denominator = torch.pow(torch.pow(j_det, 2) + EPS, 1 / 3)
 
     # compute amips energy for positive tetrahedrons whose determinant of their Jacobian is positive
-    amips_energy = torch.mean(torch.div(trace, denominator) * (J_det >= 0).float(), dim=1, keepdim=True)
+    amips_energy = torch.mean(torch.div(trace, denominator) * (j_det >= 0).float(),
+                              dim=1, keepdim=True)
 
     return amips_energy
