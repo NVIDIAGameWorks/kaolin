@@ -262,7 +262,7 @@ def cumprod(feats, boundaries, exclusive=False, reverse=False):
     """
     return Cumprod.apply(feats.contiguous(), boundaries.contiguous(), exclusive, reverse)
 
-def exponential_integration(feats, tau, boundaries, exclusive=False):
+def exponential_integration(feats, tau, boundaries, exclusive=True):
     r"""Exponential transmittance integration across packs using the optical thickness (tau).
 
     Exponential transmittance is derived from the Beer-Lambert law. Typical implementations of
@@ -278,7 +278,7 @@ def exponential_integration(feats, tau, boundaries, exclusive=False):
         boundaries (torch.BoolTensor): bools of shape :math:`(\text{num_rays})`.
             Given some index array marking the pack IDs, the boundaries can be calculated with
             :func:`mark_pack_boundaries`.
-        exclusive (bool): Compute exclusive exponential integration if true.
+        exclusive (bool): Compute exclusive exponential integration if true. (default: True)
 
     Returns:
         (torch.FloatTensor, torch.FloatTensor)
