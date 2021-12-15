@@ -25,7 +25,7 @@ class TestTetMeshMetrics:
                                        [0.4500, 0.5000, 0.5000],
                                        [0.4750, 0.4500, 0.4500],
                                        [0.5000, 0.5000, 0.5000]]]])
-        assert torch.allclose(tetmesh.tetrahedron_volume(tetrahedrons), torch.tensor([[2.0833e-05]]))
+        assert torch.allclose(tetmesh.tetrahedron_volume(tetrahedrons), torch.tensor([[-2.0833e-05]]))
 
     def test_amips(self):
         tetrahedrons = torch.tensor([[[

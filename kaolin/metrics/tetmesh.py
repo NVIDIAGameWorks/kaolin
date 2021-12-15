@@ -45,7 +45,7 @@ def tetrahedron_volume(tet_vertices):
 
     # compute the volume of each tetrahedron directly by using V = |(a - d) * ((b - d) x (c - d))| / 6
     volumes = torch.div(
-        torch.abs(((A - D) * torch.cross(input=(B - D), other=(C - D), dim=2)).sum(dim=2)), 6)
+        ((A - D) * torch.cross(input=(B - D), other=(C - D), dim=2)).sum(dim=2), 6)
 
     return volumes
 
