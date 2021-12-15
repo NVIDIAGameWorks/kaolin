@@ -46,7 +46,7 @@ uint raytrace_cuda_impl(
     bool return_depth,
     bool with_exit);
 
-void mark_pack_boundary_cuda_impl(
+void mark_pack_boundaries_cuda_impl(
     at::Tensor pack_ids,
     at::Tensor boundaries);
 
@@ -230,7 +230,7 @@ std::vector<at::Tensor> raytrace_cuda(
 #endif  // WITH_CUDA
 }
 
-at::Tensor mark_pack_boundary_cuda(
+at::Tensor mark_pack_boundaries_cuda(
     at::Tensor pack_ids) {
 #ifdef WITH_CUDA
   at::TensorArg pack_ids_arg{pack_ids, "pack_ids", 1};
@@ -240,7 +240,7 @@ at::Tensor mark_pack_boundary_cuda(
   at::checkScalarTypes(__func__, pack_ids_arg, {at::kByte, at::kChar, at::kInt, at::kLong, at::kShort});
   int num_ids = pack_ids.size(0);
   at::Tensor boundaries = at::zeros({num_ids}, pack_ids.options().dtype(at::kInt));
-  mark_pack_boundary_cuda_impl(pack_ids, boundaries);
+  mark_pack_boundaries_cuda_impl(pack_ids, boundaries);
   return boundaries;
 #else
   KAOLIN_NO_CUDA_ERROR(__func__);

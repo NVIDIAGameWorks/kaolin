@@ -249,7 +249,7 @@ To apply ray tracing we currently only support non-batched version, for instance
 >>> point_hierarchy = kaolin.ops.spc.generate_points(octrees, pyramids, exsum)
 >>> ridx, pidx, depth = kaolin.render.spc.unbatched_raytrace(octree, point_hierarchy, pyramids[0], exsum,
 ...                                                          origin, direction, max_level)
->>> first_hits_mask = kaolin.render.spc.mark_pack_boundary(ridx)
+>>> first_hits_mask = kaolin.render.spc.mark_pack_boundaries(ridx)
 >>> first_hits_point = pidx[first_hits_mask]
 >>> first_hits_rgb = rgb[first_hits_point - pyramids[max_level - 2]]
 
