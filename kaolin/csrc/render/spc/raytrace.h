@@ -45,7 +45,7 @@ std::vector<at::Tensor> raytrace_cuda(
     bool with_exit);
 
 
-at::Tensor mark_pack_boundary_cuda(
+at::Tensor mark_pack_boundaries_cuda(
     at::Tensor pack_ids);
 
 std::vector<at::Tensor> generate_shadow_rays_cuda(
