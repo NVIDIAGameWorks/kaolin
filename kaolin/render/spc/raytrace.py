@@ -19,7 +19,7 @@ import torch
 
 __all__ = [
     'unbatched_raytrace',
-    'mark_pack_boundary',
+    'mark_pack_boundaries',
     'mark_first_hit',
     'diff',
     'sum_reduce',
@@ -83,7 +83,7 @@ def unbatched_raytrace(octree, point_hierarchy, pyramid, exsum, origin, directio
     else:
         return ray_index, point_index
 
-def mark_pack_boundary(pack_ids):
+def mark_pack_boundaries(pack_ids):
     r"""Mark the boundaries of pack IDs.
 
     Pack IDs are sorted tensors which mark the ID of the pack each element belongs in.
@@ -99,17 +99,17 @@ def mark_pack_boundary(pack_ids):
         first_hits (torch.BoolTensor): the boolean mask marking the boundaries.
 
     Examples:
-        >>> pack_ids = torch.IntTensor([1,1,1,1,2,2,2])
-        >>> mark_pack_boundary(pack_ids)
-        tensor([1,0,0,0,1,0,0])
+        >>> pack_ids = torch.IntTensor([1,1,1,1,2,2,2]).to('cuda:0')
+        >>> mark_pack_boundaries(pack_ids)
+        tensor([ True, False, False, False,  True, False, False], device='cuda:0')
     """
-    return _C.render.spc.mark_pack_boundary_cuda(pack_ids.contiguous()).bool()
+    return _C.render.spc.mark_pack_boundaries_cuda(pack_ids.contiguous()).bool()
 
 def mark_first_hit(ridx):
     r"""Mark the first hit in the nuggets.
 
     .. deprecated:: 0.10.0
-       This function is deprecated. Use :func:`mark_pack_boundary`.
+       This function is deprecated. Use :func:`mark_pack_boundaries`.
 
     The nuggets are a packed tensor containing correspondences from ray index to point index, sorted
     within each ray pack by depth. This will mark true for each first hit (by depth) for a pack of
@@ -118,8 +118,8 @@ def mark_first_hit(ridx):
     Returns:
         first_hits (torch.BoolTensor): the boolean mask marking the first hit by depth.
     """
-    warnings.warn("mark_first_hit has been deprecated, please use mark_pack_boundary instead")
-    return mark_pack_boundary(ridx)
+    warnings.warn("mark_first_hit has been deprecated, please use mark_pack_boundaries instead")
+    return mark_pack_boundaries(ridx)
 
 def diff(feats, boundaries):
     r"""Find the delta between each of the features in a pack.

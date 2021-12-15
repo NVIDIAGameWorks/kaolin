@@ -18,7 +18,7 @@ import torch
 
 from kaolin.ops.spc import scan_octrees, generate_points, bits_to_uint8
 
-from kaolin.render.spc import unbatched_raytrace, mark_pack_boundary
+from kaolin.render.spc import unbatched_raytrace, mark_pack_boundaries
 
 class TestRaytrace:
     @pytest.fixture(autouse=True)
@@ -275,7 +275,7 @@ class TestRaytrace:
         origin = self._generate_rays_origin(height, width, -3)
         ridx, pidx = unbatched_raytrace(
             octree, point_hierarchy, pyramid, exsum, origin, direction, 2, return_depth=False)
-        first_hits = mark_pack_boundary(ridx)
+        first_hits = mark_pack_boundaries(ridx)
         expected_first_hits = torch.tensor([1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0],
                                            device='cuda', dtype=torch.bool)
         assert torch.equal(first_hits, expected_first_hits)
@@ -288,7 +288,7 @@ class TestRaytrace:
         origin = self._generate_rays_origin(height, width, 3)
         ridx, pidx = unbatched_raytrace(
             octree, point_hierarchy, pyramid, exsum, origin, direction, 2, return_depth=False)
-        first_hits = mark_pack_boundary(ridx)
+        first_hits = mark_pack_boundaries(ridx)
         expected_first_hits = torch.tensor([1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0],
                                            device='cuda', dtype=torch.bool)
         assert torch.equal(first_hits, expected_first_hits)
