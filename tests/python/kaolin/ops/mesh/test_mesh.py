@@ -25,7 +25,8 @@ from kaolin.ops import mesh
 from kaolin.ops.mesh.trianglemesh import _unbatched_subdivide_vertices
 from kaolin.io import obj
 
-ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../samples/')
+ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        os.pardir, os.pardir, os.pardir, os.pardir, 'samples/')
 
 @pytest.mark.parametrize("device,dtype", FLOAT_TYPES)
 class TestFaceAreas:
