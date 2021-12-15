@@ -51,12 +51,12 @@ class TestRaytrace:
         boundary = torch.tensor([1,0,1,0,0,1], device='cuda', dtype=torch.bool)
         return boundary
 
-    def test_mark_pack_boundary(self):
+    def test_mark_pack_boundaries(self):
         ridx = torch.tensor([1,1,1,1,2,2,3,3,3], device='cuda', dtype=torch.int)
         
         expected_boundary = torch.tensor([1,0,0,0,1,0,1,0,0], device='cuda', dtype=torch.bool)
 
-        output = spc_render.mark_pack_boundary(ridx)
+        output = spc_render.mark_pack_boundaries(ridx)
 
         assert torch.equal(output, expected_boundary)
 
@@ -161,7 +161,7 @@ class TestRaytrace:
     
     def test_cumprod_big_backward(self, feats_big, boundaries_big):
 
-        feats_big += 1e-7
+        feats_big += 1e-3
         feats_big.requires_grad = True
         fdim = feats_big.shape[-1]
 
@@ -181,7 +181,7 @@ class TestRaytrace:
         loss.backward()
         grad1 = feats_big.grad.clone()
     
-        assert torch.allclose(grad0, grad1)
+        assert torch.allclose(grad0, grad1, atol=1e-2)
 
     def test_cumprod_reverse(self, feats, boundaries):
         cumprod = spc_render.cumprod(feats, boundaries, reverse=True)

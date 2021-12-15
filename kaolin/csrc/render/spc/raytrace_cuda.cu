@@ -551,10 +551,10 @@ void mark_pack_boundaries_cuda_impl(
     at::Tensor pack_ids,
     at::Tensor boundaries) {
     int64_t num = pack_ids.size(0);
-    AT_DISPATCH_INTEGRAL_TYPES(pack_ids.type(), "mark_pack_boundary_cuda", ([&] {
+    AT_DISPATCH_INTEGRAL_TYPES(pack_ids.type(), "mark_pack_boundaries_cuda", ([&] {
         const at::cuda::OptionalCUDAGuard device_guard(at::device_of(boundaries));
         auto stream = at::cuda::getCurrentCUDAStream();
-        mark_pack_boundary_cuda_kernel<<<(num + 1023) / 1024, 1024, 0, stream>>>(
+        mark_pack_boundaries_cuda_kernel<<<(num + 1023) / 1024, 1024, 0, stream>>>(
             num,
             pack_ids.data_ptr<scalar_t>(),
             reinterpret_cast<uint*>(boundaries.data_ptr<int>()));
