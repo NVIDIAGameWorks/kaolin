@@ -199,7 +199,7 @@ class TestRaytrace:
         assert torch.equal(cumprod, expected)
        
     def test_exponential_integration(self, feats, tau, boundaries):
-        integrated_feats, transmittance = spc_render.exponential_integration(feats, tau, boundaries)
+        integrated_feats, transmittance = spc_render.exponential_integration(feats, tau, boundaries, exclusive=False)
         expected_feats = torch.tensor([[0,0], [0.4651,0.4651], [1.1627, 1.1627]], device='cuda', dtype=torch.float)
         expected_transmittance = torch.tensor([[0.0],[0.0],[0.0],[0.2325],[0.0],[0.2325]], device='cuda', dtype=torch.float)
         assert torch.allclose(integrated_feats, expected_feats, atol=1e-4)
