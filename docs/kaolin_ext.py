@@ -1,5 +1,5 @@
 # Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -36,6 +36,7 @@ def run_apidoc(_):
             "kaolin/ops/conversions/tetmesh.py",
             "kaolin/ops/mesh/check_sign.py",
             "kaolin/ops/mesh/mesh.py",
+            "kaolin/ops/mesh/tetmesh.py",
             "kaolin/ops/mesh/trianglemesh.py",
             "kaolin/ops/spc/spc.py",
             "kaolin/ops/spc/convolution.py",
