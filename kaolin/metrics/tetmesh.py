@@ -23,11 +23,11 @@ def tetrahedron_volume(tet_vertices):
     Args:
         tet_vertices (torch.Tensor):
             Batched tetrahedrons, of shape
-            :math:`(\text{batch_size}, \text{num_tetrahedrons}, 4, 3)`.
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 4, 3)`.
     Returns:
         (torch.Tensor):
             volume of each tetrahedron in each mesh, of shape
-            :math:`(\text{batch_size}, \text{num_tetrahedrons})`.
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons})`.
 
     Example:
         >>> tet_vertices = torch.tensor([[[[0.5000, 0.5000, 0.4500],
@@ -35,7 +35,7 @@ def tetrahedron_volume(tet_vertices):
         ...                                [0.4750, 0.4500, 0.4500],
         ...                                [0.5000, 0.5000, 0.5000]]]])
         >>> tetrahedron_volume(tet_vertices)
-        tensor([[-2.0833e-05]])
+        tensor([[2.0833e-05]])
     """
     _validate_tet_vertices(tet_vertices)
 
@@ -57,11 +57,9 @@ def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
     Args:
         tet_vertices (torch.Tensor):
             Batched tetrahedrons, of shape
-            :math:`(\text{batch_size}, \text{num_tetrahedrons}, 4, 3)`.
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 4, 3)`.
         tetrahedrons_mean (torch.Tensor):
-            Mean volume of all tetrahedrons in a grid,
-            of shape :math:`(\text{batch_size})` or :math:`(1,)` (broadcasting).
-            Default: Compute ``torch.mean(tet_vertices, dim=-1)``.
+            Mean volume of all tetrahedrons in a grid, of shape :math:`(1, 1)`.
         pow (int):
             Power for the equivolume loss.
             Increasing power puts more emphasis on the larger tetrahedron deformation.
@@ -69,7 +67,7 @@ def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
 
     Returns:
         (torch.Tensor):
-            EquiVolume loss for each mesh, of shape :math:`(\text{batch_size})`.
+            EquiVolume loss for each mesh, of shape :math:`(\\text{batch_size})`.
 
     Example:
         >>> tet_vertices = torch.tensor([[[[0.5000, 0.5000, 0.7500],
@@ -89,8 +87,8 @@ def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
         ...                                [0.6000, 0.9000, 0.3000],
         ...                                [0.5500, 0.3500, 0.9000]]]])
         >>> equivolume(tet_vertices, pow=4)
-        tensor([[2.2961e-10],
-                [7.7704e-10]])
+        tensor([[2.2898e-15],
+                [2.9661e-10]])
     """
     _validate_tet_vertices(tet_vertices)
 
@@ -99,8 +97,8 @@ def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
 
     if tetrahedrons_mean is None:
         # finding the mean volume of all tetrahedrons in the tetrahedron grid
-        tetrahedrons_mean = torch.mean(volumes, dim=-1)
-    tetrahedrons_mean = tetrahedrons_mean.reshape(1, -1)
+        tetrahedrons_mean = torch.mean(volumes, dim=-1, keepdim=True)
+
     # compute EquiVolume loss
     equivolume_loss = torch.mean(torch.pow(
         torch.abs(volumes - tetrahedrons_mean), exponent=pow),
@@ -123,14 +121,13 @@ def amips(tet_vertices, inverse_offset_matrix):
     Args:
         tet_vertices (torch.Tensor):
             Batched tetrahedrons, of shape
-            :math:`(\text{batch_size}, \text{num_tetrahedrons}, 4, 3)`.
-        inverse_offset_matrix (torch.LongTensor):
-            The inverse of the offset matrix is of shape
-            :math:`(\text{batch_size}, \text{num_tetrahedrons}, 3, 3)`.
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 4, 3)`.
+        inverse_offset_matrix (torch.LongTensor): The inverse of the offset matrix is of shape
+            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 3, 3)`.
             Refer to :func:`kaolin.ops.mesh.tetmesh.inverse_vertices_offset`.
     Returns:
         (torch.Tensor):
-            AMIPS loss for each mesh, of shape :math:`(\text{batch_size})`.
+            AMIPS loss for each mesh, of shape :math:`(\\text{batch_size})`.
 
     Example:
         >>> tet_vertices = torch.tensor([[[[1.7000, 2.3000, 4.4500],
