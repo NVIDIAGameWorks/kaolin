@@ -145,20 +145,20 @@ def unbatched_pointcloud_to_spc(pointcloud, level, features=None):
     and coverts it into a :ref:`Structured Point Cloud (SPC)<spc>`, a compressed octree representation where
     the point cloud coordinates are quantized to integer coordinates.
 
-    Point coordinates are expected to be normalized to the range :math:`[-1, 1]`.
-    If a point is out of the range :math:`[-1, 1]` it will be clipped to it.
+    Point coordinates are expected to be normalized to the range [-1, 1].
+    If a point is out of the range [-1, 1] it will be clipped to it.
 
     If ``features`` are specified, the current implementation will average features
     of points that inhabit the same quantized bucket.
 
     Args:
         pointclouds (torch.Tensor):
-            An unbatched pointcloud, of shape :math:`(\text{num_points}, 3)`.
-            Coordinates are expected to be normalized to the range :math:`[-1, 1]`.
+            An unbatched pointcloud with shape :math:`(\text{num_points}, 3)`.
+            Coordinates are expected to be normalized to the range [-1, 1].
         level (int):
             Maximum number of levels to use in octree hierarchy.
-        features (optional, torch.Tensor):
-            Feature vector containing information per point, of shape
+        features (torch.Tensor, optional):
+            Feature vector containing information per point
             :math:`(\text{num_points}, \text{feat_dim})`.
 
     Returns:
