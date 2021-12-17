@@ -86,4 +86,4 @@ class TestPoints:
             w[:, 0] * w[:, 1] * (1 - w[:, 2]),
             w[:, 0] * w[:, 1] * w[:, 2]
         ], dim=-1)
-        assert torch.allclose(coords_to_trilinear(x, points), expected_coeffs)
+        assert torch.allclose(coords_to_trilinear(x, points), expected_coeffs, atol=1e-5)
