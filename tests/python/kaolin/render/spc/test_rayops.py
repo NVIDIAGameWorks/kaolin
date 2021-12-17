@@ -74,7 +74,7 @@ class TestRaytrace:
         fdim = feats_big.shape[-1]
         sum_reduce = spc_render.sum_reduce(feats_big.reshape(-1, fdim), boundaries_big)
         expected = feats_big.sum(1)
-        assert torch.allclose(sum_reduce, expected)
+        assert torch.allclose(sum_reduce, expected, atol=1e-5)
     
     def test_sum_reduce_big_backward(self, feats_big, boundaries_big):
 
@@ -97,7 +97,7 @@ class TestRaytrace:
         loss.backward()
         grad1 = feats_big.grad.clone()
 
-        assert torch.allclose(grad0, grad1)
+        assert torch.allclose(grad0, grad1, atol=1e-5)
 
     def test_cumsum(self, feats, boundaries):
         cumsum = spc_render.cumsum(feats, boundaries)
@@ -108,7 +108,7 @@ class TestRaytrace:
         fdim = feats_big.shape[-1]
         cumsum = spc_render.cumsum(feats_big.reshape(-1, fdim), boundaries_big)
         expected = torch.cumsum(feats_big, dim=1).reshape(-1, fdim)
-        assert torch.allclose(cumsum, expected)
+        assert torch.allclose(cumsum, expected, atol=1e-5)
 
     def test_cumsum_big_backward(self, feats_big, boundaries_big):
 
@@ -131,7 +131,7 @@ class TestRaytrace:
         loss.backward()
         grad1 = feats_big.grad.clone()
 
-        assert torch.allclose(grad0, grad1)
+        assert torch.allclose(grad0, grad1, atol=1e-4)
 
     def test_cumsum_reverse(self, feats, boundaries):
         cumsum = spc_render.cumsum(feats, boundaries, reverse=True)
@@ -157,7 +157,7 @@ class TestRaytrace:
         fdim = feats_big.shape[-1]
         cumprod = spc_render.cumprod(feats_big.reshape(-1, fdim), boundaries_big)
         expected = torch.cumprod(feats_big, dim=1).reshape(-1, fdim)
-        assert torch.allclose(cumprod, expected)
+        assert torch.allclose(cumprod, expected, atol=1e-4)
     
     def test_cumprod_big_backward(self, feats_big, boundaries_big):
 
