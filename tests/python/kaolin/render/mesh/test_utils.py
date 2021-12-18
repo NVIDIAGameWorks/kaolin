@@ -70,8 +70,9 @@ class TestTextureMapping:
 
     @pytest.mark.parametrize('mode', ['nearest', 'bilinear'])
     def test_sparse_3d_texture_mapping(self, sparse_coords_batch, texture_map_3d, mode):
-        interop = texture_mapping(texture_coordinates=sparse_coords_batch, texture_maps=texture_map_3d, mode=mode)
-
+        interop = texture_mapping(texture_coordinates=sparse_coords_batch,
+                                  texture_maps=texture_map_3d,
+                                  mode=mode)
         if mode == 'nearest':
             expected_d1 = torch.tensor([[41, 15, 11, 33], [133, 111, 115, 141]])
             expected_d2 = -torch.tensor([[41, 15, 11, 33], [133, 111, 115, 141]])
@@ -87,21 +88,18 @@ class TestTextureMapping:
         assert torch.equal(interop, expected)
 
     @pytest.mark.parametrize('mode', ['nearest', 'bilinear'])
-    def test_dense_3d_texture_mapping(self, dense_coords_batch, texture_map_3d, mode):
+    def test_dense_3d_texture_mapping(self, dense_coords_batch, texture_map_3d,
+                                      mode, device, dtype):
         interop = texture_mapping(texture_coordinates=dense_coords_batch, texture_maps=texture_map_3d, mode=mode)
 
         if mode == 'nearest':
-            expected_d1 = torch.tensor([[41, 42, 43, 44, 45], [41, 42, 43, 44, 45]])
-            expected_d2 = -torch.tensor([[41, 42, 43, 44, 45], [41, 42, 43, 44, 45]])
-            expected_d3 = torch.tensor([[41, 42, 43, 44, 45], [41, 42, 43, 44, 45]])
+            expected_base = torch.tensor([41., 42., 43., 44., 45.],
+                                         device=device, dtype=dtype)
         elif mode == 'bilinear':
-            expected_d1 = torch.tensor([[41, 42, 43, 44, 45], [37.2500, 38.2500, 39.2500, 40.2500, 41.2500]])
-            expected_d2 = -torch.tensor([[41, 42, 43, 44, 45], [37.2500, 38.2500, 39.2500, 40.2500, 41.2500]])
-            expected_d3 = torch.tensor([[41, 42, 43, 44, 45], [37.2500, 38.2500, 39.2500, 40.2500, 41.2500]])
-        expected_entry1 = torch.stack([expected_d1, expected_d2, expected_d3], dim=-1)
-        expected_entry2 = torch.flip(torch.stack([expected_d1 + 100, expected_d2 - 100, expected_d3 + 100], dim=-1),
-                                     dims=(0,))
-        expected = torch.stack([expected_entry1, expected_entry2], dim=0)
-        expected = expected.to(texture_map_3d.device).type(texture_map_3d.dtype)
-        assert check_tensor(interop, shape=(2,2,5,3), dtype=texture_map_3d.dtype)
+            expected_base = torch.tensor([41., 41.75, 43., 44.25, 45.],
+                                         device=device, dtype=dtype)
+        expected = torch.stack([expected_base, expected_base + 100], dim=0)
+        expected = torch.stack([expected, -expected, expected],
+                               dim=-1).reshape(2, 1, -1, 3).repeat(1, 2, 1, 1)
+
         assert torch.equal(interop, expected)
