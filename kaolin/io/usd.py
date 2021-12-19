@@ -1,4 +1,4 @@
-# Copyright (c) 2019, 20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -890,13 +890,14 @@ def import_pointclouds(file_path, scene_paths=None, times=None):
 
 
 def get_pointcloud_bracketing_time_samples(stage, scene_path, target_time):
-    """Returns two time samples that bracket target_time for point cloud attributes at a specified
-    scene_path.
+    """Returns two time samples that bracket ``target_time`` for point cloud
+    attributes at a specified scene_path.
 
     Args:
         stage (Usd.Stage)
         scene_path (str)
         target_time (Number)
+
     Returns:
         (iterable of 2 numbers)
     """

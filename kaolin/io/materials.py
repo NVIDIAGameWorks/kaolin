@@ -1,4 +1,4 @@
-# Copyright (c) 2019, 20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -251,6 +251,9 @@ class PBRMaterial(Material):
             in a metallic workflow) in the range of `(0.0, 0.0, 0.0)` to `(1.0, 1.0, 1.0)`. Default value is grey
             `(0.5, 0.5, 0.5)`.
         roughness_value (float): Roughness value of specular lobe in range `0.0` to `1.0`. Default value is `0.5`.
+        metallic_value (float):
+            Metallic value, typically set to `0.0` for non-metallic and `1.0` for metallic materials. 
+            Ignored if `is_specular_workflow` is `True`. Default value is `0.0`.
         clearcoat_value (float): Second specular lobe amount. Color is hardcoded to white. Default value is `0.0`.
         clearcoat_roughness_value (float): Roughness for the clearcoat specular lobe in the range `0.0` to `1.0`.
             The default value is `0.01`.
@@ -300,7 +303,6 @@ class PBRMaterial(Material):
         displacement_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw].
             Default is 'auto'.
     """
-
     def __init__(
         self,
         diffuse_color=(0.5, 0.5, 0.5),
@@ -384,13 +386,13 @@ class PBRMaterial(Material):
         Args:
             file_path (str): Path to usd file (\*.usd, \*.usda).
             scene_path (str): Absolute path of material within the USD file scene. Must be a valid ``Sdf.Path``.
-            shader (str, optional): Name of shader to write. If not provided, use UsdPreviewSurface.
             bound_prims (list of Usd.Prim, optional): If provided, bind material to each prim.
             time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
                 correspond to.
             texture_dir (str, optional): Subdirectory to store texture files. If not provided, texture files will be
                 saved in the same directory as the USD file specified by `file_path`.
             texture_file_prefix (str, optional): String to be prepended to the filename of each texture file.
+            shader (str, optional): Name of shader to write. If not provided, use UsdPreviewSurface.
         """
         assert os.path.splitext(file_path)[1] in ['.usd', '.usda'], f'Invalid file path "{file_path}".'
         assert shader in self.shaders, f'Shader {shader} is not support. Choose from {list(self.shaders.keys())}.'

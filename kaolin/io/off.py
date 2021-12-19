@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21, NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +17,9 @@ from collections import namedtuple
 
 import torch
 
+__all__ = [
+    'import_mesh'
+]
 
 return_type = namedtuple('return_type',
                          ['vertices', 'faces', 'face_colors'])
@@ -32,11 +35,13 @@ def import_mesh(path, with_face_colors=False):
         with_face_colors (bool): if True, load face colors. Default: False.
 
     Returns:
+        (off.return_type):
+            nametuple of:
 
-    nametuple of:
-        - **vertices** (torch.FloatTensor): of shape (num_vertices, 3)
-        - **faces** (torch.LongTensor): of shape (num_faces, face_size)
-        - **face_colors** (torch.LongTensor): in the range [0, 255], of shape (num_faces, 3).
+            - **vertices** (torch.FloatTensor): of shape :math:`(\text{num_vertices}, 3)`.
+            - **faces** (torch.LongTensor): of shape :math:`(\text{num_faces}, \text{face_size})`.
+            - **face_colors** (torch.LongTensor):
+              in the range :math:`[0, 255]`, of shape :math:`(\text{num_faces}, 3)`.
     """
     vertices = []
     uvs = []

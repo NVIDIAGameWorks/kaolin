@@ -53,7 +53,7 @@ Related attributes:
 Packed
 ~~~~~~
 
-Heterogeneous tensors are reshaped to 2D :math:`(-1, last dimension)` and concantenated on the first axis. This is similar to packed sentences in NLP.
+Heterogeneous tensors are reshaped to 2D :math:`(-1, \text{last_dimension})` and concatenated on the first axis. This is similar to packed sentences in NLP.
 
 .. note::
     The last dimension must always be of the size of the element, e.g. 3 for 3D points (element of point clouds) or 1 for a grayscale pixel (element of grayscale textures).

@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,14 +17,16 @@ import torch
 
 
 def iou(pred, gt):
-    r""" Computes IoU across two voxelgrids
+    r"""Computes IoU across two voxelgrids
 
     Arguments:
-        pred (torch.Tensor): predicted (binary) voxelgrids of shape (N, X, Y, Z)
-        gt (torch.Tensor): ground-truth (binary) voxelgrids of shape (N, X, Y, Z)
+        pred (torch.Tensor): predicted (binary) voxelgrids, of shape
+                             :math:`(\text{batch_size}, \text{X}, \text{Y}, \text{Z})`.
+        gt (torch.Tensor): ground-truth (binary) voxelgrids, of shape
+                           :math:`(\text{batch_size}, \text{X}, \text{Y}, \text{Z})`.
 
     Returns:
-        (torch.FloatTensor): the intersection over union value
+        (torch.FloatTensor): the intersection over union value.
     Example:
         >>> pred = torch.tensor([[[[0., 0.],
         ...                        [1., 1.]],
