@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,44 +22,59 @@ from .. import camera
 from ... import ops
 
 def texture_mapping(texture_coordinates, texture_maps, mode='nearest'):
-    r"""Interpolates texture_maps by texture_coordinates.
-
-    Note that opengl tex coord is different from pytorch's coord.
-    opengl coord ranges from 0 to 1, y axis is from bottom to top
-    and it supports circular mode(-0.1 is the same as 0.9)
-    pytorch coord ranges from -1 to 1, y axis is from top to bottom and does not support circular 
-    filtering is the same as the mode parameter for torch.nn.functional.grid_sample.
+    r"""Interpolates texture_maps by dense or sparse texture_coordinates.
+    This function supports sampling texture coordinates for:
+    1. An entire 2D image
+    2. A sparse point cloud of texture coordinates.
 
     Args:
         texture_coordinates(torch.FloatTensor):
-            image texture coordinate, of shape :math:`(\text{batch_size}, h, w, 2)`
+            dense image texture coordinate, of shape :math:`(\text{batch_size}, h, w, 2)` or
+            sparse texture coordinate for points, of shape :math:`(\text{batch_size}, \text{num_points}, 2)`
+            Coordinates are expected to be normalized between [0, 1].
+            Note that opengl tex coord is different from pytorch's coord.
+            opengl coord ranges from 0 to 1, y axis is from bottom to top
+            and it supports circular mode(-0.1 is the same as 0.9)
+            pytorch coord ranges from -1 to 1, y axis is from top to bottom and does not support circular
+            filtering is the same as the mode parameter for torch.nn.functional.grid_sample.
         texture_maps(torch.FloatTensor):
-            textures, of shape :math:`(\text{batch_size}, 3, h', w')`.
-            Here, h' & w' is the height and width of texture maps
-            while h and w is height and width of rendered image.
-            For each pixel in the rendered image we use the coordinates in the texture_coordinates
-            to query corresponding RGB color in texture maps.
-            h' & w' could be different from h & w
+            textures of shape :math:`(\text{batch_size}, \text{num_channels}, h', w')`.
+            Here, :math:`h'` & :math:`w'` are the height and width of texture maps.
+
+            If ``texture_coordinates`` are image texture coordinates -
+            For each pixel in the rendered image of height we use the coordinates in
+            texture_coordinates to query corresponding value in texture maps.
+            Note that height :math:`h` and width :math:`w` of the rendered image could be different from
+            :math:`h'` & :math:`w'`.
+
+            If ``texture_coordinates`` are sparse texture coordinates -
+            For each point in ``texture_coordinates`` we query the corresponding value in ``texture_maps``.
+
     Returns:
-        (torch.FloatTensor): interpolated texture, of shape :math:`(\text{batch_size}, h, w, 3)`
+        (torch.FloatTensor):
+        interpolated texture of shape :math:`(\text{batch_size}, h, w, \text{num_channels})` or
+        interpolated texture of shape :math:`(\text{batch_size}, \text{num_points}, \text{num_channels})`
     """
+    batch_size = texture_coordinates.shape[0]
+    num_channels = texture_maps.shape[1]
+    _texture_coordinates = texture_coordinates.reshape(batch_size, -1, 1, 2)
+
     # convert coord mode from ogl to pytorch
     # some opengl texture coordinate is larger than 1 or less than 0
     # in opengl it will be normalized by remainder
     # we do the same in pytorch
-    texture_coordinates = torch.clamp(texture_coordinates, 0., 1.)
-    texture_coordinates = texture_coordinates * 2 - 1  # [0, 1] to [-1, 1]
-    texture_coordinates[:, :, :, 1] = -texture_coordinates[:, :, :, 1]  # reverse y
+    _texture_coordinates = torch.clamp(_texture_coordinates, 0., 1.)
+    _texture_coordinates = _texture_coordinates * 2 - 1  # [0, 1] to [-1, 1]
+    _texture_coordinates[:, :, :, 1] = -_texture_coordinates[:, :, :, 1]  # reverse y
 
     # sample
     texture_interpolates = torch.nn.functional.grid_sample(texture_maps,
-                                                           texture_coordinates,
+                                                           _texture_coordinates,
                                                            mode=mode,
-                                                           align_corners=False)
+                                                           align_corners=False,
+                                                           padding_mode='border')
     texture_interpolates = texture_interpolates.permute(0, 2, 3, 1)
-
-    return texture_interpolates
-
+    return texture_interpolates.reshape(batch_size, *texture_coordinates.shape[1:-1], num_channels)
 
 def spherical_harmonic_lighting(imnormal, lights):
     r"""Creates lighting effects.
