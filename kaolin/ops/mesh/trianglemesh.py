@@ -177,13 +177,17 @@ def sample_points(vertices, faces, num_samples, areas=None, face_features=None):
             Per-vertex-per-face features, matching ``faces`` order,
             of shape :math:`(\\text{batch_size}, \\text{num_faces}, 3, \\text{feature_dim})`.
             For example:
-                1. Texture uv coordinates, of shape :math:`(\\text{batch_size}, \\text{num_faces}, 3, 2)`
-                2. RGB color values, of shape :math:`(\\text{batch_size}, \\text{num_faces}, 3, 3)`
+
+                1. Texture uv coordinates would be of shape
+                   :math:`(\\text{batch_size}, \\text{num_faces}, 3, 2)`.
+                2. RGB color values would be of shape
+                   :math:`(\\text{batch_size}, \\text{num_faces}, 3, 3)`.
+
             When specified, it is used to interpolate the features for new sampled points.
 
     See also:
-            :func:`~kaolin.ops.mesh.index_vertices_by_faces` for conversion of features defined per vertex
-            and need to be converted to per-vertex-per-face shape of :math:`(\\text{num_faces}, 3)`.
+        :func:`~kaolin.ops.mesh.index_vertices_by_faces` for conversion of features defined per vertex
+        and need to be converted to per-vertex-per-face shape of :math:`(\\text{num_faces}, 3)`.
 
     Returns:
         (torch.Tensor, torch.LongTensor, (optional) torch.Tensor):
