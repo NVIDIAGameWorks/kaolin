@@ -40,8 +40,8 @@ todo_include_todos = True
 
 intersphinx_mapping = {
     'python': ("https://docs.python.org/3", None),
-    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
-    'PyTorch': ('http://pytorch.org/docs/master/', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'PyTorch': ('https://pytorch.org/docs/master/', None),
 }
 
 master_doc = 'index'
