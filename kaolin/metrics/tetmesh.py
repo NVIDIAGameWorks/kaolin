@@ -35,7 +35,7 @@ def tetrahedron_volume(tet_vertices):
         ...                                [0.4750, 0.4500, 0.4500],
         ...                                [0.5000, 0.5000, 0.5000]]]])
         >>> tetrahedron_volume(tet_vertices)
-        tensor([[2.0833e-05]])
+        tensor([[-2.0833e-05]])
     """
     _validate_tet_vertices(tet_vertices)
 
@@ -88,7 +88,7 @@ def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
         ...                                [0.5500, 0.3500, 0.9000]]]])
         >>> equivolume(tet_vertices, pow=4)
         tensor([[2.2898e-15],
-                [2.9661e-10]])
+                [1.5422e-09]])
     """
     _validate_tet_vertices(tet_vertices)
 

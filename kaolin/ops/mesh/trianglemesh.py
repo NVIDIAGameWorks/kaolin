@@ -151,7 +151,7 @@ def packed_face_areas(vertices, first_idx_vertices, faces, num_faces_per_mesh):
 
 
 def sample_points(vertices, faces, num_samples, areas=None, face_features=None):
-    r"""Uniformly sample points over the surface of triangle meshes.
+    """Uniformly sample points over the surface of triangle meshes.
 
     First face on which the point is sampled is randomly selected,
     with the probability of selection being proportional to the area of the face.
@@ -164,7 +164,7 @@ def sample_points(vertices, faces, num_samples, areas=None, face_features=None):
     Args:
         vertices (torch.Tensor):
             The vertices of the meshes, of shape
-            :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
+            :math:`(\\text{batch_size}, \\text{num_vertices}, 3)`.
         faces (torch.LongTensor):
             The faces of the mesh, of shape :math:`(\text{num_faces}, 3)`.
         num_samples (int):
@@ -175,28 +175,27 @@ def sample_points(vertices, faces, num_samples, areas=None, face_features=None):
             will be computed if None (default).
         face_features (torch.Tensor, optional):
             Per-vertex-per-face features, matching ``faces`` order,
-            of shape :math:`(\text{batch_size}, \text{num_faces}, 3, \text{feature_dim})`.
+            of shape :math:`(\\text{batch_size}, \\text{num_faces}, 3, \\text{feature_dim})`.
             For example:
 
                 1. Texture uv coordinates would be of shape
-                   :math:`(\text{batch_size}, \text{num_faces}, 3, 2)`.
+                   :math:`(\\text{batch_size}, \\text{num_faces}, 3, 2)`.
                 2. RGB color values would be of shape
-                   :math:`(\text{batch_size}, \text{num_faces}, 3, 3)`.
+                   :math:`(\\text{batch_size}, \\text{num_faces}, 3, 3)`.
 
             When specified, it is used to interpolate the features for new sampled points.
 
     See also:
         :func:`~kaolin.ops.mesh.index_vertices_by_faces` for conversion of features defined per vertex
-        and need to be converted to per-vertex-per-face shape of :math:`(\text{num_faces}, 3)`.
+        and need to be converted to per-vertex-per-face shape of :math:`(\\text{num_faces}, 3)`.
 
     Returns:
         (torch.Tensor, torch.LongTensor, (optional) torch.Tensor):
-            the pointclouds of shape :math:`(\text{batch_size}, \text{num_samples}, 3)`,
-            and the indexes of the faces selected,
-            of shape :math:`(\text{batch_size}, \text{num_samples})`.
+            the pointclouds of shape :math:`(\\text{batch_size}, \\text{num_samples}, 3)`,
+            and the indexes of the faces selected, of shape :math:`(\\text{batch_size}, \\text{num_samples})`.
 
             If ``face_features`` arg is specified, then the interpolated features of sampled points of shape
-            :math:`(\text{batch_size}, \text{num_samples}, \text{feature_dim})` are also returned.
+            :math:`(\\text{batch_size}, \\text{num_samples}, \\text{feature_dim})` are also returned.
     """
     if faces.shape[-1] != 3:
         raise NotImplementedError("sample_points is only implemented for triangle meshes")
