@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019, 20-21 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,13 +27,16 @@ import numpy as np
 import torch
 
 try:
-    from pxr import Usd, UsdGeom, Vt, Sdf
+    from pxr import Usd, UsdGeom, Vt, Sdf, UsdShade
 except ImportError:
-    warnings.warn("Warning: module pxr not found", ImportWarning)
+    warnings.warn('Warning: module pxr not found', ImportWarning)
+
+from kaolin.io import materials as usd_materials
 
 
 mesh_return_type = namedtuple('mesh_return_type', ['vertices', 'faces',
-                                                   'uvs', 'face_uvs_idx', 'face_normals', 'materials'])
+                                                   'uvs', 'face_uvs_idx', 'face_normals', 'materials_order',
+                                                   'materials'])
 pointcloud_return_type = namedtuple('pointcloud_return_type', ['points', 'colors', 'normals'])
 
 
@@ -65,91 +68,188 @@ def _get_stage_next_free_path(stage, scene_path):
     return scene_path
 
 
-def _get_flattened_mesh_attributes(stage, scene_path, time):
+def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_normals, time):
     """Return mesh attributes flattened into a single mesh."""
+    stage_dir = os.path.dirname(str(stage.GetRootLayer().realPath))
     prim = stage.GetPrimAtPath(scene_path)
     if not prim:
         raise ValueError(f'No prim found at "{scene_path}".')
 
-    mesh_prims = [x for x in Usd.PrimRange(prim).AllPrims(prim) if UsdGeom.Mesh(x)]
-    cur_first_idx_faces = 0
-    cur_first_idx_uvs = 0
-    vertices, vertex_indices, face_vertex_counts, uvs, face_uvs_idx, face_normals, materials = [], [], [], [], [], [], []
-    for mesh_prim in mesh_prims:
+    attrs = {}
+
+    def _process_mesh(mesh_prim, ref_path, attrs):
+        cur_first_idx_faces = sum([len(v) for v in attrs.get('vertices', [])])
+        cur_first_idx_uvs = sum([len(u) for u in attrs.get('uvs', [])])
         mesh = UsdGeom.Mesh(mesh_prim)
         mesh_vertices = mesh.GetPointsAttr().Get(time=time)
+        mesh_face_vertex_counts = mesh.GetFaceVertexCountsAttr().Get(time=time)
         mesh_vertex_indices = mesh.GetFaceVertexIndicesAttr().Get(time=time)
         mesh_st = mesh.GetPrimvar('st')
+        mesh_subsets = UsdGeom.Subset.GetAllGeomSubsets(UsdGeom.Imageable(mesh_prim))
+        mesh_material = UsdShade.MaterialBindingAPI(mesh_prim).ComputeBoundMaterial()[0]
+
+        # Parse mesh UVs
         if mesh_st:
             mesh_uvs = mesh_st.Get(time=time)
             mesh_uv_indices = mesh_st.GetIndices(time=time)
             mesh_uv_interpolation = mesh_st.GetInterpolation()
         mesh_face_normals = mesh.GetNormalsAttr().Get(time=time)
+
+        # Parse mesh geometry
         if mesh_vertices:
-            vertices.append(torch.from_numpy(np.array(mesh_vertices, dtype=np.float32)))
+            attrs.setdefault('vertices', []).append(torch.from_numpy(np.array(mesh_vertices, dtype=np.float32)))
         if mesh_vertex_indices:
-            face_vertex_counts.append(torch.from_numpy(
-                np.array(mesh.GetFaceVertexCountsAttr().Get(time=time), dtype=np.int64)))
-            vertex_indices.append(torch.from_numpy(np.array(mesh_vertex_indices, dtype=np.int64)) + cur_first_idx_faces)
-            if vertices:
-                cur_first_idx_faces += len(vertices[-1])
-        if mesh_face_normals:
-            face_normals.append(torch.from_numpy(np.array(mesh_face_normals, dtype=np.float32)))
+            attrs.setdefault('face_vertex_counts', []).append(torch.from_numpy(
+                np.array(mesh_face_vertex_counts, dtype=np.int64)))
+            vertex_indices = torch.from_numpy(np.array(mesh_vertex_indices, dtype=np.int64)) + cur_first_idx_faces
+            attrs.setdefault('vertex_indices', []).append(vertex_indices)
+        if with_normals and mesh_face_normals:
+            attrs.setdefault('face_normals', []).append(torch.from_numpy(np.array(mesh_face_normals, dtype=np.float32)))
         if mesh_st and mesh_uvs:
-            uvs.append(torch.from_numpy(np.array(mesh_uvs, dtype=np.float32)))
+            attrs.setdefault('uvs', []).append(torch.from_numpy(np.array(mesh_uvs, dtype=np.float32)))
             if mesh_uv_interpolation in ['vertex', 'varying']:
                 if not mesh_uv_indices:
                     # for vertex and varying interpolation, length of mesh_uv_indices should match
                     # length of mesh_vertex_indices
                     mesh_uv_indices = list(range(len(mesh_uvs)))
                 mesh_uv_indices = torch.tensor(mesh_uv_indices) + cur_first_idx_uvs
-                face_uvs_idx.append(mesh_uv_indices[torch.from_numpy(np.array(mesh_vertex_indices, dtype=np.int64))])
+                face_uvs_idx = mesh_uv_indices[torch.from_numpy(np.array(mesh_vertex_indices, dtype=np.int64))]
+                attrs.setdefault('face_uvs_idx', []).append(face_uvs_idx)
             elif mesh_uv_interpolation == 'faceVarying':
                 if not mesh_uv_indices:
                     # for faceVarying interpolation, length of mesh_uv_indices should match
                     # num_faces * face_size
-                    mesh_uv_indices = list(range(len(mesh_uvs)))
-                face_uvs_idx.append(torch.tensor(mesh_uv_indices) + cur_first_idx_uvs)
+                    # TODO implement default behaviour
+                    mesh_uv_indices = [i for i, c in enumerate(mesh_face_vertex_counts) for _ in range(c)]
+                else:
+                    attrs.setdefault('face_uvs_idx', []).append(torch.tensor(mesh_uv_indices) + cur_first_idx_uvs)
+            # elif mesh_uv_interpolation == 'uniform':
             else:
                 raise NotImplementedError(f'Interpolation type {mesh_uv_interpolation} is '
                                           'not currently supported')
-            cur_first_idx_uvs += len(mesh_uvs)
-    if not vertices:
+
+        # Parse mesh materials
+        if with_materials:
+            subset_idx_map = {}
+            attrs.setdefault('materials', []).append(None)
+            attrs.setdefault('material_idx_map', {})
+            if mesh_material:
+                mesh_material_path = str(mesh_material.GetPath())
+                if mesh_material_path in attrs['material_idx_map']:
+                    material_idx = attrs['material_idx_map'][mesh_material_path]
+                else:
+                    try:
+                        material = usd_materials.MaterialManager.read_usd_material(mesh_material, stage_dir, time)
+                        material_idx = len(attrs['materials'])
+                        attrs['materials'].append(material)
+                        attrs['material_idx_map'][mesh_material_path] = material_idx
+                    except usd_materials.MaterialNotSupportedError as e:
+                        warnings.warn(e.args[0])
+                    except usd_materials.MaterialReadError as e:
+                        warnings.warn(e.args[0])
+            if mesh_subsets:
+                for subset in mesh_subsets:
+                    subset_material, _ = UsdShade.MaterialBindingAPI(subset).ComputeBoundMaterial()
+                    subset_material_metadata = subset_material.GetPrim().GetMetadata('references')
+                    mat_ref_path = ""
+                    if ref_path:
+                        mat_ref_path = ref_path
+                    if subset_material_metadata:
+                        asset_path = subset_material_metadata.GetAddedOrExplicitItems()[0].assetPath
+                        mat_ref_path = os.path.join(ref_path, os.path.dirname(asset_path))
+                    if not os.path.isabs(mat_ref_path):
+                        mat_ref_path = os.path.join(stage_dir, mat_ref_path)
+                    try:
+                        kal_material = usd_materials.MaterialManager.read_usd_material(subset_material, mat_ref_path,
+                                                                                       time)
+                    except usd_materials.MaterialNotSupportedError as e:
+                        warnings.warn(e.args[0])
+                        continue
+                    except usd_materials.MaterialReadError as e:
+                        warnings.warn(e.args[0])
+
+                    subset_material_path = str(subset_material.GetPath())
+                    if subset_material_path not in attrs['material_idx_map']:
+                        attrs['material_idx_map'][subset_material_path] = len(attrs['materials'])
+                        attrs['materials'].append(kal_material)
+                    subset_indices = np.array(subset.GetIndicesAttr().Get())
+                    subset_idx_map[attrs['material_idx_map'][subset_material_path]] = subset_indices
+            # Create material face index list
+            if mesh_face_vertex_counts:
+                for face_idx in range(len(mesh_face_vertex_counts)):
+                    is_in_subsets = False
+                    for subset_idx in subset_idx_map:
+                        if face_idx in subset_idx_map[subset_idx]:
+                            is_in_subsets = True
+                            attrs.setdefault('materials_face_idx', []).extend(
+                                [subset_idx] * mesh_face_vertex_counts[face_idx]
+                            )
+                    if not is_in_subsets:
+                        if mesh_material:
+                            attrs.setdefault('materials_face_idx', []).extend(
+                                [material_idx] * mesh_face_vertex_counts[face_idx]
+                            )
+                        else:
+                            # Assign to `None` material (ie. index 0)
+                            attrs.setdefault('materials_face_idx', []).extend([0] * mesh_face_vertex_counts[face_idx])
+
+    def _traverse(cur_prim, ref_path, attrs):
+        metadata = cur_prim.GetMetadata('references')
+        if metadata:
+            ref_path = os.path.dirname(metadata.GetAddedOrExplicitItems()[0].assetPath)
+        if UsdGeom.Mesh(cur_prim):
+            _process_mesh(cur_prim, ref_path, attrs)
+        for child in cur_prim.GetChildren():
+            _traverse(child, ref_path, attrs)
+
+    _traverse(stage.GetPrimAtPath(scene_path), '', attrs)
+
+    if not attrs.get('vertices'):
         warnings.warn(f'Scene object at {scene_path} contains no vertices.', UserWarning)
 
     # Only import vertices if they are defined for the entire mesh
-    if all([v is not None for v in vertices]) and len(vertices) > 0:
-        vertices = torch.cat(vertices)
+    if all([v is not None for v in attrs.get('vertices', [])]) and len(attrs.get('vertices', [])) > 0:
+        attrs['vertices'] = torch.cat(attrs.get('vertices'))
     else:
-        vertices = None
+        attrs['vertices'] = None
     # Only import vertex index and counts if they are defined for the entire mesh
-    if all([vi is not None for vi in vertex_indices]) and len(vertex_indices) > 0:
-        face_vertex_counts = torch.cat(face_vertex_counts)
-        vertex_indices = torch.cat(vertex_indices)
+    if all([vi is not None for vi in attrs.get('vertex_indices', [])]) and len(attrs.get('vertex_indices', [])) > 0:
+        attrs['face_vertex_counts'] = torch.cat(attrs.get('face_vertex_counts', []))
+        attrs['vertex_indices'] = torch.cat(attrs.get('vertex_indices', []))
     else:
-        face_vertex_counts = None
-        vertex_indices = None
+        attrs['face_vertex_counts'] = None
+        attrs['vertex_indices'] = None
     # Only import UVs if they are defined for the entire mesh
-    if not all([uv is not None for uv in uvs]) or len(uvs) == 0:
-        if len(uvs) > 0:
+    if not all([uv is not None for uv in attrs.get('uvs', [])]) or len(attrs.get('uvs', [])) == 0:
+        if len(attrs.get('uvs', [])) > 0:
             warnings.warn('UVs are missing for some child meshes for prim at '
                           f'{scene_path}. As a result, no UVs were imported.')
-        uvs = None
-        face_uvs_idx = None
+        attrs['uvs'] = None
+        attrs['face_uvs_idx'] = None
     else:
-        uvs = torch.cat(uvs)
-        face_uvs_idx = torch.cat(face_uvs_idx)
+        attrs['uvs'] = torch.cat(attrs['uvs'])
+        if attrs.get('face_uvs_idx', None):
+            attrs['face_uvs_idx'] = torch.cat(attrs['face_uvs_idx'])
+        else:
+            attrs['face_uvs_idx'] = None
 
     # Only import face_normals if they are defined for the entire mesh
-    if not all([n is not None for n in face_normals]) or len(face_normals) == 0:
-        if len(face_normals) > 0:
+    if not all([n is not None for n in attrs.get('face_normals', [])]) or len(attrs.get('face_normals', [])) == 0:
+        if len(attrs.get('face_normals', [])) > 0:
             warnings.warn('Face normals are missing for some child meshes for '
                           f'prim at {scene_path}. As a result, no Face Normals were imported.')
-        face_normals = None
+        attrs['face_normals'] = None
     else:
-        face_normals = torch.cat(face_normals)
+        attrs['face_normals'] = torch.cat(attrs['face_normals'])
 
-    return vertices, face_vertex_counts, vertex_indices, uvs, face_uvs_idx, face_normals, materials
+    if attrs.get('materials_face_idx') is None or max(attrs.get('materials_face_idx', [])) == 0:
+        attrs['materials_face_idx'] = None
+    else:
+        attrs['materials_face_idx'] = torch.LongTensor(attrs['materials_face_idx'])
+
+    if all([m is None for m in attrs.get('materials', [])]):
+        attrs['materials'] = None
+    return attrs
 
 
 def get_root(file_path):
@@ -285,11 +385,12 @@ def heterogeneous_mesh_handler_skip(*args):
     return None
 
 
-def heterogeneous_mesh_handler_empty(vertices, face_vertex_counts, faces, uvs, face_uvs_idx, face_normals):
+def heterogeneous_mesh_handler_empty(*args):
     """Return empty tensors for vertices and faces of heterogeneous meshes."""
     return (torch.FloatTensor(size=(0, 3)), torch.LongTensor(size=(0,)),
             torch.LongTensor(size=(0, 3)), torch.FloatTensor(size=(0, 2)),
-            torch.LongTensor(size=(0, 3)), torch.FloatTensor(size=(0, 3, 3)))
+            torch.LongTensor(size=(0, 3)), torch.FloatTensor(size=(0, 3, 3)),
+            torch.LongTensor(size=(0,)))
 
 
 def heterogeneous_mesh_handler_naive_homogenize(vertices, face_vertex_counts, *args):
@@ -304,7 +405,7 @@ def heterogeneous_mesh_handler_naive_homogenize(vertices, face_vertex_counts, *a
             the sum of ``face_vertex_counts``.
 
     Returns:
-        (list of list of int): Homogeneous list of faces.
+        (list of list of int): Homogeneous list of attributes.
     """
     def _homogenize(attr, face_vertex_counts):
         if attr is not None:
@@ -317,15 +418,17 @@ def heterogeneous_mesh_handler_naive_homogenize(vertices, face_vertex_counts, *a
                 while len(attr_face) >= 3:
                     new_attr.append(attr_face[:3])
                     attr_face.pop(1)
-            attr = torch.tensor(new_attr)
-        return attr
+            return torch.tensor(new_attr)
+        else:
+            return None
 
     new_attrs = [_homogenize(a, face_vertex_counts) for a in args]
     new_counts = torch.ones(vertices.size(0), dtype=torch.long).fill_(3)
     return (vertices, new_counts, *new_attrs)
 
 
-def import_mesh(file_path, scene_path=None, heterogeneous_mesh_handler=None, time=None):
+def import_mesh(file_path, scene_path=None, with_materials=False, with_normals=False,
+                heterogeneous_mesh_handler=None, time=None):
     r"""Import a single mesh from a USD file in an unbatched representation.
 
     Supports homogeneous meshes (meshes with consistent numbers of vertices per face).
@@ -337,12 +440,14 @@ def import_mesh(file_path, scene_path=None, heterogeneous_mesh_handler=None, tim
         file_path (str): Path to usd file (`\*.usd`, `\*.usda`).
         scene_path (str, optional): Scene path within the USD file indicating which primitive to import.
             If not specified, the all meshes in the scene will be imported and flattened into a single mesh.
+        with_materials (bool): if True, load materials. Default: False.
+        with_normals (bool): if True, load vertex normals. Default: False.
         heterogeneous_mesh_handler (function, optional): Optional function to handle heterogeneous meshes.
             The function's input and output must be  ``vertices`` (torch.FloatTensor), ``faces`` (torch.LongTensor),
             ``uvs`` (torch.FloatTensor), ``face_uvs_idx`` (torch.LongTensor), and ``face_normals`` (torch.FloatTensor).
             If the function returns ``None``, the mesh will be skipped. If no function is specified,
             an error will be raised when attempting to import a heterogeneous mesh.
-        time (int, optional): Positive integer indicating the time at which to retrieve parameters.
+        time (convertible to float, optional): Positive integer indicating the time at which to retrieve parameters.
 
     Returns:
 
@@ -365,17 +470,19 @@ def import_mesh(file_path, scene_path=None, heterogeneous_mesh_handler=None, tim
         >>> mesh.faces
         tensor([[0, 1, 2]])
     """
-    # TODO  add arguments to selectively import UVs, normals and materials
+    # TODO  add arguments to selectively import UVs and normals
     if scene_path is None:
         scene_path = get_root(file_path)
     if time is None:
         time = Usd.TimeCode.Default()
     meshes_list = import_meshes(file_path, [scene_path],
-                                heterogeneous_mesh_handler=heterogeneous_mesh_handler, times=[time])
+                                heterogeneous_mesh_handler=heterogeneous_mesh_handler, with_materials=with_materials,
+                                with_normals=with_normals, times=[time])
     return mesh_return_type(*meshes_list[0])
 
 
-def import_meshes(file_path, scene_paths=None, heterogeneous_mesh_handler=None, times=None):
+def import_meshes(file_path, scene_paths=None, with_materials=False, with_normals=False,
+                  heterogeneous_mesh_handler=None, times=None):
     r"""Import one or more meshes from a USD file in an unbatched representation.
 
     Supports homogeneous meshes (meshes with consistent numbers of vertices per face). Custom handling of
@@ -388,6 +495,8 @@ def import_meshes(file_path, scene_paths=None, heterogeneous_mesh_handler=None, 
         file_path (str): Path to usd file (`\*.usd`, `\*.usda`).
         scene_paths (list of str, optional): Scene path(s) within the USD file indicating which primitive(s)
             to import. If None, all prims of type `Mesh` will be imported.
+        with_materials (bool): if True, load materials. Default: False.
+        with_normals (bool): if True, load vertex normals. Default: False.
         heterogeneous_mesh_handler (function, optional): Optional function to handle heterogeneous meshes.
             The function's input and output must be  ``vertices`` (torch.FloatTensor), ``faces`` (torch.LongTensor),
             ``uvs`` (torch.FloatTensor), ``face_uvs_idx`` (torch.LongTensor), and ``face_normals`` (torch.FloatTensor).
@@ -418,7 +527,7 @@ def import_meshes(file_path, scene_paths=None, heterogeneous_mesh_handler=None, 
         >>> [m.faces for m in meshes]
         [tensor([[0, 1, 2]]), tensor([[0, 1, 2]]), tensor([[0, 1, 2]])]
     """
-    # TODO  add arguments to selectively import UVs, normals and materials
+    # TODO  add arguments to selectively import UVs and normals
     assert os.path.exists(file_path)
     stage = Usd.Stage.Open(file_path)
     if scene_paths is None:
@@ -426,10 +535,18 @@ def import_meshes(file_path, scene_paths=None, heterogeneous_mesh_handler=None, 
     if times is None:
         times = [Usd.TimeCode.Default()] * len(scene_paths)
 
-    vertices_list, faces_list, uvs_list, face_uvs_idx_list, face_normals_list, materials_list = [], [], [], [], [], []
+    vertices_list, faces_list, uvs_list, face_uvs_idx_list, face_normals_list = [], [], [], [], []
+    materials_order_list, materials_list = [], []
     for scene_path, time in zip(scene_paths, times):
-        mesh_attr = _get_flattened_mesh_attributes(stage, scene_path, time=time)
-        vertices, face_vertex_counts, faces, uvs, face_uvs_idx, face_normals, materials = mesh_attr
+        mesh_attr = _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_normals, time=time)
+        vertices = mesh_attr['vertices']
+        face_vertex_counts = mesh_attr['face_vertex_counts']
+        faces = mesh_attr['vertex_indices']
+        uvs = mesh_attr['uvs']
+        face_uvs_idx = mesh_attr['face_uvs_idx']
+        face_normals = mesh_attr['face_normals']
+        materials_face_idx = mesh_attr['materials_face_idx']
+        materials = mesh_attr['materials']
         # TODO(jlafleche) Replace tuple output with mesh class
 
         if faces is not None:
@@ -438,12 +555,12 @@ def import_meshes(file_path, scene_paths=None, heterogeneous_mesh_handler=None, 
                     raise NonHomogeneousMeshError(f'Mesh at {scene_path} is non-homogeneous '
                                                   f'and cannot be imported from {file_path}.')
                 else:
-                    mesh = heterogeneous_mesh_handler(vertices, face_vertex_counts,
-                                                      faces, uvs, face_uvs_idx, face_normals)
+                    mesh = heterogeneous_mesh_handler(vertices, face_vertex_counts, faces, uvs,
+                                                      face_uvs_idx, face_normals, materials_face_idx)
                     if mesh is None:
                         continue
                     else:
-                        vertices, face_vertex_counts, faces, uvs, face_uvs_idx, face_normals = mesh
+                        vertices, face_vertex_counts, faces, uvs, face_uvs_idx, face_normals, materials_face_idx = mesh
             if faces.size(0) > 0:
                 faces = faces.view(-1, face_vertex_counts[0])
 
@@ -452,19 +569,33 @@ def import_meshes(file_path, scene_paths=None, heterogeneous_mesh_handler=None, 
             face_uvs_idx = face_uvs_idx.reshape(-1, faces.size(1))
         if face_normals is not None and faces is not None and face_normals.size(0) > 0:
             face_normals = face_normals.reshape(-1, faces.size(1), 3)
+        if faces is not None and materials_face_idx is not None:            # Create material order list
+            materials_face_idx.view(-1, faces.size(1))
+            cur_mat_idx = -1
+            materials_order = []
+            for idx in range(len(materials_face_idx)):
+                mat_idx = materials_face_idx[idx][0].item()
+                if cur_mat_idx != mat_idx:
+                    cur_mat_idx = mat_idx
+                    materials_order.append([idx, mat_idx])
+        else:
+            materials_order = None
 
         vertices_list.append(vertices)
         faces_list.append(faces)
         uvs_list.append(uvs)
         face_uvs_idx_list.append(face_uvs_idx)
         face_normals_list.append(face_normals)
+        materials_order_list.append(materials_order)
         materials_list.append(materials)
 
-    params = [vertices_list, faces_list, uvs_list, face_uvs_idx_list, face_normals_list, materials_list]
-    return [mesh_return_type(v, f, uv, fuv, fn, m) for v, f, uv, fuv, fn, m in zip(*params)]
+    params = [vertices_list, faces_list, uvs_list, face_uvs_idx_list,
+              face_normals_list, materials_order_list, materials_list]
+    return [mesh_return_type(v, f, uv, fuv, fn, mo, m) for v, f, uv, fuv, fn, mo, m in zip(*params)]
 
 
-def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_idx=None, face_normals=None, time=None):
+def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_idx=None, face_normals=None,
+             materials_order=None, materials=None, time=None):
     r"""Add a mesh to an existing USD stage.
 
     Add a mesh to the USD stage. The stage is modified but not saved to disk.
@@ -479,7 +610,12 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         face_uvs_idx (torch.LongTensor, optional): of shape ``(num_faces, face_size)``. If provided, `uvs` must also
             be specified.
         face_normals (torch.Tensor, optional): of shape ``(num_vertices, num_faces, 3)``.
-        time (int, optional): Positive integer defining the time at which the supplied parameters correspond to.
+        materials_order (torch.LongTensor): of shape (N, 2)
+          showing the order in which materials are used over **face_uvs_idx** and the first indices
+          in which they start to be used. A material can be used multiple times.
+        materials (list of Material): a list of materials
+        time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
+            correspond to.
     Returns:
         (Usd.Stage)
 
@@ -505,37 +641,54 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         vertices_list = vertices.detach().cpu().float().numpy()
         usd_mesh.GetPointsAttr().Set(Vt.Vec3fArray.FromNumpy(vertices_list), time=time)
     if uvs is not None:
-        interpolation = None
         uvs_list = uvs.view(-1, 2).detach().cpu().float().numpy()
         pv = UsdGeom.PrimvarsAPI(usd_mesh.GetPrim()).CreatePrimvar(
-            "st", Sdf.ValueTypeNames.Float2Array)
+            'st', Sdf.ValueTypeNames.Float2Array)
         pv.Set(uvs_list, time=time)
-        if face_uvs_idx is not None:
-            pv.SetIndices(Vt.IntArray.FromNumpy(face_uvs_idx.view(-1).cpu().long().numpy()), time=time)
-            interpolation = 'faceVarying'
-        else:
-            if vertices is not None and uvs.size(0) == vertices.size(0):
-                interpolation = 'vertex'
-            elif uvs.size(0) == faces.size(0):
-                interpolation = 'uniform'
-            elif uvs.size(0) == len(faces_list):
-                interpolation = 'faceVarying'
 
-        if interpolation is not None:
-            pv.SetInterpolation(interpolation)
-    if face_uvs_idx is not None and uvs is None:
-        raise ValueError('If providing "face_uvs_idx", "uvs" must also be provided.')
+        if vertices is not None and uvs.size(0) == vertices.size(0):
+            pv.SetInterpolation('vertex')
+        elif faces is not None and uvs.view(-1, 2).size(0) == faces.size(0):
+            pv.SetInterpolation('uniform')
+        else:
+            pv.SetInterpolation('faceVarying')
+
+    if face_uvs_idx is not None:
+        if uvs is not None:
+            pv.SetIndices(Vt.IntArray.FromNumpy(face_uvs_idx.view(-1).cpu().long().numpy()), time=time)
+        else:
+            warnings.warn('If providing "face_uvs_idx", "uvs" must also be provided.')
 
     if face_normals is not None:
         face_normals = face_normals.view(-1, 3).cpu().float().numpy()
         usd_mesh.GetNormalsAttr().Set(face_normals, time=time)
         UsdGeom.PointBased(usd_mesh).SetNormalsInterpolation('faceVarying')
 
+    if faces is not None and materials_order is not None and materials is not None:
+        stage.DefinePrim(f'{scene_path}/Looks', 'Scope')
+        subsets = {}
+        for i in range(len(materials_order)):
+            first_face_idx, mat_idx = materials_order[i]
+            if materials[mat_idx] is None:
+                continue
+            last_face_idx = materials_order[i + 1][0] if (i + 1) < len(materials_order) else faces.size(0)
+            for face_idx in range(first_face_idx, last_face_idx):
+                subsets.setdefault(mat_idx, []).append(face_idx)
+
+        # Create submeshes
+        for i, subset in enumerate(subsets):
+            subset_prim = stage.DefinePrim(f'{scene_path}/subset_{i}', 'GeomSubset')
+            subset_prim.GetAttribute('indices').Set(subsets[subset])
+            materials[subset]._write_usd_preview_surface(stage, f'{scene_path}/Looks/material_{subset}',
+                                                         [subset_prim], time, texture_dir=f'material_{subset}',
+                                                         texture_file_prefix='')    # TODO file path
+
     return usd_mesh.GetPrim()
 
 
 def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, faces=None,
-                uvs=None, face_uvs_idx=None, face_normals=None, materials=None, up_axis='Y', time=None):
+                uvs=None, face_uvs_idx=None, face_normals=None, materials_order=None, materials=None,
+                up_axis='Y', time=None):
     r"""Export a single mesh to USD.
 
     Export a single mesh defined by vertices and faces and save the stage to disk.
@@ -551,8 +704,13 @@ def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, fac
         face_uvs_idx (torch.LongTensor, optional): of shape ``(num_faces, face_size)``. If provided, `uvs` must also
             be specified.
         face_normals (torch.Tensor, optional): of shape ``(num_vertices, num_faces, 3)``.
-        up_axis (str, optional): Specifies the scene's up axis. Choose from ``['Y', 'Z']``.
-        time (int, optional): Positive integer defining the time at which the supplied parameters correspond to.
+        materials_order (torch.LongTensor): of shape (N, 2)
+          showing the order in which materials are used over **face_uvs_idx** and the first indices
+          in which they start to be used. A material can be used multiple times.
+        materials (list of Material): a list of materials
+        up_axis (str, optional): Specifies the scene's up axis. Choose from ``['Y', 'Z']``
+        time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
+            correspond to.
     Returns:
        (Usd.Stage)
 
@@ -566,33 +724,41 @@ def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, fac
         time = Usd.TimeCode.Default()
     if os.path.exists(file_path):
         stage = Usd.Stage.Open(file_path)
+        UsdGeom.SetStageUpAxis(stage, up_axis)
     else:
         stage = create_stage(file_path, up_axis)
-    add_mesh(stage, scene_path, vertices, faces, uvs, face_uvs_idx, face_normals, time=time)
+    add_mesh(stage, scene_path, vertices, faces, uvs, face_uvs_idx, face_normals, materials_order, materials, time=time)
     stage.Save()
 
     return stage
 
 
 def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
-                  uvs=None, face_uvs_idx=None, face_normals=None, up_axis='Y', times=None):
+                  uvs=None, face_uvs_idx=None, face_normals=None, materials_order=None, materials=None,
+                  up_axis='Y', times=None):
     r"""Export multiple meshes to a new USD stage.
 
     Export multiple meshes defined by lists vertices and faces and save the stage to disk.
 
     Args:
         file_path (str): Path to usd file (\*.usd, \*.usda).
-        scene_paths (list of str, optional): Absolute paths of meshes within the USD file scene. Must have the same number of
-            paths as the number of meshes ``N``. Must be a valid Sdf.Path. If no path is provided, a default path is used.
+        scene_paths (list of str, optional): Absolute paths of meshes within the USD file scene. Must have the same
+            number ofpaths as the number of meshes ``N``. Must be a valid Sdf.Path. If no path is provided, a default
+            path is used.
         vertices (list of torch.FloatTensor, optional): Vertices with shape ``(num_vertices, 3)``.
         faces (list of torch.LongTensor, optional): Vertex indices for each face with shape ``(num_faces, face_size)``.
             Mesh must be homogenous (consistent number of vertices per face).
         uvs (list of torch.FloatTensor, optional): of shape ``(num_uvs, 2)``.
-        face_uvs_idx (list of torch.LongTensor, optional): of shape ``(num_faces, face_size)``. If provided, `uvs` must also
-            be specified.
+        face_uvs_idx (list of torch.LongTensor, optional): of shape ``(num_faces, face_size)``. If provided, `uvs`
+            must also be specified.
         face_normals (list of torch.Tensor, optional): of shape ``(num_vertices, num_faces, 3)``.
+        materials_order (torch.LongTensor): of shape (N, 2)
+          showing the order in which materials are used over **face_uvs_idx** and the first indices
+          in which they start to be used. A material can be used multiple times.
+        materials (list of Material): a list of materials
         up_axis (str, optional): Specifies the scene's up axis. Choose from ``['Y', 'Z']``.
-        times (list of int, optional): Positive integers defining the time at which the supplied parameters correspond to.
+        times (list of int, optional): Positive integers defining the time at which the supplied parameters
+            correspond to.
     Returns:
         (Usd.Stage)
 
@@ -603,7 +769,8 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
     """
     stage = create_stage(file_path, up_axis)
     mesh_parameters = {'vertices': vertices, 'faces': faces, 'uvs': uvs,
-                       'face_uvs_idx': face_uvs_idx, 'face_normals': face_normals}
+                       'face_uvs_idx': face_uvs_idx, 'face_normals': face_normals,
+                       'materials_order': materials_order, 'materials': materials}
     supplied_parameters = {k: p for k, p in mesh_parameters.items() if p is not None}
     length = len(list(supplied_parameters.values())[0])
     assert all([len(p) == length for p in supplied_parameters.values()])
@@ -633,7 +800,7 @@ def import_pointcloud(file_path, scene_path, time=None):
     Args:
         file_path (str): Path to usd file (\*.usd, \*.usda).
         scene_path (str): Scene path within the USD file indicating which primitive to import.
-        time (int, optional): Positive integer indicating the time at which to retrieve parameters.
+        time (convertible to float, optional): Positive integer indicating the time at which to retrieve parameters.
     Returns:
         namedtuple of:
             - **points** (torch.FloatTensor): of shape (num_points, 3)
@@ -665,8 +832,8 @@ def import_pointclouds(file_path, scene_paths=None, times=None):
     Args:
         file_path (str): Path to usd file (\*.usd, \*.usda).
         scene_paths (list of str, optional): Scene path(s) within the USD file indicating which primitive(s)
-            to import. If None, will return all pointclouds found based on PointInstancer or UsdGeomPoints prims with `kaolin_type`
-            primvar set to `PointCloud`.
+            to import. If None, will return all pointclouds found based on PointInstancer or UsdGeomPoints prims with
+            `kaolin_type` primvar set to `PointCloud`.
         times (list of int): Positive integers indicating the time at which to retrieve parameters.
     Returns:
         list of namedtuple of:
@@ -713,7 +880,7 @@ def import_pointclouds(file_path, scene_paths=None, times=None):
             pointclouds.append(torch.tensor(instancer.GetPositionsAttr().Get(time=time)))
             colors.append(None)
         else:
-            raise TypeError("The prim is neither UsdGeomPoints nor UsdGeomPointInstancer.")
+            raise TypeError('The prim is neither UsdGeomPoints nor UsdGeomPointInstancer.')
 
     # TODO: place holders for normals for now
     normals = [None] * len(colors)
@@ -743,11 +910,11 @@ def get_pointcloud_bracketing_time_samples(stage, scene_path, target_time):
         instancer = UsdGeom.PointInstancer(prim)
         result = instancer.GetPositionsAttr().GetBracketingTimeSamples(target_time)
     else:
-        raise TypeError("The prim is neither UsdGeomPoints nor UsdGeomPointInstancer.")
+        raise TypeError('The prim is neither UsdGeomPoints nor UsdGeomPointInstancer.')
     return result
 
 
-def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_type="point_instancer"):
+def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_type='point_instancer'):
     r"""Add a pointcloud to an existing USD stage.
 
     Create a pointcloud represented by point instances of a sphere centered at each point coordinate.
@@ -758,13 +925,14 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
         points (torch.FloatTensor): Pointcloud tensor containing ``N`` points of shape ``(N, 3)``.
         scene_path (str): Absolute path of pointcloud within the USD file scene. Must be a valid Sdf.Path.
         colors (torch.FloatTensor, optional): Color tensor corresponding each point in the pointcloud
-            tensor of shape ``(N, 3)``. colors only works if points_type is "usd_geom_points".
-        time (int, optional): Positive integer defining the time at which the supplied parameters correspond to.
-        points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer. "usd_geom_points"
-                           indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
-                           Please refer here for UsdGeomPoints:
-                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
-                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "point_instancer".
+            tensor of shape ``(N, 3)``. colors only works if points_type is 'usd_geom_points'.
+        time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
+            correspond to.
+        points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer.
+            'usd_geom_points' indicates UsdGeomPoints and 'point_instancer' indicates PointInstancer.
+            Please refer here for UsdGeomPoints:
+            https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
+            https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: 'point_instancer'.
     Returns:
         (Usd.Stage)
 
@@ -781,19 +949,20 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
     if stage.GetPrimAtPath(scene_path):
         points_prim = stage.GetPrimAtPath(scene_path)
     else:
-        if points_type == "point_instancer":
+        if points_type == 'point_instancer':
             points_prim = stage.DefinePrim(scene_path, 'PointInstancer')
-        elif points_type == "usd_geom_points":
+        elif points_type == 'usd_geom_points':
             points_prim = stage.DefinePrim(scene_path, 'Points')
         else:
-            raise ValueError(f"Expected points_type to be 'usd_geom_points' or 'point_instancer', but got '{points_type}'.")
+            raise ValueError('Expected points_type to be "usd_geom_points" or "point_instancer", '
+                             f'but got "{points_type}".')
 
-    if points_type == "point_instancer":
+    if points_type == 'point_instancer':
         geom_points = UsdGeom.PointInstancer(points_prim)
         sphere = UsdGeom.Sphere.Define(stage, f'{scene_path}/sphere')
         sphere.GetRadiusAttr().Set(0.5)
         geom_points.CreatePrototypesRel().SetTargets([sphere.GetPath()])
-    elif points_type == "usd_geom_points":
+    elif points_type == 'usd_geom_points':
         geom_points = UsdGeom.Points(points_prim)
 
     # Calculate default point scale
@@ -805,20 +974,20 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
     positions = points.detach().cpu().tolist()
     scales = np.asarray([scale, ] * points.size(0))
 
-    if points_type == "point_instancer":
+    if points_type == 'point_instancer':
         indices = [0] * points.size(0)
         # Populate point instancer
         geom_points.GetProtoIndicesAttr().Set(indices, time=time)
         geom_points.GetPositionsAttr().Set(positions, time=time)
         scales = [(scale,) * 3] * points.size(0)
         geom_points.GetScalesAttr().Set(scales, time=time)
-    elif points_type == "usd_geom_points":
+    elif points_type == 'usd_geom_points':
         # Populate UsdGeomPoints
         geom_points.GetPointsAttr().Set(points.numpy(), time=time)
         geom_points.GetWidthsAttr().Set(Vt.FloatArray.FromNumpy(scales), time=time)
 
-    if colors is not None and points_type == "usd_geom_points":
-        assert colors.shape == points.shape, "Colors and points must have the same shape."
+    if colors is not None and points_type == 'usd_geom_points':
+        assert colors.shape == points.shape, 'Colors and points must have the same shape.'
         geom_points.GetDisplayColorAttr().Set(colors.numpy(), time=time)
 
     return stage
@@ -837,13 +1006,13 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
         scene_path (str, optional): Absolute path of pointcloud within the USD file scene. Must be a valid Sdf.Path.
             If no path is provided, a default path is used.
         color (torch.FloatTensor, optional): Color tensor corresponding each point in the pointcloud
-            tensor of shape ``(N, 3)``. colors only works if points_type is "usd_geom_points".
-        time (int): Positive integer defining the time at which the supplied parameters correspond to.
-        points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer. "usd_geom_points"
-                           indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
-                           Please refer here for UsdGeomPoints:
-                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
-                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "point_instancer".
+            tensor of shape ``(N, 3)``. colors only works if points_type is 'usd_geom_points'.
+        time (convertible to float): Positive integer defining the time at which the supplied parameters correspond to.
+        points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer.
+                'usd_geom_points' indicates UsdGeomPoints and 'point_instancer' indicates PointInstancer.
+                Please refer here for UsdGeomPoints:
+                https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
+                https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: 'point_instancer'.
     Returns:
         (Usd.Stage)
 
@@ -851,11 +1020,13 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
         >>> points = torch.rand(100, 3)
         >>> stage = export_pointcloud('./new_stage.usd', points)
     """
-    stage = export_pointclouds(file_path, [pointcloud], [scene_path], colors=[color], times=[time], points_type=points_type)
+    stage = export_pointclouds(file_path, [pointcloud], [scene_path], colors=[color], times=[time],
+                               points_type=points_type)
     return stage
 
 
-def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, times=None, points_type='point_instancer'):
+def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, times=None,
+                       points_type='point_instancer'):
     r"""Export one or more pointclouds to a USD scene.
 
     Export one or more pointclouds to USD. The pointclouds will be added to the USD stage and represented
@@ -864,16 +1035,16 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, ti
     Args:
         file_path (str): Path to usd file (\*.usd, \*.usda).
         pointclouds (list of torch.FloatTensor): List of pointcloud tensors of length ``N`` defining N pointclouds.
-        scene_paths (list of str, optional): Absolute path(s) of pointcloud(s) within the USD file scene. Must be a valid Sdf.Path.
-            If no path is provided, a default path is used.
+        scene_paths (list of str, optional): Absolute path(s) of pointcloud(s) within the USD file scene.
+            Must be a valid Sdf.Path. If no path is provided, a default path is used.
         times (list of int): Positive integers defining the time at which the supplied parameters correspond to.
         colors (list of tensors, optional): Lits of RGB colors of length ``N``, each corresponding to a pointcloud
-            in the pointcloud list. colors only works if points_type is "usd_geom_points".
-        points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer. "usd_geom_points"
-                           indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
-                           Please refer here for UsdGeomPoints:
-                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
-                           https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: "point_instancer".
+            in the pointcloud list. colors only works if points_type is 'usd_geom_points'.
+        points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer.
+            'usd_geom_points' indicates UsdGeomPoints and 'point_instancer' indicates PointInstancer.
+            Please refer here for UsdGeomPoints:
+            https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
+            https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: 'point_instancer'.
     Returns:
         (Usd.Stage)
 
@@ -910,7 +1081,7 @@ def import_voxelgrid(file_path, scene_path, time=None):
         file_path (str): Path to usd file (\*.usd, \*.usda).
         scene_path (str): Scene path within the USD file indicating which PointInstancer primitive
             to import as a voxelgrid.
-        time (int, optional): Positive integer indicating the time at which to retrieve parameters.
+        time (convertible to float, optional): Positive integer indicating the time at which to retrieve parameters.
     Returns:
         torch.BoolTensor
 
@@ -963,7 +1134,7 @@ def import_voxelgrids(file_path, scene_paths=None, times=None):
         scene_paths = []
         for p in stage.Traverse():
             is_point_instancer = UsdGeom.PointInstancer(p)
-            if UsdGeom.PointInstancer(p) and p.GetAttribute('primvars:kaolin_type').Get() == 'VoxelGrid':
+            if is_point_instancer and p.GetAttribute('primvars:kaolin_type').Get() == 'VoxelGrid':
                 scene_paths.append(p.GetPath())
     if times is None:
         times = [Usd.TimeCode.Default()] * len(scene_paths)
@@ -1002,7 +1173,8 @@ def add_voxelgrid(stage, voxelgrid, scene_path, time=None):
         stage (Usd.Stage): Stage onto which to add the voxelgrid.
         voxelgrid (torch.BoolTensor): Binary voxelgrid of shape ``(N, N, N)``.
         scene_path (str): Absolute path of voxelgrid within the USD file scene. Must be a valid Sdf.Path.
-        time (int, optional): Positive integer defining the time at which the supplied parameters correspond to.
+        time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
+            correspond to.
     Returns:
         (Usd.Stage)
 
@@ -1074,7 +1246,8 @@ def export_voxelgrid(file_path, voxelgrid, scene_path='/World/VoxelGrids/voxelgr
         voxelgrid (torch.BoolTensor): Binary voxelgrid of shape ``(N, N, N)``.
         scene_path (str, optional): Absolute path of voxelgrid within the USD file scene. Must be a valid Sdf.Path.
             If no path is provided, a default path is used.
-        time (int, optional): Positive integer defining the time at which the supplied parameters correspond to.
+        time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
+            correspond to.
     Returns:
         (Usd.Stage)
 
@@ -1098,8 +1271,8 @@ def export_voxelgrids(file_path, voxelgrids, scene_paths=None, times=None):
     Args:
         file_path (str): Path to usd file (\*.usd, \*.usda).
         voxelgrids (list of torch.BoolTensor): List of binary voxelgrid(s) of shape ``(N, N, N)``.
-        scene_path (list of str, optional): Absolute path(s) of voxelgrid within the USD file scene. Must be a valid Sdf.Path.
-            If no path is provided, a default path is used.
+        scene_path (list of str, optional): Absolute path(s) of voxelgrid within the USD file scene.
+            Must be a valid Sdf.Path. If no path is provided, a default path is used.
         times (list of int): Positive integers defining the time at which the supplied parameters correspond to.
     Returns:
         (Usd.Stage)
