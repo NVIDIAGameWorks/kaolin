@@ -67,8 +67,8 @@ def material_textures():
 def mesh():
     cur_dir = os.path.dirname(os.path.realpath(__file__))
     obj_mesh = obj.import_mesh(os.path.join(cur_dir, os.pardir, os.pardir,
-                            os.pardir, 'samples/rocket.obj'), with_normals=True,
-                            with_materials=True, error_handler=obj.skip_error_handler)
+                               os.pardir, 'samples/rocket.obj'), with_normals=True,
+                               with_materials=True, error_handler=obj.skip_error_handler)
     return obj_mesh
 
 
@@ -119,12 +119,18 @@ class TestPBRMaterial:
             'Diffuse': {'diffuse_color': (0., 1., 0.)},
             'Roughness': {'roughness_value': 0.1},
             'Metallic': {'metallic_value': 1.},
+            'Clearcoat': {'clearcoat_value': 1.},
+            'ClearcoatRougness': {'clearcoat_roughness_value': 1.},
+            'Opacity': {'opacity_value': 0.5},
+            'OpacityThreshold': {'opacity_threshold': 0.5},
+            'Ior': {'ior_value': 1.},
             'Specular': {'specular_color': (1., 0., 0.), 'is_specular_workflow': True},
+            'Displacement': {'displacement_value': 0.1},
         }
         for test_name, params in tests.items():
             prim = stage.DefinePrim(f'/World/{test_name}', 'Sphere')
             mat = materials.PBRMaterial(**params)
-            mat.write_to_usd(out_path, f'/World/Looks/{test_name}', bound_prims=[prim], time=0)
+            mat.write_to_usd(out_path, f'/World/Looks/{test_name}', bound_prims=[prim])
         stage.Save()
 
         # Confirm exported USD matches golden file
@@ -146,12 +152,21 @@ class TestPBRMaterial:
 
         tests = {
             'Default': {},
-            'Diffuse': {'diffuse_texture': _create_checkerboard((0., 1., 0.), (0., 0., 1.))},
-            'Roughness': {'roughness_texture': _create_checkerboard((0.1,), (0.9,))},
-            'Metallic': {'metallic_texture': _create_checkerboard((0.1,), (0.9,))},
-            'Normal': {'normals_texture': _create_checkerboard((0., 0., 1.,), (0., 0.5, 0.5))},
+            'Diffuse': {'diffuse_texture': _create_checkerboard((0., 1., 0.), (0., 0., 1.)),
+                        'diffuse_colorspace': 'sRGB'},
+            'Roughness': {'roughness_texture': _create_checkerboard((0.1,), (0.9,)), 'roughness_colorspace': 'raw'},
+            'Metallic': {'metallic_texture': _create_checkerboard((0.1,), (0.9,)), 'metallic_colorspace': 'raw'},
+            'Clearcoat': {'clearcoat_texture': _create_checkerboard((0.01,), (0.9,)), 'metallic_colorspace': 'raw'},
+            'ClearcoatRoughness': {'clearcoat_roughness_texture': _create_checkerboard((0.1,), (0.9,)), 'metallic_colorspace': 'raw'},
+            'Opacity': {'opacity_texture': _create_checkerboard((0.1,), (0.9,)), 'metallic_colorspace': 'raw',
+                        'opacity_threshold': 0.5},
+            'Ior': {'ior_texture': _create_checkerboard((0.1,), (0.9,)), 'metallic_colorspace': 'raw'},
+            'Normal': {'normals_texture': _create_checkerboard((0., 0., 1.,), (0., 0.5, 0.5)),
+                       'normals_colorspace': 'raw'},
             'Specular': {'specular_texture': _create_checkerboard((1., 0., 0.), (0., 0., 1.)),
-                         'is_specular_workflow': True},
+                         'is_specular_workflow': True, 'specular_colorspace': 'raw'},
+            'Displacement': {'displacement_texture': _create_checkerboard((0.1,), (0.9,)),
+                             'specular_colorspace': 'raw'},
         }
 
         for test_name, params in tests.items():
@@ -160,7 +175,7 @@ class TestPBRMaterial:
                                 uvs=mesh.uvs,
                                 face_uvs_idx=mesh.face_uvs_idx,
                                 face_normals=mesh.vertex_normals[mesh.face_normals].view(-1, 3))
-            material_textures.write_to_usd(out_path, f'/World/Looks/{test_name}', bound_prims=[prim], time=0)
+            material_textures.write_to_usd(out_path, f'/World/Looks/{test_name}', bound_prims=[prim])
         stage.Save()
 
         # Confirm exported USD matches golden file
@@ -168,3 +183,35 @@ class TestPBRMaterial:
         golden = os.path.join(out_dir, os.pardir, os.pardir, os.pardir,
                               os.pardir, 'samples/golden/pbr_material_textures.usda')
         assert open(golden).read() == open(out_path).read()
+
+    def test_colorspace(self, out_dir, mesh, material_textures):
+        out_path = os.path.join(out_dir, 'colorspace_auto.usda')
+        stage = usd.create_stage(out_path)
+
+        def _create_checkerboard(val1, val2):
+            channels = len(val1)
+            checkerboard = torch.ones((channels, 2, 2)) * torch.tensor(val1)[:, None, None]
+            checkerboard[:, 0, 0] = torch.tensor(val2)
+            checkerboard[:, 1, 1] = torch.tensor(val2)
+            checkerboard = torch.nn.functional.interpolate(checkerboard[None, ...], scale_factor=128)[0]
+            return checkerboard
+
+        single_channel_texture = _create_checkerboard((0.2,), (0.8,))
+        rgb_texture = _create_checkerboard((0., 0.4, 0.), (0., 0., 0.4))
+
+        texture = {'metallic_texture': single_channel_texture, 'metallic_colorspace': 'auto',
+                   'roughness_texture': single_channel_texture, 'roughness_colorspace': 'raw',
+                   'diffuse_texture': rgb_texture, 'diffuse_colorspace': 'sRGB'}
+        material = materials.PBRMaterial(**texture)
+
+        prim = usd.add_mesh(stage, '/World/colorspace_test', mesh.vertices, mesh.faces,
+                            uvs=mesh.uvs,
+                            face_uvs_idx=mesh.face_uvs_idx,
+                            face_normals=mesh.vertex_normals[mesh.face_normals].view(-1, 3))
+        material.write_to_usd(out_path, '/World/Looks/colorspace_test', bound_prims=[prim])
+
+        material_in = materials.PBRMaterial().read_from_usd(out_path, '/World/Looks/colorspace_test')
+
+        assert material_in.diffuse_colorspace == 'sRGB'
+        assert material_in.metallic_colorspace == 'auto'
+        assert material_in.roughness_colorspace == 'raw'
