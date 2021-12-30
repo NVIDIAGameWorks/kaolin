@@ -117,6 +117,9 @@ decide_cuda_kernel(
     if (depth[tidx] > 0.0){
       // Count # of occupied voxels for expansion, if more levels are left
       info[tidx] = not_done ? __popc(octree[pidx]) : 1;      
+    } else if (depth[tidx] < 0.0){
+      // Origin is inside current level's voxel, keep intersecting if more levels are left
+      info[tidx] = not_done ? __popc(octree[pidx]) : 0; 
     } else {
       info[tidx] = 0;
     }
@@ -165,6 +168,9 @@ decide_cuda_kernel(
     if (depth[tidx].x > 0.0 && depth[tidx].y > 0.0){
       // Count # of occupied voxels for expansion, if more levels are left
       info[tidx] = not_done ? __popc(octree[pidx]) : 1;      
+    } else if (depth[tidx].x < 0.0 && depth[tidx].y < 0.0){
+      // Origin is inside current level's voxel, keep intersecting if more levels are left
+      info[tidx] = not_done ? __popc(octree[pidx]) : 0; 
     } else {
       info[tidx] = 0;
     }
