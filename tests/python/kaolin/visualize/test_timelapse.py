@@ -21,6 +21,8 @@ import pytest
 
 
 from kaolin import io
+import kaolin.io.usd
+import kaolin.io.materials
 from kaolin.visualize import timelapse
 from kaolin.ops.conversions import trianglemeshes_to_voxelgrids
 
@@ -62,16 +64,15 @@ def pointcloud():
 def pointcloud_color():
     cur_dir = os.path.dirname(os.path.realpath(__file__))
     pointcloud, color, normals = io.usd.import_pointcloud(os.path.join(cur_dir, os.pardir, os.pardir,
-                                                          os.pardir, 'samples/golden/pointcloud_GeomPoints_colors.usda'),
-                                                          '/World/pointcloud')
+                                            os.pardir, 'samples/golden/pointcloud_GeomPoints_colors.usda'),
+                                            '/World/pointcloud')
     return pointcloud, color
 
 @pytest.fixture(scope='module')
 def meshes():
     cur_dir = os.path.dirname(os.path.realpath(__file__))
     meshes = io.usd.import_meshes(os.path.join(cur_dir, os.pardir, os.pardir,
-                                  os.pardir, 'samples/rocket_hetero.usd'),
-                                  with_normals=True,
+                                  os.pardir, 'samples/rocket_hetero.usd'), 
                                   heterogeneous_mesh_handler=io.usd.heterogeneous_mesh_handler_naive_homogenize)
     return meshes
 
@@ -130,7 +131,7 @@ class TestTimelapse:
         assert os.path.exists(texture_dir) 
         for iteration in data.keys():
             filename = os.path.join(out_dir, 'test', 'mesh_0.usd')
-            mesh_in = io.usd.import_mesh(filename, time=iteration, with_normals=True)
+            mesh_in = io.usd.import_mesh(filename, time=iteration)
             # Verify mesh properties
             assert torch.allclose(data[iteration]['vertices_list'][0], mesh_in.vertices)
             assert torch.equal(data[iteration]['faces_list'][0], mesh_in.faces)
@@ -139,7 +140,7 @@ class TestTimelapse:
             else:
                 i = iteration
             assert torch.allclose(data[i]['uvs_list'][0].view(-1, 2), mesh_in.uvs.view(-1, 2))
-            # assert torch.equal(data[i]['face_uvs_idx_list'][0], mesh_in.face_uvs_idx)
+            assert torch.equal(data[i]['face_uvs_idx_list'][0], mesh_in.face_uvs_idx)
             assert torch.allclose(data[i]['face_normals_list'][0], mesh_in.face_normals)
 
             materials = data[iteration]['materials_list'][0]
@@ -215,7 +216,7 @@ class TestTimelapse:
             assert torch.allclose(pointcloud_in, params['pointcloud_list'][0])
 
             assert torch.allclose(color_in, params['colors'][0])
-
+    
     def test_add_pointcloud_batch_instancer(self, instancer_out_dir, pointcloud):
         writer = timelapse.Timelapse(instancer_out_dir)
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2019, 20-21, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,18 +20,29 @@ import numpy as np
 import torch
 from PIL import Image
 
-from kaolin.io.materials import MaterialLoadError, MaterialFileError, MaterialNotFoundError
-
-
 return_type = namedtuple('return_type',
                          ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
                           'materials_order', 'vertex_normals', 'face_normals'])
 
 
+class MaterialError(Exception):
+    pass
+
+
+class MaterialLoadError(MaterialError):
+    pass
+
+
+class MaterialFileError(MaterialError):
+    pass
+
+
+class MaterialNotFoundError(MaterialError):
+    pass
+
 def ignore_error_handler(error, **kwargs):
     """Simple error handler to use in :func:`load_obj` that ignore all errors"""
     pass
-
 
 def skip_error_handler(error, **kwargs):
     """Simple error handler to use in :func:`load_obj` that skips all errors
@@ -71,7 +82,7 @@ def import_mesh(path, with_materials=False, with_normals=False,
         - **uvs** (torch.Tensor): of shape (num_uvs, 2)
         - **face_uvs_idx** (torch.LongTensor): of shape (num_faces, face_size)
         - **materials** (list of dict): a list of materials (see return values of :func:`load_mtl`)
-        - **materials_order** (torch.LongTensor): of shape (num_same_material_groups, 2)
+        - **materials_orders** (torch.LongTensor): of shape (num_same_material_groups, 2)
           showing the order in which materials are used over **face_uvs_idx** and the first indices
           in which they start to be used. A material can be used multiple times.
         - **vertex_normals** (torch.Tensor): of shape (num_vertices, 3)
@@ -94,7 +105,7 @@ def import_mesh(path, with_materials=False, with_normals=False,
     vertex_normals = []
     # 3 values per face
     face_normals = []
-    # textures = []
+    textures = []
     mtl_path = None
     materials_order = []
     materials_dict = {}

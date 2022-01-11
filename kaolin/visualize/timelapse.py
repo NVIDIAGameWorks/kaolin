@@ -6,7 +6,7 @@ import posixpath
 import warnings
 
 try:
-    from pxr import Usd
+    from pxr import Usd, UsdShade
 except ImportError:
     warnings.warn("Warning: module pxr not found", ImportWarning)
 
@@ -204,12 +204,13 @@ class Timelapse:
                     vset.SetVariantSelection(material_name)
                     material.usd_root_path = meshes_path
                     with vset.GetVariantEditContext():
-                        material.write_to_usd(
+                        material_prim = material.write_to_usd(
                             ind_out_path, f'/{mesh_name}/{material_name}',
                             time=iteration,
                             texture_dir='textures',
-                            texture_file_prefix=f'{mesh_name}_{material_name}_{iteration}_',
-                            bound_prims=[mesh_prim])
+                            texture_file_prefix=f'{mesh_name}_{material_name}_{iteration}_')
+                        binding_api = UsdShade.MaterialBindingAPI(mesh_prim)
+                        binding_api.Bind(UsdShade.Material(material_prim))
             stage.Save()
 
 
