@@ -48,8 +48,8 @@ namespace kaolin {
 void sided_distance_forward_cuda_impl(
     const at::Tensor p1,
     const at::Tensor p2,
-    const at::Tensor dist,
-    const at::Tensor idx);
+    at::Tensor dist,
+    at::Tensor idx);
 
 void sided_distance_backward_cuda_impl(
     at::Tensor grad_output,
