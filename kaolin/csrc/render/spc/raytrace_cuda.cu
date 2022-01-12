@@ -604,24 +604,23 @@ int sum_reduce_cuda_impl(
     int64_t feat_dim,
     at::Tensor feats_in,
     at::Tensor feats_out,
-    at::Tensor inclusive_sum){
+    at::Tensor inclusive_sum) {
 
-    int* inclusive_sum_ptr = inclusive_sum.data_ptr<int>();
-    
-    int cnt;
-    
-    const int num_threads = 1024;
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "sum_reduce_cuda", ([&] {
-        const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
-        auto stream = at::cuda::getCurrentCUDAStream();
-        cudaMemcpyAsync(&cnt, inclusive_sum_ptr + num_feats - 1, sizeof(int), cudaMemcpyDeviceToHost, stream);
-        sum_reduce_cuda_kernel<scalar_t><<<(num_feats+num_threads-1)/num_threads, num_threads, 0, stream>>>(
-            num_feats, feat_dim, 
-            feats_in.data_ptr<scalar_t>(), 
-            feats_out.data_ptr<scalar_t>(), 
-            inclusive_sum_ptr);
-    }));
-    return cnt;
+  int* inclusive_sum_ptr = inclusive_sum.data_ptr<int>();
+  int cnt;
+
+  const int num_threads = 1024;
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "sum_reduce_cuda", ([&] {
+      const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
+      auto stream = at::cuda::getCurrentCUDAStream();
+      cudaMemcpyAsync(&cnt, inclusive_sum_ptr + num_feats - 1, sizeof(int), cudaMemcpyDeviceToHost, stream);
+      sum_reduce_cuda_kernel<scalar_t><<<(num_feats+num_threads-1)/num_threads, num_threads, 0, stream>>>(
+          num_feats, feat_dim, 
+          feats_in.data_ptr<scalar_t>(), 
+          feats_out.data_ptr<scalar_t>(), 
+          inclusive_sum_ptr);
+  }));
+  return cnt;
 }
 
 void cumsum_cuda_impl(
