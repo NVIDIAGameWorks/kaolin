@@ -82,7 +82,7 @@ void inclusive_sum_cuda_impl(
     at::Tensor info,
     at::Tensor inclusive_sum);
 
-uint sum_reduce_cuda_impl(
+int sum_reduce_cuda_impl(
     int64_t num_feats,
     int64_t feat_dim,
     at::Tensor feats_in,
