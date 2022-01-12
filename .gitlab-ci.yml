@@ -71,11 +71,41 @@ pytest linux:
   tags: [kaolin]
   stage: test
   needs: ['build linux']
-  image: "docker:19.03.9"
+  image: "docker:19.03.0"
   before_script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
     - ci/pytest-linux.sh
+
+dibr-notebook linux:
+  tags: [kaolin]
+  stage: test
+  needs: ['build linux']
+  image: "docker:19.03.0"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - ci/dibr-notebook-linux.sh
+
+dmtet-notebook linux:
+  tags: [kaolin]
+  stage: test
+  needs: ['build linux']
+  image: "docker:19.03.0"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - ci/dmtet-notebook-linux.sh
+
+understanding-spcs-notebook linux:
+  tags: [kaolin]
+  stage: test
+  needs: ['build linux']
+  image: "docker:19.03.0"
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - ci/understanding-spcs-notebook-linux.sh
 
 test windows:
   tags: [kaolin_windows]
@@ -83,4 +113,3 @@ test windows:
   needs: ['build windows']
   script:
     - ci\test-windows.bat
-

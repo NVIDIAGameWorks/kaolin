@@ -5,3 +5,4 @@ flake8-mypy==17.8.0
 flake8-pyi==19.3.0
 pytest==5.4.2
 pytest-cov==2.8.1
+jupyter
