@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <limits>
+
 #include <ATen/ATen.h>
 
 namespace kaolin {
@@ -83,7 +85,8 @@ std::vector<at::Tensor> deftet_sparse_render_forward_cuda(
   auto selected_face_idx = at::full({batch_size, num_points, knum}, -1,
                                     options.dtype(at::kLong));
   auto pixel_depths = at::full({batch_size, num_points, knum},
-                               -1. / 0., options);
+                               -std::numeric_limits<float>::infinity(),
+			       options);
   auto w0_arr = at::zeros({batch_size, num_points, knum}, options);
   auto w1_arr = at::zeros({batch_size, num_points, knum}, options);
 
