@@ -15,6 +15,7 @@ RUN sed -i -e 's|^deb http://[^.]*[.]ubuntu[.]com/ubuntu|deb  https://urm.nvidia
          build-essential \
          curl \
          git \
+         unzip \
          libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2 libxtst6 xauth xvfb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -51,6 +52,7 @@ RUN npm install \
     npm cache clean
 
 COPY . .
+
 ENV TORCH_CUDA_ARCH_LIST "5.2 6.0 6.1 7.0 7.5+PTX"
 ENV KAOLIN_INSTALL_EXPERIMENTAL "1"
 RUN python setup.py develop
