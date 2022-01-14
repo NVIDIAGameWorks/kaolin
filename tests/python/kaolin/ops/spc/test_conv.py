@@ -152,7 +152,7 @@ class TestConv3D:
         expected_height, expected_width, expected_depth = expected_output.shape[2:]
         expected_output *= output_sparsity_masks[:, :, :expected_height, :expected_width, :expected_depth]
         assert torch.allclose(output[:, :, :expected_height, :expected_width, :expected_depth],
-                              expected_output, atol=1e-3, rtol=1e-3)
+                              expected_output, atol=1e-5, rtol=1e-5)
         grad_output = torch.rand_like(output)
         output.backward(grad_output)
         expected_output.backward(grad_output[:, :, :expected_height, :expected_width, :expected_depth])
@@ -231,14 +231,14 @@ class TestConv3D:
                                            kernel_offset:depth + kernel_offset]
         expected_output *= out_sparsity_masks.unsqueeze(1)
         assert output_level == max_level
-        assert torch.allclose(output, expected_output, rtol=1e-3, atol=1e-3)
+        assert torch.allclose(output, expected_output, rtol=1e-5, atol=1e-5)
         # test backward
         grad_out = torch.rand_like(expected_output)
         expected_output.backward(grad_out)
         output.backward(grad_out)
         _, _, sparsified_grad = spc.feature_grids_to_spc(feature_grids.grad, sparsity_masks)
         assert torch.allclose(coalescent_features.grad, sparsified_grad,
-                              rtol=5e-2, atol=5e-2)
+                              rtol=1e-5, atol=1e-5)
         assert torch.allclose(spc_weight.grad,
                               dense_weight.grad.reshape(out_channels, in_channels, -1).permute(2, 1, 0),
                               rtol=5e-2, atol=5e-2)
