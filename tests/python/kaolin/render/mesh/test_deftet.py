@@ -420,9 +420,9 @@ class TestDeftetSparseRender:
         interpolated_features.backward(grad_out)
         gt_interpolated_features.backward(grad_out)
 
-        assert torch.all(pixel_coords.grad == 0.)
-        assert torch.all(render_ranges.grad == 0.)
-        assert torch.all(face_vertices_z.grad == 0.)
+        assert pixel_coords.grad is None or torch.all(pixel_coords.grad == 0.)
+        assert render_ranges.grad is None or torch.all(render_ranges.grad == 0.)
+        assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
         assert torch.allclose(face_vertices_image.grad,
                               face_vertices_image2.grad,
                               rtol=1e-3, atol=1e-3)
@@ -472,9 +472,9 @@ class TestDeftetSparseRender:
         interpolated_features.backward(grad_out)
         gt_interpolated_features.backward(grad_out)
 
-        assert torch.all(pixel_coords.grad == 0.)
-        assert torch.all(render_ranges.grad == 0.)
-        assert torch.all(face_vertices_z.grad == 0.)
+        assert pixel_coords.grad is None or torch.all(pixel_coords.grad == 0.)
+        assert render_ranges.grad is None or torch.all(render_ranges.grad == 0.)
+        assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
         assert torch.allclose(face_vertices_image.grad,
                               face_vertices_image2.grad,
                               rtol=1e-3, atol=1e-3)
