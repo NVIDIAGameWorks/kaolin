@@ -18,6 +18,7 @@
 
 #ifdef WITH_CUDA
 
+#include <stdint.h>
 #include <vector_types.h>
 #include <vector_functions.h>
 
@@ -32,7 +33,7 @@ typedef unsigned char       uchar;
 typedef unsigned short      ushort;
 typedef unsigned int        uint;
 
-typedef long unsigned int   morton_code;
+typedef uint64_t            morton_code;
 typedef short3              point_data;
 typedef long3               tri_index;
 
