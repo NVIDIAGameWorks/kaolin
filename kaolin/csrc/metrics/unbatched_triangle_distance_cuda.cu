@@ -21,6 +21,24 @@
 
 #include "../utils.h"
 
+#define PRIVATE_CASE_TYPE_AND_VAL(ENUM_TYPE, TYPE, TYPE_NAME, VAL, ...) \
+  case ENUM_TYPE: { \
+    using TYPE_NAME = TYPE; \
+    const int num_threads = VAL; \
+    return __VA_ARGS__(); \
+  }
+
+
+#define DISPATCH_INPUT_TYPES(TYPE, TYPE_NAME, SCOPE_NAME, ...) \
+  [&] { \
+    switch(TYPE) \
+    { \
+      PRIVATE_CASE_TYPE_AND_VAL(at::ScalarType::Float, float, TYPE_NAME, 1024, __VA_ARGS__) \
+      PRIVATE_CASE_TYPE_AND_VAL(at::ScalarType::Double, double, TYPE_NAME, 512, __VA_ARGS__) \
+      default: \
+        AT_ERROR(#SCOPE_NAME, " not implemented for '", toString(TYPE), "'"); \
+    } \
+  }()
 
 namespace kaolin {
 
@@ -431,11 +449,11 @@ void unbatched_triangle_distance_backward_cuda_impl(
     at::Tensor dist_type,
     at::Tensor grad_points,
     at::Tensor grad_face_vertices) {
-  const int num_threads = 1024;
-  const int num_points = points.size(0);
-  const int num_blocks = (num_points + num_threads - 1) / num_threads;
-  AT_DISPATCH_FLOATING_TYPES(points.scalar_type(),
-                             "unbatched_triangle_distance_backward_cuda", [&] {
+
+  DISPATCH_INPUT_TYPES(points.scalar_type(), scalar_t,
+                       "unbatched_triangle_distance_backward_cuda", [&] {
+    const int num_points = points.size(0);
+    const int num_blocks = (num_points + num_threads - 1) / num_threads;
     using vector_t = ScalarTypeToVec3<scalar_t>::type;
     const at::cuda::OptionalCUDAGuard device_guard(at::device_of(points));
     auto stream = at::cuda::getCurrentCUDAStream();
@@ -455,3 +473,6 @@ void unbatched_triangle_distance_backward_cuda_impl(
 }
 
 }  // namespace kaolin
+
+#undef PRIVATE_CASE_TYPE_AND_VAL
+#undef DISPATCH_INPUT_TYPES
