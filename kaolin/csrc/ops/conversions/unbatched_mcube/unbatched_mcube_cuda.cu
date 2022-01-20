@@ -13,6 +13,7 @@
 // limitations under the License.
 #define CUB_NS_PREFIX namespace kaolin {
 #define CUB_NS_POSTFIX }
+#define CUB_NS_QUALIFIER ::kaolin::cub
 
 #include <stdio.h>
 #include <string.h>

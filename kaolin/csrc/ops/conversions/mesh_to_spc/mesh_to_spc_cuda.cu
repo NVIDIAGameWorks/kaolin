@@ -15,8 +15,7 @@
 
 #define CUB_NS_PREFIX namespace kaolin {
 #define CUB_NS_POSTFIX }
-
-#include <stdio.h>
+#define CUB_NS_QUALIFIER ::kaolin::cub
 
 #define CUB_STDERR
 #include <cub/device/device_scan.cuh>
@@ -26,14 +25,16 @@
 
 namespace kaolin {
 
-using namespace cub;
 using namespace std;
 
 
 uint64_t GetStorageBytes(void* d_temp_storageA, morton_code* d_M0, morton_code* d_M1, uint max_total_points)
 {
     uint64_t    temp_storage_bytesA = 0;
-    CubDebugExit(DeviceRadixSort::SortKeys(d_temp_storageA, temp_storage_bytesA, d_M0, d_M1, max_total_points));
+    CubDebugExit(
+        cub::DeviceRadixSort::SortKeys(d_temp_storageA, temp_storage_bytesA,
+                                       d_M0, d_M1, max_total_points)
+    );
     return temp_storage_bytesA;
 }
 
@@ -429,7 +430,7 @@ uint ConstructOctree(morton_code* d_morton_buffer, uint* d_info, uint* d_psum,
         // Mark boundaries of morton code octants
         d_CommonParent << <(prev + 1023) / 1024, 1024 >> >(prev, mroot, d_info);
         // Count number of allocated nodes in layer above
-        DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_info, d_psum, prev);
+        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_info, d_psum, prev);
         cudaMemcpy(&curr, d_psum+prev-1, sizeof(uint), cudaMemcpyDeviceToHost);
         h_pyramid[i-1] = curr;
 
@@ -489,7 +490,7 @@ uint VoxelizeGPU(uint npnts, float3* d_Pnts, uint ntris, tri_index* d_Tris, uint
     // Info contains triangle ID -> # rasterized voxels. 
     // Count total # rasterized voxels and flush the buffer.
     uint cnt;
-    DeviceScan::InclusiveSum(d_temp_storageA, temp_storage_bytesA, d_info, d_psum, ntris);
+    cub::DeviceScan::InclusiveSum(d_temp_storageA, temp_storage_bytesA, d_info, d_psum, ntris);
     cudaMemcpy(&cnt, d_psum + ntris - 1, sizeof(uint), cudaMemcpyDeviceToHost);
     cudaMemset(d_Info, 0, cnt+1);
 
@@ -497,7 +498,7 @@ uint VoxelizeGPU(uint npnts, float3* d_Pnts, uint ntris, tri_index* d_Tris, uint
     d_prepTriTable << <(ntris + 63) / 64, 64 >> > (ntris, d_psum, d_Info);
     
     // Create voxel->triangle ID correspondences.
-    DeviceScan::InclusiveSum(d_temp_storageA, temp_storage_bytesA, d_Info, d_PrefixSum, cnt+1);
+    cub::DeviceScan::InclusiveSum(d_temp_storageA, temp_storage_bytesA, d_Info, d_PrefixSum, cnt+1);
 
     // Fill morton buffer with voxels
     d_ProcessVoxels << <(cnt + 63) / 64, 64 >> > (cnt, d_l0, d_l1, d_l2, d_F, d_axis, d_W, d_pmin, d_info, d_psum, d_PrefixSum, d_Info, d_M0);
@@ -505,19 +506,19 @@ uint VoxelizeGPU(uint npnts, float3* d_Pnts, uint ntris, tri_index* d_Tris, uint
 
     // Sort mortons, find unique, and fill the buffer (d_M1)
     // d_M1 = d_M0[d_Info]
-    DeviceScan::ExclusiveSum(d_temp_storageA, temp_storage_bytesA, d_Info, d_PrefixSum, cnt+1);
+    cub::DeviceScan::ExclusiveSum(d_temp_storageA, temp_storage_bytesA, d_Info, d_PrefixSum, cnt+1);
     cudaMemcpy(&mcnt, d_PrefixSum + cnt, sizeof(uint), cudaMemcpyDeviceToHost);
     d_Compactify << <(cnt + 63) / 64, 64 >> > (cnt, d_M0, d_M1, d_Info, d_PrefixSum);
 
     // d_M0 = d_M1.sort()
-    CubDebugExit(DeviceRadixSort::SortKeys(d_temp_storageA, temp_storage_bytesA, d_M1, d_M0, mcnt));
+    CubDebugExit(cub::DeviceRadixSort::SortKeys(d_temp_storageA, temp_storage_bytesA, d_M1, d_M0, mcnt));
 
     // Mark boundaries of unique  
     d_RemoveDuplicates << <(mcnt + 63) / 64, 64 >> > (mcnt, d_M0, d_Info);
 
     // d_M1[-psize:] = d_M0[d_Info]
     uint psize;
-    DeviceScan::ExclusiveSum(d_temp_storageA, temp_storage_bytesA, d_Info, d_PrefixSum, mcnt+1);
+    cub::DeviceScan::ExclusiveSum(d_temp_storageA, temp_storage_bytesA, d_Info, d_PrefixSum, mcnt+1);
     cudaMemcpy(&psize, d_PrefixSum + mcnt, sizeof(uint), cudaMemcpyDeviceToHost);
     d_Compactify << <(mcnt + 63) / 64, 64 >> > (mcnt, d_M0, d_M1+KAOLIN_SPC_MAX_POINTS-psize, d_Info, d_PrefixSum);
     // printf("cnt= %d, mcnt= %d, psize= %d\n", cnt, mcnt, psize);

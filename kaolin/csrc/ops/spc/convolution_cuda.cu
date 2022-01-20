@@ -19,12 +19,11 @@
 
 #define CUB_NS_PREFIX namespace kaolin {
 #define CUB_NS_POSTFIX }
+#define CUB_NS_QUALIFIER ::kaolin::cub
 
 #include <cub/device/device_scan.cuh>
 
 namespace kaolin {
-
-using namespace cub;
 
 #define THREADS_PER_BLOCK 64
 
@@ -58,7 +57,7 @@ uint GetPyramid(uint* Pyramid, int batch, int k, int level, int olevel) {
 uint64_t GetStorageBytesX(void* d_temp_storage, uint* d_Info,
                        uint* d_PrefixSum, uint max_total_points) {
   uint64_t temp_storage_bytes = 0;
-  CubDebugExit(DeviceScan::InclusiveSum(
+  CubDebugExit(cub::DeviceScan::InclusiveSum(
       d_temp_storage, temp_storage_bytes, d_Info, d_PrefixSum, max_total_points));
   return temp_storage_bytes;
 }
@@ -186,7 +185,7 @@ void ProcessKernelMaps(
     int* Outmap,
     int* InmapX,
     int* OutmapX) {
-  DeviceScan::InclusiveSum(d_temp_storageA, temp_storage_bytesA,
+  cub::DeviceScan::InclusiveSum(d_temp_storageA, temp_storage_bytesA,
                            Info, PSum, K*Cnt);
   CUDA_CHECK(cudaGetLastError());
 
