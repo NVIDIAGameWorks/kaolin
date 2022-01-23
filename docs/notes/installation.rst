@@ -54,6 +54,9 @@ To enable installation of experimental features, set
 environment variable
 ``export KAOLIN_INSTALL_EXPERIMENTAL=1``. To install, run:
 
+.. Note::
+    On CUDA >= 11.0, CUB is already available and ``CUB_HOME`` should be specified to avoid conflict with the submodule ``third_party/cub`` (typically on linux ``export CUB_HOME=/usr/local/cuda-*/include/``).
+
 .. code-block:: bash
 
     $ python setup.py develop
