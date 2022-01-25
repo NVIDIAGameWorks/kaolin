@@ -63,6 +63,9 @@ Kaolin may be able to work with other PyTorch versions. See below for overriding
 4. Install Kaolin
 ^^^^^^^^^^^^^^^^^
 
+.. Note::
+    On CUDA >= 11.0, CUB is already available and ``CUB_HOME`` should be specified to avoid conflict with the submodule ``third_party/cub`` (typically on linux ``export CUB_HOME=/usr/local/cuda-*/include/``).
+
 .. code-block:: bash
 
     $ python setup.py develop

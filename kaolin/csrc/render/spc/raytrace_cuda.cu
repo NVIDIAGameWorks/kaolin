@@ -37,7 +37,6 @@
 
 namespace kaolin {
 
-using namespace cub;
 using namespace at::indexing;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -596,7 +595,7 @@ void inclusive_sum_cuda_impl(
     at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, device(at::DeviceType::CUDA).dtype(at::kByte));
     temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
 
-    CubDebugExit(DeviceScan::InclusiveSum(temp_storage_ptr, temp_storage_bytes, info_ptr, inclusive_sum_ptr, num));
+    CubDebugExit(cub::DeviceScan::InclusiveSum(temp_storage_ptr, temp_storage_bytes, info_ptr, inclusive_sum_ptr, num));
 }
 
 int sum_reduce_cuda_impl(
