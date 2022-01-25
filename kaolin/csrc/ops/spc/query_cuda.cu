@@ -14,10 +14,7 @@
 // limitations under the License.
 
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <ATen/ATen.h>
-#include <cuda_runtime.h>
 
 #include "../../spc_math.h"
 #include "../../spc_utils.cuh"
