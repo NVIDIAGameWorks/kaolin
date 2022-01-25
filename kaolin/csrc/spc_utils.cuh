@@ -18,8 +18,7 @@
 
 #define CUB_NS_PREFIX namespace kaolin {
 #define CUB_NS_POSTFIX }
-
-#ifdef WITH_CUDA
+#define CUB_NS_QUALIFIER ::kaolin::cub
 
 #include <cub/device/device_scan.cuh>
 #include "spc_math.h"
@@ -138,5 +137,4 @@ static uint64_t get_cub_storage_bytes(
 }
 
 } // namespace kaolin
-#endif  // WITH_CUDA
 #endif  // KAOLIN_SPC_UTILS_CUH_

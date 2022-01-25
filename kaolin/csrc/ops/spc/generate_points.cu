@@ -14,11 +14,6 @@
 // limitations under the License.
 
 
-#define CUB_NS_PREFIX namespace kaolin {
-#define CUB_NS_POSTFIX }
-
-#include <cub/device/device_scan.cuh>
-
 #include <ATen/ATen.h>
 
 #include "../../spc_math.h"
@@ -28,8 +23,6 @@
 #define THREADS_PER_BLOCK 64
 
 namespace kaolin {
-
-using namespace cub;
 
 void generate_points_cuda_impl(
     at::Tensor octrees,
