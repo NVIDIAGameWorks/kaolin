@@ -15,9 +15,6 @@
 
 
 #include <ATen/ATen.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <cuda_runtime.h>
 
 #include "../../spc_math.h"
 #include "../../spc_utils.cuh"

@@ -16,6 +16,7 @@
 
 #define CUB_NS_PREFIX namespace kaolin {
 #define CUB_NS_POSTFIX }
+#define CUB_NS_QUALIFIER ::kaolin::cub
 
 #include <cub/device/device_scan.cuh>
 
@@ -28,8 +29,6 @@
 #define THREADS_PER_BLOCK 64
 
 namespace kaolin {
-
-using namespace cub;
 
 __global__ void scan_nodes_cuda_kernel(
     const uint num_bytes,
@@ -74,7 +73,7 @@ int scan_octrees_cuda_impl(
     // compute exclusive sum 1 element beyond end of list to get inclusive sum starting at prefix_sum_ptr+1
     scan_nodes_cuda_kernel<<< (osize + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >>>(
         osize, O0, num_childrens_per_node_ptr);
-    CubDebugExit(DeviceScan::ExclusiveSum(
+    CubDebugExit(cub::DeviceScan::ExclusiveSum(
         temp_storage_ptr, temp_storage_bytes, num_childrens_per_node_ptr,
         EX0, osize + 1)); // carful with the +1
 

@@ -15,6 +15,7 @@
 
 #define CUB_NS_PREFIX namespace kaolin {
 #define CUB_NS_POSTFIX }
+#define CUB_NS_QUALIFIER ::kaolin::cub
 
 #include <stdio.h>
 #include <ATen/ATen.h>
@@ -36,7 +37,6 @@
 
 namespace kaolin {
 
-using namespace cub;
 using namespace at::indexing;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -506,7 +506,7 @@ uint raytrace_cuda_impl(
             num, points_ptr, ray_o_ptr, ray_d_ptr, nuggets[buffer], 
             depths[buffer], info_ptr, octree_ptr, l, target_level - l);
     }
-    CubDebugExit(DeviceScan::InclusiveSum(
+    CubDebugExit(cub::DeviceScan::InclusiveSum(
         temp_storage_ptr, temp_storage_bytes, info_ptr,
         prefix_sum_ptr + 1, num)); //start sum on second element
     cudaMemcpy(&cnt, prefix_sum_ptr + num, sizeof(uint), cudaMemcpyDeviceToHost);
@@ -595,7 +595,7 @@ void inclusive_sum_cuda_impl(
     at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, device(at::DeviceType::CUDA).dtype(at::kByte));
     temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
 
-    CubDebugExit(DeviceScan::InclusiveSum(temp_storage_ptr, temp_storage_bytes, info_ptr, inclusive_sum_ptr, num));
+    CubDebugExit(cub::DeviceScan::InclusiveSum(temp_storage_ptr, temp_storage_bytes, info_ptr, inclusive_sum_ptr, num));
 }
 
 int sum_reduce_cuda_impl(
@@ -823,7 +823,7 @@ uint generate_shadow_rays_cuda_impl(
   uint cnt = 0;
   plane_intersect_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
       num, ray_o, ray_d, dst, plane, info);
-  CubDebugExit(DeviceScan::ExclusiveSum(
+  CubDebugExit(cub::DeviceScan::ExclusiveSum(
       temp_storage_ptr, temp_storage_bytes, info, prefix_sum, num));
   cudaMemcpy(&cnt, prefix_sum + num - 1, sizeof(uint), cudaMemcpyDeviceToHost);
   compactify_shadow_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
