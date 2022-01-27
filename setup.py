@@ -41,7 +41,7 @@ else:
                           f'but found version {torch.__version__} instead. '
                           'This will try to install a compatible version of PyTorch. '
                           'If the installation fails we recommend to first install it.')
-        missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
+            missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
 
 cython_spec = importlib.util.find_spec("cython")
 if cython_spec is None:
