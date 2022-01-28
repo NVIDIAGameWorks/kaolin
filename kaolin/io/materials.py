@@ -251,6 +251,9 @@ class PBRMaterial(Material):
             in a metallic workflow) in the range of `(0.0, 0.0, 0.0)` to `(1.0, 1.0, 1.0)`. Default value is grey
             `(0.5, 0.5, 0.5)`.
         roughness_value (float): Roughness value of specular lobe in range `0.0` to `1.0`. Default value is `0.5`.
+        metallic_value (float):
+            Metallic value, typically set to `0.0` for non-metallic and `1.0` for metallic materials. 
+            Ignored if `is_specular_workflow` is `True`. Default value is `0.0`.
         clearcoat_value (float): Second specular lobe amount. Color is hardcoded to white. Default value is `0.0`.
         clearcoat_roughness_value (float): Roughness for the clearcoat specular lobe in the range `0.0` to `1.0`.
             The default value is `0.01`.
