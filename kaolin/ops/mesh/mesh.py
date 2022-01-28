@@ -26,16 +26,19 @@ def index_vertices_by_faces(vertices_features, faces):
 
     Args:
         vertices_features (torch.FloatTensor):
-            vertices features, of shape :math:`(\text{batch_size}, \text{num_points}, \text{knum})`,
-            knum is feature dimension
-            The features could be xyz position, rgb color, or even neural network features
-        faces (torch.LongTensor): face index, of shape :math:`(\text{num_faces}, \text{num_vertices})`
+            vertices features, of shape
+            :math:`(\text{batch_size}, \text{num_points}, \text{knum})`,
+            ``knum`` is feature dimension, the features could be xyz position,
+            rgb color, or even neural network features.
+        faces (torch.LongTensor):
+            face index, of shape :math:`(\text{num_faces}, \text{num_vertices})`.
     Returns:
         (torch.FloatTensor):
-            the face features,
-            of shape :math:`(\text{batch_size}, \text{num_faces}, \text{num_vertices}, \text{knum})`
+            the face features, of shape
+            :math:`(\text{batch_size}, \text{num_faces}, \text{num_vertices}, \text{knum})`.
     """
-    assert vertices_features.ndim == 3, "vertices_features must have 3 dimensions of shape (batch_size, num_points, knum)"
+    assert vertices_features.ndim == 3, \
+        "vertices_features must have 3 dimensions of shape (batch_size, num_points, knum)"
     assert faces.ndim == 2, "faces must have 2 dimensions of shape (num_faces, num_vertices)"
     input = vertices_features.unsqueeze(2).expand(-1, -1, faces.shape[-1], -1)
     indices = faces[None, ..., None].expand(vertices_features.shape[0], -1, -1, vertices_features.shape[-1])

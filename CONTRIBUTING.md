@@ -79,7 +79,7 @@ Include a license at the top of new files.
 # limitations under the License.
 ```
 
-When non-trivial changes are made, the license should be changed accordingly. For instance, if the file is originally authored in 2021, a few typos get fixed in 202, a paragraph or subroutine is added in 2023, and a major rev2.0 is created in 2024, you would in 2024 write:
+When non-trivial changes are made, the license should be changed accordingly. For instance, if the file is originally authored in 2021, a few typos get fixed in 2022, a paragraph or subroutine is added in 2023, and a major rev2.0 is created in 2024, you would in 2024 write:
 "Copyright (c) 2021,23-24 NVIDIA CORPORATION & AFFILIATES"
 
 #### Code organization

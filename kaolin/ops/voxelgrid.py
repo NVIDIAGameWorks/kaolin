@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +26,8 @@ def downsample(voxelgrids, scale):
         The voxelgrids output is not thresholded.
 
     Args:
-        voxelgrids (torch.Tensor): voxelgrids of shape (N, X, Y, Z) to be downsampled
+        voxelgrids (torch.Tensor): voxelgrids to be downsampled, of shape
+                                   :math:`(\text{batch_size}, \text{X}, \text{Y}, \text{Z})`.
         scale (list or tuple or int): List or tuple of int of length 3 to scale each dimension down.
                                       or an int to scale down for every dimension.
 

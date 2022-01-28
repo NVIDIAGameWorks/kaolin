@@ -1,4 +1,4 @@
-# Copyright (c) 2019, 20-21, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21 NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,12 @@ from PIL import Image
 
 from kaolin.io.materials import MaterialLoadError, MaterialFileError, MaterialNotFoundError
 
+__all__ = [
+    'ignore_error_handler',
+    'skip_error_handler',
+    'default_error_handler',
+    'import_mesh'
+]
 
 return_type = namedtuple('return_type',
                          ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
@@ -56,26 +62,33 @@ def import_mesh(path, with_materials=False, with_normals=False,
         path (str): path to the obj file (with extension).
         with_materials (bool): if True, load materials. Default: False.
         with_normals (bool): if True, load vertex normals. Default: False.
-        error_handler (Callable):
-            function that handle errors that may happen during file processing.
-            Take (error (Exception), material_name (str, optional),
-            materials (list of dict, optional),
-            materials_order (list, optional)) as input.
+        error_handler (Callable, optional):
+            function that handle errors that may happen during file processing,
+            with following signature:
+            ``error_handler(error: Exception, material_name: Optional[str],
+            materials: Optional[list[dict]], materials_order: Optional[list])``.
             Default: raise all errors.
 
     Returns:
+        (obj.return_type):
+            nametuple of:
 
-    nametuple of:
-        - **vertices** (torch.Tensor): of shape (num_vertices, 3)
-        - **faces** (torch.LongTensor): of shape (num_faces, face_size)
-        - **uvs** (torch.Tensor): of shape (num_uvs, 2)
-        - **face_uvs_idx** (torch.LongTensor): of shape (num_faces, face_size)
-        - **materials** (list of dict): a list of materials (see return values of :func:`load_mtl`)
-        - **materials_order** (torch.LongTensor): of shape (num_same_material_groups, 2)
-          showing the order in which materials are used over **face_uvs_idx** and the first indices
-          in which they start to be used. A material can be used multiple times.
-        - **vertex_normals** (torch.Tensor): of shape (num_vertices, 3)
-        - **face_normals** (torch.LongTensor): of shape (num_faces, face_size)
+            - **vertices** (torch.Tensor): of shape :math:`(\text{num_vertices}, 3)`.
+            - **faces** (torch.LongTensor):
+              of shape :math:`(\text{num_faces}, \text{face_size})`.
+            - **uvs** (torch.Tensor): of shape :math:`(\text{num_uvs}, 2)`.
+            - **face_uvs_idx** (torch.LongTensor):
+              of shape :math:`(\text{num_faces}, \text{face_size})`.
+            - **materials** (list of dict):
+              a list of materials (see return values of :func:`load_mtl`).
+            - **materials_order** (torch.LongTensor):
+              of shape :math:`(\text{num_same_material_groups}, 2)`.
+              showing the order in which materials are used over **face_uvs_idx**
+              and the first indices in which they start to be used.
+              A material can be used multiple times.
+            - **vertex_normals** (torch.Tensor): of shape :math:`(\text{num_vertices}, 3)`.
+            - **face_normals** (torch.LongTensor):
+              of shape :math:`(\text{num_faces}, \text{face_size})`.
 
     Raises:
         MaterialNotFoundError:

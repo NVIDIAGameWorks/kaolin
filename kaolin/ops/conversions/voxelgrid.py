@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,11 +59,19 @@ def voxelgrids_to_cubic_meshes(voxelgrids, is_trimesh=True):
     If `is_trimesh==True`, this function performs the same operation
     as "Cubify" defined in the ICCV 2019 paper "Mesh R-CNN": 
     https://arxiv.org/abs/1906.02739.
+
     Args:
-        voxelgrids (torch.Tensor): binary voxel array with shape (B, X, Y, Z).
-        is_trimesh (bool): the outputs are triangular meshes if True. Otherwise quadmeshes are returned.
+        voxelgrids (torch.Tensor): binary voxel array, of shape
+                                   :math:`(\text{batch_size}, \text{X}, \text{Y}, \text{Z})`.
+        is_trimesh (optional, bool): if True, the outputs are triangular meshes.
+                                     Otherwise quadmeshes are returned. Default: True.
+
     Returns:
-        (list[torch.Tensor], list[torch.LongTensor]): tuple containing the list of vertices and the list of faces for each mesh.
+        (list[torch.Tensor], list[torch.LongTensor]):
+
+            - The list of vertices for each mesh.
+            - The list of faces for each mesh.
+
     Example:
         >>> voxelgrids = torch.ones((1, 1, 1, 1))
         >>> verts, faces = voxelgrids_to_cubic_meshes(voxelgrids)
@@ -165,15 +173,17 @@ def voxelgrids_to_trianglemeshes(voxelgrids, iso_value=0.5):
     Args:
         voxelgrids (torch.Tensor):
             Exact batched voxel array with shape
-            :math:`(\text{batch_size}, \text{dim}, \text{dim}, \text{dim})`.
-        iso_value (float):
-            Value in the range [0, 1] used to determine whether a voxel is inside the
+            :math:`(\text{batch_size}, \text{X}, \text{Y}, \text{Z})`.
+        iso_value (optional, float):
+            Value in the range :math:`[0, 1]` used to determine whether a voxel is inside the
             surface or not. Isovalue is also used to interpolate 
             newly created triangle vertices. Defaults to 0.5
 
     Returns:
-        (List of torch.FloatTensor, List of torch.LongTensor): 
-         List of vertices and faces tensors of the converted triangle mesh, corresponds to each voxelgrid.
+        (list[torch.FloatTensor], list[torch.LongTensor]):
+
+            - The list of vertices of each mesh.
+            - The list of faces of each mesh.
 
     Example:
         >>> voxelgrid = torch.tensor([[[[1, 0], 
