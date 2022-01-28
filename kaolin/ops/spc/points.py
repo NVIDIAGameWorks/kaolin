@@ -28,13 +28,14 @@ import torch
 from kaolin import _C
 
 def quantize_points(x, level):
-    r"""Quantize [-1, 1] float coordinates in to [0, (2^level)-1] integer coords.
+    r"""Quantize :math:`[-1, 1]` float coordinates in to
+    :math:`[0, (2^{level})-1]` integer coords.
 
-    If a point is out of the range [-1, 1] it will be clipped to it.
+    If a point is out of the range :math:`[-1, 1]` it will be clipped to it.
 
     Args:
-        x (torch.FloatTensor): floating point coordinates,
-                               must but of last dimension 3.
+        x (torch.FloatTensor): Floating point coordinates,
+                               must be of last dimension 3.
         level (int): Level of the grid
 
     Returns
@@ -48,7 +49,7 @@ def unbatched_points_to_octree(points, level, sorted=False):
     r"""Convert (quantized) 3D points to an octree.
 
     This function assumes that the points are all in the same frame of reference
-    of [0, 2^level]. Note that SPC.points does not satisfy this constraint.
+    of :math:`[0, 2^level]`. Note that SPC.points does not satisfy this constraint.
 
     Args:
         points (torch.ShortTensor):
@@ -58,8 +59,9 @@ def unbatched_points_to_octree(points, level, sorted=False):
         sorted (bool): True if the points are unique and sorted in morton order.
 
     Returns:
-        (torch.ByteTensor): the generated octree,
-                            of shape :math:`(2^\text{level}, 2^\text{level}, 2^\text{level})`.
+        (torch.ByteTensor):
+            the generated octree,
+            of shape :math:`(2^\text{level}, 2^\text{level}, 2^\text{level})`.
     """
     if not sorted:
         unique = torch.unique(points.contiguous(), dim=0).contiguous()
@@ -129,8 +131,9 @@ def points_to_corners(points):
                                     of shape :math:`(\text{num_points}, 3)`.
 
     Returns:
-        (torch.ShortTensor): Quantized 3D new points,
-                             of shape :math:`(\text{num_points}, 8, 3)`.
+        (torch.ShortTensor):
+            Quantized 3D new points,
+            of shape :math:`(\text{num_points}, 8, 3)`.
 
     Examples:
         >>> inputs = torch.tensor([
@@ -173,8 +176,9 @@ def coords_to_trilinear(coords, points):
                                     of shape :math:`(\text{num_points}, 3)`.
 
     Returns:
-        (torch.FloatTensor): The trilinear interpolation coefficients,
-                             of shape :math:`(\text{num_points}, 8)`.
+        (torch.FloatTensor):
+            The trilinear interpolation coefficients,
+            of shape :math:`(\text{num_points}, 8)`.
     """
     shape = list(points.shape)
     shape[-1] = 8

@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,21 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -61,18 +62,25 @@ def sdf_to_voxelgrids(sdf, bbox_center=0., bbox_dim=1., init_res=32, upsampling_
     around the surface.
 
     Args:
-        sdf (list[callable]): a list of callable that 
-            takes in an Nx3 tensor of N 3D coordinates and 
-            outputs the N corresponding SDF values
-        bbox_center (float): center of the surface's bounding box.
-        bbox_dim (float): largest dimension of the surface's bounding box.
-        init_res (int): the initial resolution of the voxel, should be
-            large enough to properly define the surface.
-        upsampling_steps (int): Number of times the initial resolution will
-            be doubled.
+        sdf (list[callable]):
+            A list of callable that takes 3D coordinates as a :class:`torch.Tensor`, of shape
+            :math:`(\text{num_points}, 3)` and output the N corresponding SDF values
+            as a :class:`torch.Tensor`, of shape :math:`(\text{num_points})`.
+        bbox_center (optional, float):
+            Center of the surface's bounding box. Default: 0.
+        bbox_dim (optional, float):
+            Largest dimension of the surface's bounding box. Default: 1.
+        init_res (optional, int):
+            The initial resolution of the voxelgrids, should be
+            large enough to properly define the surface. Default: 32.
+        upsampling_steps (optional, int):
+            Number of times the initial resolution will be doubled. Default: 0.
 
     Returns:
-        (torch.Tensor): Binary voxelgrids of shape :math:`(batch\_size, init\_res * 2 ^ {upsampling\_steps} + 1)`
+        (torch.Tensor):
+            Binary voxelgrids, of shape
+            :math:`(\text{batch_size}, \text{init_res} * 2 ^ \text{upsampling_steps} + 1)`.
+
     Example:
         >>> def sphere(points):
         ...     return torch.sum(points ** 2, 1) ** 0.5 - 0.5

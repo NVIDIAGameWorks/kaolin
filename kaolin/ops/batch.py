@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -212,16 +213,18 @@ def packed_to_list(packed_tensor, shape_per_tensor, first_idx):
             for first_id, last_id, shape in zip(first_idx[:-1], first_idx[1:], shape_per_tensor)]
 
 def fill_max_shape(shape_per_tensor, partial_max_shape=None):
-    """Fills partial definition of shape to be at least as big as each shape in shape_per_tensor.
+    r"""Fills partial definition of shape to be at least as big as each shape in shape_per_tensor.
 
     if the i-th dimension is -1 then the i-th output will be ``shape_per_tensor[:,i].max()``.
 
     Args:
-        shape_per_tensor (torch.Tensor): input :ref:`shape_per_tensor<packed_shape_per_tensor>`, of shape (N x ndim).
-        partial_max_shape (tuple, list or torch.Tensor): partially defined maximum shape, of size ndim.
+        shape_per_tensor (torch.Tensor): Input :ref:`shape_per_tensor<packed_shape_per_tensor>`,
+                                         of shape :math:`(\text{N}, \text{ndim})`.
+        partial_max_shape (tuple, list or torch.Tensor): partially defined maximum shape,
+                                                         of size ``ndim``.
 
     Returns:
-        (torch.Tensor): the max_shape fully defined, of same size than partial_max_shape.
+        (torch.Tensor): the max_shape fully defined, of same size than ``partial_max_shape``.
 
     Example:
         >>> partial_max_shape = (6, -1, -1)

@@ -1,3 +1,18 @@
+# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
 import math
 import os
@@ -27,18 +42,29 @@ def import_synthetic_view(root_dir, idx, rgb=True, depth_linear=False,
 
     Returns:
         (dict):
-        All the sensors selected depending on the arguments:
-            - 'rgb' (torch.FloatTensor): the RGB image, of shape :math:`(B, H, W, 3)`.
-            - 'depth_linear' (torch.FloatTensor): the depth map with linear scaling, of shape :math:`(B, H, W)`.
-            - 'semantic' (torch.IntTensor): the semantic segmentation map, of shape :math:`(B, H, W)`.
-            - 'instance' (torch.IntTensor): the instance segmentation map, of shape :math:`(B, H, W)`.
-            - 'bbox_2d_tight' (dict): the bounding box, as 4 floats (xmin, xmax, ymin, ymax).
-            - 'normals' (torch.FloatTensor): the normals map, of shape :math:`(B, H, W, 3)`.
-        And 'metadata', a dictionary containing:
-            - 'assets_transform': the transformation matrix of the combined assets transformations
-            - 'cam_transform': the transformation matrix, of shape :math:`(4, 3)`.
-            - 'cam_proj': the projection matrix, of shape :math:`(3, 1)`.
-            - 'clipping_range': the range at which the object are seen, as a list of (min, max).
+            A dictionary of all the sensors selected depending on the arguments:
+
+            - **rgb** (torch.FloatTensor): the RGB image, of shape :math:`(B, H, W, 3)`.
+            - **depth_linear** (torch.FloatTensor):
+              the depth map with linear scaling, of shape :math:`(B, H, W)`.
+            - **semantic** (torch.IntTensor):
+              the semantic segmentation map, of shape :math:`(B, H, W)`.
+            - **instance** (torch.IntTensor):
+              the instance segmentation map, of shape :math:`(B, H, W)`.
+            - **bbox_2d_tight** (dict):
+              the bounding box, as 4 floats (xmin, xmax, ymin, ymax).
+            - **normals** (torch.FloatTensor):
+              the normals map, of shape :math:`(B, H, W, 3)`.
+            - And **metadata**, a dictionary containing:
+
+              - **assets_transform** (torch.FloatTensor):
+                the transformation matrix of the combined assets transformations.
+              - **cam_transform** (torch.FloatTensor):
+                the transformation matrix, of shape :math:`(4, 3)`.
+              - **cam_proj** (torch.FloatTensor):
+                the projection matrix, of shape :math:`(3, 1)`.
+              - **clipping_range** (list of float):
+                the range at which the object are seen, as a list of (min, max).
 
     .. _Omniverse Kaolin App:
         https://docs.omniverse.nvidia.com/app_kaolin/app_kaolin/user_manual.html#data-generator

@@ -37,21 +37,24 @@ def trianglemeshes_to_voxelgrids(
     the voxelgrids will only be generated in the range [0, 1] of normalized_vertices.
 
     Args:
-        vertices (torch.tensor): batched vertices of shape (B, V, 3) of mesh to convert.
-        faces (torch.tensor): unbatched faces of shape (F, 3) of mesh to convert.
+        vertices (torch.tensor): Batched vertices of the input meshes, of shape
+                                 :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
+        faces (torch.tensor): Unbatched faces of the meshes, of shape
+                              :math:`(\text{num_faces}, 3)`.
         resolution (int): desired resolution of generated voxelgrid.
-        origin (torch.tensor): origin of the voxelgrid in the mesh coordinates.
-                               It has shape :math:`(\text{batch_size}, 3)`.
-                               Default: origin = torch.min(vertices, dim=1)[0]
-        scale (torch.tensor): the scale by which we divide the vertex position.
-                              It has shape :math:`(\text{batch_size})`.
-                              Default: scale = torch.max(torch.max(vertices, dim=1)[0] - origin, dim=1)[0]
-        return_sparse (bool): If True, sparse tensor is returned.
+        origin (torch.tensor): Origin of the voxelgrid in the mesh coordinates,
+                               of shape :math:`(\text{batch_size}, 3)`.
+                               Default: ``torch.min(vertices, dim=1)[0]``.
+        scale (torch.tensor): The scale by which we divide the vertex position,
+                              of shape :math:`(\text{batch_size})`.
+                              Default: ``torch.max(torch.max(vertices, dim=1)[0] - origin, dim=1)[0]``.
+        return_sparse (optional, bool): If True, sparse tensor is returned. Default: False.
 
     Returns:
         (torch.Tensor or torch.FloatTensor):
-            Binary batched voxelgrids of shape (B, resolution, resolution, resolution).
-            If return_sparse == True, sparse tensor is returned.
+            Binary batched voxelgrids, of shape
+            :math:`(\text{batch_size}, \text{resolution}, \text{resolution}, \text{resolution})`.
+            If return_sparse is True, sparse tensor is returned.
 
     Example:
         >>> vertices = torch.tensor([[[0, 0, 0],

@@ -25,8 +25,8 @@ def manual_seed(torch_seed, random_seed=None, numpy_seed=None):
 
     Args:
         torch_seed (int): The desired seed for torch module.
-        random_seed (int): The desired seed for random module. Default: torch_seed value.
-        numpy_seed (int): The desired seed for numpy module. Default: torch_seed value.
+        random_seed (int): The desired seed for random module. Default: ``torch_seed`` value.
+        numpy_seed (int): The desired seed for numpy module. Default: ``torch_seed`` value.
     """
     if random_seed is None:
         random_seed = torch_seed
@@ -58,8 +58,9 @@ def set_state(torch_state, random_state, numpy_state):
 def get_state():
     """Returns the generator states for generating random numbers.
 
-    Mostly used in pair with :func:`set_state`
-    pytest --doctest-modules kaolin/
+    Mostly used in pair with :func:`set_state`.
+
+    See also:
     - https://pytorch.org/docs/stable/generated/torch.get_rng_state.html#torch.get_rng_state
     - https://docs.python.org/3/library/random.html#random.getstate
     - https://numpy.org/doc/stable/reference/random/generated/numpy.random.set_state.html#numpy.random.set_state
@@ -79,9 +80,12 @@ def random_shape_per_tensor(batch_size, min_shape=None, max_shape=None):
     """Generate random :attr:`shape_per_tensor`.
 
     Args:
-        min_shape (list, tuple or torch.LongTensor): minimum values for each dimension of generated shapes.
+        batch_size (int): Batch size (first dimension) of the generated tensor.
+        min_shape (list, tuple or torch.LongTensor):
+            Minimum values for each dimension of generated shapes.
             Default: 1 for each dimensions.
-        max_shape (list, tuple or torch.LongTensor): maximu values for each dimension of generated shapes.
+        max_shape (list, tuple or torch.LongTensor):
+            maximum values for each dimension of generated shapes.
 
     Return:
         (torch.LongTensor): A shape_per_tensor (2D).
@@ -106,8 +110,8 @@ def random_tensor(low, high, shape, dtype=torch.float, device='cpu'):
         low (float): the lowest value to be drawn from the distribution.
         high (float): the highest value to be drawn from the distribution.
         shape (list, tuple or torch.LongTensor): the desired output shape.
-        dtype (torch.dtype): the desired output dtype.
-        device (torch.device): the desired output device.
+        dtype (torch.dtype): the desired output dtype. Default: ``torch.float``.
+        device (torch.device): the desired output device. Default: 'cpu'
 
     Return:
         (torch.Tensor): a random generated tensor.
@@ -137,7 +141,7 @@ def random_spc_octrees(batch_size, max_level, device='cpu'):
     Args:
         batch_size (int): The desired number of octrees.
         max_level (int): The desired max level of the octrees.
-        device (torch.device): The desired output device.
+        device (torch.device): The desired output device. Default: 'cpu'.
 
     Return:
         (torch.ByteTensor, torch.IntTensor):

@@ -117,13 +117,17 @@ def marching_tetrahedra(vertices, tets, sdf, return_tet_idx=False):
     https://search.ieice.org/bin/summary.php?id=e74-d_1_214.
 
     Args:
-        vertices (torch.tensor): batched vertices of shape (B, V, 3) of tetrahedral grids.
-        faces (torch.tensor): unbatched tetrahedrons of shape (T, 4).
-        sdf (torch.tensor): batched SDFs of shape (B, V) which specify the SDF value of each vertex.
-        return_tet_idx (bool, optional): return index of tetrahedron where each face is extracted.
+        vertices (torch.tensor): batched vertices of tetrahedral meshes, of shape
+                                 :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
+        faces (torch.tensor): unbatched tetrahedral mesh topology, of shape
+                              :math:`(\text{num_tetrahedrons}, 4)`.
+        sdf (torch.tensor): batched SDFs which specify the SDF value of each vertex, of shape
+                            :math:`(\text{batch_size}, \text{num_vertices})`.
+        return_tet_idx (optional, bool): if True, return index of tetrahedron
+                                         where each face is extracted. Default: False.
 
     Returns:
-        (list[torch.Tensor], list[torch.LongTensor], (optional) list[torch.LongTensor] ): 
+        (list[torch.Tensor], list[torch.LongTensor], (optional) list[torch.LongTensor]): 
 
             - the list of vertices for mesh converted from each tetrahedral grid.
             - the list of faces for mesh converted from each tetrahedral grid.
