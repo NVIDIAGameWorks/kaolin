@@ -17,7 +17,7 @@
 import torch
 
 def _validate_tet_vertices(tet_vertices):
-    """Helper method to validate the dimensions of the batched tetrahedrons tensor.
+    r"""Helper method to validate the dimensions of the batched tetrahedrons tensor.
 
     Args:
         tet_vertices (torch.Tensor):
@@ -35,20 +35,22 @@ def _validate_tet_vertices(tet_vertices):
 
 
 def inverse_vertices_offset(tet_vertices):
-    r"""Given tetrahedrons with 4 vertices A, B, C, D. Compute the inverse of the offset matrix w.r.t. vertex A for each
-    tetrahedron. The offset matrix is obtained by the concatenation of `B - A`, `C - A` and `D - A`. The resulting shape
-    of the offset matrix is :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 3, 3)`. The inverse of the offset matrix
-    is computed by this function.
+    r"""Given tetrahedrons with 4 vertices A, B, C, D.
+    Compute the inverse of the offset matrix w.r.t. vertex A for each
+    tetrahedron. The offset matrix is obtained by the concatenation of :math:`B - A`,
+    :math:`C - A` and :math:`D - A`. The resulting shape
+    of the offset matrix is :math:`(\text{batch_size}, \text{num_tetrahedrons}, 3, 3)`.
+    The inverse of the offset matrix is computed by this function.
 
     Args:
         tet_vertices (torch.Tensor):
             Batched tetrahedrons, of shape
-            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 4, 3)`.
+            :math:`(\text{batch_size}, \text{num_tetrahedrons}, 4, 3)`.
 
     Returns:
         (torch.Tensor):
             Batched inverse offset matrix, of shape
-            :math:`(\\text{batch_size}, \\text{num_tetrahedrons}, 3, 3)`.
+            :math:`(\text{batch_size}, \text{num_tetrahedrons}, 3, 3)`.
             Each offset matrix is of shape :math:`(3, 3)`,
             hence its inverse is also of shape :math:`(3, 3)`.
 

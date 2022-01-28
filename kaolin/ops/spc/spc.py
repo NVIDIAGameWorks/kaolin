@@ -80,8 +80,8 @@ def generate_points(octrees, pyramids, exsum):
             counts of individual octrees of shape :math:`(k + \text{batch_size})`
 
     Returns:
-        (torch.Tensor);
-            A tensor containing batched point hierachies derived from a batch of octrees
+        (torch.Tensor):
+            A tensor containing batched point hierachies derived from a batch of octrees.
     """
     return _C.ops.spc.generate_points_cuda(octrees.contiguous(),
                                            pyramids.contiguous(),
@@ -139,7 +139,7 @@ def to_dense(point_hierarchies, pyramids, input, level=-1, **kwargs):
         input (torch.FloatTensor):
             Batched tensor of input feature data,
             of shape :math:`(\text{num_inputs}, \text{feature_dim})`.
-            The number of inputs, :math:`\text{num_inputs}`,
+            :math:`\text{num_inputs}`,
             must correspond to number of points in the
             batched point hierarchy at `level`.
 

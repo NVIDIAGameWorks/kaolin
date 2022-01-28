@@ -266,10 +266,13 @@ def average_edge_length(vertices, faces):
     r"""Returns the average length of each faces in a mesh.
 
     Args:
-        vertices (torch.Tensor): Batched vertices of shape (B, V, 3) of a Mesh
-        faces (torch.LongTensor): Faces of shape (F, 3) of a Mesh
+        vertices (torch.Tensor): Batched vertices, of shape
+                                 :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
+        faces (torch.LongTensor): Faces, of shape :math:`(\text{num_faces}, 3)`.
     Returns:
-        (torch.Tensor): average length of each edges in a face of shape (B, F)
+        (torch.Tensor):
+            average length of each edges in a face, of shape
+            :math:`(\text{batch_size}, \text{num_faces})`.
 
     Example:
         >>> vertices = torch.tensor([[[1, 0, 0],

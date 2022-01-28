@@ -15,6 +15,7 @@ Functions
     :members:
     :exclude-members:
         return_type,
+        ignore_error_handler,
         skip_error_handler,
         default_error_handler,
         MaterialError,
@@ -25,5 +26,6 @@ Functions
 Error Handler
 -------------
 
+.. autofunction:: ignore_error_handler
 .. autofunction:: skip_error_handler
 .. autofunction:: default_error_handler

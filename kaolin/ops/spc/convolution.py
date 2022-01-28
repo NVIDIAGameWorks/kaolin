@@ -103,7 +103,8 @@ def conv3d(octrees, point_hierarchies, level, pyramids, exsum, input,
             filter of shape :math:`(\text{kernel_vectors.shape[0]}, \text{in_channels},
             \text{self.out_channels})`.
         kernel_vectors (torch.ShortTensor):
-            A tensor of 3D offsets that define the shape of the kernel.
+            A tensor of 3D offsets that define the shape of the kernel,
+            of shape :math:`(\text{num_weights}, 3)`.
             See :ref:`kernel creation <kernel-text>`.
         jump (int, optional):
             The difference between the input and output levels for the convolution.
@@ -150,19 +151,16 @@ class Conv3d(nn.Module):
     Args:
         in_channels (int):
             The number of channels in the input tensor.
-
         out_channels (int):
             The number of channels in the output tensor.
-
         kernel_vectors (torch.ShortTensor):
             A tensor of 3D offsets that define the shape of the kernel,
-            see :ref:`kernel creation <kernel-text>`.
-
+            of shape :math:`(\text{num_weights}, 3)`.
+            See :ref:`kernel creation <kernel-text>`.
         jump (int, optional):
             The difference between the input and output levels for the convolution.
             A non-zero value implies downsampling. Value must be positive and refer to a valid level of
             the structured point cloud. Default: 0.
-
         bias (bool, optional):
             If True, the convolution layer has a bias. Default: True.
     """
@@ -330,7 +328,8 @@ def conv_transpose3d(octrees, point_hierarchies, level, pyramids, exsum,
             \text{self.out_channels})`.
 
         kernel_vectors (torch.ShortTensor):
-            A tensor of 3D offsets that define the shape of the kernel.
+            A tensor of 3D offsets that define the shape of the kernel,
+            of shape :math:`(\text{num_weights}, 3)`.
             See :ref:`kernel creation <kernel-text>`.
 
         jump (int, optional):
@@ -375,7 +374,8 @@ class ConvTranspose3d(nn.Module):
             The number of channels in the output tensor.
 
         kernel_vectors (torch.ShortTensor):
-            A tensor of 3D offsets that define the shape of the kernel.
+            A tensor of 3D offsets that define the shape of the kernel,
+            of shape :math:`(\text{num_weights}, 3)`.
             See :ref:`kernel creation <kernel-text>`.
 
         jump (int, optional):

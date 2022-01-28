@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,18 +15,26 @@
 import torch
 from torch import nn
 
+__all__ = [
+    'sparse_bmm',
+    'normalize_adj',
+    'GraphConv'
+]
 
 def sparse_bmm(sparse_matrix, dense_matrix_batch):
-    """
-    Perform torch.bmm on an unbatched sparse matrix and a batched dense matrix.
+    r"""Perform torch.bmm on an unbatched sparse matrix and a batched dense matrix.
 
     Args:
-        sparse_matrix (torch.sparse.FloatTensor): Shape = (m, n)
-        dense_matrix_batch (torch.FloatTensor): Shape = (b, n, p)
+        sparse_matrix (torch.sparse.FloatTensor):
+            Input sparse matrix, of shape :math:`(\text{M}, \text{N})`.
+        dense_matrix_batch (torch.FloatTensor):
+            Input batched dense matrix, of shape
+            :math:`(\text{batch_size}, \text{N}, \text{P})`.
 
     Returns:
         (torch.FloatTensor):
-            Result of the batched matrix multiplication. Shape = (b, n, p)
+            Result of the batched matrix multiplication, of shape,
+            :math:`(\text{batch_size}, \text{N}, \text{P})`.
     """
     m = sparse_matrix.shape[0]
     b, n, p = dense_matrix_batch.shape
@@ -37,9 +46,7 @@ def sparse_bmm(sparse_matrix, dense_matrix_batch):
 
 
 def normalize_adj(adj):
-    """
-    Normalize the adjacency matrix with shape = (num_nodes, num_nodes) such that
-    the sum of each row is 1.
+    r"""Normalize the adjacency matrix such that the sum of each row is 1.
 
     This operation is slow, so it should be done only once for a graph and then
     reused.
@@ -50,8 +57,7 @@ def normalize_adj(adj):
 
     Args:
         adj (torch.sparse.FloatTensor or torch.FloatTensor):
-            Shape = (num_nodes, num_nodes)
-            The adjacency matrix.
+            Input adjacency matrix, of shape :math:`(\text{num_nodes}, \text{num_nodes})`.
 
     Returns:
         (torch.sparse.FloatTensor or torch.FloatTensor):
@@ -72,23 +78,32 @@ def normalize_adj(adj):
         return adj / norm
 
 class GraphConv(nn.Module):
-    """A simple graph convolution layer, similar to the one defined by *Kipf et al.* in
+    r"""A simple graph convolution layer, similar to the one defined by *Kipf et al.* in
     `Semi-Supervised Classification with Graph Convolutional Networks`_ ICLR 2017
 
-    This operation with self_layer=False is equivalent to :math:`(A H W)` where:
-    - :math:`H` is the node features with shape (batch_size, num_nodes, input_dim)
-    - :math:`W` is a weight matrix of shape (input_dim, output_dim)
-    - :math:`A` is the adjacency matrix of shape (num_nodes, num_nodes).
-    It can include self-loop.
+    This operation with ``self_layer=False`` is equivalent to
+    :math:`(A H W)` where:
 
-    With normalize_adj=True, it is equivalent to :math:`(D^{-1} A H W)`, where:
-    - :math:`D` is a diagonal matrix with :math:`D_{ii}` = the sum of the i-th row of A.
-    In other words, :math:`D` is the incoming degree of each node.
+    - :math:`H` is the node features, of shape
+      :math:`(\text{batch_size}, \text{num_nodes}, \text{input_dim})`.
 
-    With self_layer=True, it is equivalent to the above plus :math:`(H W_{\\text{self}})`, where:
-    - :math:`W_{\\text{self}}` is a separate weight matrix to filter each node's self features.
+    - :math:`W` is a weight matrix, of shape
+      :math:`(\text{input_dim}, \text{output_dim})`.
 
-    Note that when self_layer is True, A should not include self-loop.
+    - :math:`A` is the adjacency matrix, of shape
+      :math:`(\text{num_nodes}, \text{num_nodes})`.
+      It can include self-loop.
+
+    With ``normalize_adj=True``, it is equivalent to :math:`(D^{-1} A H W)`, where:
+
+    - :math:`D` is a diagonal matrix with :math:`D_{ii}` = the sum of the i-th row of :math:`A`.
+      In other words, :math:`D` is the incoming degree of each node.
+
+    With ``self_layer=True``, it is equivalent to the above plus :math:`(H W_{\text{self}})`, where:
+
+    - :math:`W_{\text{self}}` is a separate weight matrix to filter each node's self features.
+
+    Note that when ``self_layer=True``, A should not include self-loop.
 
     Args:
         input_dim (int): The number of features in each input node.
@@ -136,27 +151,27 @@ class GraphConv(nn.Module):
                 self.linear_self.bias.data.uniform_(-1.0, 1.0)
 
     def forward(self, node_feat, adj, normalize_adj=True):
-        """
+        r"""
         Args:
             node_feat (torch.FloatTensor):
-                Shape = (batch_size, num_nodes, input_dim)
-                The input features of each node.
+                The input features of each node, of shape
+                :math:`(\text{batch_size}, \text{num_nodes}, \text{input_dim})`.
             adj (torch.sparse.FloatTensor or torch.FloatTensor):
-                Shape = (num_nodes, num_nodes)
-                The adjacency matrix. adj[i, j] is non-zero if there's an
-                incoming edge from j to i. Should not include self-loop if
-                self_layer is True.
-            normalize_adj (bool):
+                The adjacency matrix. ``adj[i, j]`` is non-zero if there's an
+                incoming edge from ``j`` to ``i``. Should not include self-loop if
+                ``self_layer`` is ``True``, of shape
+                :math:`(\text{num_nodes}, \text{num_nodes})`.
+            normalize_adj (optional, bool):
                 Set this to true to apply normalization to adjacency; that is,
                 each output feature will be divided by the number of incoming
                 neighbors. If normalization is not desired, or if the adjacency
                 matrix is pre-normalized, set this to False to improve
-                performance.
+                performance. Default: True.
 
         Returns:
             (torch.FloatTensor):
-                The output features of each node.
-                Shape = (batch_size, num_nodes, output_dim)
+                The output features of each node, of shape
+                :math:(\text{batch_size}, \text{num_nodes}, \text{output_dim})`.
         """
 
         if adj.type().endswith('sparse.FloatTensor'):

@@ -53,7 +53,7 @@ def sided_distance(p1, p2):
     r"""For each point in :math:`p_{1i} \in P_1` will find the indices and squared euclidean 
     distances of the closest point :math:`P_2`, as following:
 
-    :math:`sided\_distance(p_{1i}, P_2) = \min\limits_{p_{2j}\in{P_2}}(||p_{1i} - p_{2j}||_2^2)`
+    :math:`\text{sided_distance}(p_{1i}, P_2) = \min\limits_{p_{2j}\in{P_2}}(||p_{1i} - p_{2j}||_2^2)`
 
     Args:
         p1 (torch.Tensor): Pointclouds, of shape

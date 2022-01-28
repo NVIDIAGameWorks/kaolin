@@ -240,9 +240,10 @@ class ShapeNetV2(KaolinDataset):
 
     Args:
         root (str): path to ShapeNet root directory
-        categories (list): List of categories to load from ShapeNet. This list may
-                           contain synset ids, class label names (for ShapeNetCore classes),
-                           or a combination of both. Default: all supported categories.
+        categories (list):
+            List of categories to load from ShapeNet. This list may
+            contain synset ids, class label names (for ShapeNetCore classes),
+            or a combination of both. Default: all supported categories.
         train (bool):
             If True, return the training set, otherwise the test set.
             Default: True.

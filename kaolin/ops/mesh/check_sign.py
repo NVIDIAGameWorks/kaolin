@@ -1,4 +1,5 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -69,15 +70,18 @@ def check_sign(verts, faces, points, hash_resolution=512):
     to determine if the point is inside the mesh. 
 
     Args:
-        verts (torch.Tensor): vertices of shape (batch_size, num_vertices, 3)
-        faces (torch.Tensor): faces of shape (num_faces, 3)
-        points (torch.Tensor): points of shape (batch_size, num_points, 3) to check
-        hash_resolution (int): resolution used to check the points sign
+        verts (torch.Tensor):
+            vertices, of shape :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
+        faces (torch.Tensor):
+            faces, of shape :math:`(\text{num_faces}, 3)`.
+        points (torch.Tensor):
+            points to check, of shape :math:`(\text{batch_size}, \text{num_points}, 3)`.
+        hash_resolution (int): resolution used to check the points sign.
 
     Returns:
         (torch.BoolTensor): 
-            length p tensor indicating whether each point is 
-            inside the mesh 
+            Tensor indicating whether each point is inside the mesh,
+            of shape :math:`(\text{batch_size}, \text{num_vertices})`.
 
     Example:
         >>> device = 'cuda' if torch.cuda.is_available() else 'cpu'
