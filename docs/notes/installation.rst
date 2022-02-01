@@ -17,7 +17,7 @@ Requirements
 Dependencies
 ------------
 
-* torch >= 1.5, <= 1.7.1
+* torch >= 1.5, <= 1.9.0
 * cython == 0.29.20
 * scipy >= 1.2.0
 * Pillow >= 8.0.0
