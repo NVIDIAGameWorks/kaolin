@@ -2,7 +2,7 @@
   "dependencies": {
     "jquery": "^3.5.1",
     "mustard-ui": "^1.0.4",
-    "three": "^0.125.2"
+    "three": "^0.137.0"
   },
   "devDependencies": {
     "cypress": "^6.5.0",
