@@ -4,6 +4,7 @@ python:
    version: 3.7
    system_packages: true
    install:
+      - requirements: docs/readthedocs_requirements.txt
       - requirements: tools/doc_requirements.txt
       - method: setuptools
         path: '.'
