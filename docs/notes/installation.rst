@@ -17,11 +17,11 @@ Requirements
 Dependencies
 ------------
 
-* torch >= 1.5, <= 1.10.2
-* cython == 0.29.20 (auto-installed)
-* scipy >= 1.2.0 (auto-installed)
-* Pillow >= 8.0.0 (auto-installed)
-* usd-core >= 20.11 (auto-installed; required for USD I/O and 3D checkpoints with :class:`~kaolin.visualize.Timelapse`)
+* torch >= 1.5, <= 1.9.0
+* cython == 0.29.20
+* scipy >= 1.2.0
+* Pillow >= 8.0.0
+* usd-core >= 20.11 (optional, required for USD related features such as visualization and importer / exporter)
 
 Installation from source
 ------------------------

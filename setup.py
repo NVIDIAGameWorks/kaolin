@@ -39,11 +39,13 @@ else:
                 'version as IGNORE_TORCH_VER is set.'
             )
         else:
-            warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
-                          f'but found version {torch.__version__} instead. '
-                          'This will try to install a compatible version of PyTorch. '
-                          'If the installation fails we recommend to first install it.')
-            missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
+            raise ImportError(
+                f'Kaolin requires PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
+                f'but found version {torch.__version__} instead.'
+                'If you wish to install with this specific version set IGNORE_TORCH_VER=1.'
+            )
+
+missing_modules = []
 
 cython_spec = importlib.util.find_spec("cython")
 if cython_spec is None:
@@ -115,21 +117,18 @@ if not torch.cuda.is_available():
         # Extension builds after https://github.com/pytorch/pytorch/pull/23408 attempt to query torch.cuda.get_device_capability(),
         # which will fail if you are compiling in an environment without visible GPUs (e.g. during an nvidia-docker build command).
         logging.warning(
-            "Torch did not find available GPUs on this system.\n"
+            "Torch did not find available GPUs on this system.\n",
             "If your intention is to cross-compile, this is not an error.\n"
             "By default, Apex will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n"
             "Volta (compute capability 7.0), Turing (compute capability 7.5),\n"
             "and, if the CUDA version is >= 11.0, Ampere (compute capability 8.0).\n"
             "If you wish to cross-compile for a single specific architecture,\n"
-            'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n'
+            'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n',
         )
         if os.getenv("TORCH_CUDA_ARCH_LIST", None) is None:
-            _, bare_metal_major, bare_metal_minor = get_cuda_bare_metal_version(CUDA_HOME)
+            _, bare_metal_major, _ = get_cuda_bare_metal_version(CUDA_HOME)
             if int(bare_metal_major) == 11:
-                if int(bare_metal_minor) == 0:
-                    os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0"
-                else:
-                    os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6"
+                os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6"
             else:
                 os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5"
     else:
