@@ -6,60 +6,86 @@
 # IGNORE_TORCH_VER
 #   ignore version requirements for PyTorch
 
-from os import environ
+import os
 from setuptools import setup, find_packages, dist
 import importlib
 from pkg_resources import parse_version
+import subprocess
 import warnings
 
 TORCH_MIN_VER = '1.5.0'
 TORCH_MAX_VER = '1.9.0'
 CYTHON_MIN_VER = '0.29.20'
-INCLUDE_EXPERIMENTAL = environ.get('KAOLIN_INSTALL_EXPERIMENTAL') is not None
-IGNORE_TORCH_VER = environ.get('IGNORE_TORCH_VER') is not None
+INCLUDE_EXPERIMENTAL = os.getenv('KAOLIN_INSTALL_EXPERIMENTAL') is not None
+IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
 
-missing_modules = []
+# Module required before installation
+# trying to install it ahead turned out to be too unstable.
 torch_spec = importlib.util.find_spec("torch")
 if torch_spec is None:
-    warnings.warn("Couldn't find torch installed, so this will try to install it. "
-                  "If the installation fails we recommend to first install it.")
-    if IGNORE_TORCH_VER:
-        missing_modules.append('torch')
-    else:
-        missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
+    raise ImportError(
+        f"Kaolin requires PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, "
+        "but couldn't find the module installed."
+    )
 else:
     import torch
     torch_ver = parse_version(torch.__version__)
     if (torch_ver < parse_version(TORCH_MIN_VER) or
         torch_ver > parse_version(TORCH_MAX_VER)):
         if IGNORE_TORCH_VER:
-            warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
-                          f'but found version {torch.__version__}. Continuing with the installed '
-                          'version as IGNORE_TORCH_VER is set.')
+            warnings.warn(
+                f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
+                f'but found version {torch.__version__}. Continuing with the installed '
+                'version as IGNORE_TORCH_VER is set.'
+            )
         else:
-            warnings.warn(f'Kaolin is compatible with PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
-                          f'but found version {torch.__version__} instead. '
-                          'This will try to install a compatible version of PyTorch. '
-                          'If the installation fails we recommend to first install it.')
-            missing_modules.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
+            raise ImportError(
+                f'Kaolin requires PyTorch >={TORCH_MIN_VER}, <={TORCH_MAX_VER}, '
+                f'but found version {torch.__version__} instead.'
+                'If you wish to install with this specific version set IGNORE_TORCH_VER=1.'
+            )
+
+missing_modules = []
 
 cython_spec = importlib.util.find_spec("cython")
 if cython_spec is None:
-    warnings.warn("Couldn't find cython installed, so this will try to install it. "
-                  "If the installation fails we recommend to first instal it.")
+    warnings.warn(
+        f"Kaolin requires cython == {CYTHON_MIN_VER}, "
+        "but couldn't find the module installed. "
+        "This setup is gonna try to install it..."
+    )
     missing_modules.append(f'cython=={CYTHON_MIN_VER}')
+
 else:
     import Cython
     cython_ver = parse_version(Cython.__version__)
     if cython_ver != parse_version('0.29.20'):
-        warnings.warn('Kaolin is compatible with cython == 0.29.20, '
-                      f'but found version {Cython.__version__} instead. '
-                      'This will try to install cython in the right version. '
-                      'If the installation fails we recommend to first install it.')
-        missing_modules.append(f'cython=={CYTHON_MIN_VER}')
+        raise ImportError('Kaolin requires cython == 0.29.20, '
+                          f'but found version {Cython.__version__} instead.')
 
+numpy_spec = importlib.util.find_spec("numpy")
+
+if numpy_spec is None:
+    warnings.warn(
+        f"Kaolin requires numpy, but couldn't find the module installed. "
+        "This setup is gonna try to install it..."
+    )
+    missing_modules.append('numpy')
 
 dist.Distribution().fetch_build_eggs(missing_modules)
+
+cython_spec = importlib.util.find_spec("cython")
+if cython_spec is None:
+    raise ImportError(
+        f"Kaolin requires cython == {CYTHON_MIN_VER} "
+        "but couldn't find or install it."
+    )
+
+numpy_spec = importlib.util.find_spec("numpy")
+if numpy_spec is None:
+    raise ImportError(
+        f"Kaolin requires numpy but couldn't find or install it."
+    )
 
 import os
 import sys
@@ -68,26 +94,54 @@ import glob
 
 import numpy
 import torch
-from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDAExtension
+from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDAExtension, CUDA_HOME
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
 logger = logging.getLogger()
 logging.basicConfig(format='%(levelname)s - %(message)s')
 
+def get_cuda_bare_metal_version(cuda_dir):
+    raw_output = subprocess.check_output([cuda_dir + "/bin/nvcc", "-V"], universal_newlines=True)
+    output = raw_output.split()
+    release_idx = output.index("release") + 1
+    release = output[release_idx].split(".")
+    bare_metal_major = release[0]
+    bare_metal_minor = release[1][0]
+
+    return raw_output, bare_metal_major, bare_metal_minor
+
 if not torch.cuda.is_available():
-    # From: https://github.com/NVIDIA/apex/blob/b66ffc1d952d0b20d6706ada783ae5b23e4ee734/setup.py
-    # Extension builds after https://github.com/pytorch/pytorch/pull/23408 attempt to query torch.cuda.get_device_capability(),
-    # which will fail if you are compiling in an environment without visible GPUs (e.g. during an nvidia-docker build command).
-    logging.warning(
-        '\nWarning: Torch did not find available GPUs on this system.\n'
-        'If your intention is to cross-compile, this is not an error.\n'
-        'By default, Kaolin will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n'
-        'Volta (compute capability 7.0), and Turing (compute capability 7.5).\n'
-        'If you wish to cross-compile for a single specific architecture,\n'
-        'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n')
-    if os.environ.get("TORCH_CUDA_ARCH_LIST", None) is None:
-        os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5"
+    if os.getenv('FORCE_CUDA', '0') == '1':
+        # From: https://github.com/NVIDIA/apex/blob/c4e85f7bf144cb0e368da96d339a6cbd9882cea5/setup.py
+        # Extension builds after https://github.com/pytorch/pytorch/pull/23408 attempt to query torch.cuda.get_device_capability(),
+        # which will fail if you are compiling in an environment without visible GPUs (e.g. during an nvidia-docker build command).
+        logging.warning(
+            "Torch did not find available GPUs on this system.\n",
+            "If your intention is to cross-compile, this is not an error.\n"
+            "By default, Apex will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n"
+            "Volta (compute capability 7.0), Turing (compute capability 7.5),\n"
+            "and, if the CUDA version is >= 11.0, Ampere (compute capability 8.0).\n"
+            "If you wish to cross-compile for a single specific architecture,\n"
+            'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n',
+        )
+        if os.getenv("TORCH_CUDA_ARCH_LIST", None) is None:
+            _, bare_metal_major, _ = get_cuda_bare_metal_version(CUDA_HOME)
+            if int(bare_metal_major) == 11:
+                os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6"
+            else:
+                os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5"
+    else:
+        logging.warning(
+            "Torch did not find available GPUs on this system.\n"
+            "Kaolin will install only with CPU support and will have very limited features.\n"
+            'If your wish to cross-compile for GPU `export FORCE_CUDA=1` before running setup.py\n'
+            "By default, Apex will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n"
+            "Volta (compute capability 7.0), Turing (compute capability 7.5),\n"
+            "and, if the CUDA version is >= 11.0, Ampere (compute capability 8.0).\n"
+            "If you wish to cross-compile for a single specific architecture,\n"
+            'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n'
+        )
 
 PACKAGE_NAME = 'kaolin'
 DESCRIPTION = 'Kaolin: A PyTorch library for accelerating 3D deep learning research'
@@ -120,11 +174,6 @@ write_version_file()
 
 def get_requirements():
     requirements = []
-    if os.name != 'nt':  # no pypi torch for windows
-        if IGNORE_TORCH_VER:
-            requirements.append('torch')
-        else:
-            requirements.append(f'torch>={TORCH_MIN_VER},<={TORCH_MAX_VER}')
     requirements.append('scipy>=1.2.0,<=1.5.2')
     requirements.append('Pillow>=8.0.0')
     requirements.append('tqdm>=4.51.0')
@@ -157,7 +206,11 @@ def get_extensions():
         define_macros += [("WITH_CUDA", None), ("THRUST_IGNORE_CUB_VERSION_CHECK", None)]
         sources += glob.glob('kaolin/csrc/**/*.cu', recursive=True)
         extension = CUDAExtension
-        extra_compile_args.update({'nvcc': ['-O3']})
+        extra_compile_args.update({'nvcc': [
+            '-O3',
+            '-DWITH_CUDA',
+            '-DTHRUST_IGNORE_CUB_VERSION_CHECK'
+        ]})
         include_dirs = get_include_dirs()
     else:
         extension = CppExtension
@@ -208,11 +261,19 @@ def get_extensions():
     return extensions + cython_extensions
 
 def get_include_dirs():
+    include_dirs = []
     if torch.cuda.is_available() or os.getenv('FORCE_CUDA', '0') == '1':
-        cub_home = os.environ.get("CUB_HOME", os.path.join(cwd, 'third_party/cub'))
-        return [cub_home]
-    else:
-        return None
+        _, bare_metal_major, _ = get_cuda_bare_metal_version(CUDA_HOME)
+        if "CUB_HOME" in os.environ:
+            logging.warning(f'Including CUB_HOME ({os.environ["CUB_HOME"]}).')
+            include_dirs.append(os.environ["CUB_HOME"])
+        else:
+            if int(bare_metal_major) < 11:
+                logging.warning(f'Including default CUB_HOME ({os.path.join(cwd, "third_party/cub")}).')
+                include_dirs.append(os.path.join(cwd, 'third_party/cub'))
+
+    return include_dirs
+
 
 if __name__ == '__main__':
     setup(
