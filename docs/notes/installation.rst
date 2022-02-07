@@ -17,7 +17,7 @@ Requirements
 Dependencies
 ------------
 
-* torch >= 1.5, <= 1.9.0
+* torch >= 1.5, <= 1.10.2
 * cython == 0.29.20
 * scipy >= 1.2.0
 * Pillow >= 8.0.0
@@ -45,14 +45,10 @@ Clone and optionally check out an `official release <https://github.com/NVIDIAGa
     $ cd kaolin
     $ git checkout v0.10.0
 
-2. Install Pytorch
-^^^^^^^^^^^^^^^^^^
-Follow `official instructions <https://pytorch.org>`_ to install PyTorch of a supported version.
-Kaolin may be able to work with other PyTorch versions. See below for overriding PyTorch version check during install.
+If instead of the latest version you want a specific release like 0.10.0, 0.9.0, 0.9.1 or 0.1 you can then select the tag, example:
 
 
-3. Optional Environment Variables
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    $ git checkout v0.10.0
 
 * If trying Kaolin with an unsupported PyTorch version, set: ``export IGNORE_TORCH_VER=1``
 * To install experimental features (like :ref:`kaolin-dash3d <dash 3d>`), set: ``export KAOLIN_INSTALL_EXPERIMENTAL=1``
