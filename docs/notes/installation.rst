@@ -17,7 +17,7 @@ Requirements
 Dependencies
 ------------
 
-* torch >= 1.5, <= 1.9.0
+* torch >= 1.5, <= 1.10.2
 * cython == 0.29.20
 * scipy >= 1.2.0
 * Pillow >= 8.0.0
@@ -44,11 +44,11 @@ To install the library. You must first clone the repository:
     $ git clone --recursive https://github.com/NVIDIAGameWorks/kaolin
     $ cd kaolin
 
-If instead of the latest version you want a specific release like 0.9.0, 0.9.1 or 0.1 you can then select the tag, example:
+If instead of the latest version you want a specific release like 0.10.0, 0.9.0, 0.9.1 or 0.1 you can then select the tag, example:
 
 .. code-block:: bash
 
-    $ git checkout v0.9.1
+    $ git checkout v0.10.0
 
 To enable installation of experimental features, set
 environment variable
