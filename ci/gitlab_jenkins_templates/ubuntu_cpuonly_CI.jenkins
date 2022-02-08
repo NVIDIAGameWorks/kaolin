@@ -1,0 +1,92 @@
+#!/usr/bin/env groovy
+
+docker_registry_server = targetImageTag.split(':')[0..1].join(':')
+currentBuild.displayName = targetImageTag.split(':')[2]
+currentBuild.description = sourceBranch + ": " + commitHash
+
+podTemplate(
+cloud:'sc-ipp-blossom-prod',
+yaml:'''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: docker
+    image: docker:19.03.1
+    command:
+    - sleep
+    args:
+    - 1d
+    env:
+      - name: DOCKER_HOST
+        value: tcp://localhost:2375
+  - name: docker-daemon
+    image: docker:19.03.1-dind
+    securityContext:
+      privileged: true
+    env:
+      - name: DOCKER_TLS_CERTDIR
+        value: ""
+    resources:
+        requests:
+          memory: 32Gi
+          cpu: 12  
+        limits:
+          memory: 32Gi
+          cpu: 12
+''') {
+  node(POD_LABEL) {
+    container("docker") {
+      try {
+        gitlabCommitStatus("build-${configName}") {
+          stage("Checkout") {
+            checkout([
+                $class: 'GitSCM',
+                branches: [[name: "${commitHash}"]],
+                extensions: [[
+                    $class: 'SubmoduleOption',
+                    disableSubmodules: false,
+                    parentCredentials: false,
+                    recursiveSubmodules: true,
+                    reference: '',
+                    trackingSubmodules: false
+                ]],
+                userRemoteConfigs: [[
+                    credentialsId: 'gitlab-credentials',
+                    url: "${repoUrl}"
+                ]]
+            ])
+          }
+
+          stage("Build") {
+            def baseImage = docker.build(
+                "${targetImageTag}-base",
+                """--no-cache --network host -f ./tools/linux/Dockerfile.base_cpuonly \
+                   --build-arg PYTHON_VERSION=${pythonVer} \
+                   --build-arg PYTORCH_VERSION=${torchVer} \
+                   .
+                """)
+            targetImage = docker.build(
+                "${targetImageTag}",
+                """--no-cache --network host -f ./tools/linux/Dockerfile.install \
+                   --build-arg BASE_IMAGE=${targetImageTag}-base \
+                   --build-arg FORCE_CUDA=0 \
+                   .
+                """)
+          }
+        }
+      } catch (e) {
+        updateGitlabCommitStatus(name: "test-${configName}", state: 'canceled')
+        throw e
+      }
+      gitlabCommitStatus("test-${configName}") {
+        stage("Test") {
+          targetImage.inside {
+            // Don't know why but it doesn't work from /kaolin with docker plugin
+            sh 'cd /tmp && python -c "import kaolin"'
+          }
+        }
+      }
+    }
+  }
+}
