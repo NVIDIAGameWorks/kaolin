@@ -33,23 +33,23 @@ namespace kaolin {
 using namespace at::indexing;
 
 #ifdef WITH_CUDA
-uint64_t GetStorageBytesX(void* d_temp_storage, uint* d_Info, uint* d_PrefixSum, uint max_total_points);
+uint64_t GetStorageBytesX(void* d_temp_storage, uint32_t* d_Info, uint32_t* d_PrefixSum, uint32_t max_total_points);
 
 void Conv3d_forward_cuda(
     point_data*  d_Proot,
     uchar*     dO,
-    uint*     dP,
+    uint32_t*     dP,
     float*     Input, int N,
     float*     Output, int M,
     float*     Params,
-    point_data* Kvec, uint Ksize,
+    point_data* Kvec, uint32_t Ksize,
     int     Jump,
     int     Qlevel,
     int     Olevel,
     int     BatchSize,
-    uint*    Pyramid,
-    uint*    d_Info,
-    uint*    d_PSum,
+    uint32_t*    Pyramid,
+    uint32_t*    d_Info,
+    uint32_t*    d_PSum,
     void*    d_temp_storageA,
     int64_t    temp_storage_bytesA,
     int*    d_Inmap,
@@ -60,19 +60,19 @@ void Conv3d_forward_cuda(
 void Conv3d_backward_cuda(
     point_data*  d_Proot,
     uchar*     dO,
-    uint*     dP,
+    uint32_t*     dP,
     float*     Input, int N,
     float*     Grad_Inputs,
     float*     Grad_Outputs, int M,
     float*     Params, float* Grad_Params,
-    point_data* Kvec, uint Ksize,
+    point_data* Kvec, uint32_t Ksize,
     int     Jump,
     int     Plevel,
     int     Olevel,
     int     BatchSize,
-    uint*    Pyramid,
-    uint*    d_Info,
-    uint*    d_PSum,
+    uint32_t*    Pyramid,
+    uint32_t*    d_Info,
+    uint32_t*    d_PSum,
     void*    d_temp_storageA,
     int64_t    temp_storage_bytesA,
     int*    d_Inmap,
@@ -83,18 +83,18 @@ void Conv3d_backward_cuda(
 void ConvTranspose3d_forward_cuda(
     point_data*  d_Proot,
     uchar*     dO,
-    uint*     dP,
+    uint32_t*     dP,
     float*     Input, int N,
     float*     Output, int M,
     float*     Params,
-    point_data* Kvec, uint Ksize,
+    point_data* Kvec, uint32_t Ksize,
     int     Jump,
     int     Qlevel,
     int     Olevel,
     int     BatchSize,
-    uint*    Pyramid,
-    uint*    d_Info,
-    uint*    d_PSum,
+    uint32_t*    Pyramid,
+    uint32_t*    d_Info,
+    uint32_t*    d_PSum,
     void*    d_temp_storageA,
     int64_t    temp_storage_bytesA,
     int*    d_Inmap,
@@ -105,19 +105,19 @@ void ConvTranspose3d_forward_cuda(
 void ConvTranspose3d_backward_cuda(
     point_data*  d_Proot,
     uchar*     dO,
-    uint*     dP,
+    uint32_t*     dP,
     float*     Input, int N,
     float*     Grad_Inputs,
     float*     Grad_Outputs, int M,
     float*     Params, float* Grad_Params,
-    point_data* Kvec, uint Ksize,
+    point_data* Kvec, uint32_t Ksize,
     int     Jump,
     int     Plevel,
     int     Olevel,
     int     BatchSize,
-    uint*    Pyramid,
-    uint*    d_Info,
-    uint*    d_PSum,
+    uint32_t*    Pyramid,
+    uint32_t*    d_Info,
+    uint32_t*    d_PSum,
     void*    d_temp_storageA,
     int64_t    temp_storage_bytesA,
     int*    d_Inmap,
@@ -130,13 +130,13 @@ void ConvTranspose3d_backward_cuda(
 std::tuple<at::Tensor, int> Conv3d_forward(
     at::Tensor octree,
     at::Tensor points,
-    uint level,
+    uint32_t level,
     at::Tensor pyramid,
     at::Tensor exsum,
     at::Tensor inputs,
     at::Tensor params,
     at::Tensor kernel_vectors,
-    uint jump) {
+    uint32_t jump) {
 #ifdef WITH_CUDA
   CHECK_OCTREES(octree);
   CHECK_INPUT(inputs);
@@ -148,24 +148,24 @@ std::tuple<at::Tensor, int> Conv3d_forward(
   CHECK_CPU(pyramid);
   CHECK_CUDA(kernel_vectors);
 
-  uint kernel_vectors_size = params.size(0);
+  uint32_t kernel_vectors_size = params.size(0);
   assert(kernel_vectors_size == kernel_vectors.size(0));
   point_data* Kvec = (point_data*)kernel_vectors.data_ptr<short>();
 
-  uint N = params.size(1);
+  uint32_t N = params.size(1);
   assert(N == inputs.size(1));
 
-  uint M = params.size(2);
+  uint32_t M = params.size(2);
 
   int BatchSize = pyramid.size(0);
-  uint* Pyramid = reinterpret_cast<uint*>(pyramid.data_ptr<int>());
+  uint32_t* Pyramid = reinterpret_cast<uint32_t*>(pyramid.data_ptr<int>());
 
   int Qlevel = level;
   int Plevel = Qlevel - jump;
   int Olevel = pyramid.size(2)-2;
   assert(PLevel >= 0);
 
-  uint psize = pyramid.index({ Slice(None), 0, Plevel }).sum().item<int>();
+  uint32_t psize = pyramid.index({ Slice(None), 0, Plevel }).sum().item<int>();
   int pmax = pyramid.index({ Slice(None), 0, Plevel }).max().item<int>();
 
   at::Tensor outputs = at::zeros({ psize, M}, octree.options().dtype(at::kFloat));
@@ -187,8 +187,8 @@ std::tuple<at::Tensor, int> Conv3d_forward(
   at::Tensor OmapX = at::zeros({ scan_size }, octree.options().dtype(at::kInt));
 
   // get tensor data pointers
-  uint*  d_Info = reinterpret_cast<uint*>(Info.data_ptr<int>());
-  uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
+  uint32_t*  d_Info = reinterpret_cast<uint32_t*>(Info.data_ptr<int>());
+  uint32_t*  d_PrefixSum = reinterpret_cast<uint32_t*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
   uint64_t temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
@@ -203,7 +203,7 @@ std::tuple<at::Tensor, int> Conv3d_forward(
 
   point_data* d_Proot = reinterpret_cast<point_data*>(points.data_ptr<short>());
   uchar* dO = octree.data_ptr<uchar>();
-  uint* dEx = reinterpret_cast<uint*>(exsum.data_ptr<int>());
+  uint32_t* dEx = reinterpret_cast<uint32_t*>(exsum.data_ptr<int>());
 
   Conv3d_forward_cuda(
     d_Proot, dO, dEx,
@@ -228,14 +228,14 @@ std::tuple<at::Tensor, int> Conv3d_forward(
 std::vector<at::Tensor> Conv3d_backward(
     at::Tensor octree,
     at::Tensor points,
-    uint level,
+    uint32_t level,
     at::Tensor pyramid,
     at::Tensor exsum,
     at::Tensor inputs,
     at::Tensor grad_outputs,
     at::Tensor params,
     at::Tensor kernel_vectors,
-    uint jump) {
+    uint32_t jump) {
 #ifdef WITH_CUDA
   CHECK_INPUT(grad_outputs);
   CHECK_INPUT(inputs);
@@ -247,18 +247,18 @@ std::vector<at::Tensor> Conv3d_backward(
   CHECK_CPU(pyramid);
   CHECK_CUDA(kernel_vectors);
 
-  uint kernel_vectors_size = params.size(0);
+  uint32_t kernel_vectors_size = params.size(0);
   assert(kernel_vectors_size == kernel_vectors.size(0));
   point_data* Kvec = (point_data*)kernel_vectors.data_ptr<short>();
 
-  uint N = params.size(1);
+  uint32_t N = params.size(1);
   assert(N == inputs.size(1));
 
-  uint M = params.size(2);
+  uint32_t M = params.size(2);
 
   int BatchSize = pyramid.size(0);
   int Olevel = pyramid.size(2)-2;
-  uint* Pyramid = reinterpret_cast<uint*>(pyramid.data_ptr<int>());
+  uint32_t* Pyramid = reinterpret_cast<uint32_t*>(pyramid.data_ptr<int>());
 
   int Plevel = level;
   int Qlevel = Plevel + jump;
@@ -287,8 +287,8 @@ std::vector<at::Tensor> Conv3d_backward(
   at::Tensor OmapX = at::zeros({ scan_size }, octree.options().dtype(at::kInt));
 
   // get tensor data pointers
-  uint*  d_Info = reinterpret_cast<uint*>(Info.data_ptr<int>());
-  uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
+  uint32_t*  d_Info = reinterpret_cast<uint32_t*>(Info.data_ptr<int>());
+  uint32_t*  d_PrefixSum = reinterpret_cast<uint32_t*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
   uint64_t temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
@@ -302,7 +302,7 @@ std::vector<at::Tensor> Conv3d_backward(
 
   point_data*  d_Proot = (point_data*)points.data_ptr<short>();
   uchar*     dO = octree.data_ptr<uchar>();
-  uint*     dEx = reinterpret_cast<uint*>(exsum.data_ptr<int>());
+  uint32_t*     dEx = reinterpret_cast<uint32_t*>(exsum.data_ptr<int>());
 
   Conv3d_backward_cuda(
     d_Proot, dO, dEx,
@@ -326,13 +326,13 @@ std::vector<at::Tensor> Conv3d_backward(
 std::tuple<at::Tensor, int> ConvTranspose3d_forward(
     at::Tensor octree,
     at::Tensor points,
-    uint level,
+    uint32_t level,
     at::Tensor pyramid,
     at::Tensor exsum,
     at::Tensor inputs,
     at::Tensor params,
     at::Tensor kernel_vectors,
-    uint jump) {
+    uint32_t jump) {
 #if WITH_CUDA
   CHECK_OCTREES(octree);
   CHECK_INPUT(inputs);
@@ -344,25 +344,25 @@ std::tuple<at::Tensor, int> ConvTranspose3d_forward(
   CHECK_CPU(pyramid);
   CHECK_CUDA(kernel_vectors);
 
-  uint kernel_vectors_size = params.size(0);
+  uint32_t kernel_vectors_size = params.size(0);
   assert(kernel_vectors_size == kernel_vectors.size(0));
   point_data* Kvec = (point_data*)kernel_vectors.data_ptr<short>();
 
-  uint N = params.size(1);
+  uint32_t N = params.size(1);
   assert(N == inputs.size(1));
 
-  uint M = params.size(2);
+  uint32_t M = params.size(2);
 
   // int jump = jump[0].item<int>();
   int BatchSize = pyramid.size(0);
-  uint* Pyramid = reinterpret_cast<uint*>(pyramid.data_ptr<int>());
+  uint32_t* Pyramid = reinterpret_cast<uint32_t*>(pyramid.data_ptr<int>());
 
   int Qlevel = level;
   int Plevel = Qlevel + jump;
   int Olevel = pyramid.size(2)-2;
   assert(PLevel <= Olevel);
 
-  uint psize = pyramid.index({ Slice(None), 0, Plevel }).sum().item<int>();
+  uint32_t psize = pyramid.index({ Slice(None), 0, Plevel }).sum().item<int>();
   int pmax = pyramid.index({ Slice(None), 0, Plevel }).max().item<int>();
 
   at::Tensor outputs = at::zeros({ psize, M}, octree.options().dtype(at::kFloat));
@@ -383,8 +383,8 @@ std::tuple<at::Tensor, int> ConvTranspose3d_forward(
   at::Tensor OmapX = at::zeros({ scan_size }, octree.options().dtype(at::kInt));
 
   // get tensor data pointers
-  uint*  d_Info = reinterpret_cast<uint*>(Info.data_ptr<int>());
-  uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
+  uint32_t*  d_Info = reinterpret_cast<uint32_t*>(Info.data_ptr<int>());
+  uint32_t*  d_PrefixSum = reinterpret_cast<uint32_t*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
   uint64_t temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
@@ -398,7 +398,7 @@ std::tuple<at::Tensor, int> ConvTranspose3d_forward(
 
   point_data*  d_Proot = (point_data*)points.data_ptr<short>();
   uchar*     dO = octree.data_ptr<uchar>();
-  uint*     dEx = reinterpret_cast<uint*>(exsum.data_ptr<int>());
+  uint32_t*     dEx = reinterpret_cast<uint32_t*>(exsum.data_ptr<int>());
 
   ConvTranspose3d_forward_cuda(
     d_Proot, dO, dEx,
@@ -422,14 +422,14 @@ std::tuple<at::Tensor, int> ConvTranspose3d_forward(
 std::vector<at::Tensor>  ConvTranspose3d_backward(
     at::Tensor octree,
     at::Tensor points,
-    uint level,
+    uint32_t level,
     at::Tensor pyramid,
     at::Tensor exsum,
     at::Tensor inputs,
     at::Tensor grad_outputs,
     at::Tensor params,
     at::Tensor kernel_vectors,
-    uint jump) {
+    uint32_t jump) {
 #if WITH_CUDA
   CHECK_OCTREES(octree);
   CHECK_INPUT(grad_outputs);
@@ -442,17 +442,17 @@ std::vector<at::Tensor>  ConvTranspose3d_backward(
   CHECK_CPU(pyramid);
   CHECK_CUDA(kernel_vectors);
 
-  uint kernel_vectors_size = params.size(0);
+  uint32_t kernel_vectors_size = params.size(0);
   assert(kernel_vectors_size == kernel_vectors.size(0));
   point_data* Kvec = (point_data*)kernel_vectors.data_ptr<short>();
 
-  uint N = params.size(1);
+  uint32_t N = params.size(1);
   assert(N == inputs.size(1));
 
-  uint M = params.size(2);
+  uint32_t M = params.size(2);
   int BatchSize = pyramid.size(0);
   int Olevel = pyramid.size(2)-2;
-  uint* Pyramid = reinterpret_cast<uint*>(pyramid.data_ptr<int>());
+  uint32_t* Pyramid = reinterpret_cast<uint32_t*>(pyramid.data_ptr<int>());
 
   int Plevel = level;
   int Qlevel = Plevel - jump;
@@ -481,8 +481,8 @@ std::vector<at::Tensor>  ConvTranspose3d_backward(
   at::Tensor OmapX = at::zeros({ scan_size }, octree.options().dtype(at::kInt));
 
   // get tensor data pointers
-  uint*  d_Info = reinterpret_cast<uint*>(Info.data_ptr<int>());
-  uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
+  uint32_t*  d_Info = reinterpret_cast<uint32_t*>(Info.data_ptr<int>());
+  uint32_t*  d_PrefixSum = reinterpret_cast<uint32_t*>(PrefixSum.data_ptr<int>());
 
   void* d_temp_storage = NULL;
   uint64_t temp_storage_bytes = GetStorageBytesX(d_temp_storage, d_Info, d_PrefixSum, scan_size);
@@ -496,7 +496,7 @@ std::vector<at::Tensor>  ConvTranspose3d_backward(
 
   point_data*  d_Proot = (point_data*)points.data_ptr<short>();
   uchar*     dO = octree.data_ptr<uchar>();
-  uint*     dEx = reinterpret_cast<uint*>(exsum.data_ptr<int>());
+  uint32_t*     dEx = reinterpret_cast<uint32_t*>(exsum.data_ptr<int>());
 
   ConvTranspose3d_backward_cuda(
     d_Proot, dO, dEx,

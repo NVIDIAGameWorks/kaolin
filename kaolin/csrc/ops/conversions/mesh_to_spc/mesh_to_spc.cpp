@@ -32,25 +32,25 @@ using namespace std;
 using namespace at::indexing;
 
 #ifdef WITH_CUDA
-uint64_t GetStorageBytes(void* d_temp_storageA, morton_code* d_M0, morton_code* d_M1, uint max_total_points);
+uint64_t GetStorageBytes(void* d_temp_storageA, morton_code* d_M0, morton_code* d_M1, uint32_t max_total_points);
 
-uint VoxelizeGPU(uint npnts, float3* Pnts, uint ntris, long3* Tris, uint Level,
+uint32_t VoxelizeGPU(uint32_t npnts, float3* Pnts, uint32_t ntris, long3* Tris, uint32_t Level,
   point_data* d_P, morton_code* d_M0, morton_code* d_M1,
-  uint* d_Info, uint* d_PrefixSum, uint* d_info, uint* d_psum,
+  uint32_t* d_Info, uint32_t* d_PrefixSum, uint32_t* d_info, uint32_t* d_psum,
   float3* d_l0, float3* d_l1, float3* d_l2, float3* d_F,
   uchar* d_axis, ushort* d_W, ushort2* d_pmin,
   void* d_temp_storageA, uint64_t temp_storage_bytesA, uchar* d_Odata, int* d_Pyramid);
 
-uint PointToOctree(point_data* d_points, morton_code* d_morton, uint* d_info, uint* d_psum, 
+uint32_t PointToOctree(point_data* d_points, morton_code* d_morton, uint32_t* d_info, uint32_t* d_psum, 
     void* d_temp_storage, uint64_t temp_storage_bytes, uchar* d_octree, int* h_pyramid, 
-    uint psize, uint level);
+    uint32_t psize, uint32_t level);
 #endif
 
 at::Tensor points_to_octree(
     at::Tensor points,
-    uint level) {
+    uint32_t level) {
 #ifdef WITH_CUDA
-    uint psize = points.size(0);
+    uint32_t psize = points.size(0);
     at::Tensor morton = at::zeros({KAOLIN_SPC_MAX_POINTS}, points.options().dtype(at::kLong));
     at::Tensor info = at::zeros({KAOLIN_SPC_MAX_POINTS}, points.options().dtype(at::kInt));
     at::Tensor psum = at::zeros({KAOLIN_SPC_MAX_POINTS}, points.options().dtype(at::kInt));
@@ -59,8 +59,8 @@ at::Tensor points_to_octree(
   
     point_data* d_points = reinterpret_cast<point_data*>(points.data_ptr<short>());
     morton_code* d_morton = reinterpret_cast<morton_code*>(morton.data_ptr<int64_t>());
-    uint*  d_info = reinterpret_cast<uint*>(info.data_ptr<int>());
-    uint*  d_psum = reinterpret_cast<uint*>(psum.data_ptr<int>());
+    uint32_t*  d_info = reinterpret_cast<uint32_t*>(info.data_ptr<int>());
+    uint32_t*  d_psum = reinterpret_cast<uint32_t*>(psum.data_ptr<int>());
     uchar* d_octree = octree.data_ptr<uchar>();
     int*  h_pyramid = pyramid.data_ptr<int>();
     void* d_temp_storage = NULL;
@@ -68,7 +68,7 @@ at::Tensor points_to_octree(
     at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, points.options().dtype(at::kByte));
     d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
     
-    uint osize = PointToOctree(d_points, d_morton, d_info, d_psum, d_temp_storage, temp_storage_bytes,
+    uint32_t osize = PointToOctree(d_points, d_morton, d_info, d_psum, d_temp_storage, temp_storage_bytes,
             d_octree, h_pyramid, psize, level);
 
     return octree.index({Slice(KAOLIN_SPC_MAX_OCTREE - osize, None)});
@@ -80,13 +80,13 @@ at::Tensor points_to_octree(
 at::Tensor mesh_to_spc(
     at::Tensor vertices,
     at::Tensor triangles,
-    uint Level) {
+    uint32_t Level) {
 #ifdef WITH_CUDA
   CHECK_PACKED_FLOAT3(vertices);
   CHECK_PACKED_LONG3(triangles);
 
-  uint npnts = vertices.size(0);
-  uint ntris = triangles.size(0);
+  uint32_t npnts = vertices.size(0);
+  uint32_t ntris = triangles.size(0);
 
   // allocate local GPU storage
   at::Tensor P = at::zeros({KAOLIN_SPC_MAX_POINTS, 3}, vertices.options().dtype(at::kShort));
@@ -116,10 +116,10 @@ at::Tensor mesh_to_spc(
   morton_code* d_M0 = reinterpret_cast<morton_code*>(M0.data_ptr<int64_t>());
   morton_code* d_M1 = reinterpret_cast<morton_code*>(M1.data_ptr<int64_t>());
 
-  uint*  d_Info = reinterpret_cast<uint*>(Info.data_ptr<int>());
-  uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
-  uint*  d_info = reinterpret_cast<uint*>(info.data_ptr<int>());
-  uint*  d_psum = reinterpret_cast<uint*>(psum.data_ptr<int>());
+  uint32_t*  d_Info = reinterpret_cast<uint32_t*>(Info.data_ptr<int>());
+  uint32_t*  d_PrefixSum = reinterpret_cast<uint32_t*>(PrefixSum.data_ptr<int>());
+  uint32_t*  d_info = reinterpret_cast<uint32_t*>(info.data_ptr<int>());
+  uint32_t*  d_psum = reinterpret_cast<uint32_t*>(psum.data_ptr<int>());
 
   float3* d_Pnts = reinterpret_cast<float3*>(vertices.data_ptr<float>());
   tri_index* d_Tris = reinterpret_cast<tri_index*>(triangles.data_ptr<int64_t>());
@@ -144,7 +144,7 @@ at::Tensor mesh_to_spc(
   d_temp_storageA = (void*)temp_storageA.data_ptr<uchar>();
 
   // do cuda
-  uint Osize = VoxelizeGPU(npnts, d_Pnts, ntris, d_Tris, Level,
+  uint32_t Osize = VoxelizeGPU(npnts, d_Pnts, ntris, d_Tris, Level,
               d_P, d_M0, d_M1, d_Info, d_PrefixSum, d_info, d_psum,
               d_l0, d_l1, d_l2, d_F,
               d_axis, d_W, d_pmin, d_temp_storageA, temp_storage_bytesA, d_Odata, h_Pyramid);

@@ -39,48 +39,48 @@ at::Tensor generate_points_cuda(
 std::tuple<at::Tensor, int> Conv3d_forward(
     at::Tensor octree,
     at::Tensor points,
-    uint level,
+    uint32_t level,
     at::Tensor pyramid,
     at::Tensor exsum,
     at::Tensor inputs,
     at::Tensor params,
     at::Tensor kernel_vectors,
-    uint jump);
+    uint32_t jump);
 
 std::vector<at::Tensor> Conv3d_backward(
     at::Tensor octree,
     at::Tensor points,
-    uint level,
+    uint32_t level,
     at::Tensor pyramid,
     at::Tensor exsum,
     at::Tensor inputs,
     at::Tensor grad_outputs,
     at::Tensor params,
     at::Tensor kernel_vectors,
-    uint jump);
+    uint32_t jump);
 
 std::tuple<at::Tensor, int> ConvTranspose3d_forward(
     at::Tensor octree,
     at::Tensor points,
-    uint level,
+    uint32_t level,
     at::Tensor pyramid,
     at::Tensor exsum,
     at::Tensor inputs,
     at::Tensor params,
     at::Tensor kernel_vectors,
-    uint jump);
+    uint32_t jump);
 
 std::vector<at::Tensor> ConvTranspose3d_backward(
     at::Tensor octree,
     at::Tensor points,
-    uint level,
+    uint32_t level,
     at::Tensor pyramid,
     at::Tensor exsum,
     at::Tensor inputs,
     at::Tensor grad_outputs,
     at::Tensor params,
     at::Tensor kernel_vectors,
-    uint jump);
+    uint32_t jump);
 
 }  // namespace kaolin
 
