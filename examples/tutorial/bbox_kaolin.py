@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import kaolin
 from matplotlib import pyplot as plt
+import matplotlib.animation as animation
 
 from typing import Tuple
 from torch.utils.data import DataLoader
@@ -13,9 +14,11 @@ import glob
 
 # hyperparameters
 batch_size_hyper = 2
-mask_weight = 1.0
-lr = 5e-2
-num_epoch = 300
+mask_weight_hyper = 1.0
+mask_occupancy_hyper = 0.05
+mask_overlap_hyper = 1.0
+lr = 5e-3
+num_epoch = 3
 
 # load image(s) with camera extrinsics
 rendered_path = "../samples/rendered_clock/"
@@ -30,16 +33,42 @@ dataloader = DataLoader(train_data, batch_size=batch_size_hyper, shuffle=True, p
 class DiffBBox:
     """Represents a 3d bounding box to fit."""
     def __init__(self, mesh_file: str):
-        self.mesh = kaolin.io.obj.import_mesh(mesh_file, with_materials=True)
-        self.vertices = None
-        self.faces = None
+        self._mesh = kaolin.io.obj.import_mesh(mesh_file, with_materials=True)
+        self._vertices = None
+        self._faces = None
+        self._centers = torch.zeros((3,), dtype=torch.float, device="cuda", requires_grad=True)
+        self._scales = torch.ones((3,), dtype=torch.float, device="cuda", requires_grad=True)
+        # self._rotations = torch.ones((3,3,), dtype=torch.float, device="cuda", requires_grad=True)
         self._preprocess()
-        # TODO: reparameterize as center and scale - ie NOT change vertices themselves
+        # TODO: add pose as quaternion. rotate verts
     
     def _preprocess(self):
-        self.vertices = self.mesh.vertices.cuda().unsqueeze(0) * 75
-        self.vertices.requires_grad = True
-        self.faces = self.mesh.faces.cuda()
+        self._vertices = self._mesh.vertices.cuda().unsqueeze(0) * 75
+        self._vertices.requires_grad = False
+        self._faces = self._mesh.faces.cuda()
+    
+    @property
+    def vertices(self):
+        # rotate, scale in xyz, translate
+        # return (torch.matmul(self._vertices, self._rotations) * self._scales) + self._centers
+        return (self._vertices * self._scales) + self._centers
+    
+    @property
+    def faces(self):
+        return self._faces
+
+def overlap(lhs_mask, rhs_mask):
+    batch_size, height, width = lhs_mask.shape
+    assert rhs_mask.shape == lhs_mask.shape
+    sil_mul = lhs_mask * rhs_mask
+    sil_area = torch.sum(sil_mul.reshape(batch_size, -1), dim=1)
+
+    return 1 - torch.mean(sil_area/(height*width))
+
+def occupancy(mask):
+    batch_size, height, width = mask.shape
+    mask_area = torch.sum(mask.reshape(batch_size, -1), dim=1)
+    return torch.mean(mask_area/(height*width))
 
 def project_to_2d(bbox: DiffBBox, batch_size: int, image_shape: Tuple[int, int], camera_transform, camera_projection) -> torch.Tensor:
     face_vertices_camera, face_vertices_image, face_normals = kaolin.render.mesh.prepare_vertices(
@@ -63,9 +92,8 @@ def draw_image(gt_mask, pred_mask):
     canvas[...,2] = pred_mask.cpu().detach().numpy()
     canvas[...,1] = gt_mask.cpu().detach().numpy()
 
-    return canvas*255
+    return np.clip(canvas, 0.0, 1.0)
 
-import matplotlib.animation as animation
 
 def show_renders(dataset: torch.Tensor):
     with torch.no_grad():
@@ -90,7 +118,8 @@ def show_renders(dataset: torch.Tensor):
 
 # set up model & optimization
 bbox = DiffBBox('../samples/bbox.obj')
-optim = torch.optim.Adam(params=[bbox.vertices], lr=lr)
+optim = torch.optim.Adam(params=[bbox._centers, bbox._scales], lr=lr)
+
 
 image_list = []
 for epoch in range(num_epoch):
@@ -108,16 +137,26 @@ for epoch in range(num_epoch):
 
         # compute overlap of projection with ground truth segmentation mask
         mask_loss: torch.Tensor = kaolin.metrics.render.mask_iou(soft_mask, gt_mask.squeeze(-1))
+        mask_occupancy = occupancy(soft_mask)
+        mask_overlap = overlap(soft_mask, gt_mask.squeeze(-1))
 
-        loss = mask_loss * mask_weight
+        # loss = mask_loss * mask_weight
+        # penalize larger masks
+        # reward more overlap
+        loss = mask_occupancy * mask_occupancy_hyper + mask_overlap * mask_overlap_hyper
 
         loss.backward()
         optim.step()
 
+        test_batch_ids = [2, 5, 10]
+        test_viz = [train_data[idx] for idx in test_batch_ids]
+        image_list.append(show_renders(test_viz))
+
+
     print(f"{epoch} loss: {loss}")
-    test_batch_ids = [2, 5, 10]
-    test_viz = [train_data[idx] for idx in test_batch_ids]
-    image_list.append(show_renders(test_viz))
+    # test_batch_ids = [2, 5, 10]
+    # test_viz = [train_data[idx] for idx in test_batch_ids]
+    # image_list.append(show_renders(test_viz))
 
 
 # generate final plot
@@ -134,6 +173,6 @@ for i in range(len(image_list)):
         for j in range(num_subplots):
             ax[j].imshow(image_list[i][j])
     ims.append(sp_ims)
-ani = animation.ArtistAnimation(f, ims, interval=30, blit=True, repeat_delay=200)
+ani = animation.ArtistAnimation(f, ims, interval=60, blit=True, repeat_delay=200)
 ani.save("animation.gif")
-# plt.show()
+
