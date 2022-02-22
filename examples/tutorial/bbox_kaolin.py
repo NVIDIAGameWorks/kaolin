@@ -7,8 +7,6 @@ import matplotlib.animation as animation
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
-from PIL import Image
-from pyrr import Quaternion, matrix44
 from torch.utils.data import DataLoader
 
 import kaolin
