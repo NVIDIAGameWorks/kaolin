@@ -6,6 +6,14 @@ import cv2
 import matplotlib.animation as animation
 import numpy as np
 import torch
+from conversions import (
+    euler_to_matrix33,
+    euler_to_matrix44,
+    euler_to_quaternion,
+    quaternion_to_matrix33,
+    quaternion_to_matrix44,
+    quaternion_to_matrix44_v2,
+)
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 
@@ -86,7 +94,13 @@ class DiffBBox(torch.nn.Module):
         # rotate, scale in xyz, translate
         # euler = np.random.uniform(0.0, 1.0, size=[3])
         # rot = _euler_to_matrix33(euler)
-        rot = _euler_to_matrix33(self._rot_pitch, self._rot_roll, self._rot_yaw)
+        # rot = _euler_to_matrix33(self._rot_pitch, self._rot_roll, self._rot_yaw)
+        rot = euler_to_matrix33(self._rot_pitch, self._rot_roll, self._rot_yaw)
+        rot2 = euler_to_matrix44(self._rot_pitch, self._rot_roll, self._rot_yaw)
+        q = euler_to_quaternion(self._rot_pitch, self._rot_roll, self._rot_yaw)
+        mat33 = quaternion_to_matrix33(q)
+        mat44 = quaternion_to_matrix44(q)
+        mat44_v2 = quaternion_to_matrix44_v2(q)
         return (torch.matmul(self._vertices, rot) * self._scales) + self._centers
 
     @property
