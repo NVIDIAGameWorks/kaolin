@@ -6,18 +6,23 @@ import cv2
 import matplotlib.animation as animation
 import numpy as np
 import torch
-from conversions import (
-    euler_to_matrix33,
-    euler_to_matrix44,
-    euler_to_quaternion,
-    quaternion_to_matrix33,
-    quaternion_to_matrix44,
-    quaternion_to_matrix44_v2,
-)
+import torch.nn.functional as F
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 
 import kaolin
+from examples.tutorial.conversions import (
+    _pad_mat33_to_mat44,
+    euler_to_matrix33,
+    euler_to_matrix44,
+    euler_to_quaternion,
+    matrix33_to_quaternion,
+    quaternion_to_matrix33,
+    quaternion_to_matrix44,
+    quaternion_to_matrix44_v2,
+    scale_to_matrix44,
+    translation_to_matrix44,
+)
 
 # hyperparameters
 batch_size_hyper = 2
@@ -92,15 +97,14 @@ class DiffBBox(torch.nn.Module):
     @property
     def vertices(self):
         # rotate, scale in xyz, translate
-        # euler = np.random.uniform(0.0, 1.0, size=[3])
-        # rot = _euler_to_matrix33(euler)
-        # rot = _euler_to_matrix33(self._rot_pitch, self._rot_roll, self._rot_yaw)
         rot = euler_to_matrix33(self._rot_pitch, self._rot_roll, self._rot_yaw)
-        rot2 = euler_to_matrix44(self._rot_pitch, self._rot_roll, self._rot_yaw)
-        q = euler_to_quaternion(self._rot_pitch, self._rot_roll, self._rot_yaw)
-        mat33 = quaternion_to_matrix33(q)
-        mat44 = quaternion_to_matrix44(q)
-        mat44_v2 = quaternion_to_matrix44_v2(q)
+        # rot2 = euler_to_matrix44(self._rot_pitch, self._rot_roll, self._rot_yaw)
+        # smat = scale_to_matrix44(self._scales)
+        # tmat = translation_to_matrix44(self._centers)
+        # vertices = F.pad(self._vertices, (0, 1), mode='constant', value=1.)
+
+        # return torch.matmul(torch.matmul(torch.matmul(vertices, rot2), smat), tmat)
+        # tmp = torch.cat([self._vertices, torch.ones(size=(1,8,1,)).cuda()], dim=-1)
         return (torch.matmul(self._vertices, rot) * self._scales) + self._centers
 
     @property
