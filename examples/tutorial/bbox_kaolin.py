@@ -62,6 +62,20 @@ def _euler_to_matrix33(pitch, roll, yaw, dtype=torch.float) -> torch.Tensor:
     return mat33
 
 
+def euler_to_quat(heading, attitude, bank):
+    c1 = torch.cos(heading / 2)
+    c2 = torch.cos(attitude / 2)
+    c3 = torch.cos(bank / 2)
+    s1 = torch.sin(heading / 2)
+    s2 = torch.sin(attitude / 2)
+    s3 = torch.sin(bank / 2)
+    w = c1 * c2 * c3 - s1 * s2 * s3
+    x = s1 * s2 * c3 + c1 * c2 * s3
+    y = s1 * c2 * c3 + c1 * s2 * s3
+    z = c1 * s2 * c3 - s1 * c2 * s3
+    return torch.stack([w, x, y, z])
+
+
 # set up mesh to optimize
 class DiffBBox(torch.nn.Module):
     """Represents a 3d bounding box to fit."""
@@ -74,12 +88,8 @@ class DiffBBox(torch.nn.Module):
         self._faces = None
         self._centers = torch.zeros((3,), dtype=torch.float, device="cuda", requires_grad=True)
         self._scales = torch.ones((3,), dtype=torch.float, device="cuda", requires_grad=True)
-        # rotations as euler angles
-        # self._rotations = torch.zeros((3,), dtype=torch.float, device="cuda", requires_grad=True)
-        euler = np.random.uniform(0.0, 1.0, size=[3])
-        self._rot_pitch = torch.nn.Parameter(torch.tensor(euler[0], dtype=torch.float))
-        self._rot_roll = torch.nn.Parameter(torch.tensor(euler[1], dtype=torch.float))
-        self._rot_yaw = torch.nn.Parameter(torch.tensor(euler[2], dtype=torch.float))
+        # rotations as quaternion
+        self._rotations = torch.tensor([0.0, 0.0, 0.0, 1.0], device="cuda", requires_grad=True)
         self._preprocess()
         # TODO: add pose as quaternion. rotate verts
 
@@ -97,8 +107,8 @@ class DiffBBox(torch.nn.Module):
     @property
     def vertices(self):
         # rotate, scale in xyz, translate
-        rot = euler_to_matrix33(self._rot_pitch, self._rot_roll, self._rot_yaw)
-        # rot2 = euler_to_matrix44(self._rot_pitch, self._rot_roll, self._rot_yaw)
+        # rot = euler_to_matrix33(self._rot_pitch, self._rot_roll, self._rot_yaw)
+        rot = quaternion_to_matrix33(self._rotations)
         # smat = scale_to_matrix44(self._scales)
         # tmat = translation_to_matrix44(self._centers)
         # vertices = F.pad(self._vertices, (0, 1), mode='constant', value=1.)
@@ -195,7 +205,7 @@ def show_renders(dataset: torch.Tensor):
 
 # set up model & optimization
 bbox = DiffBBox("../samples/bbox.obj")
-optim = torch.optim.Adam(params=[bbox._centers, bbox._scales, *bbox.parameters()], lr=lr)
+optim = torch.optim.Adam(params=[bbox._centers, bbox._scales, bbox._rotations], lr=lr)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=scheduler_step_size, gamma=scheduler_gamma)
 
 
