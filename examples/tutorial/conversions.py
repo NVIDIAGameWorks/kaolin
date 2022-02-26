@@ -31,7 +31,7 @@ def _pad_mat33_to_mat44(mat33: torch.Tensor) -> torch.Tensor:
     return mat44
 
 
-def euler_to_quaternion(pitch, roll, yaw) -> torch.Tensor:
+def euler_to_quaternion(roll, pitch, yaw) -> torch.Tensor:
     # TODO: avoid moving data to cuda by hand?
     halfRoll = roll * 0.5
     sR = torch.sin(halfRoll)
