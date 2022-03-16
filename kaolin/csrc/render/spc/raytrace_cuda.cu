@@ -39,11 +39,13 @@ namespace kaolin {
 
 using namespace at::indexing;
 
+#define RT_NUM_THREADS 1024
+
 ////////////////////////////////////////////////////////////////////////////////////////////////
 /// Constants
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-__constant__ uint VOXEL_ORDER[8][8] = {
+__constant__ uint8_t VOXEL_ORDER[8][8] = {
     { 0, 1, 2, 4, 3, 5, 6, 7 },
     { 1, 0, 3, 5, 2, 4, 7, 6 },
     { 2, 0, 3, 6, 1, 4, 7, 5 },
@@ -85,8 +87,8 @@ decide_cuda_kernel(
     float* depth,
     uint* __restrict__ info, 
     const uint8_t* __restrict__ octree, 
-    const uint level, 
-    const uint not_done) {
+    const uint32_t level, 
+    const uint32_t not_done) {
 
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
   const float eps = 1e-8;
@@ -133,8 +135,8 @@ decide_cuda_kernel(
     float2* __restrict__ depth,
     uint* __restrict__ info, 
     const uint8_t* __restrict__ octree, 
-    const uint level, 
-    const uint not_done) {
+    const uint32_t level, 
+    const uint32_t not_done) {
 
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
   const float eps = 1e-8;
@@ -184,7 +186,7 @@ subdivide_cuda_kernel(
     const uint* __restrict__ exclusive_sum, 
     const uint* __restrict__ info,
     const uint* __restrict__ prefix_sum, 
-    const uint level) {
+    const uint32_t level) {
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num && info[tidx]) {
@@ -437,23 +439,19 @@ cumsum_reverse_cuda_kernel(
 /// CUDA Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-uint raytrace_cuda_impl(
+std::vector<at::Tensor> raytrace_cuda_impl(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
     at::Tensor exclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
-    at::Tensor nugget_buffers,
-    at::Tensor depth_buffers,
-    uint max_level,
-    uint target_level,
+    uint32_t max_level,
+    uint32_t target_level,
     bool return_depth,
     bool with_exit) {
 
   uint num = ray_o.size(0);
-  at::Tensor info = at::zeros({KAOLIN_SPC_MAX_POINTS}, octree.options().dtype(at::kInt));
-  at::Tensor prefix_sum = at::zeros({KAOLIN_SPC_MAX_POINTS}, octree.options().dtype(at::kInt));
   
   uint8_t* octree_ptr = octree.data_ptr<uint8_t>();
   point_data* points_ptr = reinterpret_cast<point_data*>(points.data_ptr<short>());
@@ -462,76 +460,91 @@ uint raytrace_cuda_impl(
   uint*  exclusive_sum_ptr = reinterpret_cast<uint*>(exclusive_sum.data_ptr<int>());
   float3* ray_o_ptr = reinterpret_cast<float3*>(ray_o.data_ptr<float>());
   float3* ray_d_ptr = reinterpret_cast<float3*>(ray_d.data_ptr<float>());
-  uint2* nugget_buffers_ptr = reinterpret_cast<uint2*>(nugget_buffers.data_ptr<int>());
-  float* depth_buffers_ptr = depth_buffers.data_ptr<float>();
 
-  uint* prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
-  uint* info_ptr = reinterpret_cast<uint*>(info.data_ptr<int>());
-  
-  void* temp_storage_ptr = NULL;
-  uint64_t temp_storage_bytes = get_cub_storage_bytes(
-    temp_storage_ptr, info_ptr, prefix_sum_ptr, KAOLIN_SPC_MAX_POINTS);
-  at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, octree.options());
-  temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
-  
-  uint2*  nuggets[2];
-  nuggets[0] = nugget_buffers_ptr;
-  nuggets[1] = nugget_buffers_ptr + KAOLIN_SPC_MAX_POINTS;
 
-  const uint depth_dim = with_exit ? 2 : 1;
-  float* depths[2];
-  depths[0] = depth_buffers_ptr;
-  depths[1] = depth_buffers_ptr + (depth_dim * KAOLIN_SPC_MAX_POINTS);
+  // allocate local GPU storage
+  at::Tensor nuggets0 = at::empty({num, 2}, octree.options().dtype(at::kInt));
+  uint2* nuggets0_ptr = reinterpret_cast<uint2*>(nuggets0.data_ptr<int>());
+  at::Tensor nuggets1;
 
-  int osize = pyramid_sum[max_level];
+  uint depth_dim = with_exit ? 2 : 1;
+  at::Tensor depths0 = at::empty({num, depth_dim}, octree.options().dtype(at::kFloat));
+  float* depth0_ptr  = depths0.data_ptr<float>();
+  at::Tensor depths1;
 
   // Generate proposals (first proposal is root node)
-  init_nuggets_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(num, nuggets[0]);
+  init_nuggets_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(num, nuggets0_ptr);
 
   uint cnt, buffer = 0;
+  for (uint32_t l = 0; l <= target_level; l++) {
 
-  // set first element to zero
-  CubDebugExit(cudaMemcpy(prefix_sum_ptr, &buffer, sizeof(uint),
-                          cudaMemcpyHostToDevice));
+    at::Tensor info = at::empty({num+1}, octree.options().dtype(at::kInt));
+    uint* info_ptr = reinterpret_cast<uint*>(info.data_ptr<int>());
 
-  for (uint l = 0; l <= target_level; l++) {
     // Do the proposals hit?
     if (with_exit) {
-        decide_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
-            num, points_ptr, ray_o_ptr, ray_d_ptr, nuggets[buffer], 
-            reinterpret_cast<float2*>(depths[buffer]),
+        decide_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
+            num, points_ptr, ray_o_ptr, ray_d_ptr, nuggets0_ptr, 
+            reinterpret_cast<float2*>(depth0_ptr),
             info_ptr, octree_ptr, l, target_level - l);
     } else {
-        decide_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
-            num, points_ptr, ray_o_ptr, ray_d_ptr, nuggets[buffer], 
-            depths[buffer], info_ptr, octree_ptr, l, target_level - l);
+        decide_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
+            num, points_ptr, ray_o_ptr, ray_d_ptr, nuggets0_ptr, 
+            depth0_ptr, info_ptr, octree_ptr, l, target_level - l);
     }
+
+
+    at::Tensor prefix_sum = at::empty({num+1}, octree.options().dtype(at::kInt));
+    uint*  prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
+
+    // set first element to zero
+    CubDebugExit(cudaMemcpy(prefix_sum_ptr, &buffer, sizeof(uint),
+                            cudaMemcpyHostToDevice));
+
+    // set up memory for DeviceScan calls
+    void* temp_storage_ptr = NULL;
+    uint64_t temp_storage_bytes = get_cub_storage_bytes(
+      temp_storage_ptr, info_ptr, prefix_sum_ptr, num+1);
+    at::Tensor temp_storage = at::empty({(int64_t)temp_storage_bytes}, octree.options());
+    temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
+
+
     CubDebugExit(cub::DeviceScan::InclusiveSum(
         temp_storage_ptr, temp_storage_bytes, info_ptr,
         prefix_sum_ptr + 1, num)); //start sum on second element
     cudaMemcpy(&cnt, prefix_sum_ptr + num, sizeof(uint), cudaMemcpyDeviceToHost);
 
-    if (cnt == 0 || cnt > KAOLIN_SPC_MAX_POINTS)
-      break; // either miss everything, or exceed memory allocation
+    // allocate local GPU storage
+    nuggets1 = at::empty({cnt, 2}, octree.options().dtype(at::kInt));
+    uint2* nuggets1_ptr = reinterpret_cast<uint2*>(nuggets1.data_ptr<int>());
+
+    depths1 = at::empty({cnt, depth_dim}, octree.options().dtype(at::kFloat));
+    float* depth1_ptr  = depths1.data_ptr<float>();
+
+    if (cnt == 0)
+    {
+      num = cnt;
+      break; // miss everything
+    }
 
     // Subdivide if more levels remain, repeat
     if (l < target_level) {
-      subdivide_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
-          num, nuggets[buffer], nuggets[(buffer + 1) % 2], ray_o_ptr, points_ptr,
+      subdivide_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
+          num, nuggets0_ptr, nuggets1_ptr, ray_o_ptr, points_ptr,
           octree_ptr, exclusive_sum_ptr, info_ptr, prefix_sum_ptr, l);
     } else {
-      compactify_cuda_kernel<uint2><<<(num + 1023) / 1024, 1024>>>(
-          num, nuggets[buffer], nuggets[(buffer + 1) % 2],
+      compactify_cuda_kernel<uint2><<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
+          num, nuggets0_ptr, nuggets1_ptr,
           info_ptr, prefix_sum_ptr);
       if (return_depth) {
           if (with_exit) {
-            compactify_cuda_kernel<float2><<<(num + 1023) / 1024, 1024>>>(
-                num, reinterpret_cast<float2*>(depths[buffer]), 
-                reinterpret_cast<float2*>(depths[(buffer + 1) % 2]),
+            compactify_cuda_kernel<float2><<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
+                num, reinterpret_cast<float2*>(depth0_ptr), 
+                reinterpret_cast<float2*>(depth1_ptr),
                 info_ptr, prefix_sum_ptr);
           } else {
-            compactify_cuda_kernel<float><<<(num + 1023) / 1024, 1024>>>(
-                num, depths[buffer], depths[(buffer + 1) % 2],
+            compactify_cuda_kernel<float><<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
+                num, depth0_ptr, depth1_ptr,
                 info_ptr, prefix_sum_ptr);
           }
       }
@@ -539,11 +552,18 @@ uint raytrace_cuda_impl(
 
     CubDebugExit(cudaGetLastError());
 
-    buffer = (buffer + 1) % 2;
+    nuggets0_ptr = nuggets1_ptr;
+    depth0_ptr = depth1_ptr;
+
     num = cnt;
   }
 
-  return cnt;
+  if (return_depth) {
+    return { nuggets1.index({Slice(0, num)}).contiguous(),
+             depths1.index({Slice(0, num)}).contiguous() };
+  } else {
+    return { nuggets1.index({Slice(0, num)}).contiguous() };
+  }
 }
 
 void mark_pack_boundaries_cuda_impl(
@@ -553,7 +573,7 @@ void mark_pack_boundaries_cuda_impl(
     AT_DISPATCH_INTEGRAL_TYPES(pack_ids.type(), "mark_pack_boundaries_cuda", ([&] {
         const at::cuda::OptionalCUDAGuard device_guard(at::device_of(boundaries));
         auto stream = at::cuda::getCurrentCUDAStream();
-        mark_pack_boundaries_cuda_kernel<<<(num + 1023) / 1024, 1024, 0, stream>>>(
+        mark_pack_boundaries_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS, 0, stream>>>(
             num,
             pack_ids.data_ptr<scalar_t>(),
             reinterpret_cast<uint*>(boundaries.data_ptr<int>()));
@@ -732,7 +752,7 @@ void generate_primary_rays_cuda_impl(
     float3* ray_d) {
   uint num = width*height;
 
-  generate_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(num, width, height, tf, ray_o, ray_d);
+  generate_rays_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(num, width, height, tf, ray_o, ray_d);
 }
 
 
@@ -821,14 +841,14 @@ uint generate_shadow_rays_cuda_impl(
   temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
 
   uint cnt = 0;
-  plane_intersect_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+  plane_intersect_rays_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
       num, ray_o, ray_d, dst, plane, info);
   CubDebugExit(cub::DeviceScan::ExclusiveSum(
       temp_storage_ptr, temp_storage_bytes, info, prefix_sum, num));
   cudaMemcpy(&cnt, prefix_sum + num - 1, sizeof(uint), cudaMemcpyDeviceToHost);
-  compactify_shadow_rays_cuda_kernel<<<(num + 1023) / 1024, 1024>>>(
+  compactify_shadow_rays_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
       num, dst, src, map, info, prefix_sum);
-  set_shadow_rays_cuda_kernel<<<(cnt + 1023) / 1024, 1024>>>(cnt, src, dst, light);
+  set_shadow_rays_cuda_kernel<<<(cnt + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(cnt, src, dst, light);
 
   return cnt;
 }
