@@ -186,8 +186,8 @@ def get_requirements():
                       "to use USD related features")
     requirements.append('usd-core>=20.11; python_version < "3.10"')
     if INCLUDE_EXPERIMENTAL:
-        requirements.append('tornado==6.0.4')
-        requirements.append('flask==1.1.2')
+        requirements.append('tornado==6.1')
+        requirements.append('flask==2.0.3')
     return requirements
 
 
