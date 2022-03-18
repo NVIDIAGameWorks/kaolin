@@ -46,6 +46,20 @@ input[type=checkbox]:checked {
     padding: 0;
 }
 
+button {
+  color: white;
+  background-color: var(--nvidia-color);
+}
+
+.nav-container {
+  margin: 0 0;
+  justify-content: left;
+}
+
+.nav-logo {
+  margin: 5px 10px 0 0;
+}
+
 /* SIDEBAR ------------------------------------------*/
 
 html{
@@ -99,6 +113,21 @@ html{
   white-space: pre-wrap;
   word-wrap: break-word;
   word-break: break-all;
+}
+
+.optrow {
+  margin: 10px 0;
+}
+
+.opt {
+  display: inline-block;
+  margin: 0 10px 0 0;
+}
+
+.rightbuttonrow {
+  display: flex;
+  justify-content: right;
+  margin: 10px 0;
 }
 
 /* VIEWS ------------------------------------------*/

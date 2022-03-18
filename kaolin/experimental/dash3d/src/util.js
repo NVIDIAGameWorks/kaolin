@@ -66,6 +66,25 @@ nvidia.util.downloadURL = function(filename, url) {
   document.body.removeChild(a);
 };
 
+nvidia.util.updateCurrentUrlParam = function(key, val) {
+  let url = new URL(window.location.href);
+  let params = url.searchParams;
+
+  if (val == params.get(key)) {
+    return false;
+  }
+
+  if (val === undefined || val === false) {
+    params.delete(key);
+  } else {
+    params.set(key, val);
+  }
+
+  let new_url = url.toString();
+  window.history.replaceState({}, document.title, new_url);
+  return true;
+};
+
 if (typeof module !== 'undefined') {
     module.exports = nvidia.util;
 }

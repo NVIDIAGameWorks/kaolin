@@ -50,7 +50,8 @@ class Timelapse:
         Args:
             iteration (int): Positive integer identifying the iteration the supplied pointclouds belong to.
             category (str, optional): Batch name.
-            pointcloud_list (list of tensors, optional): Batch of points of length N defining N pointclouds.
+            pointcloud_list (list of tensors, optional): Batch of point clouds as (B x N x 3) tensor or list of variable
+               length point cloud tensors, each (N_i x 3).
             colors (list of tensors, optional): Batch of RGB colors of length N.
             points_type (str): String that indicates whether to save pointcloud as UsdGeomPoints or PointInstancer. 
                                "usd_geom_points" indicates UsdGeomPoints and "point_instancer" indicates PointInstancer. 
@@ -314,6 +315,22 @@ class TimelapseParser(object):
             self.dir_info = TimelapseParser.parse_filepath_info(self.filepaths)
             return True
         return False
+
+    @staticmethod
+    def _count_items(cat_infos):
+        total = 0
+        for cat in cat_infos:
+            total += len(cat['ids'])
+        return total
+
+    def num_mesh_items(self):
+        return TimelapseParser._count_items(self.dir_info['mesh'])
+
+    def num_pointcloud_items(self):
+        return TimelapseParser._count_items(self.dir_info['pointcloud'])
+
+    def num_voxelgrid_items(self):
+        return TimelapseParser._count_items(self.dir_info['voxelgrid'])
 
     def num_mesh_categories(self):
         return len(self.dir_info['mesh'])

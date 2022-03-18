@@ -57,7 +57,7 @@ nvidia.geometry.GetBoundingBox = function(geometries) {
 /**
   * Parse point clouds from binary data written by the web server.
   */
-nvidia.geometry.PtCloudsFromBinary = function(binary_data, initial_offset) {
+nvidia.geometry.PtCloudsFromBinary = function(binary_data, initial_offset, sphere_radius) {
     let global_info = new Int32Array(binary_data, initial_offset, 4);
     const n_clouds = global_info[0];
     const texture_mode = global_info[1];
@@ -72,7 +72,6 @@ nvidia.geometry.PtCloudsFromBinary = function(binary_data, initial_offset) {
     let geometries = [];
     let read_start = initial_offset + 4 * 4;  // 4 * 4 bytes used for n_clouds read above
 
-    const sphere_radius = 0.02;  // TODO: make adaptive
     for (let m = 0; m < n_clouds; ++m) {
         let meta = new Int32Array(binary_data, read_start, 2);
         read_start += 2 * 4;
