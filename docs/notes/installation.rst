@@ -18,10 +18,10 @@ Dependencies
 ------------
 
 * torch >= 1.5, <= 1.10.2
-* cython == 0.29.20
-* scipy >= 1.2.0
-* Pillow >= 8.0.0
-* usd-core >= 20.11 (optional, required for USD related features such as visualization and importer / exporter)
+* cython == 0.29.20 (auto-installed)
+* scipy >= 1.2.0 (auto-installed)
+* Pillow >= 8.0.0 (auto-installed)
+* usd-core >= 20.11 (auto-installed; required for USD I/O and 3D checkpoints with :class:`~kaolin.visualize.Timelapse`)
 
 Installation from source
 ------------------------
@@ -45,10 +45,14 @@ Clone and optionally check out an `official release <https://github.com/NVIDIAGa
     $ cd kaolin
     $ git checkout v0.10.0
 
-If instead of the latest version you want a specific release like 0.10.0, 0.9.0, 0.9.1 or 0.1 you can then select the tag, example:
+2. Install Pytorch
+^^^^^^^^^^^^^^^^^^
+Follow `official instructions <https://pytorch.org>`_ to install PyTorch of a supported version.
+Kaolin may be able to work with other PyTorch versions. See below for overriding PyTorch version check during install.
 
 
-    $ git checkout v0.10.0
+3. Optional Environment Variables
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * If trying Kaolin with an unsupported PyTorch version, set: ``export IGNORE_TORCH_VER=1``
 * To install experimental features (like :ref:`kaolin-dash3d <dash 3d>`), set: ``export KAOLIN_INSTALL_EXPERIMENTAL=1``
@@ -58,9 +62,6 @@ If instead of the latest version you want a specific release like 0.10.0, 0.9.0,
 
 4. Install Kaolin
 ^^^^^^^^^^^^^^^^^
-
-.. Note::
-    On CUDA >= 11.0, CUB is already available and ``CUB_HOME`` should be specified to avoid conflict with the submodule ``third_party/cub`` (typically on linux ``export CUB_HOME=/usr/local/cuda-*/include/``).
 
 .. code-block:: bash
 
