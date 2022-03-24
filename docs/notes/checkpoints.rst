@@ -1,5 +1,7 @@
-3D Checkpoints
-==============
+.. _3d_viz:
+
+3D Checkpoint Visualization
+===========================
 
 .. image:: ../img/koala.jpg
 
