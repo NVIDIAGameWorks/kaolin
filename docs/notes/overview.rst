@@ -2,15 +2,11 @@
 
 .. _overview:
 
-API Overview and Reference
-==========================
+API Overview
+============
 
-Kaolin library
---------------
-
-NVIDIA Kaolin library provides a PyTorch API for working with a variety of 3D representations and includes a growing collection of GPU-optimized operations such as modular differentiable rendering, fast conversions between representations, data loading, 3D checkpoints and more.
-
-It is composed of multiple modules:
+Below is a summary of Kaolin functionality. Refer to :ref:`tutorial_index` for specific use cases, examples
+and recipes that use these building blocks.
 
 Operators for 3D Data:
 ^^^^^^^^^^^^^^^^^^^^^^
