@@ -17,23 +17,39 @@
 import glob
 import os
 from pathlib import Path
-from typing import Tuple
+from typing import List, Tuple
 
-import cv2
 import matplotlib.animation as animation
 import numpy as np
 import torch
+from torch import Tensor
 from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 
 import kaolin
 
 
-def vector_normalize(vec: torch.Tensor) -> torch.Tensor:
+def vector_normalize(vec: Tensor) -> Tensor:
+    """Normalize a 1d vector using the L2 norm.
+
+    Args:
+        vec (Tensor): A 1d vector of shape (b,1).
+
+    Returns:
+        Tensor: A normalized version of the input vector of shape (b,1).
+    """    
     return vec / vec.norm(p=2, dim=-1, keepdim=True)
 
 
-def quaternion_to_matrix33(quat: torch.Tensor) -> torch.Tensor:
+def quaternion_to_matrix33(quat: Tensor) -> Tensor:
+    """Convert a quaternion to a 3x3 rotation matrix.
+
+    Args:
+        quat (Tensor): Rotation quaternion of shape (4).
+
+    Returns:
+        Tensor: Rotation matrix of shape (3,3).
+    """    
     q = vector_normalize(quat)
 
     # http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToMatrix/index.htm
@@ -66,10 +82,10 @@ def quaternion_to_matrix33(quat: torch.Tensor) -> torch.Tensor:
     return mat33
 
 
-class DifferentiableBBox(torch.nn.Module):
+class DifferentiableBBox:
     """Represents a differentiable 3d bounding box.
 
-    Box is paramterized in terms of a fixed mesh and a learned (optimized)
+    Box is parametrized in terms of a fixed mesh and a learned (optimized)
     transformation in terms of rotation, scaling, and translation.
     """
 
@@ -106,9 +122,22 @@ class DifferentiableBBox(torch.nn.Module):
     @property
     def faces(self):
         return self._faces
+    
+    @property
+    def parameters(self):
+        return [self._centers, self._scales, self._rotations]
 
 
-def overlap(lhs_mask, rhs_mask):
+def overlap(lhs_mask: Tensor, rhs_mask: Tensor) -> Tensor:
+    """Compute the overlap of two 2d masks as the intersection over union.
+
+    Args:
+        lhs_mask (Tensor): 2d mask of shape (b, h, w).
+        rhs_mask (Tensor): 2d mask of shape (b, h, w).
+
+    Returns:
+        Tensor: Fraction of overlap of the two masks of shape (1). Averaged over batch samples.
+    """    
     batch_size, height, width = lhs_mask.shape
     assert rhs_mask.shape == lhs_mask.shape
     sil_mul = lhs_mask * rhs_mask
@@ -117,7 +146,15 @@ def overlap(lhs_mask, rhs_mask):
     return 1 - torch.mean(sil_area / (height * width))
 
 
-def occupancy(mask):
+def occupancy(mask: Tensor) -> Tensor:
+    """Compute what fraction of a total image is occupied by a 2d mask.
+
+    Args:
+        mask (Tensor): 2d mask of shape (b, h, w).
+
+    Returns:
+        Tensor: Fraction of the full image occupied by the mask of shape (1). Averaged over batch samples.
+    """    
     batch_size, height, width = mask.shape
     mask_area = torch.sum(mask.reshape(batch_size, -1), dim=1)
     return torch.mean(mask_area / (height * width))
@@ -127,9 +164,21 @@ def project_to_2d(
     bbox: DifferentiableBBox,
     batch_size: int,
     image_shape: Tuple[int, int],
-    camera_transform,
-    camera_projection,
-) -> torch.Tensor:
+    camera_transform: Tensor,
+    camera_projection: Tensor,
+) -> Tensor:
+    """Render a mesh onto a 2d image given a viewing camera's transform and projection.
+
+    Args:
+        bbox (DifferentiableBBox): Differentiable bounding box representing 3d mesh.
+        batch_size (int): Number of elements in the data batch.
+        image_shape (Tuple[int, int]): Tuple of image dimensions (height, width).
+        camera_transform (Tensor): Camera transform of shape (b, 4, 3).
+        camera_projection (Tensor): Camera projection of shape (b, 3, 1).
+
+    Returns:
+        Tensor: Soft mask for mesh silhouette of shape (b, h, w). (h, w) given by `image_shape`.
+    """
     (face_vertices_camera, face_vertices_image, face_normals,) = kaolin.render.mesh.prepare_vertices(
         bbox.vertices.repeat(batch_size, 1, 1),
         bbox.faces,
@@ -151,7 +200,16 @@ def project_to_2d(
     return soft_mask  # only aligning images by 2d silhouette
 
 
-def draw_image(gt_mask, pred_mask):
+def draw_image(gt_mask: Tensor, pred_mask: Tensor) -> np.ndarray:
+    """Compute an image array showing ground truth vs predicted masks.
+
+    Args:
+        gt_mask (Tensor): Ground truth mask of shape (w, h).
+        pred_mask (Tensor): Predicted mask of shape (w, h).
+
+    Returns:
+        np.ndarray: [0,1] normalized numpy array of shape (w, h, 3).
+    """    
     # mask shape is [w,h]
     canvas = np.zeros((gt_mask.shape[0], gt_mask.shape[1], 3))
     canvas[..., 2] = pred_mask.cpu().detach().numpy()
@@ -160,7 +218,19 @@ def draw_image(gt_mask, pred_mask):
     return np.clip(canvas, 0.0, 1.0)
 
 
-def show_renders(dataset: torch.Tensor):
+def show_renders(bbox: DifferentiableBBox, dataset: Tensor) -> List[np.ndarray]:
+    """Generate images comparing ground truth and predicted semantic segmentations for a given mesh.
+
+    The mesh is projected to 2d to match the camera views of each ground truth 2d render.
+    Images plot the true silhouette of the object overlayed with the mesh silhouette.
+
+    Args:
+        bbox (DifferentiableBBox): Differentiable bounding box representing 3d mesh.
+        dataset (Tensor): Batch of ground truth 2d renders with camera extrinsics.
+
+    Returns:
+        List[np.ndarray]: [0,1] normalized images comparing ground truth and mesh silhouette.
+    """    
     with torch.no_grad():
         images = []
         for sample in dataset:
@@ -207,7 +277,7 @@ dataloader = DataLoader(train_data, batch_size=batch_size_hyper, shuffle=True, p
 
 # set up model & optimization parameters
 bbox = DifferentiableBBox(mesh_path)  # simple 3d box mesh data
-optim = torch.optim.Adam(params=[bbox._centers, bbox._scales, bbox._rotations], lr=lr)
+optim = torch.optim.Adam(params=bbox.parameters, lr=lr)
 scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=scheduler_step_size, gamma=scheduler_gamma)
 
 # run training
@@ -236,7 +306,8 @@ for epoch in range(num_epoch):
         mask_occupancy = occupancy(soft_mask)
         mask_overlap = overlap(soft_mask, gt_mask.squeeze(-1))
 
-        # loss = mask_loss * mask_weight
+        # compute loss by penalizing the size of the mask (to shrink) 
+        # and rewarding overlap with the 2d render silhouette
         #   mask_occupancy = penalize larger masks
         #   mask_overlap = reward more overlap
         loss = mask_occupancy * mask_occupancy_hyper + mask_overlap * mask_overlap_hyper
@@ -249,12 +320,10 @@ for epoch in range(num_epoch):
             test_batch_ids = [2, 5, 10]  # pick canonical test render views
             test_viz = [train_data[idx] for idx in test_batch_ids]
             # only keep 1 in 10 renders to reduce animation processing time
-            image_list.append(show_renders(test_viz))
-
-            cv2.imshow("test", image_list[-1][0])
-            # minimal delay to ensure window updates
-            # disable to remove thread-switching cost.
-            k = cv2.waitKey(1)
+            image_list.append(show_renders(bbox, test_viz))
+            # TODO: does this work when using notebook?
+            # plt.imshow(image_list[-1][0])
+            # plt.show(block=False)
 
     scheduler.step()
     print(f"loss on epoch {epoch:<}: {loss}")
