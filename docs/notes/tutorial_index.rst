@@ -34,6 +34,11 @@ Detailed Tutorials
     * computing mask intersection-over-union loss (IOU)
     * using Timelapse API for 3D checkpoints
     * visualizing 3D results of training
+* `Fitting a 3D Bounding Box <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/bbox_tutorial.ipynb>`_: fits a 3D bounding box around an object in images using `DIB-R <https://github.com/nv-tlabs/DIB-R-Single-Image-3D-Reconstruction>`_ renderer, covering:
+    * generating data with Omniverse Kaolin App, and loading this synthetic data
+    * loading a mesh
+    * DIB-R rasterization
+    * computing mask intersection-over-union loss (IOU)
 * :ref:`3d_viz`: explains saving 3D checkpoints and visualizing them, covering:
     * using Timelapse API for writing 3D checkpoints
     * understanding output file format
