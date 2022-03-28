@@ -27,7 +27,7 @@ void query_cuda_impl(
     at::Tensor prefix_sum,
     at::Tensor query_points,
     at::Tensor pidx,
-    uint target_level);
+    uint32_t target_level);
 
 #endif // WITH_CUDA
 
@@ -35,7 +35,7 @@ at::Tensor query_cuda(
     at::Tensor octree,
     at::Tensor prefix_sum,
     at::Tensor query_points,
-    uint target_level) {
+    uint32_t target_level) {
 #ifdef WITH_CUDA
   at::TensorArg octree_arg{octree, "octree", 1};
   at::TensorArg prefix_sum_arg{prefix_sum, "prefix_sum", 2};

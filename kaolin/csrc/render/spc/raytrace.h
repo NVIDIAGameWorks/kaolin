@@ -25,8 +25,8 @@
 namespace kaolin {
 
 std::vector<at::Tensor> generate_primary_rays_cuda(
-    uint height,
-    uint width,
+    uint32_t height,
+    uint32_t width,
     at::Tensor Eye,
     at::Tensor At,
     at::Tensor Up,
@@ -40,7 +40,7 @@ std::vector<at::Tensor> raytrace_cuda(
     at::Tensor exclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
-    uint target_level,
+    uint32_t target_level,
     bool return_depth,
     bool with_exit);
 

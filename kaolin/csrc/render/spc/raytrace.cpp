@@ -32,7 +32,7 @@ using namespace at::indexing;
 
 #ifdef WITH_CUDA
 
-uint raytrace_cuda_impl(
+uint32_t raytrace_cuda_impl(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
@@ -41,8 +41,8 @@ uint raytrace_cuda_impl(
     at::Tensor ray_d,
     at::Tensor nugget_buffers,
     at::Tensor depth_buffers,
-    uint max_level,
-    uint target_level,
+    uint32_t max_level,
+    uint32_t target_level,
     bool return_depth,
     bool with_exit);
 
@@ -51,23 +51,23 @@ void mark_pack_boundaries_cuda_impl(
     at::Tensor boundaries);
 
 void generate_primary_rays_cuda_impl(
-    uint width,
-    uint height,
+    uint32_t width,
+    uint32_t height,
     float4x4& tf,
     float3* ray_o,
     float3* ray_d);
 
-uint generate_shadow_rays_cuda_impl(
-  uint num,
+uint32_t generate_shadow_rays_cuda_impl(
+  uint32_t num,
   float3* ray_o,
   float3* ray_d,
   float3* src,
   float3* dst,
-  uint* map,
+  uint32_t* map,
   float3& light,
   float4& plane,
-  uint* info,
-  uint* prefix_sum);
+  uint32_t* info,
+  uint32_t* prefix_sum);
 
 void diff_cuda_impl(
     int64_t num_packs, 
@@ -110,8 +110,8 @@ void cumprod_cuda_impl(
 #endif
 
 std::vector<at::Tensor> generate_primary_rays_cuda(
-    uint height, 
-    uint width, 
+    uint32_t height, 
+    uint32_t width, 
     at::Tensor Eye, 
     at::Tensor At,
     at::Tensor Up, 
@@ -125,7 +125,7 @@ std::vector<at::Tensor> generate_primary_rays_cuda(
   CHECK_CPU(World);
   CHECK_SIZES(World, 4, 4);
 
-  uint num = width * height;
+  uint32_t num = width * height;
   at::Tensor Org = at::zeros({num, 3}, at::device(at::kCUDA).dtype(at::kFloat));
   at::Tensor Dir = at::zeros({num, 3}, at::device(at::kCUDA).dtype(at::kFloat));
   float3* d_org = reinterpret_cast<float3*>(Org.data_ptr<float>());
@@ -177,7 +177,7 @@ std::vector<at::Tensor> raytrace_cuda(
     at::Tensor exclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
-    uint target_level,
+    uint32_t target_level,
     bool return_depth,
     bool with_exit) {
 #ifdef WITH_CUDA
@@ -196,12 +196,12 @@ std::vector<at::Tensor> raytrace_cuda(
   at::checkSize(__func__, points_arg, 1, 3);
   at::checkDim(__func__, pyramid_arg, 2);
   at::checkSize(__func__, pyramid_arg, 0, 2);
-  uint max_level = pyramid.size(1)-2;
+  uint32_t max_level = pyramid.size(1)-2;
   TORCH_CHECK(max_level < KAOLIN_SPC_MAX_LEVELS, "SPC pyramid too big");
 
-  uint* pyramid_ptr = (uint*)pyramid.data_ptr<int>();
-  uint osize = pyramid_ptr[2*max_level+2];
-  uint psize = pyramid_ptr[2*max_level+3];
+  uint32_t* pyramid_ptr = (uint32_t*)pyramid.data_ptr<int>();
+  uint32_t osize = pyramid_ptr[2*max_level+2];
+  uint32_t psize = pyramid_ptr[2*max_level+3];
   at::checkSize(__func__, octree_arg, 0, osize);
   at::checkSize(__func__, points_arg, 0, psize);
   TORCH_CHECK(pyramid_ptr[max_level+1] == 0 && pyramid_ptr[max_level+2] == 0, 
@@ -210,14 +210,14 @@ std::vector<at::Tensor> raytrace_cuda(
   // allocate local GPU storage
   at::Tensor nuggets = at::zeros({2 * KAOLIN_SPC_MAX_POINTS, 2}, octree.options().dtype(at::kInt));
 
-  uint depth_dim = with_exit ? 2 : 1;
+  uint32_t depth_dim = with_exit ? 2 : 1;
   at::Tensor depth = at::zeros({2 * KAOLIN_SPC_MAX_POINTS, depth_dim}, octree.options().dtype(at::kFloat));
 
   // do cuda
-  uint num = raytrace_cuda_impl(octree, points, pyramid, exclusive_sum, ray_o, ray_d, nuggets, depth, 
+  uint32_t num = raytrace_cuda_impl(octree, points, pyramid, exclusive_sum, ray_o, ray_d, nuggets, depth, 
                                 max_level, target_level, return_depth, with_exit);
 
-  uint pad = ((target_level + 1) % 2) * KAOLIN_SPC_MAX_POINTS;
+  uint32_t pad = ((target_level + 1) % 2) * KAOLIN_SPC_MAX_POINTS;
  
   if (return_depth) {
     return { nuggets.index({Slice(pad, pad+num)}).contiguous(),
@@ -255,7 +255,7 @@ std::vector<at::Tensor> generate_shadow_rays_cuda(
     at::Tensor plane) {
 #ifdef WITH_CUDA
   // do some tensor hecks
-  uint num = ray_d.size(0);
+  uint32_t num = ray_d.size(0);
   // allocate local GPU storage
   at::Tensor Src = at::zeros({num, 3}, ray_o.options().dtype(at::kFloat));
   at::Tensor Dst = at::zeros({num, 3}, ray_o.options().dtype(at::kFloat));
@@ -271,10 +271,10 @@ std::vector<at::Tensor> generate_shadow_rays_cuda(
 
   float3* d_src = reinterpret_cast<float3*>(Src.data_ptr<float>());
   float3* d_dst = reinterpret_cast<float3*>(Dst.data_ptr<float>());
-  uint* d_map = reinterpret_cast<uint*>(Map.data_ptr<int>());
+  uint32_t* d_map = reinterpret_cast<uint32_t*>(Map.data_ptr<int>());
 
-  uint*  d_Info = reinterpret_cast<uint*>(Info.data_ptr<int>());
-  uint*  d_PrefixSum = reinterpret_cast<uint*>(PrefixSum.data_ptr<int>());
+  uint32_t*  d_Info = reinterpret_cast<uint32_t*>(Info.data_ptr<int>());
+  uint32_t*  d_PrefixSum = reinterpret_cast<uint32_t*>(PrefixSum.data_ptr<int>());
 
 
 
@@ -284,7 +284,7 @@ std::vector<at::Tensor> generate_shadow_rays_cuda(
 
 
   // do cuda
-  uint cnt = generate_shadow_rays_cuda_impl(num, d_org, d_dir, d_src, d_dst, d_map, 
+  uint32_t cnt = generate_shadow_rays_cuda_impl(num, d_org, d_dir, d_src, d_dst, d_map, 
           light_, plane_, d_Info, d_PrefixSum);
 
   // assemble output tensors

@@ -28,7 +28,7 @@ at::Tensor query_cuda(
     at::Tensor octree,
     at::Tensor prefix_sum,
     at::Tensor query_points,
-    uint target_level);
+    uint32_t target_level);
 
 } // namespace kaolin
 
