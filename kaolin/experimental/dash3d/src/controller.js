@@ -44,6 +44,7 @@ nvidia.Controller.prototype.getViewContainerId = function(type, i) {
 };
 
 nvidia.Controller.prototype.initRenderers = function() {
+  let camera = null;
   for (let t = 0; t < this.supported_types.length; ++t) {
     const type = this.supported_types[t];
     this.renderers[type] = [];
@@ -55,7 +56,11 @@ nvidia.Controller.prototype.initRenderers = function() {
     // Then assume existence of ids: {type}-header{i}, {type}-view{i}, {type}-info{i}
     for (let i = 0; i < containers.length; ++i) {
       const id = this.getViewContainerId(type, i);
-      this.renderers[type].push(new nvidia.ThreeJsRenderer(id));
+      const new_renderer = new nvidia.ThreeJsRenderer(id, camera);
+      if (this.shouldLinkCameras() && camera === null) {
+        camera = new_renderer.camera;
+      }
+      this.renderers[type].push(new_renderer);
     }
   }
 };
@@ -98,7 +103,7 @@ nvidia.Controller.prototype.initViews = function() {
     cat_selectors.empty();
     cat_selectors.off("change");
 
-    if (!categories) {
+    if (!categories || categories.length == 0) {
       nvidia.util.timed_log("No entries for type " + type);
       continue;
     }
@@ -112,18 +117,28 @@ nvidia.Controller.prototype.initViews = function() {
       end_time = Math.max(categories[i]["end_time"], end_time);
     }
 
-    const nviews = Math.min(categories.length, renderers.length);
+    // Select an initial set of categories and ids to display.
+    // Currently selects 0th id from all categories, if there are enough viewports.
+    // If more viewports remain, selects subsequent ids from the last category if it has them.
+    // Better logic is definitely possible, but none would fit all scenarios.
+    let id_idx = 0;
+    const nviews = renderers.length;
     for (let i = 0; i < nviews; ++i) {
-      const cat = categories[i];
+      let cat_idx = Math.min(i, categories.length - 1);
+      let cat = categories[cat_idx];
+
+      if (i >= categories.length) {
+        id_idx = Math.min(cat["ids"].length - 1, id_idx + 1);
+      }
       this.active_views[type].push({
         category: cat["category"],
-        id: cat["ids"][0],
+        id: cat["ids"][id_idx],
         time: cat["end_time"]
       });
 
       const hsel = "#" + this.getHeaderId(type, i);
       const cat_dropdown = $(hsel + " .cat");
-      cat_dropdown.val(i);
+      cat_dropdown.val(cat_idx);
 
       const id_dropdown = $(hsel + " .id");
       id_dropdown.off("change");
@@ -131,7 +146,7 @@ nvidia.Controller.prototype.initViews = function() {
       $.each(cat["ids"], function(v) {
         id_dropdown.append($("<option></option>")
             .attr("value", v).text("id " + v)); });
-      id_dropdown.val(cat["ids"][0]);
+      id_dropdown.val(cat["ids"][id_idx]);
 
       const callback_maker = function(controller, typename, view_idx) {
         return function() { controller.onViewDropdownChange(typename, view_idx); }
@@ -142,8 +157,6 @@ nvidia.Controller.prototype.initViews = function() {
       if (cat["ids"].length < 2) {
         id_dropdown.hide();
       }
-
-      // TODO: reset renderer as well
     }
   }
   $("#timeslider").attr("max", end_time).val(end_time);
@@ -154,6 +167,20 @@ nvidia.Controller.prototype.initSidebarEvents = function() {
   // Note: this is very DOM-dependent
   $("#timeslider").on("change", function(c) {
     return function(e) { c.onTimeSliderValueChange($("#timeslider").val()); }; }(this));
+
+  $("#radius").on("change", function(e) {nvidia.util.updateCurrentUrlParam("radius", $(this).val());});
+  $("#linkcam").on("change", function(e) {nvidia.util.updateCurrentUrlParam("linkcam", this.checked);});
+  $("#maxviews").on("change", function(e) {nvidia.util.updateCurrentUrlParam("maxviews", $(this).val());});
+
+  $("#refresh").click(function(e) { location.reload(); });
+};
+
+nvidia.Controller.prototype.getSphereRadius = function() {
+  return $("#radius").val();
+};
+
+nvidia.Controller.prototype.shouldLinkCameras = function() {
+  return $("#linkcam")[0].checked;
 };
 
 nvidia.Controller.prototype.onTimeSliderValueChange = function(time) {
@@ -270,7 +297,7 @@ nvidia.Controller.prototype.parseBinaryGeometry = function(binary_data) {
       "time": snap_time
     };
   } else if (data_type === 1) {
-    const geos = nvidia.geometry.PtCloudsFromBinary(binary_data, 4 * 4);
+    const geos = nvidia.geometry.PtCloudsFromBinary(binary_data, 4 * 4, this.getSphereRadius());
     return {
      "type": "pointcloud",
       "geos": geos,

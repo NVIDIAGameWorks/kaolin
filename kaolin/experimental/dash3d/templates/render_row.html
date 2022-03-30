@@ -18,17 +18,14 @@
     <div id="{{type}}-info0" class="info">
     </div>
   </div>
-  {% elif count == 2 %}
-  {% for id in range(2) %}
-  <div class="col col-md-6">
-    {% include 'render_card.html' %}
-  </div>
-  {% endfor %}
   {% else %}
-  {% for id in range(3) %}
-  <div class="col-md-4">
+  {% with %}
+  {% set col=12/count %}
+  {% for id in range(count) %}
+  <div class="col col-md-{{[col|int, 3]|max}}">
     {% include 'render_card.html' %}
   </div>
   {% endfor %}
+  {% endwith %}
   {% endif %}
 </div>

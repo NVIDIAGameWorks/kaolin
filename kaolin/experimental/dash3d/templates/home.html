@@ -30,7 +30,7 @@
        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
        vPosition = vec3(gl_Position[0], gl_Position[1], gl_Position[2]);
      }
-   </script>
+      </script>
 
       <script id="shader-vs" type="x-shader/x-vertex">
       //#version 300 es
@@ -123,11 +123,17 @@ void main() {
               </div>
           </div>
       </fieldset>
+      <fieldset>
+        {% with %}
+        {% set urlargs=urlargs %}
+        {% include 'view_settings.html' %}
+        {% endwith %}
+      </fieldset>
   </div>
   <div class="main">
 
   <section class="section-tertiary">
-      <div class="container container-small">
+      <div class="container container-large">
         <h3>Meshes</h3>
         {% with %}
         {% set type='mesh' %}
@@ -137,7 +143,7 @@ void main() {
       </div>
   </section>
   <section class="section-tertiary">
-      <div class="container container-small">
+      <div class="container container-large">
           <h3>Point Clouds</h3>
           {% with %}
           {% set type='pointcloud' %}

@@ -18,6 +18,7 @@ import logging
 import os
 import sys
 
+import flask
 from flask import Flask, render_template
 from tornado.wsgi import WSGIContainer
 from tornado.web import Application, FallbackHandler
@@ -26,6 +27,16 @@ from tornado.ioloop import IOLoop
 from kaolin.experimental.dash3d.util import StreamingGeometryHelper, GeometryWebSocketHandler
 
 logger = logging.getLogger(__name__)
+
+
+def get_max_viewports(urlargs):
+    default_val = 3
+    try:
+        res = int(urlargs.get("maxviews", default_val))
+        res = max(1, min(8, res))
+    except Exception as e:
+        res = default_val
+    return res
 
 
 def create_server(logdir):
@@ -49,9 +60,13 @@ def create_server(logdir):
     @app.route('/')
     def index():
         helper.parser.check_for_updates()
+
+        urlargs = dict(flask.request.args)
+        max_viewports = get_max_viewports(urlargs)
         return render_template('home.html', logdir=helper.logdir,
-                               nmeshes=helper.parser.num_mesh_categories(),
-                               npointclouds=helper.parser.num_pointcloud_categories())
+                               nmeshes=min(helper.parser.num_mesh_items(), max_viewports),
+                               npointclouds=min(helper.parser.num_pointcloud_items(), max_viewports),
+                               urlargs=urlargs)
 
     # Tornado server to handle websockets
     container = WSGIContainer(app)

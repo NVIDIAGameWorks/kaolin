@@ -26,12 +26,12 @@ namespace kaolin {
 
 at::Tensor points_to_octree(
     at::Tensor points,
-    uint level);
+    uint32_t level);
 
 at::Tensor mesh_to_spc(
     at::Tensor vertices,
     at::Tensor triangles,
-    uint Level) ;
+    uint32_t Level) ;
 
 }  // namespace kaolin
 
