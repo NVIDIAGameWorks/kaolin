@@ -276,6 +276,9 @@ class TestTimelapseParser:
         assert parser.num_mesh_categories() == 2
         assert parser.num_pointcloud_categories() == 2
         assert parser.num_voxelgrid_categories() == 1
+        assert parser.num_mesh_items() == 4
+        assert parser.num_pointcloud_items() == 4
+        assert parser.num_voxelgrid_items() == 2
 
         expected_categories = {
             "mesh": [
@@ -315,4 +318,3 @@ class TestTimelapseParser:
         assert parser.check_for_updates()
         assert parser.num_mesh_categories() == 1
         assert parser.num_pointcloud_categories() == 1
-        assert parser.num_voxelgrid_categories() == 0

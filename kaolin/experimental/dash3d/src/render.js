@@ -15,7 +15,7 @@
 
 var nvidia = nvidia || {};
 
-nvidia.ThreeJsRenderer = function(elemid) {
+nvidia.ThreeJsRenderer = function(elemid, optional_camera) {
   this.meshes = [];
   this.container = document.getElementById(elemid);
 
@@ -50,13 +50,17 @@ nvidia.ThreeJsRenderer = function(elemid) {
       console.log('Initialized green plastic shader');
     };}(this));
 
-  this.init();
+  this.init(optional_camera);
 };
 
-nvidia.ThreeJsRenderer.prototype.init = function() {
+nvidia.ThreeJsRenderer.prototype.init = function(optional_camera) {
   var aspect = 1.0;  // width/height
-  this.camera = new THREE.PerspectiveCamera(20, 1.0, 0.1, 10000);
-  this.camera.position.y = 0.5;
+  if (optional_camera) {
+    this.camera = optional_camera;
+  } else {
+    this.camera = new THREE.PerspectiveCamera(20, 1.0, 0.1, 10000);
+    this.camera.position.y = 0.5;
+  }
 
   this.scene = new THREE.Scene();
   this.scene.background = new THREE.Color( 0xffffff );
@@ -128,11 +132,12 @@ nvidia.ThreeJsRenderer.prototype.init = function() {
     self.render();
   });
 
-  this.setManualCamera();
+  if (!optional_camera) {
+    this.setManualCamera();
+  }
 
   this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
   this.controls.update();
-
 
   var renderer = this;
   var animate = function() {
