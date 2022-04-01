@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-22 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,11 +23,12 @@ from kaolin.ops.batch import get_first_idx, tile_to_packed, list_to_packed
 
 from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_tensor
 from kaolin.ops import mesh
-from kaolin.ops.mesh.trianglemesh import _unbatched_subdivide_vertices
+from kaolin.ops.mesh.trianglemesh import _unbatched_subdivide_vertices, subdivide_trianglemesh
 from kaolin.io import obj
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         os.pardir, os.pardir, os.pardir, os.pardir, 'samples/')
+
 
 @pytest.mark.parametrize("device,dtype", FLOAT_TYPES)
 class TestFaceAreas:
@@ -62,7 +64,7 @@ class TestFaceAreas:
         first_idx_vertices = torch.LongTensor([0, 4, 7], device='cpu')
         num_faces_per_mesh = torch.LongTensor([2, 1], device='cpu')
         output = mesh.packed_face_areas(vertices, first_idx_vertices,
-                                                faces, num_faces_per_mesh)
+                                        faces, num_faces_per_mesh)
         expected_output = torch.tensor([0.5, 1., math.sqrt(2.)], device=device, dtype=dtype)
         assert torch.allclose(output, expected_output)
 
@@ -72,17 +74,17 @@ class TestSamplePoints:
 
     @pytest.fixture(autouse=True)
     def vertices(self, device, dtype):
-         # TODO(cfujitsang): extend the test with Z variation
-         return torch.tensor([[[0.,   0.,  0.],
-                               [0.,   1.,  0.],
-                               [1.,   0.,  0.],
-                               [-1,   0.,  0.]],
-                              [[1.,   1.,  3.],
-                               [1.,   1.5, 3.],
-                               [1.5,  1.,  3.],
-                               [0.5,  1.,  3.]]],
-                             device=device, dtype=dtype)
-         return vertices
+        # TODO(cfujitsang): extend the test with Z variation
+        return torch.tensor([[[0., 0., 0.],
+                              [0., 1., 0.],
+                              [1., 0., 0.],
+                              [-1, 0., 0.]],
+                             [[1., 1., 3.],
+                              [1., 1.5, 3.],
+                              [1.5, 1., 3.],
+                              [0.5, 1., 3.]]],
+                            device=device, dtype=dtype)
+        return vertices
 
     @pytest.fixture(autouse=True)
     def faces(self, device, dtype):
@@ -93,9 +95,9 @@ class TestSamplePoints:
     @pytest.fixture(autouse=True)
     def face_features(self, device, dtype):
         return torch.tensor(
-            [[[[0., 0.], [0., 1.],  [0., 2.]],
-              [[1., 3.], [1., 4.],  [1., 5.]]],
-             [[[2., 6.], [2., 7.],  [2., 8.]],
+            [[[[0., 0.], [0., 1.], [0., 2.]],
+              [[1., 3.], [1., 4.], [1., 5.]]],
+             [[[2., 6.], [2., 7.], [2., 8.]],
               [[3., 9.], [3., 10.], [3., 11.]]]],
             device=device, dtype=torch.long)
 
@@ -125,8 +127,7 @@ class TestSamplePoints:
         sampling_prob = num_samples / 2
         tolerance = sampling_prob * 0.2
         assert torch.all(num_0 < sampling_prob + tolerance) and \
-               torch.all(num_0 > sampling_prob - tolerance)
-
+            torch.all(num_0 > sampling_prob - tolerance)
 
         face_vertices = mesh.index_vertices_by_faces(vertices, faces)
 
@@ -153,7 +154,7 @@ class TestSamplePoints:
         # check that the point is close to the plan
         assert torch.allclose(point_to_face_dist,
                               torch.zeros((batch_size, num_samples),
-                              device=device, dtype=dtype),
+                                          device=device, dtype=dtype),
                               atol=atol, rtol=rtol)
 
         # check that the point lie in the triangle
@@ -237,7 +238,7 @@ class TestSamplePoints:
             mesh.sample_points)(vertices, faces, num_samples, face_areas,
                                 face_features=face_features)
         points2, face_choices2, interpolated_features2 = with_seed(1234)(
-            mesh.sample_points)(vertices, faces, num_samples,   
+            mesh.sample_points)(vertices, faces, num_samples,
                                 face_features=face_features)
         assert torch.allclose(points1, points2)
         assert torch.equal(face_choices1, face_choices2)
@@ -362,7 +363,7 @@ class TestSamplePoints:
         faces, num_faces_per_mesh = packed_faces_info
 
         face_areas = mesh.packed_face_areas(vertices, first_idx_vertices,
-                                                    faces, num_faces_per_mesh)
+                                            faces, num_faces_per_mesh)
 
         points1, face_choices1 = with_seed(1234)(mesh.packed_sample_points)(
             vertices, first_idx_vertices, faces, num_faces_per_mesh, num_samples, face_areas)
@@ -387,6 +388,7 @@ class TestSamplePoints:
         assert not torch.equal(points1, points2)
         assert not torch.equal(face_choices1, face_choices2)
 
+
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 def test_adjacency_matrix_sparse(device, dtype):
     num_vertices = 5
@@ -402,6 +404,7 @@ def test_adjacency_matrix_sparse(device, dtype):
 
     assert torch.equal(output, expected)
 
+
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 def test_adjacency_matrix_dense(device, dtype):
     num_vertices = 5
@@ -416,6 +419,7 @@ def test_adjacency_matrix_dense(device, dtype):
                              [1, 1, 0, 0, 0]], dtype=torch.float, device=device)
     assert torch.equal(output, expected)
 
+
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 def test_adjacency_consistent(device, dtype):
     test_mesh = obj.import_mesh(os.path.join(ROOT_DIR, 'model.obj'))
@@ -429,6 +433,7 @@ def test_adjacency_consistent(device, dtype):
     dense = mesh.adjacency_matrix(num_vertices, faces, sparse=False)
 
     assert torch.equal(sparse_to_dense, dense)
+
 
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 class TestUniformLaplacian:
@@ -457,6 +462,7 @@ class TestUniformLaplacian:
         # Any row and column related to V3 is zeros.
         assert torch.equal(result[3, :3], torch.zeros((3), device=device, dtype=torch.float))
         assert torch.equal(result[:3, 3], torch.zeros((3), device=device, dtype=torch.float))
+
 
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 class TestSubdivide:
@@ -629,6 +635,7 @@ class TestSubdivide:
 
         assert torch.equal(new_vertices, expected_vertices)
 
+
 @pytest.mark.parametrize('device', ['cpu', 'cuda'])
 class TestCheckSign:
 
@@ -636,13 +643,13 @@ class TestCheckSign:
     def verts(self, device):
         verts = []
         verts.append(torch.tensor([[0., 0., 0.],
-                              [1., 0.5, 1.],
-                              [0.5, 1., 1.],
-                              [1., 1., 0.5]], device = device))
+                                   [1., 0.5, 1.],
+                                   [0.5, 1., 1.],
+                                   [1., 1., 0.5]], device=device))
         verts.append(torch.tensor([[0., 0., 0.],
-                              [1., 0, 0],
-                              [0, 0, 1.],
-                              [0, 1., 0]], device = device))
+                                   [1., 0, 0],
+                                   [0, 0, 1.],
+                                   [0, 1., 0]], device=device))
         return torch.stack(verts)
 
     @pytest.fixture(autouse=True)
@@ -650,12 +657,12 @@ class TestCheckSign:
         faces = torch.tensor([[0, 3, 1],
                               [0, 1, 2],
                               [0, 2, 3],
-                              [3, 2, 1]], device = device)
+                              [3, 2, 1]], device=device)
         return faces
 
     @pytest.fixture(autouse=True)
     def points(self, device):
-        axis = torch.linspace(0.1, 0.9, 3, device = device)
+        axis = torch.linspace(0.1, 0.9, 3, device=device)
         p_x, p_y, p_z = torch.meshgrid(axis + 0.01, axis + 0.02, axis + 0.03)
         points = torch.cat((p_x.unsqueeze(-1), p_y.unsqueeze(-1), p_z.unsqueeze(-1)), dim=3)
         points = points.view(1, -1, 3).expand(2, -1, -1)
@@ -664,13 +671,13 @@ class TestCheckSign:
     @pytest.fixture(autouse=True)
     def expected(self, device):
         expected = []
-        expected.append(torch.tensor([ True, False, False, False, False, False, False, False, 
-                                    False, False, False, False, False,  True, False, False, 
-                                    False,  True, False, False, False, False, False,  True, 
-                                    False,  True, False], device=device))
-        expected.append(torch.tensor([ True,  True, False,  True, False, False, False, False, False,  True,
-         False, False, False, False, False, False, False, False, False, False,
-         False, False, False, False, False, False, False], device=device))
+        expected.append(torch.tensor([True, False, False, False, False, False, False, False,
+                                      False, False, False, False, False, True, False, False,
+                                      False, True, False, False, False, False, False, True,
+                                      False, True, False], device=device))
+        expected.append(torch.tensor([True, True, False, True, False, False, False, False, False, True,
+                                      False, False, False, False, False, False, False, False, False, False,
+                                      False, False, False, False, False, False, False], device=device))
         return torch.stack(expected)
 
     def test_verts_type(self, verts, faces, points):
@@ -725,21 +732,21 @@ class TestCheckSign:
         with pytest.raises(ValueError,
                            match=r"Expected verts to have 3 coordinates "
                                  r"but got 2 coordinates."):
-            verts = verts[...,:2]
+            verts = verts[..., :2]
             mesh.check_sign(verts, faces, points)
 
     def test_faces_shape(self, verts, faces, points):
         with pytest.raises(ValueError,
                            match=r"Expected faces to have 3 vertices "
                                  r"but got 2 vertices."):
-            faces = faces[:,:2]
+            faces = faces[:, :2]
             mesh.check_sign(verts, faces, points)
 
     def test_points_shape(self, verts, faces, points):
         with pytest.raises(ValueError,
                            match=r"Expected points to have 3 coordinates "
                                  r"but got 2 coordinates."):
-            points = points[...,:2]
+            points = points[..., :2]
             mesh.check_sign(verts, faces, points)
 
     def test_single_batch(self, verts, faces, points, expected):
@@ -752,9 +759,241 @@ class TestCheckSign:
 
     def test_faces_with_zero_area(self, verts, faces, points, expected):
         faces = torch.cat([faces, torch.tensor([[1, 1, 1],
-                              [0, 0, 0],
-                              [2, 2, 2],
-                              [3, 3, 3]]).to(faces.device)])
+                                                [0, 0, 0],
+                                                [2, 2, 2],
+                                                [3, 3, 3]]).to(faces.device)])
         output = mesh.check_sign(verts, faces, points)
         assert(torch.equal(output, expected))
 
+
+@pytest.mark.parametrize('device', ['cpu', 'cuda'])
+class TestSubdivideTrianglemesh:
+
+    @pytest.fixture(autouse=True)
+    def vertices_icosahedron(self, device):
+        return torch.tensor([[[-0.5257, 0.8507, 0.0000],
+                              [0.5257, 0.8507, 0.0000],
+                              [-0.5257, -0.8507, 0.0000],
+                              [0.5257, -0.8507, 0.0000],
+                              [0.0000, -0.5257, 0.8507],
+                              [0.0000, 0.5257, 0.8507],
+                              [0.0000, -0.5257, -0.8507],
+                              [0.0000, 0.5257, -0.8507],
+                              [0.8507, 0.0000, -0.5257],
+                              [0.8507, 0.0000, 0.5257],
+                              [-0.8507, 0.0000, -0.5257],
+                              [-0.8507, 0.0000, 0.5257]]], dtype=torch.float, device=device)
+
+    @pytest.fixture(autouse=True)
+    def faces_icosahedron(self, device):
+        return torch.tensor([[0, 11, 5],
+                             [0, 5, 1],
+                             [0, 1, 7],
+                             [0, 7, 10],
+                             [0, 10, 11],
+                             [1, 5, 9],
+                             [5, 11, 4],
+                             [11, 10, 2],
+                             [10, 7, 6],
+                             [7, 1, 8],
+                             [3, 9, 4],
+                             [3, 4, 2],
+                             [3, 2, 6],
+                             [3, 6, 8],
+                             [3, 8, 9],
+                             [4, 9, 5],
+                             [2, 4, 11],
+                             [6, 2, 10],
+                             [8, 6, 7],
+                             [9, 8, 1]], dtype=torch.long, device=device)
+
+    @pytest.fixture(autouse=True)
+    def expected_vertices_default_alpha(self, device):
+        return torch.tensor([[[-0.4035, 0.6529, 0.0000],
+                              [0.4035, 0.6529, 0.0000],
+                              [-0.4035, -0.6529, 0.0000],
+                              [0.4035, -0.6529, 0.0000],
+                              [0.0000, -0.4035, 0.6529],
+                              [0.0000, 0.4035, 0.6529],
+                              [0.0000, -0.4035, -0.6529],
+                              [0.0000, 0.4035, -0.6529],
+                              [0.6529, 0.0000, -0.4035],
+                              [0.6529, 0.0000, 0.4035],
+                              [-0.6529, 0.0000, -0.4035],
+                              [-0.6529, 0.0000, 0.4035],
+                              [0.0000, 0.7694, 0.0000],
+                              [-0.2378, 0.6225, 0.3847],
+                              [-0.2378, 0.6225, -0.3847],
+                              [-0.6225, 0.3847, -0.2378],
+                              [-0.6225, 0.3847, 0.2378],
+                              [0.2378, 0.6225, 0.3847],
+                              [0.2378, 0.6225, -0.3847],
+                              [0.6225, 0.3847, -0.2378],
+                              [0.6225, 0.3847, 0.2378],
+                              [0.0000, -0.7694, 0.0000],
+                              [-0.2378, -0.6225, 0.3847],
+                              [-0.2378, -0.6225, -0.3847],
+                              [-0.6225, -0.3847, -0.2378],
+                              [-0.6225, -0.3847, 0.2378],
+                              [0.2378, -0.6225, 0.3847],
+                              [0.2378, -0.6225, -0.3847],
+                              [0.6225, -0.3847, -0.2378],
+                              [0.6225, -0.3847, 0.2378],
+                              [0.0000, 0.0000, 0.7694],
+                              [0.3847, -0.2378, 0.6225],
+                              [-0.3847, -0.2378, 0.6225],
+                              [0.3847, 0.2378, 0.6225],
+                              [-0.3847, 0.2378, 0.6225],
+                              [0.0000, 0.0000, -0.7694],
+                              [0.3847, -0.2378, -0.6225],
+                              [-0.3847, -0.2378, -0.6225],
+                              [0.3847, 0.2378, -0.6225],
+                              [-0.3847, 0.2378, -0.6225],
+                              [0.7694, 0.0000, 0.0000],
+                              [-0.7694, 0.0000, 0.0000]]], dtype=torch.float, device=device)
+
+    @pytest.fixture(autouse=True)
+    def expected_vertices_zero_alpha(self, device):
+        return torch.tensor([[[-0.5257, 0.8507, 0.0000],
+                            [0.5257, 0.8507, 0.0000],
+                            [-0.5257, -0.8507, 0.0000],
+                            [0.5257, -0.8507, 0.0000],
+                            [0.0000, -0.5257, 0.8507],
+                            [0.0000, 0.5257, 0.8507],
+                            [0.0000, -0.5257, -0.8507],
+                            [0.0000, 0.5257, -0.8507],
+                            [0.8507, 0.0000, -0.5257],
+                            [0.8507, 0.0000, 0.5257],
+                            [-0.8507, 0.0000, -0.5257],
+                            [-0.8507, 0.0000, 0.5257],
+                            [0.0000, 0.7694, 0.0000],
+                            [-0.2378, 0.6225, 0.3847],
+                            [-0.2378, 0.6225, -0.3847],
+                            [-0.6225, 0.3847, -0.2378],
+                            [-0.6225, 0.3847, 0.2378],
+                            [0.2378, 0.6225, 0.3847],
+                            [0.2378, 0.6225, -0.3847],
+                            [0.6225, 0.3847, -0.2378],
+                            [0.6225, 0.3847, 0.2378],
+                            [0.0000, -0.7694, 0.0000],
+                            [-0.2378, -0.6225, 0.3847],
+                            [-0.2378, -0.6225, -0.3847],
+                            [-0.6225, -0.3847, -0.2378],
+                            [-0.6225, -0.3847, 0.2378],
+                            [0.2378, -0.6225, 0.3847],
+                            [0.2378, -0.6225, -0.3847],
+                            [0.6225, -0.3847, -0.2378],
+                            [0.6225, -0.3847, 0.2378],
+                            [0.0000, 0.0000, 0.7694],
+                            [0.3847, -0.2378, 0.6225],
+                            [-0.3847, -0.2378, 0.6225],
+                            [0.3847, 0.2378, 0.6225],
+                            [-0.3847, 0.2378, 0.6225],
+                            [0.0000, 0.0000, -0.7694],
+                            [0.3847, -0.2378, -0.6225],
+                            [-0.3847, -0.2378, -0.6225],
+                            [0.3847, 0.2378, -0.6225],
+                            [-0.3847, 0.2378, -0.6225],
+                            [0.7694, 0.0000, 0.0000],
+                            [-0.7694, 0.0000, 0.0000]]], dtype=torch.float, device=device)
+
+    @pytest.fixture(autouse=True)
+    def expected_faces_icosahedron_1_iter(self, device):
+        return torch.tensor([[11, 34, 16],
+                            [0, 16, 13],
+                            [5, 13, 34],
+                            [13, 16, 34],
+                            [5, 17, 13],
+                            [0, 13, 12],
+                            [1, 12, 17],
+                            [12, 13, 17],
+                            [1, 18, 12],
+                            [0, 12, 14],
+                            [7, 14, 18],
+                            [14, 12, 18],
+                            [7, 39, 14],
+                            [0, 14, 15],
+                            [10, 15, 39],
+                            [15, 14, 39],
+                            [10, 41, 15],
+                            [0, 15, 16],
+                            [11, 16, 41],
+                            [16, 15, 41],
+                            [5, 33, 17],
+                            [1, 17, 20],
+                            [9, 20, 33],
+                            [20, 17, 33],
+                            [11, 32, 34],
+                            [5, 34, 30],
+                            [4, 30, 32],
+                            [30, 34, 32],
+                            [10, 24, 41],
+                            [11, 41, 25],
+                            [2, 25, 24],
+                            [25, 41, 24],
+                            [7, 35, 39],
+                            [10, 39, 37],
+                            [6, 37, 35],
+                            [37, 39, 35],
+                            [1, 19, 18],
+                            [7, 18, 38],
+                            [8, 38, 19],
+                            [38, 18, 19],
+                            [9, 31, 29],
+                            [3, 29, 26],
+                            [4, 26, 31],
+                            [26, 29, 31],
+                            [4, 22, 26],
+                            [3, 26, 21],
+                            [2, 21, 22],
+                            [21, 26, 22],
+                            [2, 23, 21],
+                            [3, 21, 27],
+                            [6, 27, 23],
+                            [27, 21, 23],
+                            [6, 36, 27],
+                            [3, 27, 28],
+                            [8, 28, 36],
+                            [28, 27, 36],
+                            [8, 40, 28],
+                            [3, 28, 29],
+                            [9, 29, 40],
+                            [29, 28, 40],
+                            [9, 33, 31],
+                            [4, 31, 30],
+                            [5, 30, 33],
+                            [30, 31, 33],
+                            [4, 32, 22],
+                            [2, 22, 25],
+                            [11, 25, 32],
+                            [25, 22, 32],
+                            [2, 24, 23],
+                            [6, 23, 37],
+                            [10, 37, 24],
+                            [37, 23, 24],
+                            [6, 35, 36],
+                            [8, 36, 38],
+                            [7, 38, 35],
+                            [38, 36, 35],
+                            [8, 19, 40],
+                            [9, 40, 20],
+                            [1, 20, 19],
+                            [20, 40, 19]], dtype=torch.long, device=device)
+
+    def test_subdivide_trianglemesh_1_iter_default_alpha(self, vertices_icosahedron, faces_icosahedron, expected_vertices_default_alpha, expected_faces_icosahedron_1_iter):
+        new_vertices, new_faces = subdivide_trianglemesh(vertices_icosahedron, faces_icosahedron, 1)
+        assert torch.allclose(new_vertices, expected_vertices_default_alpha, atol=1e-04)
+        assert torch.equal(new_faces, expected_faces_icosahedron_1_iter)
+
+    def test_subdivide_trianglemesh_1_iter_zero_alpha(self, vertices_icosahedron, faces_icosahedron, expected_vertices_zero_alpha, expected_faces_icosahedron_1_iter):
+        alpha = torch.zeros_like(vertices_icosahedron[..., 0])
+        new_vertices, new_faces = subdivide_trianglemesh(vertices_icosahedron, faces_icosahedron, 1, alpha)
+        assert torch.allclose(new_vertices, expected_vertices_zero_alpha, atol=1e-04)
+        assert torch.equal(new_faces, expected_faces_icosahedron_1_iter)
+
+    def test_subdivide_trianglemesh_5_iter(self, vertices_icosahedron, faces_icosahedron):
+        new_vertices, new_faces = subdivide_trianglemesh(vertices_icosahedron, faces_icosahedron, 5)
+        # check total area of all faces
+        assert torch.allclose(mesh.face_areas(new_vertices, new_faces).sum(),
+                              torch.tensor([6.2005], dtype=new_vertices.dtype, device=new_faces.device), atol=1e-04)
+        assert new_faces.shape[0] == faces_icosahedron.shape[0] * 4 ** 5
