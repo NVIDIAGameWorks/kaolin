@@ -1,0 +1,113 @@
+#!/usr/bin/env groovy
+
+docker_registry_server = targetImageTag.split(':')[0..1].join(':')
+// This will be the "RUN" displayed on Blue Ocean
+currentBuild.displayName = targetImageTag.split(':')[2]
+// This will be the "MESSAGE" displayed on Blue Ocean
+currentBuild.description = sourceBranch + ": " + commitHash
+
+podTemplate(
+cloud:'sc-ipp-blossom-prod',
+yaml:'''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: docker
+    image: docker:19.03.1
+    command:
+    - sleep
+    args:
+    - 1d
+    env:
+      - name: DOCKER_HOST
+        value: tcp://localhost:2375
+  - name: docker-daemon
+    image: docker:19.03.1-dind
+    securityContext:
+      privileged: true
+    env:
+      - name: DOCKER_TLS_CERTDIR
+        value: ""
+    resources:
+        requests:
+          memory: 32Gi
+          cpu: 12
+        limits:
+          memory: 32Gi
+          cpu: 12
+''') {
+  node(POD_LABEL) {
+    container("docker") {
+      try {
+        gitlabCommitStatus("build-${configName}") {
+          stage("Checkout") {
+            checkout([
+                $class: 'GitSCM',
+                branches: [[name: "${commitHash}"]],
+                // We need submodules
+                extensions: [[
+                    $class: 'SubmoduleOption',
+                    disableSubmodules: false,
+                    parentCredentials: false,
+                    recursiveSubmodules: true,
+                    reference: '',
+                    trackingSubmodules: false
+                ]],
+                userRemoteConfigs: [[
+                    credentialsId: 'gitlab-credentials',
+                    url: "${repoUrl}"
+                ]]
+            ])
+          }
+          docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
+            stage("Build") {
+              targetImage = docker.build(
+                  "${targetImageTag}",
+                  """--no-cache --network host -f ./tools/linux/Dockerfile.install \
+                     --build-arg BASE_IMAGE=${baseImageTag} \
+                     .
+                  """)
+            }
+            stage("Push") {
+              targetImage.push()
+            }
+          }
+        }
+      } catch (e) {
+        // In case of build failure, we need to update the following tests as we won't run them.
+        for (arch in archsToTest.split(';')) {
+          updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: 'canceled')
+        }
+        throw e
+      }
+      stage("Launch tests") {
+        jobMap = [:]
+        for (arch in archsToTest.split(';')) {
+          jobMap["${arch}"] = prepareUbuntuTestJob(arch)
+        }
+        parallel jobMap
+      }
+    }
+  }
+}
+
+def prepareUbuntuTestJob(arch) {
+  return {
+    stage("Test ${arch}") {
+      build job: "ubuntu_test_template_CI",
+      parameters: [
+        string(name: 'sourceBranch', value: "${sourceBranch}"),
+        string(name: 'configName', value: "${configName}"),
+        string(name: 'imageTag', value: "${targetImageTag}"),
+        string(name: 'arch', value: "${arch}"),
+        string(name: 'commitHash', value: "${commitHash}")
+      ],
+      // This node doesn't need to be held while tests run.
+      wait: false,
+      // Success of this script depend only on successful build
+      // and launch of tests, not successful tests.
+      propagate: false
+    }
+  }
+}

@@ -1,0 +1,243 @@
+#!/usr/bin/env groovy
+
+import groovy.transform.Field
+
+// Configs for build from pytorch docker images
+// (See: https://hub.docker.com/r/pytorch/pytorch/tags)
+def ubuntu_from_pytorch_configs = [
+    [
+        'cudaVer': '10.2', 'cudnnVer': '7', 'torchVer': '1.8.1',
+        'archsToTest': 'Tesla_V100_PCIE_32GB;TITAN_RTX'
+    ],
+    [
+        'cudaVer': '11.1', 'cudnnVer': '8', 'torchVer': '1.8.1',
+        'archsToTest': 'A100_PCIE_40GB'
+    ],
+    [
+        'cudaVer': '10.2', 'cudnnVer': '7', 'torchVer': '1.9.0',
+        'archsToTest': 'Tesla_V100_PCIE_32GB'
+    ],
+    [
+        'cudaVer': '11.1', 'cudnnVer': '8', 'torchVer': '1.9.1',
+        'archsToTest': 'TITAN_RTX;A100_PCIE_40GB'
+    ],
+    [
+        'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.10.0',
+        'archsToTest': 'A100_PCIE_40GB'
+    ],
+    [
+        'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.11.0',
+        'archsToTest': 'A100_PCIE_40GB'
+    ]
+]
+
+// Configs for build from NGC pytorch docker images
+// (See: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch/tags)
+def ubuntu_from_nvcr_configs = [
+    [
+        'baseImageTag': '22.02-py3',
+        'archsToTest': 'A100_PCIE_40GB'
+    ]
+]
+
+// Configs for build from cuda container
+// with custom installation of all the dependencies like PyTorch
+// (See: https://hub.docker.com/r/nvidia/cuda/tags)
+def ubuntu_from_cuda_configs = [
+    [
+        'cudaVer': '10.2', 'cudnnVer': '7',
+        'pythonVer': '3.7', 'torchVer': '1.8.1',
+        'archsToTest': 'Tesla_V100_PCIE_32GB;TITAN_RTX'
+    ],
+    [
+        'cudaVer': '11.3.0', 'cudnnVer': '8',
+        'pythonVer': '3.9', 'torchVer': '1.11.0',
+        'archsToTest': 'A100_PCIE_40GB'
+    ],
+]
+
+// Configs for build for cpu only
+// (Use docker image ubuntu:18.04 as a base)
+def ubuntu_cpuonly_configs = [
+    [
+        'pythonVer': '3.7', 'torchVer': '1.8.1',
+    ],
+    [
+        'pythonVer': '3.9', 'torchVer': '1.11.0',
+    ]
+]
+
+
+dockerRegistryServer = 'gitlab-master.nvidia.com:5005'
+dockerRegistryName = 'toronto_dl_lab/kaolin'
+imageBaseTag = "${dockerRegistryServer}/${dockerRegistryName}/kaolin"
+// Used for target docker image tag, as it doesn't support all characters (such as /)
+branchRef = gitlabSourceBranch.replaceAll("[^a-zA-Z0-9]", "-")
+
+node {
+    checkout scm
+    // Sanity check, in case this script fail to launch all builds and tests
+    gitlabCommitStatus("launch all builds") {
+        // Right now we only apply CI on MR and master branch.
+        // To enable master branch we have to accept all the push requests
+        // and prune them here.
+        sh "echo ${gitlabActionType}"
+        if (gitlabActionType == "MERGE" || gitlabSourceBranch == "master") {
+            jobMap = [:]
+            // Jenkins doesn't parse the commit hash from the webhook.
+            // So we need to get the commit hash from the last commit in the branch,
+            // So we unsure that all the build and run are on the same commit
+            //
+            // Note:
+            //   If two commits on the same branch are pushed before the first
+            //   run this line then they will both run on the second commit
+            commitHash = sh(script: "git log -1 --pretty=format:%h",
+                            returnStdout: true).trim()
+            sh "echo ${commitHash}"
+            // Check if the last commit message has a [with custom] tag
+            def hasNoCustom = sh(script: "git log -1 | grep '.*\\[with custom\\].*'",
+                                 returnStatus: true)
+            // We try to build from cuda docker image if the commit has such tag
+            // or CI is applied on master
+            if (hasNoCustom == 0 || gitlabSourceBranch == "master") {
+                for (config in ubuntu_from_cuda_configs) {
+                    def configName = "custom-torch${config['torchVer']}-" + \
+                                     "cuda${config['cudaVer']}-" +
+                                     "cudnn${config['cudnnVer']}-" +
+                                     "py${config['pythonVer']}"
+                    jobMap["${configName}"] = prepareUbuntuFromCUDAJob(
+                        configName,
+                        config['cudaVer'],
+                        config['cudnnVer'],
+                        config['pythonVer'],
+                        config['torchVer'],
+                        config['archsToTest']
+                    )
+                }
+            }
+
+            for (config in ubuntu_from_pytorch_configs) {
+                def configName = "pytorch-torch${config['torchVer']}-" + \
+                                 "cuda${config['cudaVer']}-cudnn${config['cudnnVer']}"
+                def baseImageTag = "pytorch/pytorch:${config['torchVer']}-" + \
+                                   "cuda${config['cudaVer']}-" + \
+                                   "cudnn${config['cudnnVer']}-devel"
+                jobMap["${configName}"] = prepareUbuntuFromBaseImageJob(
+                    configName,
+                    baseImageTag,
+                    config['archsToTest']
+                )
+            }
+
+            for (config in ubuntu_from_nvcr_configs) {
+                def configName = "nvcr-${config['baseImageTag']}"
+                def baseImageTag = "nvcr.io/nvidia/pytorch:${config['baseImageTag']}"
+                jobMap["${configName}"] = prepareUbuntuFromBaseImageJob(
+                    configName,
+                    baseImageTag,
+                    config['archsToTest']
+                )   
+            }
+
+            for (config in ubuntu_cpuonly_configs) {
+                def torchVerLabel = config['torchVer'].split('\\.')[0..1].join('')
+                def pythonVerLabel = config['pythonVer'].split('\\.').join('')
+                def configName = "cpuonly-py${config['pythonVer']}-torch${config['torchVer']}"
+                jobMap["${configName}"] = prepareUbuntuCPUOnlyJob(
+                    configName,
+                    config['pythonVer'],
+                    config['torchVer']
+                )
+            }
+
+            stage('Launch builds') {
+                parallel jobMap
+            }
+        }
+    }
+}
+
+def prepareUbuntuFromBaseImageJob(configName, baseImageTag, archsToTest) {
+  return {
+    stage("${configName}") {
+      // Notify Gitlab about the build and tests it will be running
+      // so it doesn't the build successful before it start running them
+      // and we can also see issue if the build / test is never run.
+      updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
+      for (arch in archsToTest.split(';')) {
+        updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "pending")
+      }
+      build job: "ubuntu_build_template_CI",
+      parameters: [
+        string(name: 'configName', value: "${configName}"),
+        string(name: 'baseImageTag', value: "${baseImageTag}"),
+        string(name: 'targetImageTag',
+               value: "${imageBaseTag}:${branchRef}-${BUILD_ID}-${configName}"),
+        string(name: 'archsToTest', value: "${archsToTest}"),
+        string(name: 'sourceBranch', value: "${env.gitlabSourceBranch}"),
+        string(name: 'repoUrl', value: "${scm.userRemoteConfigs[0].url}"),
+        string(name: 'commitHash', value: "${commitHash}")
+      ],
+      // This node doesn't need to be held while builds and tests run.
+      wait: false,
+      // Success of this script depend only on successful launch,
+      // Not successful builds and tests.
+      propagate: false
+    }
+  }
+}
+
+def prepareUbuntuFromCUDAJob(configName, cudaVer, cudnnVer, pythonVer, torchVer, archsToTest) {
+  return {
+    stage("${configName}") {
+      // Notify Gitlab about the build and tests it will be running
+      // so it doesn't the build successful before it start running them
+      // and we can also see issue if the build / test is never run.
+      updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
+      for (arch in archsToTest.split(';')) {
+        updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "pending")
+      }
+      build job: "ubuntu_custom_build_template_CI",
+      parameters: [
+        string(name: 'configName', value: "${configName}"),
+        string(name: 'cudaVer', value: "${cudaVer}"),
+        string(name: 'cudnnVer', value: "${cudnnVer}"),
+        string(name: 'pythonVer', value: "${pythonVer}"),
+        string(name: 'torchVer', value: "${torchVer}"),
+        string(name: 'targetImageTag',
+               value: "${imageBaseTag}:${branchRef}-${BUILD_ID}-${configName}"),
+        string(name: 'sourceBranch', value: "${env.gitlabSourceBranch}"),
+        string(name: 'repoUrl', value: "${scm.userRemoteConfigs[0].url}" ),
+        string(name: 'archsToTest', value: "${archsToTest}"),
+        string(name: 'commitHash', value: "${commitHash}")
+      ],
+      // This node doesn't need to be held while builds and tests run.
+      wait: false,
+      // Success of this script depend only on successful launch,
+      // Not successful builds and tests.
+      propagate: false
+    }
+  }
+}
+
+def prepareUbuntuCPUOnlyJob(configName, pythonVer, torchVer) {
+  return {
+    stage("${configName}") {
+      updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
+      updateGitlabCommitStatus(name: "test-${configName}", state: "pending")
+      build job: "ubuntu_cpuonly_template_CI",
+      parameters: [
+        string(name: 'configName', value: "${configName}"),
+        string(name: 'pythonVer', value: "${pythonVer}"),
+        string(name: 'torchVer', value: "${torchVer}"),
+        string(name: 'targetImageTag',
+               value: "${imageBaseTag}:${branchRef}-${BUILD_ID}-${configName}"),
+        string(name: 'sourceBranch', value: "${env.gitlabSourceBranch}"),
+        string(name: 'repoUrl', value: "${scm.userRemoteConfigs[0].url}" ),
+        string(name: 'commitHash', value: "${commitHash}")
+      ],
+      wait: false,
+      propagate: false
+    }
+  }
+}
