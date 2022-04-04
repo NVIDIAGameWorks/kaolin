@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-21-22 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import torch
 from PIL import Image
 
 from kaolin.io.materials import MaterialLoadError, MaterialFileError, MaterialNotFoundError
+from kaolin.io import utils
 
 __all__ = [
     'ignore_error_handler',
@@ -32,7 +33,6 @@ __all__ = [
 return_type = namedtuple('return_type',
                          ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
                           'materials_order', 'vertex_normals', 'face_normals'])
-
 
 def ignore_error_handler(error, **kwargs):
     """Simple error handler to use in :func:`load_obj` that ignore all errors"""
@@ -49,10 +49,18 @@ def default_error_handler(error, **kwargs):
     """Simple error handle to use in :func:`load_obj` that raises all errors."""
     raise error
 
+def flatten_feature(feature):
+    """Flatten the nested list of a feature.
+    """
+    if feature is None or len(feature) == 0:
+        return None
+    else:
+        return [item for sublist in feature for item in sublist]
+
 
 # TODO(cfujitsang): support https://en.wikipedia.org/wiki/Wavefront_.obj_file#Geometric_vertex ?
 def import_mesh(path, with_materials=False, with_normals=False,
-                error_handler=None):
+                error_handler=None, heterogeneous_mesh_handler=None):
     r"""Load data from an obj file as a single mesh.
 
     With limited materials support to Kd, Ka, Ks, map_Kd, map_Ka and map_Ks.
@@ -68,6 +76,11 @@ def import_mesh(path, with_materials=False, with_normals=False,
             ``error_handler(error: Exception, material_name: Optional[str],
             materials: Optional[list[dict]], materials_order: Optional[list])``.
             Default: raise all errors.
+        heterogeneous_mesh_handler (Callable, optional):
+            function that handles the import of heterogeneous mesh,
+            with following signature:
+            ``heterogeneous_mesh_handler(vertices, face_vertex_counts, *args)``
+        Default: Heterogenenous mesh will raise a NonHomogeneousError.
 
     Returns:
         (obj.return_type):
@@ -131,12 +144,12 @@ def import_mesh(path, with_materials=False, with_normals=False,
                     if len(data[1]) > 1 and data[1][1] != '':
                         face_uvs_idx.append([int(d[1]) for d in data])
                     else:
-                        face_uvs_idx.append([0, 0, 0])
+                        face_uvs_idx.append([0] * len(data))
                 if with_normals:
                     if len(data[1]) > 2:
                         face_normals.append([int(d[2]) for d in data])
                     else:
-                        face_normals.append([0, 0, 0])
+                        face_normals.append([0] * len(data))
             elif with_materials and data[0] == 'usemtl':
                 material_name = data[1]
                 if material_name not in materials_idx:
@@ -159,6 +172,24 @@ def import_mesh(path, with_materials=False, with_normals=False,
 
     vertices = torch.FloatTensor([float(el) for sublist in vertices
                                   for el in sublist]).view(-1, 3)
+
+    face_vertex_counts = torch.IntTensor([len(f) for f in faces])
+
+    if not torch.all(face_vertex_counts == face_vertex_counts[0]):
+        if heterogeneous_mesh_handler is None:
+            raise utils.NonHomogeneousMeshError(f'Mesh is non-homogeneous '
+                                                f'and cannot be imported from {path}.'
+                                                f'User can set heterogeneous_mesh_handler.'
+                                                f'See kaolin.io.utils for the available options')
+        else:
+            all_features = [faces, face_uvs_idx, face_normals]
+            # Flatten all features
+            all_features = [flatten_feature(f) for f in all_features]
+
+            mesh = heterogeneous_mesh_handler(vertices, face_vertex_counts, *all_features)
+        if mesh is not None:
+            vertices, face_vertex_counts, faces, face_uvs_idx, face_normals = mesh
+
     faces = torch.LongTensor(faces) - 1
 
     if with_materials:
