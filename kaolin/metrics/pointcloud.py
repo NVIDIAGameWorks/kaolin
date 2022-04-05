@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-22 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -164,7 +164,7 @@ def f_score(gt_points, pred_points, radius=0.01, eps=1e-8):
         ...                    [[-0.0020699, 6.4429, 12.3],
         ...                     [3.8386, 8.3585, 4.7662]]], device='cuda', dtype=torch.float)
         >>> f_score(p1, p2, radius=1)
-        tensor([0.5000, 0.0000], device='cuda:0')
+        tensor([0.0000, 0.5000], device='cuda:0')
         >>> f_score(p1, p2, radius=1.5)
         tensor([1.0000, 0.5000], device='cuda:0')
     """
@@ -173,8 +173,8 @@ def f_score(gt_points, pred_points, radius=0.01, eps=1e-8):
 
     data_type = gt_points.dtype
 
-    fn = torch.sum(pred_distances > radius, dim=0).type(data_type)
-    fp = torch.sum(gt_distances > radius, dim=0).type(data_type)
+    fn = torch.sum(pred_distances > radius, dim=1).type(data_type)
+    fp = torch.sum(gt_distances > radius, dim=1).type(data_type)
     tp = (gt_distances.shape[1] - fp).type(data_type)
 
     precision = tp / (tp + fp)

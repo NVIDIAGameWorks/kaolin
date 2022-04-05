@@ -316,9 +316,32 @@ class TestFScore:
         output1 = pc.f_score(gt_points, pred_points, radius=0.2)
         output2 = pc.f_score(gt_points, pred_points, radius=0.12)
 
-        expected1 = torch.tensor([1, 0.5], device=device, dtype=dtype)
+        expected1 = torch.tensor([0.5, 1], device=device, dtype=dtype)
         expected2 = torch.tensor([0.5, 0.5], device=device, dtype=dtype)
 
         atol, rtol = get_tol
         assert torch.allclose(output1, expected1, atol=atol, rtol=rtol)
         assert torch.allclose(output2, expected2, atol=atol, rtol=rtol)
+
+    def test_FScore_heterogeneous(self, device, dtype, get_tol):
+        gt_points = torch.tensor([[[8.8977, 4.1709, 1.2839],
+                                   [8.5640, 7.7767, 9.4214]],
+                                  [[0.5431, 6.4495, 11.4914],
+                                   [3.2126, 8.0865, 3.1018]]], dtype=dtype, device=device)
+
+        pred_points = torch.tensor([[[8.8914, 4.1788, 1.2176],
+                                     [8.5291, 7.5513, 9.5412],
+                                     [3.7831, 6.0182, 4.1208]],
+                                    [[0.4010, 6.4602, 11.5183],
+                                     [3.2977, 8.0325, 3.1180],
+                                     [2.4987, 5.8763, 3.1987]]], dtype=dtype, device=device)
+        output1 = pc.f_score(gt_points, pred_points, radius=0.2)
+        output2 = pc.f_score(gt_points, pred_points, radius=0.12)
+
+        expected1 = torch.tensor([0.4, 0.8], device=device, dtype=dtype)
+        expected2 = torch.tensor([0.4, 0.4], device=device, dtype=dtype)
+
+        atol, rtol = get_tol
+        assert torch.allclose(output1, expected1, atol=atol, rtol=rtol)
+        assert torch.allclose(output2, expected2, atol=atol, rtol=rtol)
+
