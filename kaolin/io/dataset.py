@@ -1,4 +1,4 @@
-# Copyright (c) 2020,21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2020,21-22 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -236,14 +236,18 @@ class ProcessedDataset(KaolinDataset):
                             self.cache_convert(key, data)
                 else:
                     p = Pool(num_workers)
-                    iterator = p.imap_unordered(
-                        _preprocess_task,
-                        [(idx, self._get_base_data, self.get_cache_key,
-                          self.cache_convert)
-                         for idx in uncached])
-                    for i in tqdm(range(len(uncached)), desc=desc,
-                                  disable=no_progress):
-                        next(iterator)
+                    try:
+                        iterator = p.imap_unordered(
+                            _preprocess_task,
+                            [(idx, self._get_base_data, self.get_cache_key,
+                              self.cache_convert)
+                             for idx in uncached])
+                        for i in tqdm(range(len(uncached)), desc=desc,
+                                      disable=no_progress):
+                            next(iterator)
+                    finally:
+                        p.close()
+                        p.join()
         else:
             self.cache_convert = None
 

@@ -1,4 +1,5 @@
-# Copyright (c) 2019,20 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019,20-22 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -112,7 +113,7 @@ def voxelgrids_to_cubic_meshes(voxelgrids, is_trimesh=True):
         voxelgrids = voxelgrids.float()
 
     conv_results = torch.nn.functional.conv3d(
-        voxelgrids, k, padding=1)  # (B, 3, r, r, r)
+        voxelgrids, k, padding=1).round()  # (B, 3, r, r, r)
 
     indices = torch.nonzero(conv_results.transpose(
         0, 1), as_tuple=True)  # (N, 5)

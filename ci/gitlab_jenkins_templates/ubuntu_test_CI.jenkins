@@ -31,6 +31,7 @@ spec:
         gitlabCommitStatus("test-${configName}-${arch}") {
           stage("Install deps") {
             sh 'pip install -r /kaolin/tools/ci_requirements.txt'
+            sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'
           }
           testMap = [
             "Disp info": {
@@ -50,7 +51,6 @@ spec:
               }
             }, "DIB-R Tutorial": {
               stage("DIB-R Tutorial") {
-                sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'
                 sh 'cd /kaolin/examples/tutorial && ipython dibr_tutorial.ipynb'
               }
             }, "DMTet Tutorial": {
