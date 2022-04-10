@@ -77,12 +77,12 @@ branchRef = gitlabSourceBranch.replaceAll("[^a-zA-Z0-9]", "-")
 node {
     checkout scm
     // Sanity check, in case this script fail to launch all builds and tests
-    gitlabCommitStatus("launch all builds") {
-        // Right now we only apply CI on MR and master branch.
-        // To enable master branch we have to accept all the push requests
-        // and prune them here.
-        sh "echo ${gitlabActionType}"
-        if (gitlabActionType == "MERGE" || gitlabSourceBranch == "master") {
+    // Right now we only apply CI on MR and master branch.
+    // To enable master branch we have to accept all the push requests
+    // and prune them here.
+    sh "echo ${gitlabActionType}"
+    if (gitlabActionType == "MERGE" || gitlabSourceBranch == "master") {
+        gitlabCommitStatus("launch all builds") {
             jobMap = [:]
             // Jenkins doesn't parse the commit hash from the webhook.
             // So we need to get the commit hash from the last commit in the branch,
