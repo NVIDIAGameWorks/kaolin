@@ -32,15 +32,13 @@ using namespace at::indexing;
 
 #ifdef WITH_CUDA
 
-uint32_t raytrace_cuda_impl(
+std::vector<at::Tensor> raytrace_cuda_impl(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
     at::Tensor exclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
-    at::Tensor nugget_buffers,
-    at::Tensor depth_buffers,
     uint32_t max_level,
     uint32_t target_level,
     bool return_depth,
@@ -207,24 +205,10 @@ std::vector<at::Tensor> raytrace_cuda(
   TORCH_CHECK(pyramid_ptr[max_level+1] == 0 && pyramid_ptr[max_level+2] == 0, 
               "SPC pyramid corrupt, check if the SPC pyramid has been sliced");
 
-  // allocate local GPU storage
-  at::Tensor nuggets = at::zeros({2 * KAOLIN_SPC_MAX_POINTS, 2}, octree.options().dtype(at::kInt));
-
-  uint32_t depth_dim = with_exit ? 2 : 1;
-  at::Tensor depth = at::zeros({2 * KAOLIN_SPC_MAX_POINTS, depth_dim}, octree.options().dtype(at::kFloat));
-
   // do cuda
-  uint32_t num = raytrace_cuda_impl(octree, points, pyramid, exclusive_sum, ray_o, ray_d, nuggets, depth, 
+  return raytrace_cuda_impl(octree, points, pyramid, exclusive_sum, ray_o, ray_d, 
                                 max_level, target_level, return_depth, with_exit);
 
-  uint32_t pad = ((target_level + 1) % 2) * KAOLIN_SPC_MAX_POINTS;
- 
-  if (return_depth) {
-    return { nuggets.index({Slice(pad, pad+num)}).contiguous(),
-             depth.index({Slice(pad, pad+num)}).contiguous() };
-  } else {
-    return { nuggets.index({Slice(pad, pad+num)}).contiguous() };
-  }
 #else
   KAOLIN_NO_CUDA_ERROR(__func__);
 #endif  // WITH_CUDA
