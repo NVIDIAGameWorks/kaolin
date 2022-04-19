@@ -147,7 +147,7 @@ def subdivide_tetmesh(vertices, tetrahedrons, features=None):
                  [-0.2500],
                  [ 0.5000]]])
 
-    .. _Deep Marching Tetrahedra: a Hybrid Representation for High-Resolution 3D Shape Synthesis\:
+    .. _Deep Marching Tetrahedra\: a Hybrid Representation for High-Resolution 3D Shape Synthesis:
             https://arxiv.org/abs/2111.04276
     """
 
