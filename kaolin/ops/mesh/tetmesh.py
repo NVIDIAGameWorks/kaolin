@@ -100,12 +100,12 @@ def subdivide_tetmesh(vertices, tetrahedrons, features=None):
     Returns:
         (torch.Tensor, torch.LongTensor, (optional) torch.Tensor): 
 
-            - batched vertices of subdivided tetrahedral meshes, of shape
-                                 :math:`(\text{batch_size}, \text{new_num_vertices}, 3)`
-            - unbatched tetrahedral mesh topology, of shape
-                              :math:`(\text{num_tetrahedrons} * 8, 4)`.
-            - batched per-vertex feature vectors of subdivided tetrahedral meshes, of shape
-                            :math:`(\text{batch_size}, \text{new_num_vertices}, \text{feature_dim})`.
+        - batched vertices of subdivided tetrahedral meshes, of shape 
+        :math:`(\text{batch_size}, \text{new_num_vertices}, 3)`
+        - unbatched tetrahedral mesh topology, of shape 
+        :math:`(\text{num_tetrahedrons} * 8, 4)`.
+        - batched per-vertex feature vectors of subdivided tetrahedral meshes, of shape 
+        :math:`(\text{batch_size}, \text{new_num_vertices}, \text{feature_dim})`.
 
     Example:
         >>> vertices = torch.tensor([[[0, 0, 0],
