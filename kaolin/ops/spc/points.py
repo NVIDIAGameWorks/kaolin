@@ -22,10 +22,12 @@ __all__ = [
     'coords_to_trilinear',
     'coords_to_trilinear_coeffs',
     'unbatched_points_to_octree',
-    'quantize_points'
+    'quantize_points',
+    'create_dense_spc'
 ]
 
 import warnings
+import numpy as np
 import torch
 
 from kaolin import _C
@@ -293,3 +295,18 @@ def coords_to_trilinear_coeffs(coords, points, level):
     coords_ = (2**level) * (coords * 0.5 + 0.5)
 
     return _C.ops.spc.coords_to_trilinear_cuda(coords_.contiguous(), points.contiguous()).reshape(*shape)
+
+
+def create_dense_spc(level, device):
+    """Creates a dense SPC model
+
+    Args:
+        level (int): The level at which the octree will be initialized to.
+        device (torch.device): Torch device to keep the spc octree
+
+    Returns:
+        (torch.ByteTensor): the octree tensor
+    """
+    lengths = torch.tensor([sum(8 ** l for l in range(level))], dtype=torch.int32)
+    octree = torch.full((lengths,), 255, device=device, dtype=torch.uint8)
+    return octree, lengths

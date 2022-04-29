@@ -138,6 +138,56 @@ class Spc(object):
         self._point_hierarchies = point_hierarchies
         self.features = features
 
+    @classmethod
+    def make_dense(cls, level, device='cuda'):
+        """Creates a dense, fully occupied Spc object.
+        The Spc will have ``level`` levels of detail.
+
+        Args:
+            level (int):
+                Number of levels to use for the dense Spc.
+            device (torch.device):
+                Torch device to keep the spc octree
+
+        Return:
+            (kaolin.rep.Spc): a new fully occupied ``Spc``.
+        """
+        from ..ops.spc import create_dense_spc
+        octree, lengths = create_dense_spc(level, device)  # Create a single entry batch
+        return Spc(octrees=octree, lengths=lengths)
+
+    @classmethod
+    def from_features(cls, feature_grids, masks=None):
+        """Creates a sparse Spc object from the feature grid.
+
+        Args:
+            feature_grids (torch.Tensor):
+                The sparse 3D feature grids, of shape
+                :math:`(\text{batch_size}, \text{feature_dim}, X, Y, Z)`
+            masks (optional, torch.BoolTensor):
+                The topology mask, showing where are the features,
+                of shape :math:`(\text{batch_size}, X, Y, Z)`.
+                Default: A feature is determined when not full of zeros.
+
+        Returns:
+            (torch.ByteTensor, torch.IntTensor, torch.Tensor):
+                a tuple containing:
+
+                    - The octree, of size :math:`(\text{num_nodes})`
+
+                    - The lengths of each octree, of size :math:`(\text{batch_size})`
+
+                    - The coalescent features, of same dtype than ``feature_grids``,
+                      of shape :math:`(\text{num_features}, \text{feature_dim})`.
+        Return:
+            (kaolin.rep.Spc): a ``Spc``, with length of :math:`(\text{batch_size})`,
+            an octree of size octree, of size :math:`(\text{num_nodes})`, and the features field
+            of the same dtype as ``feature_grids`` and of shape :math:`(\text{num_features}, \text{feature_dim})`.
+        """
+        from ..ops.spc import feature_grids_to_spc
+        octrees, lengths, coalescent_features = feature_grids_to_spc(feature_grids, masks=masks)
+        return Spc(octrees=octrees, lengths=lengths, features=coalescent_features)
+
     # TODO(cfujitsang): could be interesting to separate into multiple functions
     def _apply_scan_octrees(self):
         # to break circular dependency
@@ -237,3 +287,18 @@ class Spc(object):
             return {k: getattr(self, k) for k in self.KEYS}
         else:
             return {k: getattr(self, k) for k in keys}
+
+    def num_points(self, lod: int):
+        """
+        Returns how many points the SPC holds at a given level of detail.
+
+        Args:
+            lod (int):
+                Index of a level of detail.
+                Level 0 is considered the root and always holds a single point,
+                level 1 holds up to :math:`(\text{num_points}=8)` points,
+                level 2 holds up to :math:`(\text{num_points}=8^{2})`, and so forth.
+        Return:
+            (torch.Tensor): The number of points each SPC entry holds for the given level of detail.
+        """
+        return self.pyramids[:, 0, lod]

@@ -158,6 +158,14 @@ spec:
           build_passed = false
           echo e.toString()
         }
+        try {
+          stage("SPC Convolution 3D Recipe") {
+            sh 'cd /kaolin/examples/recipes/spc/ && python spc_conv3d_example.py'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
         if (build_passed) {
           currentBuild.result = "SUCCESS"
           updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "success")
