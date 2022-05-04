@@ -5,6 +5,13 @@ FROM ${BASE_IMAGE}
 ARG FORCE_CUDA=1
 ENV FORCE_CUDA=${FORCE_CUDA}
 
+RUN if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
+        rm /etc/apt/sources.list.d/cuda.list; \
+    fi \
+    && if [ -f /etc/apt/sources.list.d/nvidia-ml.list ]; then \
+        rm /etc/apt/sources.list.d/nvidia-ml.list; \
+    fi
+
 WORKDIR /kaolin
 
 COPY . .
