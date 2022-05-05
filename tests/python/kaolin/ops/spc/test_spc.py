@@ -166,7 +166,9 @@ class TestQuery:
              [3,1,1],
              [0,0,0],
              [3,3,3]], device='cuda', dtype=torch.short)
-        octree = unbatched_points_to_octree(points, 2)
+        level = 2
+        resolution = 2**level
+        octree = unbatched_points_to_octree(points, level)
         length = torch.tensor([len(octree)], dtype=torch.int32)
         _, pyramid, prefix = scan_octrees(octree, length)
 
@@ -177,16 +179,70 @@ class TestQuery:
              [3,3,3],
              [2,2,2],
              [1,1,1]], device='cuda', dtype=torch.short)
+        query_coords_float = (2.0 * (query_points.float() / resolution) - 1.0)
+        query_coords_int = query_points
 
         point_hierarchy = generate_points(octree, pyramid, prefix)
 
-        results = unbatched_query(octree, prefix, query_points, 2)
-        
+        results_float = unbatched_query(octree, prefix, query_coords_float, 2)
+        results_int = unbatched_query(octree, prefix, query_coords_int, 2)
+
         expected_results = torch.tensor(
             [7,6,5,8,-1,-1], dtype=torch.long, device='cuda')
 
-        assert torch.equal(point_hierarchy[results[:-2]], query_points[:-2])
-        assert torch.equal(expected_results, results)
+        assert torch.equal(expected_results, results_float)
+        assert torch.equal(expected_results, results_int)
+        assert torch.equal(point_hierarchy[results_float[:-2]], query_points[:-2])
+        assert torch.equal(point_hierarchy[results_int[:-2]], query_points[:-2])
+
+    def test_query_multiscale(self):
+        points = torch.tensor(
+            [[3,2,0],
+             [3,1,1],
+             [0,0,0],
+             [3,3,3]], device='cuda', dtype=torch.short)
+        level = 3
+        resolution = 2**level
+        octree = unbatched_points_to_octree(points, level)
+        length = torch.tensor([len(octree)], dtype=torch.int32)
+        _, pyramid, prefix = scan_octrees(octree, length)
+
+        query_points = torch.tensor(
+            [[3,2,0],
+             [3,1,1],
+             [0,0,0],
+             [0,4,4],
+             [3,3,3],
+             [2,2,2],
+             [1,1,1],
+             [16,16,16]], device='cuda', dtype=torch.short)
+        query_coords_float = (2.0 * (query_points.float() / resolution) - 1.0)
+        query_coords_int = query_points
+
+        point_hierarchy = generate_points(octree, pyramid, prefix)
+
+        expected_results0 = unbatched_query(octree, prefix, query_coords_float, 0)
+        expected_results1 = unbatched_query(octree, prefix, query_coords_float, 1)
+        expected_results2 = unbatched_query(octree, prefix, query_coords_float, 2)
+        expected_results3 = unbatched_query(octree, prefix, query_coords_float, 3)
+
+        results03_float = unbatched_query(octree, prefix, query_coords_float, level, with_parents=True)
+        results02_float = unbatched_query(octree, prefix, query_coords_float, level-1, with_parents=True)
+
+        assert torch.equal(expected_results0, results03_float[:,0])
+        assert torch.equal(expected_results1, results03_float[:,1])
+        assert torch.equal(expected_results2, results03_float[:,2])
+        assert torch.equal(expected_results3, results03_float[:,3])
+        
+        assert torch.equal(expected_results0, results02_float[:,0])
+        assert torch.equal(expected_results1, results02_float[:,1])
+        assert torch.equal(expected_results2, results02_float[:,2])
+        
+        expected_results3 = unbatched_query(octree, prefix, query_coords_int, 3)
+
+        results03_int = unbatched_query(octree, prefix, query_coords_int, level, with_parents=True)
+
+        assert torch.equal(expected_results3, results03_int[:,3])
 
 class TestToDense:
     @pytest.mark.parametrize('with_spc_to_dict', [False, True])
