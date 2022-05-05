@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,603 +18,563 @@ import pytest
 
 import numpy as np
 import torch
+import math
 import os
 
 from kaolin.render.camera import perspective_camera, rotate_translate_points
-from kaolin.render.mesh import dibr_rasterization, texture_mapping, \
-                               spherical_harmonic_lighting, prepare_vertices
-from kaolin.ops.mesh import index_vertices_by_faces, face_normals
+from kaolin.render.mesh import rasterize
+from kaolin.render.mesh.deftet import _naive_deftet_sparse_render
+import kaolin as kal
 from PIL import Image
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-SAMPLE_DIR = os.path.join(ROOT_DIR, '../../../../samples/rasterization')
+MODEL_DIR = os.path.join(ROOT_DIR, os.pardir, os.pardir, os.pardir, os.pardir, 'samples/')
 
-
-# TODO(cfujitsang): Add half support
-@pytest.mark.parametrize("device", ["cuda"])
 @pytest.mark.parametrize("dtype", [torch.float, torch.double])
-@pytest.mark.parametrize("height", [256])
-@pytest.mark.parametrize("width", [512])
-class TestDIBR:
+@pytest.mark.parametrize("batch_size", [1, 3])
+@pytest.mark.parametrize("height,width", [(35, 31)])
+@pytest.mark.parametrize("flip", [False, True])
+class TestRasterize:
     @pytest.fixture(autouse=True)
-    def vertices(self, dtype, device):
-        # shape: (batch_size, num_vertices, 3)
-        return torch.tensor(
-            [[[-1, -1, -1], [1, -1, 0], [1, 1, -1], [-1, 1, 0]],
-             [[-1, -1, 0], [1, -1, -1], [1, 1, 0], [-1, 1, -1]]],
-            dtype=dtype,
-            device=device)
+    def mesh(self):
+        mesh = kal.io.obj.import_mesh(os.path.join(MODEL_DIR, 'model.obj'),
+                                      with_materials=True)
+        return mesh
 
     @pytest.fixture(autouse=True)
-    def faces(self, device):
-        # shape: (num_faces, 3)
-        return torch.tensor([[0, 1, 2], [0, 2, 3]],
-                            dtype=torch.long,
-                            device=device)
+    def faces(self, mesh, flip):
+        out = mesh.faces.cuda()
+        if flip:
+            out = torch.flip(out, dims=(-1,))
+        return out
 
     @pytest.fixture(autouse=True)
-    def vertex_colors(self, dtype, device):
-        # shape: (batch_size, num_vertices, 3)
-        return torch.tensor([[[0.9, 0.1, 0.1],
-                              [0.1, 0.9, 0.1],
-                              [0.1, 0.1, 0.9],
-                              [0.9, 0.9, 0.1]],
-                             [[0.1, 0.9, 0.1],
-                              [0.9, 0.1, 0.1],
-                              [0.9, 0.9, 0.1],
-                              [0.1, 0.1, 0.9]]],
-                            dtype=dtype,
-                            device=device)
+    def camera_pos(self, batch_size, dtype):
+        return torch.tensor([[0.5, 0.5, 3.],
+                             [2., 2., -2.],
+                             [3., 0.5, 0.5]],
+                            device='cuda', dtype=dtype)[:batch_size]
 
     @pytest.fixture(autouse=True)
-    def uvs(self, dtype, device):
-        return torch.tensor([[[0.001, 0.001],
-                              [1 - 0.001, 0.001],
-                              [1 - 0.001, 1 - 0.001],
-                              [0.001, 1 - 0.001]]],
-                            dtype=dtype,
-                            device=device).repeat(2, 1, 1)
+    def look_at(self, batch_size, dtype):
+        return torch.full((batch_size, 3), 0.5, device='cuda',
+                          dtype=dtype)
 
     @pytest.fixture(autouse=True)
-    def texture_maps(self, dtype, device):
-        # shape: (batch_size, 3, h, w)
-        # this is because when we do pytorch interpolation
-        # the shape is (batch_size, features, height, width)
-        # we we need to prepare an image with size as (batch_size, 3, h, w)
-        jetcolor = torch.tensor([[[
-            [0.0, 0.0, 1.0],
-            [0.0, 0.5, 1.0],
-            [0.0, 1.0, 1.0],
-            [0.5, 1.0, 0.5],
-            [1.0, 1.0, 0.0],
-            [1.0, 0.5, 0.0],
-            [1.0, 0.0, 0.0],
-            [0.5, 0.0, 0.0]
-        ]]], dtype=dtype, device=device)
-
-        return jetcolor.repeat(2, jetcolor.shape[2], 1, 1).permute(0, 3, 1, 2)
+    def camera_up(self, batch_size, dtype):
+        return torch.tensor([[0., 1., 0.]], device='cuda',
+                            dtype=dtype).repeat(batch_size, 1)
 
     @pytest.fixture(autouse=True)
-    def lights(self, dtype, device):
-        # shape: (batch_size, 9)
-        return torch.tensor([[1, 1, 1, -1, 0, 0, 0, 0, 0]],
-                            dtype=dtype,
-                            device=device).repeat(2, 1)
+    def camera_proj(self, dtype):
+        return kal.render.camera.generate_perspective_projection(
+            fovyangle=math.pi / 4., dtype=dtype).cuda()
 
     @pytest.fixture(autouse=True)
-    def camera_rot(self, dtype, device):
-        # shape: (batch_size, 3, 3)
-        return torch.tensor([[[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
-                            dtype=dtype,
-                            device=device).repeat(2, 1, 1)
-
-    @pytest.fixture(autouse=True)
-    def camera_trans(self, dtype, device):
-        # shape: (batch_size, 3)
-        return torch.tensor([[0, 0, 4]],
-                            dtype=dtype,
-                            device=device).repeat(2, 1)
-
-    @pytest.fixture(autouse=True)
-    def camera_proj(self, width, height, dtype, device):
-        # shape: (3, 1)
-        return torch.tensor([[2.5 / (width / height)], [2.5], [-1]],
-                            dtype=dtype,
-                            device=device)
-
-    @pytest.fixture(autouse=True)
-    def vertices_camera(self, vertices, camera_rot, camera_trans):
-        return rotate_translate_points(vertices, camera_rot, camera_trans)
+    def vertices_camera(self, mesh, camera_pos, look_at, camera_up, dtype):
+        vertices = mesh.vertices.to('cuda', dtype).unsqueeze(0)
+        min_vertices = vertices.min(dim=1, keepdims=True)[0]
+        max_vertices = vertices.max(dim=1, keepdims=True)[0]
+        vertices = (vertices - min_vertices) / (max_vertices - min_vertices)
+        camera_rot, camera_trans = kal.render.camera.generate_rotate_translate_matrices(
+            camera_pos, look_at, camera_up)
+        return kal.render.camera.rotate_translate_points(
+            vertices, camera_rot, camera_trans)
 
     @pytest.fixture(autouse=True)
     def vertices_image(self, vertices_camera, camera_proj):
-        return perspective_camera(vertices_camera, camera_proj)
+        return kal.render.camera.perspective_camera(
+            vertices_camera, camera_proj)
 
     @pytest.fixture(autouse=True)
-    def face_vertices_camera(self, vertices_camera, faces):
-        return index_vertices_by_faces(vertices_camera, faces)
+    def face_vertices_z(self, vertices_camera, faces):
+        return kal.ops.mesh.index_vertices_by_faces(
+            vertices_camera[:, :, -1:], faces).squeeze(-1)
 
     @pytest.fixture(autouse=True)
-    def face_vertices_image(self, vertices_image, faces):
-        return index_vertices_by_faces(vertices_image, faces)
-
-    @pytest.fixture(autouse=True)
-    def face_camera_normals_z(self, face_vertices_camera):
-        face_normals_unit = face_normals(face_vertices_camera, unit=True)
-        return face_normals_unit[:, :, 2]
-
-    def test_prepare_vertices(self, vertices, faces, camera_rot, camera_trans,
-                              camera_proj, face_vertices_camera, face_vertices_image):
-        _face_vertices_camera, _face_vertices_image, _face_normals = \
-            prepare_vertices(vertices, faces, camera_proj, camera_rot, camera_trans)
-        assert torch.equal(face_vertices_camera, _face_vertices_camera)
-        assert torch.equal(face_vertices_image, _face_vertices_image)
-        assert torch.equal(face_normals(face_vertices_camera, unit=True),
-                           _face_normals)
-
-    def test_render_vertex_colors(self, vertex_colors, faces,
-                                  face_vertices_camera, face_vertices_image,
-                                  face_camera_normals_z, height, width,
-                                  dtype, device):
-        batch_size = faces.shape[0]
-        # face_vertex_colors
-        attributes = vertex_colors
-        face_attributes_idx = faces
-        face_attributes = index_vertices_by_faces(attributes, face_attributes_idx)
-
-        # imfeat is interpolated features
-        # improb is the soft mask
-        # imfaceidx is the face index map, which pixel is covered by which face
-        # it starts from 1, 0 is void.
-        imfeat, improb, imfaceidx = dibr_rasterization(height,
-                                                       width,
-                                                       face_vertices_camera[:, :, :, 2],
-                                                       face_vertices_image,
-                                                       face_attributes,
-                                                       face_camera_normals_z)
-        image = imfeat
-        images_gt = [torch.from_numpy(np.array(Image.open(
-                         os.path.join(SAMPLE_DIR, f'vertex_color_{bs}.png'))))
-                     for bs in range(batch_size)]
-        images_gt = torch.stack(images_gt, dim=0).to(device, dtype) / 255.
-        # the rendered soft mask is only tested here
-        images_prob_gt = [torch.from_numpy(np.array(Image.open(
-                              os.path.join(SAMPLE_DIR, f"image_prob_{bs}.png"))))
-                          for bs in range(batch_size)]
-        images_prob_gt = torch.stack(images_prob_gt, dim=0).to(device, dtype) / 255.
-        # the rendered face_idx is only tested here
-        images_face_idx_gt = [torch.from_numpy(np.array(Image.open(
-                                  os.path.join(SAMPLE_DIR, f"image_face_idx_{bs}.png"))))
-                              for bs in range(batch_size)]
-        images_face_idx_gt = \
-            (torch.stack(images_face_idx_gt, dim=0).to(device, torch.long) // 100) - 1
-        assert torch.allclose(image, images_gt, atol=1. / 255.)
-        assert torch.allclose(improb, images_prob_gt, atol=1. / 255.0)
-
-        if dtype == torch.double:
-            num_pix_diff_tol = 4
-        else:
-            num_pix_diff_tol = 0
-
-        num_pix_diff = torch.sum(~torch.isclose(imfaceidx,
-                                                images_face_idx_gt,
-                                                atol=1. / 255.))
-        assert num_pix_diff <= num_pix_diff_tol
-
-    def test_render_normal(self, face_vertices_camera, face_vertices_image,
-                           face_camera_normals_z, height, width, dtype, device):
-        batch_size = face_vertices_camera.shape[0]
-        face_normals_unit = face_normals(face_vertices_camera, unit=True)
-        face_attributes = face_normals_unit.unsqueeze(-2).repeat(1, 1, 3, 1)
-
-        # imfeat is interpolated features
-        # improb is the soft mask
-        # imfaceidx is the face index map, which pixel is covered by which face
-        # it starts from 1, 0 is void.
-        imfeat, improb, imfaceidx = dibr_rasterization(height,
-                                                       width,
-                                                       face_vertices_camera[:, :, :, 2],
-                                                       face_vertices_image,
-                                                       face_attributes,
-                                                       face_camera_normals_z)
-        images = (imfeat + 1) / 2
-        images_gt = [torch.from_numpy(np.array(Image.open(
-                         os.path.join(SAMPLE_DIR, f'vertex_normal_{bs}.png'))))
-                     for bs in range(batch_size)]
-        images_gt = torch.stack(images_gt, dim=0).to(device, dtype) / 255.
-        if dtype == torch.double:
-            num_pix_diff_tol = 8
-        else:
-            num_pix_diff_tol = 0
-        num_pix_diff = torch.sum(~torch.isclose(images, images_gt, atol=1. / 255.))
-        assert num_pix_diff <= num_pix_diff_tol
-
-    def test_render_depths(self, face_vertices_camera, face_vertices_image,
-                           face_camera_normals_z, height, width, dtype, device):
-        batch_size = face_vertices_camera.shape[0]
-        # face_vertices_camera is of shape (num_batch, num_face, 9)
-        num_batch, num_faces = face_vertices_camera.shape[:2]
-        face_attributes = face_vertices_camera.reshape(num_batch, num_faces, 3, 3)[:, :, :, 2:3]
-
-        # imfeat is interpolated features
-        # improb is the soft mask
-        # imfaceidx is the face index map, which pixel is covered by which face
-        # it starts from 1, 0 is void.
-        imfeat, improb, imfaceidx = dibr_rasterization(height,
-                                                       width,
-                                                       face_vertices_camera[:, :, :, 2],
-                                                       face_vertices_image,
-                                                       face_attributes,
-                                                       face_camera_normals_z)
-
-        image = imfeat
-        image_valid_region = image < 0
-        image_valid_values = image[image_valid_region]
-        image_depth_norm = (image - image_valid_values.min()) / (
-            image_valid_values.max() - image_valid_values.min())
-        image = torch.where(image_valid_region, image_depth_norm, image)
-
-        for bs in range(batch_size):
-            image_gt = torch.from_numpy(np.array(Image.open(
-                os.path.join(SAMPLE_DIR, f'depth_{bs}.png'))))
-            image_gt = image_gt.to(device, dtype).unsqueeze(2) / 255.
-            assert torch.allclose(image[bs], image_gt, atol=1 / 255.0)
-
-    def test_render_texture(self, uvs, faces, texture_maps,
-                            face_vertices_camera, face_vertices_image,
-                            face_camera_normals_z, height, width, dtype, device):
-        batch_size = faces.shape[0]
-        # attributes with uvs
-        #uvs_with_mask = torch.nn.functional.pad(uvs, pad=(1, 0), value=1)
-        #attributes = uvs_with_mask
-        face_uvs = index_vertices_by_faces(uvs, faces)
-        face_attributes = [torch.ones((*face_uvs.shape[:-1], 1),
-                                      device=device, dtype=dtype),
-                           face_uvs]
-
-        (texmask, texcoord), improb, imfaceidx = dibr_rasterization(height,
-                                                                    width,
-                                                                    face_vertices_camera[:, :, :, 2],
-                                                                    face_vertices_image,
-                                                                    face_attributes,
-                                                                    face_camera_normals_z)
-
-        texcolor = texture_mapping(texcoord, texture_maps, mode='bilinear')
-        image = texcolor * texmask
-
-        for bs in range(batch_size):
-            image_gt = torch.from_numpy(np.array(Image.open(
-                os.path.join(SAMPLE_DIR, f'texture_{bs}.png'))))
-            image_gt = image_gt.to(device, dtype) / 255.
-            assert torch.allclose(image[bs], image_gt, atol=1. / 255.0)
-
-    def test_render_texture_with_light(self, uvs, faces, texture_maps, lights,
-                                       face_vertices_camera, face_vertices_image,
-                                       face_camera_normals_z, height, width, dtype, device):
-        batch_size = faces.shape[0]
-        # Note: in this example uv face is the same as mesh face
-        # but they could be different
-        face_uvs = index_vertices_by_faces(uvs, faces)
-
-        # normal
-        face_normals_unit = face_normals(face_vertices_camera, unit=True)
-        face_normals_unit = face_normals_unit.unsqueeze(-2).repeat(1, 1, 3, 1)
-
-        # merge them together
-        face_attributes = [
-            torch.ones((*face_uvs.shape[:-1], 1), device=device, dtype=dtype),
-            face_uvs,
-            face_normals_unit
-        ]
-
-        (texmask, texcoord, imnormal), improb, imidx = dibr_rasterization(height,
-                                                                          width,
-                                                                          face_vertices_camera[:, :, :, 2],
-                                                                          face_vertices_image,
-                                                                          face_attributes,
-                                                                          face_camera_normals_z)
-
-        texcolor = texture_mapping(texcoord, texture_maps, mode='nearest')
-        coef = spherical_harmonic_lighting(imnormal, lights)
-        images = torch.clamp(texmask * texcolor * coef.unsqueeze(-1), 0, 1)
-
-        if dtype == torch.double:
-            num_pix_diff_tol = 74  # (over 2 x 256 x 512 x 3 pixels)
-        else:
-            num_pix_diff_tol = 0
-
-        images_gt = [torch.from_numpy(np.array(Image.open(
-                         os.path.join(SAMPLE_DIR, f'texture_light_{bs}.png'))))
-                     for bs in range(batch_size)]
-        images_gt = torch.stack(images_gt, dim=0).to(device, dtype) / 255.
-
-        num_pix_diff = torch.sum(~torch.isclose(images, images_gt, atol=1. / 255.))
-        assert num_pix_diff <= num_pix_diff_tol
-
-    ###################################
-    #### TEST VERTICE OPTIMIZATION ####
-    ###################################
-    # Test that the vertex positions can be optimized
-    # with rendered target image
-    def test_optimize_vertex_position(self, vertices, faces, vertex_colors, vertices_image,
-                                      camera_rot, camera_trans, camera_proj,
-                                      height, width, dtype, device):
-        batch_size = faces.shape[0]
-        # face_vertex_colors
-        camera_rot = camera_rot.to(device, dtype)
-        camera_rot.requires_grad = False
-        camera_trans = camera_trans.to(device, dtype)
-        camera_trans.requires_grad = False
-        camera_proj = camera_proj.to(device, dtype)
-        camera_proj.requires_grad = False
-        face_attributes = index_vertices_by_faces(vertex_colors.to(device, dtype), faces)
-        vertices = vertices.to(device, dtype).clone().detach()
-        vertices.requires_grad = False
-        moved_vertices = vertices.to(device, dtype).clone()
-        moved_vertices[:,0,:2] += 0.4
-        moved_vertices = moved_vertices.detach()
-        moved_vertices.requires_grad = True
-
-        images_gt = [torch.from_numpy(np.array(Image.open(
-                        os.path.join(SAMPLE_DIR, f'vertex_color_{bs}.png'))))
-                     for bs in range(batch_size)]
-        images_gt = torch.stack(images_gt, dim=0).to(device, dtype) / 255.
-
-        with torch.no_grad():
-            moved_vertices_camera = rotate_translate_points(moved_vertices, camera_rot, camera_trans)
-            moved_vertices_image = perspective_camera(moved_vertices_camera, camera_proj)
-
-        # test that the vertex are far enough to fail the test.
-        assert not torch.allclose(moved_vertices_image, vertices_image, atol=1e-2, rtol=1e-2)
-
-        with torch.no_grad():
-            face_moved_vertices_camera, face_moved_vertices_image, face_moved_normals = \
-                prepare_vertices(moved_vertices, faces, camera_proj, camera_rot, camera_trans)
-            face_moved_normals_z = face_moved_normals[:, :, 2]
-
-            imfeat, _, _ = dibr_rasterization(height,
-                                              width,
-                                              face_moved_vertices_camera[:, :, :, 2],
-                                              face_moved_vertices_image,
-                                              face_attributes,
-                                              face_moved_normals_z)
-            original_loss = torch.mean(torch.abs(imfeat - images_gt))
-
-        # test that the loss is high enough
-        assert original_loss > 0.01
-        optimizer = torch.optim.Adam([moved_vertices], lr=5e-3)
-
-        for i in range(100):
-            optimizer.zero_grad()
-            face_moved_vertices_camera, face_moved_vertices_image, face_moved_normals = \
-                prepare_vertices(moved_vertices, faces, camera_proj, camera_rot, camera_trans)
-            face_moved_normals_z = face_moved_normals[:, :, 2]
-            imfeat, _, _ = dibr_rasterization(height,
-                                              width,
-                                              face_moved_vertices_camera[:, :, :, 2],
-                                              face_moved_vertices_image,
-                                              face_attributes,
-                                              face_moved_normals_z)
-            loss = torch.mean(torch.abs(imfeat - images_gt))
-            loss.backward()
-            optimizer.step()
-
-        moved_vertices_camera = rotate_translate_points(moved_vertices, camera_rot, camera_trans)
-        moved_vertices_image = perspective_camera(moved_vertices_camera, camera_proj)
-
-        # test that the loss went down
-        assert loss < 0.001
-        # We only test on image plan since we don't change camera angle during training we don't expect depth to be correct.
-        # We could probably fine-tune the test to have a lower tolerance (TODO: cfujitsang)
-        assert torch.allclose(moved_vertices_image, vertices_image, atol=1e-2, rtol=1e-2)
-
-
-@pytest.mark.parametrize("device", ["cuda"])
-@pytest.mark.parametrize("height", [256])
-@pytest.mark.parametrize("width", [512])
-class TestDIBRGrad:
-    @pytest.fixture(autouse=True)
-    def vertices(self, device):
-        # shape: (batch_size, num_vertices, 3)
-        return torch.tensor(
-            [[[-1, -1, -1], [1, -1, 0], [1, 1, -1], [-1, 1, 0]],
-             [[-1, -1, 0], [1, -1, -1], [1, 1, 0], [-1, 1, -1]]],
-            dtype=torch.double,
-            device=device)
-
-    @pytest.fixture(autouse=True)
-    def faces(self, device):
-        # shape: (num_faces, 3)
-        return torch.tensor([[0, 1, 2], [0, 2, 3]],
-                            dtype=torch.long,
-                            device=device)
-
-    @pytest.fixture(autouse=True)
-    def vertex_colors(self, device):
-        # shape: (batch_size, num_vertices, 3)
-        return torch.tensor([[[0.9, 0.1, 0.1],
-                              [0.1, 0.9, 0.1],
-                              [0.1, 0.1, 0.9],
-                              [0.9, 0.9, 0.1]],
-                             [[0.1, 0.9, 0.1],
-                              [0.9, 0.1, 0.1],
-                              [0.9, 0.9, 0.1],
-                              [0.1, 0.1, 0.9]]],
-                            dtype=torch.double,
-                            device=device)
-
-    @pytest.fixture(autouse=True)
-    def camera_trans(self, device):
-        # shape: (batch_size, 3)
-        return torch.tensor([[0, 0, 4]],
-                            dtype=torch.double,
-                            device=device).repeat(2, 1)
-
-    @pytest.fixture(autouse=True)
-    def camera_rot(self, device):
-        # shape: (batch_size, 3, 3)
-        return torch.tensor([[[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
-                            dtype=torch.double,
-                            device=device).repeat(2, 1, 1)
-
-    @pytest.fixture(autouse=True)
-    def camera_proj(self, width, height, device):
-        # shape: (3, 1)
-        return torch.tensor([[2.5 / (width / height)], [2.5], [-1]],
-                            dtype=torch.double,
-                            device=device)
-
-    @pytest.fixture(autouse=True)
-    def camera_proj_zoom(self, width, height, device):
-        # very small field of view
-        return torch.tensor([[10. / (width / height)], [10.], [-1]],
-                            dtype=torch.double,
-                            device=device)
-
-    @pytest.fixture(autouse=True)
-    def vertices_camera(self, vertices, camera_rot, camera_trans):
-        return rotate_translate_points(vertices, camera_rot, camera_trans)
-
-    @pytest.fixture(autouse=True)
-    def vertices_image(self, vertices_camera, camera_proj):
-        return perspective_camera(vertices_camera, camera_proj)
-
-    @pytest.fixture(autouse=True)
-    def face_vertices_camera(self, vertices_camera, faces):
-        return index_vertices_by_faces(vertices_camera, faces)
+    def valid_faces(self, batch_size, face_vertices_z):
+        min_z = face_vertices_z.reshape(batch_size, -1).min(dim=1, keepdims=True)[0]
+        max_z = face_vertices_z.reshape(batch_size, -1).max(dim=1, keepdims=True)[0]
+        middle_z = (min_z + max_z) / 2.
+        return torch.all(face_vertices_z < middle_z.unsqueeze(-1), dim=-1)
 
     @pytest.fixture(autouse=True)
     def face_vertices_image(self, vertices_image, faces):
-        return index_vertices_by_faces(vertices_image, faces)
+        return kal.ops.mesh.index_vertices_by_faces(
+            vertices_image, faces)
 
     @pytest.fixture(autouse=True)
-    def face_camera_normals_z(self, face_vertices_camera):
-        face_normals_unit = face_normals(face_vertices_camera, unit=True)
-        return face_normals_unit[:, :, 2]
+    def texture_map(self, mesh, dtype):
+        return mesh.materials[0]['map_Kd'].to('cuda', dtype).permute(
+            2, 0, 1).unsqueeze(0) / 255.
 
     @pytest.fixture(autouse=True)
-    def face_vertex_colors(self, vertex_colors, faces):
-        face_vertex_colors = index_vertices_by_faces(vertex_colors, faces).detach()
-        face_vertex_colors.requires_grad = True
-        return face_vertex_colors
-    #########################################
-    #### TEST GRADIENTS ON FACE_FEATURES ####
-    #########################################
-    # This should always works regardless of the mesh
-    def test_face_vertex_colors_gradcheck(self, height, width, face_vertices_camera,
-                                          face_vertices_image, face_vertex_colors,
-                                          face_camera_normals_z):
-        torch.autograd.gradcheck(
-            dibr_rasterization,
-            inputs=(20, 30, face_vertices_camera[:, :, :, 2], face_vertices_image,
-                    face_vertex_colors, face_camera_normals_z),
-            raise_exception=True)
+    def face_uvs(self, mesh, batch_size, dtype, flip):
+        face_uvs_idx = mesh.face_uvs_idx.cuda()
+        if flip:
+            face_uvs_idx = torch.flip(face_uvs_idx, dims=(-1,))
+        return kal.ops.mesh.index_vertices_by_faces(
+            mesh.uvs.unsqueeze(0).to('cuda', dtype),
+            face_uvs_idx).repeat(batch_size, 1, 1, 1)
 
     @pytest.fixture(autouse=True)
-    def target_face_vertex_colors_grad(self, height, width, face_vertices_camera,
-                                       face_vertices_image, face_vertex_colors,
-                                       face_camera_normals_z):
-        _face_vertex_colors = face_vertex_colors.detach()
-        _face_vertex_colors.requires_grad = True
-        # This assume that test_vertex_colors_gradcheck pass
-        outputs = dibr_rasterization(20, 30, face_vertices_camera[:, :, :, 2],
-                                     face_vertices_image, _face_vertex_colors,
-                                     face_camera_normals_z)
-        # gradients will be provided through the two differentiable outputs
-        output = sum([torch.sum(output) for output in outputs])
-        output.backward()
-        return _face_vertex_colors.grad.clone()
-
-    @pytest.mark.parametrize("dtype", [torch.float, torch.double])
-    def test_face_vertex_colors_grads(self, height, width, face_vertices_camera,
-                                      face_vertices_image, face_vertex_colors,
-                                      face_camera_normals_z, dtype,
-                                      target_face_vertex_colors_grad):
-        _face_vertex_colors = face_vertex_colors.detach()
-        _face_vertex_colors.requires_grad = True
-        outputs = dibr_rasterization(20,
-                                     30,
-                                     face_vertices_camera.to(dtype)[:, :, :, 2],
-                                     face_vertices_image.to(dtype),
-                                     _face_vertex_colors.to(dtype),
-                                     face_camera_normals_z.to(dtype))
-        # gradients will be provided through the two differentiable outputs
-        output = sum([torch.sum(output) for output in outputs])
-        output.backward()
-        assert torch.allclose(_face_vertex_colors.grad, target_face_vertex_colors_grad)
-
-
-    ######################################################
-    #### TEST GRADIENTS ON FACE_FEATURES AND VERTICES ####
-    ######################################################
-    # We also test for gradients on vertices,
-    # it only works if the mesh is filling the rendered image,
-    # because the gradients generated on void is analytically wrong
-    @pytest.fixture(autouse=True)
-    def vertices_images_zoom(self, vertices_camera, camera_proj_zoom):
-        # the two faces are fully covering the camera
-        return perspective_camera(vertices_camera, camera_proj_zoom)
+    def pixel_coords(self, batch_size, height, width, dtype):
+        x = (2 * torch.arange(width, device='cuda', dtype=dtype) + 1 - width) / width
+        y = (height - 2 * torch.arange(height, device='cuda', dtype=dtype) - 1.) / height
+        return torch.stack([
+            x.reshape(1, 1, -1).repeat(batch_size, height, 1),
+            y.reshape(1, -1, 1).repeat(batch_size, 1, width)
+        ], dim=-1).reshape(batch_size, -1, 2)
 
     @pytest.fixture(autouse=True)
-    def face_vertices_image_zoom(self, vertices_images_zoom, faces):
-        face_vertices_image_zoom = index_vertices_by_faces(vertices_images_zoom, faces)
-        face_vertices_image_zoom.requires_grad = True
-        return face_vertices_image_zoom
+    def render_ranges(self, vertices_camera, height, width):
+        min_z = vertices_camera[:, :, -1].min(dim=1)[0]
+        max_z = vertices_camera[:, :, -1].max(dim=1)[0]
+        render_range = torch.stack([min_z - 1e-2, max_z + 1e-2], dim=-1)
 
-    def test_all_gradcheck(self, height, width, face_vertices_camera,
-                           face_vertices_image_zoom, face_vertex_colors,
-                           face_camera_normals_z):
-        _face_vertex_colors = face_vertex_colors.detach()
-        _face_vertex_colors.requires_grad = True
-        _face_vertices_image_zoom = face_vertices_image_zoom.detach()
-        _face_vertices_image_zoom.requires_grad = True
+        return render_range.unsqueeze(1).repeat(1, height * width, 1)
 
-        torch.autograd.gradcheck(
-            dibr_rasterization,
-            inputs=(20, 30, face_vertices_camera[:, :, :, 2],
-                    _face_vertices_image_zoom,
-                    _face_vertex_colors, face_camera_normals_z),
-            raise_exception=True)
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_cuda_forward(self, batch_size, height, width, pixel_coords,
+                          render_ranges, face_vertices_z, face_vertices_image,
+                          face_uvs, with_valid_faces, valid_faces):
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+        face_attr = face_uvs
 
-    @pytest.fixture(autouse=True)
-    def target_all_grads(self, height, width, face_vertices_camera,
-                         face_vertices_image_zoom, face_vertex_colors,
-                         face_camera_normals_z):
-        _face_vertex_colors = face_vertex_colors.detach()
-        _face_vertex_colors.requires_grad = True
-        _face_vertices_image_zoom = face_vertices_image_zoom.detach()
-        _face_vertices_image_zoom.requires_grad = True
-        # This assume that test_vertex_colors_gradcheck pass
-        outputs = dibr_rasterization(20, 30, face_vertices_camera[:, :, :, 2],
-                                     _face_vertices_image_zoom, _face_vertex_colors,
-                                     face_camera_normals_z)
-        # gradients will be provided through the two differentiable outputs
-        output = sum([torch.sum(output) for output in outputs])
-        output.backward()
-        return _face_vertices_image_zoom.grad.clone().detach(), _face_vertex_colors.grad.clone().detach()
+        interpolated_features, face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_attr, backend='cuda', **kwargs)
+        gt_interpolated_features, gt_face_idx = _naive_deftet_sparse_render(
+            pixel_coords, render_ranges, face_vertices_z,
+            face_vertices_image, face_attr, 1, **kwargs)
 
-    @pytest.mark.parametrize("dtype", [torch.float, torch.double])
-    def test_all_grads(self, height, width, face_vertices_camera,
-                       face_vertices_image_zoom, face_vertex_colors,
-                       face_camera_normals_z, dtype,
-                       target_all_grads):
-        _face_vertex_colors = face_vertex_colors.detach()
-        _face_vertex_colors.requires_grad = True
-        _face_vertices_image_zoom = face_vertices_image_zoom.detach()
-        _face_vertices_image_zoom.requires_grad = True
-        outputs = dibr_rasterization(20,
-                                     30,
-                                     face_vertices_camera.to(dtype)[:, :, :, 2],
-                                     _face_vertices_image_zoom.to(dtype),
-                                     _face_vertex_colors.to(dtype),
-                                     face_camera_normals_z.to(dtype))
-        # gradients will be provided through the two differentiable outputs
-        output = sum([torch.sum(output) for output in outputs])
-        output.backward()
-        if dtype == torch.float:
-            assert torch.allclose(target_all_grads[0], _face_vertices_image_zoom.grad,
-                                  rtol=1e-5, atol=1e-4)
-        else:
-            # TODO(cfujitsang): non-determinism?
-            assert torch.allclose(target_all_grads[0], _face_vertices_image_zoom.grad)
-        assert torch.allclose(target_all_grads[1], _face_vertex_colors.grad)
+        assert torch.equal(face_idx, gt_face_idx.reshape(batch_size, height, width))
+        assert torch.allclose(
+            interpolated_features,
+            gt_interpolated_features.reshape(batch_size, height, width, face_uvs.shape[-1]),
+            rtol=1e-5, atol=1e-5
+        )
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_cuda_forward_with_list(
+            self, batch_size, height, width, pixel_coords,
+            render_ranges, face_vertices_z, face_vertices_image,
+            face_uvs, with_valid_faces, valid_faces):
+        """Test with list of tensors as features"""
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+        face_attr = [face_uvs, torch.ones_like(face_uvs[..., 1:])]
+
+        (uvs_map, mask), face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_attr, backend='cuda', **kwargs)
+        (gt_uvs_map, gt_mask), gt_face_idx = _naive_deftet_sparse_render( 
+            pixel_coords, render_ranges, face_vertices_z,
+            face_vertices_image, face_attr, 1, **kwargs)
+
+        assert torch.equal(face_idx, gt_face_idx.reshape(batch_size, height, width))
+        assert torch.allclose(
+            uvs_map,
+            gt_uvs_map.reshape(batch_size, height, width, face_uvs.shape[-1]),
+            rtol=1e-5, atol=1e-5
+        )
+        assert torch.allclose(
+            mask,
+            gt_mask.reshape(batch_size, height, width, 1),
+            rtol=1e-5, atol=1e-5
+        )
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_cuda_backward(self, batch_size, height, width, pixel_coords,
+                           render_ranges, face_vertices_z, face_vertices_image,
+                           face_uvs, with_valid_faces, valid_faces):
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+        face_vertices_z = face_vertices_z.detach()
+        face_vertices_z.requires_grad = True
+        face_vertices_image = face_vertices_image.detach()
+        face_vertices_image.requires_grad = True
+        face_uvs = face_uvs.detach()
+        face_uvs.requires_grad = True
+        pixel_coords2 = pixel_coords.detach()
+        pixel_coords2.requires_grad = True
+        render_ranges2 = render_ranges.detach()
+        render_ranges2.requires_grad = True
+        face_vertices_z2 = face_vertices_z.detach()
+        face_vertices_z2.requires_grad = True
+        face_vertices_image2 = face_vertices_image.detach()
+        face_vertices_image2.requires_grad = True
+        face_uvs2 = face_uvs.detach()
+        face_uvs2.requires_grad = True
+
+        interpolated_features, face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_uvs, backend='cuda')
+        gt_interpolated_features, gt_face_idx = _naive_deftet_sparse_render(
+            pixel_coords2, render_ranges2, face_vertices_z2,
+            face_vertices_image2, face_uvs2, 1)
+        gt_interpolated_features = gt_interpolated_features.reshape(
+            batch_size, height, width, face_uvs.shape[-1])
+
+        grad_out = torch.rand_like(interpolated_features)
+        interpolated_features.backward(grad_out)
+        gt_interpolated_features.backward(grad_out)
+
+        assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
+        assert torch.allclose(face_vertices_image.grad,
+                              face_vertices_image2.grad,
+                              rtol=1e-3, atol=1e-2)
+        assert torch.allclose(face_uvs.grad,
+                              face_uvs2.grad,
+                              rtol=1e-3, atol=1e-3)
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_cuda_backward_with_list(
+            self, batch_size, height, width, pixel_coords,
+            render_ranges, face_vertices_z, face_vertices_image,
+            face_uvs, with_valid_faces, valid_faces):
+        """Test with list of tensors as features"""
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+        face_vertices_z = face_vertices_z.detach()
+        face_vertices_z.requires_grad = True
+        face_vertices_image = face_vertices_image.detach()
+        face_vertices_image.requires_grad = True
+        face_uvs = face_uvs.detach()
+        face_uvs.requires_grad = True
+        face_mask = torch.ones_like(face_uvs[..., :1], requires_grad=True)
+        pixel_coords2 = pixel_coords.detach()
+        pixel_coords2.requires_grad = True
+        render_ranges2 = render_ranges.detach()
+        render_ranges2.requires_grad = True
+        face_vertices_z2 = face_vertices_z.detach()
+        face_vertices_z2.requires_grad = True
+        face_vertices_image2 = face_vertices_image.detach()
+        face_vertices_image2.requires_grad = True
+        face_uvs2 = face_uvs.detach()
+        face_uvs2.requires_grad = True
+        face_mask2 = face_mask.detach()
+        face_mask2.requires_grad = True
+
+        interpolated_features, face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            [face_uvs, face_mask], backend='cuda', **kwargs)
+        interpolated_features = torch.cat(interpolated_features, dim=-1)
+
+        gt_interpolated_features, gt_face_idx = _naive_deftet_sparse_render(
+            pixel_coords2, render_ranges2, face_vertices_z2,
+            face_vertices_image2, [face_uvs2, face_mask2], 1, **kwargs)
+        gt_interpolated_features = torch.cat([
+            feat.reshape(batch_size, height, width, -1) for feat in gt_interpolated_features
+        ], dim=-1)
+
+        grad_out = torch.rand_like(gt_interpolated_features)
+        interpolated_features.backward(grad_out)
+        gt_interpolated_features.backward(grad_out)
+
+        assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
+        assert torch.allclose(face_vertices_image.grad,
+                              face_vertices_image2.grad,
+                              rtol=1e-3, atol=1e-2)
+        assert torch.allclose(face_uvs.grad,
+                              face_uvs2.grad,
+                              rtol=1e-3, atol=1e-3)
+        assert torch.allclose(face_mask.grad,
+                              face_mask2.grad,
+                              rtol=1e-3, atol=1e-3)
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_nvdiffrast_fwd_forward(
+            self, batch_size, height, width, pixel_coords,
+            render_ranges, face_vertices_z, face_vertices_image,
+            face_uvs, with_valid_faces, valid_faces):
+        if face_vertices_image.dtype == torch.double:
+            pytest.skip("nvdiffrast not compatible with double")
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+
+        interpolated_features, face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_uvs, backend='nvdiffrast_fwd', **kwargs)
+        gt_interpolated_features, gt_face_idx = _naive_deftet_sparse_render(
+            pixel_coords, render_ranges, face_vertices_z,
+            face_vertices_image, face_uvs, 1, **kwargs)
+        gt_interpolated_features = gt_interpolated_features.reshape(
+            batch_size, height, width, face_uvs.shape[-1])
+        gt_face_idx = gt_face_idx.reshape(batch_size, height, width)
+
+        face_idx_same = face_idx == gt_face_idx
+        # Numerical differences can lead to difference
+        # face being rasterized, we assume about 98% similarity
+        assert torch.sum(face_idx_same) / face_idx.numel() > 0.98
+        mask_intersection = (face_idx >= 0) & (gt_face_idx >= 0)
+
+        # Attribute can be quite different if the face getting rasterized is different
+        assert torch.allclose(
+            interpolated_features[face_idx_same],
+            gt_interpolated_features[face_idx_same],
+            rtol=1e-3, atol=1e-3
+        )
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_nvdiffrast_fwd_forward_with_list(
+            self, batch_size, height, width, pixel_coords,
+            render_ranges, face_vertices_z, face_vertices_image,
+            face_uvs, with_valid_faces, valid_faces, dtype):
+        """Test with list of tensors as features"""
+        if face_vertices_image.dtype == torch.double:
+            pytest.skip("nvdiffrast not compatible with double")
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+        face_attr = [face_uvs, face_vertices_z.unsqueeze(-1)]
+
+        (uvs_map, depth_map), face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_attr, backend='nvdiffrast_fwd', **kwargs)
+        (gt_uvs_map, gt_depth_map), gt_face_idx = _naive_deftet_sparse_render(
+            pixel_coords, render_ranges, face_vertices_z,
+            face_vertices_image, face_attr, 1, **kwargs)
+        gt_uvs_map = gt_uvs_map.reshape(batch_size, height, width, face_uvs.shape[-1])
+        gt_depth_map = gt_depth_map.reshape(batch_size, height, width, 1)
+        gt_face_idx = gt_face_idx.reshape(batch_size, height, width)
+
+        face_idx_same = face_idx == gt_face_idx
+        # Numerical differences can lead to difference
+        # face being rasterized, we assume about 98% similarity
+        assert torch.sum(face_idx_same) / face_idx.numel() > 0.98
+        mask_intersection = (face_idx >= 0) & (gt_face_idx >= 0)
+
+        # On a smooth enough surface the depth maps should match
+        # (exclusing border because of numerical difference)
+        assert torch.allclose(
+            depth_map[mask_intersection],
+            gt_depth_map[mask_intersection],
+            rtol=1e-3, atol=1e-3
+        )
+        # Attribute can be quite different if the face getting rasterized is different
+        assert torch.allclose(
+            uvs_map[face_idx_same],
+            gt_uvs_map[face_idx_same],
+            rtol=1e-3, atol=1e-3
+        )
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_nvdiffrast_fwd_backward(
+            self, batch_size, height, width, pixel_coords,
+            render_ranges, face_vertices_z, face_vertices_image,
+            face_uvs, with_valid_faces, valid_faces):
+        if face_vertices_image.dtype == torch.double:
+            pytest.skip("nvdiffrast not compatible with double")
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+        face_vertices_z = face_vertices_z.detach()
+        face_vertices_z.requires_grad = True
+        face_vertices_image = face_vertices_image.detach()
+        face_vertices_image.requires_grad = True
+        face_uvs = face_uvs.detach()
+        face_uvs.requires_grad = True
+        pixel_coords2 = pixel_coords.detach()
+        pixel_coords2.requires_grad = True
+        render_ranges2 = render_ranges.detach()
+        render_ranges2.requires_grad = True
+        face_vertices_z2 = face_vertices_z.detach()
+        face_vertices_z2.requires_grad = True
+        face_vertices_image2 = face_vertices_image.detach()
+        face_vertices_image2.requires_grad = True
+        face_uvs2 = face_uvs.detach()
+        face_uvs2.requires_grad = True
+
+        interpolated_features, face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_uvs, backend='nvdiffrast_fwd', **kwargs)
+        gt_interpolated_features, gt_face_idx = _naive_deftet_sparse_render(
+            pixel_coords2, render_ranges2, face_vertices_z2,
+            face_vertices_image2, face_uvs2, 1, **kwargs)
+        gt_interpolated_features = gt_interpolated_features.reshape(
+            batch_size, height, width, -1)
+        gt_face_idx = gt_face_idx.reshape(batch_size, height, width)
+
+        face_idx_diff = face_idx != gt_face_idx
+
+        grad_out = torch.rand_like(gt_interpolated_features)
+        grad_out[face_idx_diff] = 0.
+        interpolated_features.backward(grad_out)
+        gt_interpolated_features.backward(grad_out)
+
+        assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
+        assert torch.allclose(face_vertices_image.grad,
+                              face_vertices_image2.grad,
+                              rtol=5e-2, atol=5e-2)
+        assert torch.allclose(face_uvs.grad,
+                              face_uvs2.grad,
+                              rtol=1e-2, atol=5e-2)
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_nvdiffrast_fwd_backward_with_mask(
+            self, batch_size, height, width, pixel_coords,
+            render_ranges, face_vertices_z, face_vertices_image,
+            face_uvs, with_valid_faces, valid_faces):
+        if face_vertices_image.dtype == torch.double:
+            pytest.skip("nvdiffrast not compatible with double")
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+        face_vertices_z = face_vertices_z.detach()
+        face_vertices_z.requires_grad = True
+        face_vertices_image = face_vertices_image.detach()
+        face_vertices_image.requires_grad = True
+        face_uvs = face_uvs.detach()
+        face_uvs.requires_grad = True
+        face_mask = torch.ones_like(face_uvs[..., :1], requires_grad=True)
+        pixel_coords2 = pixel_coords.detach()
+        pixel_coords2.requires_grad = True
+        render_ranges2 = render_ranges.detach()
+        render_ranges2.requires_grad = True
+        face_vertices_z2 = face_vertices_z.detach()
+        face_vertices_z2.requires_grad = True
+        face_vertices_image2 = face_vertices_image.detach()
+        face_vertices_image2.requires_grad = True
+        face_uvs2 = face_uvs.detach()
+        face_uvs2.requires_grad = True
+        face_mask2 = face_mask.detach()
+        face_mask2.requires_grad = True
+
+        interpolated_features, face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            [face_uvs, face_mask], backend='nvdiffrast_fwd', **kwargs)
+        interpolated_features = torch.cat(interpolated_features, dim=-1)
+
+        gt_interpolated_features, gt_face_idx = _naive_deftet_sparse_render(
+            pixel_coords2, render_ranges2, face_vertices_z2,
+            face_vertices_image2, [face_uvs2, face_mask2], 1, **kwargs)
+        gt_interpolated_features = torch.cat([
+            feat.reshape(batch_size, height, width, -1) for feat in gt_interpolated_features
+        ], dim=-1)
+        gt_face_idx = gt_face_idx.reshape(batch_size, height, width)
+
+        face_idx_diff = face_idx != gt_face_idx
+
+        grad_out = torch.rand_like(gt_interpolated_features)
+        grad_out[face_idx_diff] = 0.
+        interpolated_features.backward(grad_out)
+        gt_interpolated_features.backward(grad_out)
+
+        assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
+        assert torch.allclose(face_vertices_image.grad,
+                              face_vertices_image2.grad,
+                              rtol=5e-2, atol=5e-2)
+        assert torch.allclose(face_uvs.grad,
+                              face_uvs2.grad,
+                              rtol=1e-2, atol=5e-2)
+        assert torch.allclose(face_mask.grad,
+                              face_mask2.grad,
+                              rtol=1e-2, atol=5e-2)
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_nvdiffrast_forward(
+            self, batch_size, height, width, face_vertices_z,
+            face_vertices_image, face_uvs, with_valid_faces, valid_faces):
+        if face_vertices_image.dtype == torch.double:
+            pytest.skip("nvdiffrast not compatible with double")
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+        face_attr = face_uvs
+
+        interpolated_features, face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_attr, backend='nvdiffrast', **kwargs)
+        # To simplify the test we use nvdiffrast_fwd for ground truth
+        # already tested above
+        gt_interpolated_features, gt_face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_attr, backend='nvdiffrast_fwd', **kwargs)
+        gt_interpolated_features = gt_interpolated_features.reshape(
+            batch_size, height, width, face_uvs.shape[-1])
+        gt_face_idx = gt_face_idx.reshape(batch_size, height, width)
+
+        assert torch.equal(face_idx, gt_face_idx)
+        assert torch.equal(interpolated_features, gt_interpolated_features)
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_nvdiffrast_forward_with_list(
+            self, batch_size, height, width, face_vertices_z,
+            face_vertices_image, face_uvs, with_valid_faces, valid_faces):
+        """Test with list of tensors as features"""
+        if face_vertices_image.dtype == torch.double:
+            pytest.skip("nvdiffrast not compatible with double")
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+        face_attr = [face_uvs, torch.ones_like(face_uvs[..., :1])]
+
+        (uvs_map, mask), face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_attr, backend='nvdiffrast', **kwargs)
+        # To simplify the test we use nvdiffrast_fwd for ground truth
+        # already tested above
+        (gt_uvs_map, gt_mask), gt_face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_attr, backend='nvdiffrast_fwd', **kwargs)
+        gt_uvs_map = gt_uvs_map.reshape(
+            batch_size, height, width, face_uvs.shape[-1])
+        gt_mask = gt_mask.reshape(batch_size, height, width, 1)
+        gt_face_idx = gt_face_idx.reshape(batch_size, height, width)
+
+        assert torch.equal(face_idx, gt_face_idx)
+        assert torch.equal(uvs_map, gt_uvs_map)
+        assert torch.equal(mask, gt_mask)
+
+    @pytest.mark.parametrize('with_valid_faces', [False, True])
+    def test_nvdiffrast_backward(
+            self, batch_size, height, width, face_vertices_z,
+            face_vertices_image, face_uvs, with_valid_faces, valid_faces):
+        if face_vertices_image.dtype == torch.double:
+            pytest.skip("nvdiffrast not compatible with double")
+        kwargs = {}
+        if with_valid_faces:
+            kwargs['valid_faces'] = valid_faces
+
+        face_vertices_z = face_vertices_z.detach()
+        face_vertices_z.requires_grad = True
+        face_vertices_image = face_vertices_image.detach()
+        face_vertices_image.requires_grad = True
+        face_uvs = face_uvs.detach()
+        face_uvs.requires_grad = True
+        face_vertices_z2 = face_vertices_z.detach()
+        face_vertices_z2.requires_grad = True
+        face_vertices_image2 = face_vertices_image.detach()
+        face_vertices_image2.requires_grad = True
+        face_uvs2 = face_uvs.detach()
+        face_uvs2.requires_grad = True
+
+        interpolated_features, face_idx = rasterize(
+            height, width, face_vertices_z, face_vertices_image,
+            face_uvs, backend='nvdiffrast', **kwargs)
+        gt_interpolated_features, gt_face_idx = rasterize(
+            height, width, face_vertices_z2, face_vertices_image2,
+            face_uvs2, backend='nvdiffrast_fwd', **kwargs)
+        gt_interpolated_features = gt_interpolated_features.reshape(
+            batch_size, height, width, -1)
+        gt_face_idx = gt_face_idx.reshape(batch_size, height, width)
+
+        grad_out = torch.rand_like(gt_interpolated_features)
+        interpolated_features.backward(grad_out)
+        gt_interpolated_features.backward(grad_out)
+
+        assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
+        assert torch.allclose(face_vertices_image.grad,
+                              face_vertices_image2.grad,
+                              rtol=5e-2, atol=5e-2)
+        assert torch.allclose(face_uvs.grad,
+                              face_uvs2.grad,
+                              rtol=1e-2, atol=1e-2)
+

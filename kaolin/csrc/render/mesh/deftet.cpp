@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,34 +22,37 @@ namespace kaolin {
 #ifdef WITH_CUDA
 
 void deftet_sparse_render_forward_cuda_impl(
-    at::Tensor face_vertices_z,
-    at::Tensor face_vertices_image,
-    at::Tensor face_bboxes,
-    at::Tensor pixel_coords,
-    at::Tensor pixel_depth_ranges,
+    const at::Tensor face_vertices_z,
+    const at::Tensor face_vertices_image,
+    const at::Tensor face_bboxes,
+    const at::Tensor pixel_coords,
+    const at::Tensor pixel_depth_ranges,
     at::Tensor selected_face_idx,
     at::Tensor pixel_depths,
     at::Tensor w0_arr,
-    at::Tensor w1_arr);
+    at::Tensor w1_arr,
+    const float eps);
 
 void deftet_sparse_render_backward_cuda_impl(
-    at::Tensor grad_interpolated_features,
-    at::Tensor face_idx,
-    at::Tensor weights,
-    at::Tensor face_vertices_image,
-    at::Tensor face_features,
+    const at::Tensor grad_interpolated_features,
+    const at::Tensor face_idx,
+    const at::Tensor weights,
+    const at::Tensor face_vertices_image,
+    const at::Tensor face_features,
     at::Tensor grad_face_vertices_image,
-    at::Tensor grad_face_features);
+    at::Tensor grad_face_features,
+    const float eps);
 
 #endif // WITH_CUDA
 
 std::vector<at::Tensor> deftet_sparse_render_forward_cuda(
-    at::Tensor face_vertices_z,
-    at::Tensor face_vertices_image,
-    at::Tensor face_bboxes,
-    at::Tensor pixel_coords,
-    at::Tensor pixel_depth_ranges,
-    int knum) {
+    const at::Tensor face_vertices_z,
+    const at::Tensor face_vertices_image,
+    const at::Tensor face_bboxes,
+    const at::Tensor pixel_coords,
+    const at::Tensor pixel_depth_ranges,
+    const int knum,
+    const float eps) {
 
   at::TensorArg face_vertices_z_arg{face_vertices_z, "face_vertices_z", 1};
   at::TensorArg face_vertices_image_arg{
@@ -94,7 +97,7 @@ std::vector<at::Tensor> deftet_sparse_render_forward_cuda(
   deftet_sparse_render_forward_cuda_impl(
       face_vertices_z, face_vertices_image, face_bboxes,
       pixel_coords, pixel_depth_ranges, selected_face_idx,
-      pixel_depths, w0_arr, w1_arr);
+      pixel_depths, w0_arr, w1_arr, eps);
 #else
   AT_ERROR("In deftet_sparse_render_forward_cuda: Kaolin built without CUDA,"
 	   " cannot run with GPU tensors");
@@ -104,11 +107,12 @@ std::vector<at::Tensor> deftet_sparse_render_forward_cuda(
 }
 
 std::vector<at::Tensor> deftet_sparse_render_backward_cuda(
-    at::Tensor grad_interpolated_features,
-    at::Tensor face_idx,
-    at::Tensor weights,
-    at::Tensor face_vertices_image,
-    at::Tensor face_features) {
+    const at::Tensor grad_interpolated_features,
+    const at::Tensor face_idx,
+    const at::Tensor weights,
+    const at::Tensor face_vertices_image,
+    const at::Tensor face_features,
+    const float eps) {
 
   at::TensorArg grad_interpolated_features_arg{
     grad_interpolated_features, "grad_interpolated_features", 1};
@@ -146,7 +150,7 @@ std::vector<at::Tensor> deftet_sparse_render_backward_cuda(
 #if WITH_CUDA
   deftet_sparse_render_backward_cuda_impl(
       grad_interpolated_features, face_idx, weights, face_vertices_image,
-      face_features, grad_face_vertices_image, grad_face_features);
+      face_features, grad_face_vertices_image, grad_face_features, eps);
 #else
   AT_ERROR("In deftet_sparse_render_backward_cuda: Kaolin built without CUDA,"
 	   " cannot run with GPU tensors");

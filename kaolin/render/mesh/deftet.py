@@ -22,44 +22,69 @@ __all__ = [
     "deftet_sparse_render"
 ]
 
-NAIVE_EPS = 1e-10
-
 def _base_naive_deftet_render(
-        pixel_coords,           # (2,)
-        render_range,           # (2,)
-        face_vertices_z,        # (num_faces, 3)
-        face_vertices_min,      # (num_faces, 2)
-        face_vertices_max,      # (num_faces, 2)
-        ax, ay, m, p, n, q, k3):                  # int
+        pixel_coords,         # (2,)
+        render_range,         # (2,)
+        face_vertices_image,  # (num_faces, 3, 2)
+        face_vertices_z,      # (num_faces, 3)
+        face_vertices_min,    # (num_faces, 2)
+        face_vertices_max,    # (num_faces, 2)
+        valid_faces,          # (num_faces)
+        eps):                 # int
     """Base function for :func:`_naive_deftet_sparse_render`
        non-batched and for a single pixel
 
        This is because most operations are vectorized on faces
        but then only few outputs of those vectorized operations
-       are used (so it's the memory is only used temporarily).
+       are used (so the memory is only used temporarily).
     """
     in_bbox_mask = torch.logical_and(
-        pixel_coords.unsqueeze(0) > face_vertices_min,
+        pixel_coords.unsqueeze(0) >= face_vertices_min,
         pixel_coords.unsqueeze(0) < face_vertices_max)
     in_bbox_mask = torch.logical_and(in_bbox_mask[:, 0],
                                      in_bbox_mask[:, 1])
+    in_bbox_mask = torch.logical_and(in_bbox_mask,
+                                     valid_faces)
     in_bbox_idx = torch.where(in_bbox_mask)[0]
-    ax = ax[in_bbox_idx]
-    ay = ay[in_bbox_idx]
-    m = m[in_bbox_idx]
-    p = p[in_bbox_idx]
-    n = n[in_bbox_idx]
-    q = q[in_bbox_idx]
-    k3 = k3[in_bbox_idx]
-    s = pixel_coords[0] - ax
-    t = pixel_coords[1] - ay
-    k1 = s * q - n * t
-    k2 = m * t - s * p
+    #ax = ax[in_bbox_idx]
+    #ay = ay[in_bbox_idx]
+    #m = m[in_bbox_idx]
+    #p = p[in_bbox_idx]
+    #n = n[in_bbox_idx]
+    #q = q[in_bbox_idx]
+    #k3 = k3[in_bbox_idx]
+    #s = pixel_coords[0] - ax
+    #t = pixel_coords[1] - ay
+    #k1 = s * q - n * t
+    #k2 = m * t - s * p
 
-    w1 = k1 / (k3 + NAIVE_EPS)
-    w2 = k2 / (k3 + NAIVE_EPS)
-    w0 = 1. - w1 - w2
-    selected_mask = (w0 >= -NAIVE_EPS) & (w1 >= -NAIVE_EPS) & (w2 >= -NAIVE_EPS)
+    #w1 = k1 / (k3 + NORM_EPS)
+    #w2 = k2 / (k3 + NORM_EPS)
+    #w0 = 1. - w1 - w2
+    face_vertices_image = face_vertices_image[in_bbox_idx]
+    ax = face_vertices_image[:, 0, 0]
+    ay = face_vertices_image[:, 0, 1]
+    bx = face_vertices_image[:, 1, 0]
+    by = face_vertices_image[:, 1, 1]
+    cx = face_vertices_image[:, 2, 0]
+    cy = face_vertices_image[:, 2, 1]
+
+    a_edge_x = ax - pixel_coords[0];
+    a_edge_y = ay - pixel_coords[1];
+    b_edge_x = bx - pixel_coords[0];
+    b_edge_y = by - pixel_coords[1];
+    c_edge_x = cx - pixel_coords[0];
+    c_edge_y = cy - pixel_coords[1];
+    _w0 = b_edge_x * c_edge_y - b_edge_y * c_edge_x;
+    _w1 = c_edge_x * a_edge_y - c_edge_y * a_edge_x;
+    _w2 = a_edge_x * b_edge_y - a_edge_y * b_edge_x;
+    norm = _w0 + _w1 + _w2;
+    norm_eps = eps * torch.sign(norm);
+    w0 = _w0 / (norm + norm_eps);
+    w1 = _w1 / (norm + norm_eps);
+    w2 = _w2 / (norm + norm_eps);
+
+    selected_mask = (w0 >= 0.) & (w1 >= 0.) & (w2 >= 0.)
     selected_face_vertices_z = face_vertices_z[in_bbox_idx][selected_mask]
     selected_weights = torch.stack([
         w0[selected_mask], w1[selected_mask], w2[selected_mask]], dim=-1)
@@ -78,7 +103,9 @@ def _naive_deftet_sparse_render(pixel_coords,
                                 face_vertices_z,
                                 face_vertices_image,
                                 face_features,
-                                knum):
+                                knum,
+                                valid_faces=None,
+                                eps=1e-8):
     r"""Naive implementation of :func:`deftet_sparse_render`.
 
     Note:
@@ -121,6 +148,13 @@ def _naive_deftet_sparse_render(pixel_coords,
             of shapes :math:`(\text{batch_size}, \text{num_faces}, 3, \text{feature_dim[i]})`
         knum (int):
             Maximum number of faces that influence one pixel. Default: 300.
+        valid_faces (torch.BoolTensor):
+            Mask of faces being rendered,
+            of shape :math:`(\text{batch_size}, \text{num_faces})`.
+            Default: All faces are valid.
+        eps (float):
+            Epsilon value used to normalize barycentric weights.
+            Default: 1e-8.
 
     Returns:
         (torch.Tensor or list of torch.Tensor, torch.LongTensor):
@@ -141,6 +175,12 @@ def _naive_deftet_sparse_render(pixel_coords,
     num_pixels = pixel_coords.shape[1]
     num_faces = face_vertices_z.shape[1]
     feat_dim = _face_features.shape[-1]
+
+    if valid_faces is None:
+        valid_faces = torch.ones((batch_size, num_faces),
+                                 device=pixel_coords.device,
+                                 dtype=torch.bool)
+
     assert pixel_coords.shape == (batch_size, num_pixels, 2)
     assert render_ranges.shape == (batch_size, num_pixels, 2)
     assert face_vertices_z.shape == (batch_size, num_faces, 3)
@@ -148,6 +188,15 @@ def _naive_deftet_sparse_render(pixel_coords,
     assert _face_features.shape == (batch_size, num_faces, 3, feat_dim)
     face_min = torch.min(face_vertices_image, dim=2)[0]
     face_max = torch.max(face_vertices_image, dim=2)[0]
+    selected_face_idx = torch.full((batch_size, num_pixels, knum), -1,
+                                   device=pixel_coords.device, dtype=torch.long)
+    for i in range(batch_size):
+        for j in range(num_pixels):
+            _face_idx = _base_naive_deftet_render(
+                pixel_coords[i, j], render_ranges[i, j], face_vertices_image[i],
+                face_vertices_z[i], face_min[i], face_max[i], valid_faces[i], eps)
+            selected_face_idx[i, j, :_face_idx.shape[0]] = _face_idx[:knum]
+    _idx = selected_face_idx + 1
     ax = face_vertices_image[:, :, 0, 0]
     ay = face_vertices_image[:, :, 0, 1]
     m = face_vertices_image[:, :, 1, 0] - face_vertices_image[:, :, 0, 0]
@@ -155,16 +204,6 @@ def _naive_deftet_sparse_render(pixel_coords,
     n = face_vertices_image[:, :, 2, 0] - face_vertices_image[:, :, 0, 0]
     q = face_vertices_image[:, :, 2, 1] - face_vertices_image[:, :, 0, 1]
     k3 = m * q - n * p
-    selected_face_idx = torch.full((batch_size, num_pixels, knum), -1,
-                                   device=pixel_coords.device, dtype=torch.long)
-    for i in range(batch_size):
-        for j in range(num_pixels):
-            _face_idx = _base_naive_deftet_render(
-                pixel_coords[i, j], render_ranges[i, j],
-                face_vertices_z[i], face_min[i], face_max[i],
-                ax[i], ay[i], m[i], p[i], n[i], q[i], k3[i])
-            selected_face_idx[i, j, :_face_idx.shape[0]] = _face_idx[:knum]
-    _idx = selected_face_idx + 1
     ax = torch.nn.functional.pad(ax, (1, 0), value=0.)
     ay = torch.nn.functional.pad(ay, (1, 0), value=0.)
     m = torch.nn.functional.pad(m, (1, 0), value=0.)
@@ -209,8 +248,9 @@ def _naive_deftet_sparse_render(pixel_coords,
     _k1 = _s * _q - _n * _t
     _k2 = _m * _t - _s * _p
 
-    w1 = _k1 / (_k3 + NAIVE_EPS)
-    w2 = _k2 / (_k3 + NAIVE_EPS)
+    norm_eps = eps * torch.sign(_k3);
+    w1 = _k1 / (_k3 + norm_eps)
+    w2 = _k2 / (_k3 + norm_eps)
     w0 = 1. - w1 - w2
     weights = torch.stack([w0, w1, w2], dim=-1)
     interpolated_features = torch.sum(_face_features * weights.unsqueeze(-1), dim=-2)
@@ -231,7 +271,7 @@ class DeftetSparseRenderer(Function):
 
     @staticmethod
     def forward(ctx, pixel_coords, render_ranges, face_vertices_z,
-                face_vertices_image, face_features, knum):
+                face_vertices_image, face_features, knum, eps):
         # dims
         batch_size = face_vertices_z.shape[0]
         num_faces = face_vertices_z.shape[1]
@@ -255,7 +295,8 @@ class DeftetSparseRenderer(Function):
             face_bboxes,
             pixel_coords,
             render_ranges,
-            knum)
+            knum,
+            eps)
 
         sorted_idx = torch.argsort(pixel_depth, descending=True, dim=-1)
         sorted_face_idx = torch.gather(face_idx, -1, sorted_idx).contiguous()
@@ -275,11 +316,13 @@ class DeftetSparseRenderer(Function):
 
         ctx.save_for_backward(sorted_face_idx, weights, face_vertices_image, face_features)
         ctx.mark_non_differentiable(sorted_face_idx)
+        ctx.eps = eps
         return interpolated_features, sorted_face_idx
 
     @staticmethod
     def backward(ctx, grad_interpolated_features, grad_face_idx):
         face_idx, weights, face_vertices_image, face_features = ctx.saved_tensors
+        eps = ctx.eps
 
         grad_face_vertices_image = torch.zeros_like(face_vertices_image)
         grad_face_features = torch.zeros_like(face_features)
@@ -287,13 +330,13 @@ class DeftetSparseRenderer(Function):
         grad_face_vertices_image, grad_face_features = \
             _C.render.mesh.deftet_sparse_render_backward_cuda(
                 grad_interpolated_features.contiguous(), face_idx, weights,
-                face_vertices_image, face_features)
+                face_vertices_image, face_features, eps)
 
-        return None, None, None, grad_face_vertices_image, grad_face_features, None
+        return None, None, None, grad_face_vertices_image, grad_face_features, None, None
 
 
 def deftet_sparse_render(pixel_coords, render_ranges, face_vertices_z,
-                         face_vertices_image, face_features, knum=300):
+                         face_vertices_image, face_features, knum=300, eps=1e-8):
     r"""Fully differentiable volumetric renderer devised by *Gao et al.* in
     `Learning Deformable Tetrahedral Meshes for 3D Reconstruction`_ NeurIPS 2020.
 
@@ -339,6 +382,9 @@ def deftet_sparse_render(pixel_coords, render_ranges, face_vertices_z,
             of shapes :math:`(\text{batch_size}, \text{num_faces}, 3, \text{feature_dim[i]})`.
         knum (int):
             Maximum number of faces that influence one pixel. Default: 300.
+        eps (float):
+            Epsilon value used to normalize barycentric weights.
+            Default: 1e-8.
 
     Returns:
         (torch.Tensor or list of torch.Tensor, torch.LongTensor):
@@ -360,7 +406,7 @@ def deftet_sparse_render(pixel_coords, render_ranges, face_vertices_z,
 
     image_features, face_idx = DeftetSparseRenderer.apply(
         pixel_coords, render_ranges, face_vertices_z,
-        face_vertices_image, _face_features, knum)
+        face_vertices_image, _face_features, knum, eps)
     if isinstance(face_features, (list, tuple)):
         _image_features = []
         cur_idx = 0

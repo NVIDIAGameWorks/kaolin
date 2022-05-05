@@ -21,8 +21,9 @@
 #include "./ops/conversions/unbatched_mcube/unbatched_mcube.h"
 #include "./metrics/sided_distance.h"
 #include "./metrics/unbatched_triangle_distance.h"
-#include "./render/dibr.h"
 #include "./render/mesh/deftet.h"
+#include "./render/mesh/rasterization.h"
+#include "./render/mesh/dibr_soft_mask.h"
 #include "./ops/conversions/mesh_to_spc/mesh_to_spc.h"
 #include "./ops/spc/spc.h"
 #include "./ops/spc/feature_grids.h"
@@ -72,8 +73,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   py::module render = m.def_submodule("render");
   py::module render_mesh = render.def_submodule("mesh");
   render_mesh.def("packed_rasterize_forward_cuda", &packed_rasterize_forward_cuda);
-  render_mesh.def("generate_soft_mask_cuda", &generate_soft_mask_cuda);
   render_mesh.def("rasterize_backward_cuda", &rasterize_backward_cuda);
+  render_mesh.def("dibr_soft_mask_forward_cuda", &dibr_soft_mask_forward_cuda);
+  render_mesh.def("dibr_soft_mask_backward_cuda", &dibr_soft_mask_backward_cuda);
   render_mesh.def("deftet_sparse_render_forward_cuda", &deftet_sparse_render_forward_cuda);
   render_mesh.def("deftet_sparse_render_backward_cuda", &deftet_sparse_render_backward_cuda);
   py::module render_spc = render.def_submodule("spc");

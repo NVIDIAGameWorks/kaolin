@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,10 +15,9 @@
 
 #include <ATen/ATen.h>
 #include <THC/THCAtomics.cuh>
+#include <c10/cuda/CUDAGuard.h>
 
 #include "../../utils.h"
-
-#define eps 1e-10
 
 #define BLOCK_SIZE_X 32
 #define BLOCK_SIZE_Y 32
@@ -42,7 +41,11 @@ __global__ void deftet_sparse_render_forward_cuda_kernel(
     scalar_t *__restrict__ w0_arr,
     scalar_t *__restrict__ w1_arr,
 
-    int batch_size, int num_faces, int num_pixels, int knum) {
+    const int batch_size,
+    const int num_faces,
+    const int num_pixels,
+    const int knum,
+    const float eps) {
   scalar_t x0, y0, min_depth, max_depth;
   // prefix mask is a mask representing the threadIdx.x
   // example: for threadIdx.x == 2 then the binary mask is
@@ -126,25 +129,23 @@ __global__ void deftet_sparse_render_forward_cuda_kernel(
               const scalar_t cy = face_vertices_image[shift6 + 5];
 
               // Compute barycenter weights for the intersection
-              // TODO(cfujitsang): can we use tensorcore for some of this?
-              scalar_t m = bx - ax;
-              scalar_t p = by - ay;
-
-              scalar_t n = cx - ax;
-              scalar_t q = cy - ay;
-
-              scalar_t s = x0 - ax;
-              scalar_t t = y0 - ay;
-
-              scalar_t k1 = s * q - n * t;
-              scalar_t k2 = m * t - s * p;
-              scalar_t k3 = m * q - n * p;
-
-              w1 = k1 / (k3 + eps);
-              w2 = k2 / (k3 + eps);
-              w0 = 1.0 - w1 - w2;
+	      scalar_t a_edge_x = ax - x0;
+	      scalar_t a_edge_y = ay - y0;
+	      scalar_t b_edge_x = bx - x0;
+	      scalar_t b_edge_y = by - y0;
+	      scalar_t c_edge_x = cx - x0;
+	      scalar_t c_edge_y = cy - y0;
+	      scalar_t _w0 = b_edge_x * c_edge_y - b_edge_y * c_edge_x;
+	      scalar_t _w1 = c_edge_x * a_edge_y - c_edge_y * a_edge_x;
+	      scalar_t _w2 = a_edge_x * b_edge_y - a_edge_y * b_edge_x;
+	      scalar_t norm = _w0 + _w1 + _w2;
+	      scalar_t norm_eps = copysignf(eps, norm);
+	      w0 = _w0 / (norm + norm_eps);
+	      w1 = _w1 / (norm + norm_eps);
+	      w2 = _w2 / (norm + norm_eps);
               // Is the pixel covered by the face?
-              if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
+	      // Using a boundary epsilon is necessary in case the pixel is on an edge
+              if (w0 >= 0. && w1 >= 0. && w2 >= 0.) {
                 // Here we are computing intersection depth
                 // we can use either distance from camera or
                 // distance from image plan as it won't affect ordering
@@ -190,15 +191,16 @@ __global__ void deftet_sparse_render_forward_cuda_kernel(
 }
 
 void deftet_sparse_render_forward_cuda_impl(
-    at::Tensor face_vertices_z,
-    at::Tensor face_vertices_image,
-    at::Tensor face_bboxes,
-    at::Tensor pixel_coords,
-    at::Tensor pixel_depth_ranges,
+    const at::Tensor face_vertices_z,
+    const at::Tensor face_vertices_image,
+    const at::Tensor face_bboxes,
+    const at::Tensor pixel_coords,
+    const at::Tensor pixel_depth_ranges,
     at::Tensor selected_face_idx,
     at::Tensor pixel_depths,
     at::Tensor w0_arr,
-    at::Tensor w1_arr) {
+    at::Tensor w1_arr,
+    const float eps) {
   int batch_size = face_vertices_z.size(0);
   int num_faces = face_vertices_z.size(1);
 
@@ -212,20 +214,21 @@ void deftet_sparse_render_forward_cuda_impl(
 
   AT_DISPATCH_FLOATING_TYPES(face_vertices_z.scalar_type(),
     "deftet_sparse_render_forward_cuda", ([&] {
-      deftet_sparse_render_forward_cuda_kernel<scalar_t><<<blocks, threads>>>(
-      face_vertices_z.data_ptr<scalar_t>(),
-      face_vertices_image.data_ptr<scalar_t>(),
-      face_bboxes.data_ptr<scalar_t>(),
+      const at::cuda::OptionalCUDAGuard device_guard(at::device_of(face_vertices_z));
+      auto stream = at::cuda::getCurrentCUDAStream();
 
-      pixel_coords.data_ptr<scalar_t>(),
-      pixel_depth_ranges.data_ptr<scalar_t>(),
-
-      selected_face_idx.data_ptr<int64_t>(),
-      pixel_depths.data_ptr<scalar_t>(),
-      w0_arr.data_ptr<scalar_t>(),
-      w1_arr.data_ptr<scalar_t>(),
-
-      batch_size, num_faces, num_pixels, knum);
+      deftet_sparse_render_forward_cuda_kernel<scalar_t><<<blocks, threads, 0, stream>>>(
+        face_vertices_z.data_ptr<scalar_t>(),
+        face_vertices_image.data_ptr<scalar_t>(),
+        face_bboxes.data_ptr<scalar_t>(),
+        pixel_coords.data_ptr<scalar_t>(),
+        pixel_depth_ranges.data_ptr<scalar_t>(),
+        selected_face_idx.data_ptr<int64_t>(),
+        pixel_depths.data_ptr<scalar_t>(),
+        w0_arr.data_ptr<scalar_t>(),
+        w1_arr.data_ptr<scalar_t>(),
+        batch_size, num_faces, num_pixels, knum,
+	eps);
       CUDA_CHECK(cudaGetLastError());
   }));
   return;
@@ -233,17 +236,22 @@ void deftet_sparse_render_forward_cuda_impl(
 
 template <typename scalar_t>
 __global__ void deftet_sparse_render_backward_cuda_kernel(
-  const scalar_t *__restrict__ grad_interpolated_features,
-  const int64_t *__restrict__ face_ids,
-  const scalar_t *__restrict__ weights,
+    const scalar_t *__restrict__ grad_interpolated_features,
+    const int64_t *__restrict__ face_ids,
+    const scalar_t *__restrict__ weights,
 
-  const scalar_t *__restrict__ face_vertices_image,
-  const scalar_t *__restrict__ face_features,
+    const scalar_t *__restrict__ face_vertices_image,
+    const scalar_t *__restrict__ face_features,
 
-  scalar_t *__restrict__ grad_face_vertices_image,
-  scalar_t *__restrict__ grad_face_features,
+    scalar_t *__restrict__ grad_face_vertices_image,
+    scalar_t *__restrict__ grad_face_features,
 
-  int batch_size, int num_faces, int num_pixels, int knum, int feat_dim) {
+    const int batch_size,
+    const int num_faces,
+    const int num_pixels,
+    const int knum,
+    const int feat_dim,
+    const float eps) {
 
   // Each iteration is treating a single feature of a single pixel
   for (int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -284,104 +292,105 @@ __global__ void deftet_sparse_render_backward_cuda_kernel(
       // here, we calculate dl/dp
       // dl/dp = dldI * dI/dp
       // dI/dp = c0 * dw0 / dp + c1 * dw1 / dp + c2 * dw2 / dp
-      scalar_t ax = face_vertices_image[start_image_idx + 0];
-      scalar_t ay = face_vertices_image[start_image_idx + 1];
-      scalar_t bx = face_vertices_image[start_image_idx + 2];
-      scalar_t by = face_vertices_image[start_image_idx + 3];
-      scalar_t cx = face_vertices_image[start_image_idx + 4];
-      scalar_t cy = face_vertices_image[start_image_idx + 5];
+      const scalar_t ax = face_vertices_image[start_image_idx + 0];
+      const scalar_t ay = face_vertices_image[start_image_idx + 1];
+      const scalar_t bx = face_vertices_image[start_image_idx + 2];
+      const scalar_t by = face_vertices_image[start_image_idx + 3];
+      const scalar_t cx = face_vertices_image[start_image_idx + 4];
+      const scalar_t cy = face_vertices_image[start_image_idx + 5];
 
-      scalar_t aw = weights[start_weight_idx + 0];
-      scalar_t bw = weights[start_weight_idx + 1];
-      scalar_t cw = weights[start_weight_idx + 2];
+      const scalar_t aw = weights[start_weight_idx + 0];
+      const scalar_t bw = weights[start_weight_idx + 1];
+      const scalar_t cw = weights[start_weight_idx + 2];
 
-      scalar_t x0 = aw * ax + bw * bx + cw * cx;
-      scalar_t y0 = aw * ay + bw * by + cw * cy;
+      const scalar_t x0 = aw * ax + bw * bx + cw * cx;
+      const scalar_t y0 = aw * ay + bw * by + cw * cy;
 
-      scalar_t m = bx - ax;
-      scalar_t p = by - ay;
+      const scalar_t m = bx - ax;
+      const scalar_t p = by - ay;
 
-      scalar_t n = cx - ax;
-      scalar_t q = cy - ay;
+      const scalar_t n = cx - ax;
+      const scalar_t q = cy - ay;
 
-      scalar_t s = x0 - ax;
-      scalar_t t = y0 - ay;
+      const scalar_t s = x0 - ax;
+      const scalar_t t = y0 - ay;
 
       // m * w1 + n * w2 = s
       // p * w1 + q * w2 = t
       // w1 = (sq - nt) / (mq - np)
       // w2 = (mt - sp) / (mq - np)
 
-      scalar_t k1 = s * q - n * t;
-      scalar_t k2 = m * t - s * p;
-      scalar_t k3 = m * q - n * p + eps;
+      const scalar_t k1 = s * q - n * t;
+      const scalar_t k2 = m * t - s * p;
+      scalar_t k3 = m * q - n * p;
+      k3 += copysign(eps, k3);
 
-      scalar_t dk1dm = 0;
-      scalar_t dk1dn = -t;
-      scalar_t dk1dp = 0;
-      scalar_t dk1dq = s;
-      scalar_t dk1ds = q;
-      scalar_t dk1dt = -n;
+      const scalar_t dk1dm = 0;
+      const scalar_t dk1dn = -t;
+      const scalar_t dk1dp = 0;
+      const scalar_t dk1dq = s;
+      const scalar_t dk1ds = q;
+      const scalar_t dk1dt = -n;
 
-      scalar_t dk2dm = t;
-      scalar_t dk2dn = 0;
-      scalar_t dk2dp = -s;
-      scalar_t dk2dq = 0;
-      scalar_t dk2ds = -p;
-      scalar_t dk2dt = m;
+      const scalar_t dk2dm = t;
+      const scalar_t dk2dn = 0;
+      const scalar_t dk2dp = -s;
+      const scalar_t dk2dq = 0;
+      const scalar_t dk2ds = -p;
+      const scalar_t dk2dt = m;
 
-      scalar_t dk3dm = q;
-      scalar_t dk3dn = -p;
-      scalar_t dk3dp = -n;
-      scalar_t dk3dq = m;
-      scalar_t dk3ds = 0;
-      scalar_t dk3dt = 0;
+      const scalar_t dk3dm = q;
+      const scalar_t dk3dn = -p;
+      const scalar_t dk3dp = -n;
+      const scalar_t dk3dq = m;
+      const scalar_t dk3ds = 0;
+      const scalar_t dk3dt = 0;
 
       // w1 = k1 / k3
       // w2 = k2 / k3
       // we need divide k3 ^ 2
-      scalar_t dw1dm = dk1dm * k3 - dk3dm * k1;
-      scalar_t dw1dn = dk1dn * k3 - dk3dn * k1;
-      scalar_t dw1dp = dk1dp * k3 - dk3dp * k1;
-      scalar_t dw1dq = dk1dq * k3 - dk3dq * k1;
-      scalar_t dw1ds = dk1ds * k3 - dk3ds * k1;
-      scalar_t dw1dt = dk1dt * k3 - dk3dt * k1;
+      const scalar_t dw1dm = dk1dm * k3 - dk3dm * k1;
+      const scalar_t dw1dn = dk1dn * k3 - dk3dn * k1;
+      const scalar_t dw1dp = dk1dp * k3 - dk3dp * k1;
+      const scalar_t dw1dq = dk1dq * k3 - dk3dq * k1;
+      const scalar_t dw1ds = dk1ds * k3 - dk3ds * k1;
+      const scalar_t dw1dt = dk1dt * k3 - dk3dt * k1;
 
-      scalar_t dw2dm = dk2dm * k3 - dk3dm * k2;
-      scalar_t dw2dn = dk2dn * k3 - dk3dn * k2;
-      scalar_t dw2dp = dk2dp * k3 - dk3dp * k2;
-      scalar_t dw2dq = dk2dq * k3 - dk3dq * k2;
-      scalar_t dw2ds = dk2ds * k3 - dk3ds * k2;
-      scalar_t dw2dt = dk2dt * k3 - dk3dt * k2;
+      const scalar_t dw2dm = dk2dm * k3 - dk3dm * k2;
+      const scalar_t dw2dn = dk2dn * k3 - dk3dn * k2;
+      const scalar_t dw2dp = dk2dp * k3 - dk3dp * k2;
+      const scalar_t dw2dq = dk2dq * k3 - dk3dq * k2;
+      const scalar_t dw2ds = dk2ds * k3 - dk3ds * k2;
+      const scalar_t dw2dt = dk2dt * k3 - dk3dt * k2;
 
-      scalar_t dw1dax = -(dw1dm + dw1dn + dw1ds);
-      scalar_t dw1day = -(dw1dp + dw1dq + dw1dt);
-      scalar_t dw1dbx = dw1dm;
-      scalar_t dw1dby = dw1dp;
-      scalar_t dw1dcx = dw1dn;
-      scalar_t dw1dcy = dw1dq;
+      const scalar_t dw1dax = -(dw1dm + dw1dn + dw1ds);
+      const scalar_t dw1day = -(dw1dp + dw1dq + dw1dt);
+      const scalar_t dw1dbx = dw1dm;
+      const scalar_t dw1dby = dw1dp;
+      const scalar_t dw1dcx = dw1dn;
+      const scalar_t dw1dcy = dw1dq;
 
-      scalar_t dw2dax = -(dw2dm + dw2dn + dw2ds);
-      scalar_t dw2day = -(dw2dp + dw2dq + dw2dt);
-      scalar_t dw2dbx = dw2dm;
-      scalar_t dw2dby = dw2dp;
-      scalar_t dw2dcx = dw2dn;
-      scalar_t dw2dcy = dw2dq;
+      const scalar_t dw2dax = -(dw2dm + dw2dn + dw2ds);
+      const scalar_t dw2day = -(dw2dp + dw2dq + dw2dt);
+      const scalar_t dw2dbx = dw2dm;
+      const scalar_t dw2dby = dw2dp;
+      const scalar_t dw2dcx = dw2dn;
+      const scalar_t dw2dcy = dw2dq;
 
       for (int feat_idx = 0; feat_idx < feat_dim; feat_idx++) {
 
-        scalar_t c0 = face_features[start_features_idx + feat_idx];
-        scalar_t c1 = face_features[start_features_idx + feat_dim + feat_idx];
-        scalar_t c2 = face_features[start_features_idx + feat_dim + feat_dim + feat_idx];
+        const scalar_t c0 = face_features[start_features_idx + feat_idx];
+        const scalar_t c1 = face_features[start_features_idx + feat_dim + feat_idx];
+        const scalar_t c2 = face_features[start_features_idx + feat_dim + feat_dim + feat_idx];
 
-        scalar_t dIdax = (c1 - c0) * dw1dax + (c2 - c0) * dw2dax;
-        scalar_t dIday = (c1 - c0) * dw1day + (c2 - c0) * dw2day;
-        scalar_t dIdbx = (c1 - c0) * dw1dbx + (c2 - c0) * dw2dbx;
-        scalar_t dIdby = (c1 - c0) * dw1dby + (c2 - c0) * dw2dby;
-        scalar_t dIdcx = (c1 - c0) * dw1dcx + (c2 - c0) * dw2dcx;
-        scalar_t dIdcy = (c1 - c0) * dw1dcy + (c2 - c0) * dw2dcy;
+        const scalar_t dIdax = (c1 - c0) * dw1dax + (c2 - c0) * dw2dax;
+        const scalar_t dIday = (c1 - c0) * dw1day + (c2 - c0) * dw2day;
+        const scalar_t dIdbx = (c1 - c0) * dw1dbx + (c2 - c0) * dw2dbx;
+        const scalar_t dIdby = (c1 - c0) * dw1dby + (c2 - c0) * dw2dby;
+        const scalar_t dIdcx = (c1 - c0) * dw1dcx + (c2 - c0) * dw2dcx;
+        const scalar_t dIdcy = (c1 - c0) * dw1dcy + (c2 - c0) * dw2dcy;
 
-        scalar_t dldI = grad_interpolated_features[start_feat_idx + feat_idx] / (k3 * k3);
+        const scalar_t dldI = grad_interpolated_features[start_feat_idx + feat_idx] / (k3 * k3);
 
         atomicAdd(grad_face_vertices_image + start_image_idx + 0, dldI * dIdax);
         atomicAdd(grad_face_vertices_image + start_image_idx + 1, dldI * dIday);
@@ -397,13 +406,14 @@ __global__ void deftet_sparse_render_backward_cuda_kernel(
 }
 
 void deftet_sparse_render_backward_cuda_impl(
-    at::Tensor grad_interpolated_features,
-    at::Tensor face_idx,
-    at::Tensor weights,
-    at::Tensor face_vertices_image,
-    at::Tensor face_features,
+    const at::Tensor grad_interpolated_features,
+    const at::Tensor face_idx,
+    const at::Tensor weights,
+    const at::Tensor face_vertices_image,
+    const at::Tensor face_features,
     at::Tensor grad_face_vertices_image,
-    at::Tensor grad_face_features) {
+    at::Tensor grad_face_features,
+    const float eps) {
 
   int batch_size = grad_interpolated_features.size(0);
   int num_pixels = grad_interpolated_features.size(1);
@@ -419,17 +429,20 @@ void deftet_sparse_render_backward_cuda_impl(
 
   AT_DISPATCH_FLOATING_TYPES(grad_interpolated_features.scalar_type(),
     "deftet_sparse_render_backward_cuda", ([&] {
-       deftet_sparse_render_backward_cuda_kernel<scalar_t><<<blocks, threads>>>(
-           grad_interpolated_features.data_ptr<scalar_t>(),
-           face_idx.data_ptr<int64_t>(),
-           weights.data_ptr<scalar_t>(),
-           face_vertices_image.data_ptr<scalar_t>(),
-           face_features.data_ptr<scalar_t>(),
-           grad_face_vertices_image.data_ptr<scalar_t>(),
-           grad_face_features.data_ptr<scalar_t>(),
-           batch_size, num_faces, num_pixels, knum, feat_dim);
-       CUDA_CHECK(cudaGetLastError());
-     })
+      const at::cuda::OptionalCUDAGuard device_guard(at::device_of(face_vertices_image));
+      auto stream = at::cuda::getCurrentCUDAStream();
+      deftet_sparse_render_backward_cuda_kernel<scalar_t><<<blocks, threads, 0, stream>>>(
+          grad_interpolated_features.data_ptr<scalar_t>(),
+          face_idx.data_ptr<int64_t>(),
+          weights.data_ptr<scalar_t>(),
+          face_vertices_image.data_ptr<scalar_t>(),
+          face_features.data_ptr<scalar_t>(),
+          grad_face_vertices_image.data_ptr<scalar_t>(),
+          grad_face_features.data_ptr<scalar_t>(),
+          batch_size, num_faces, num_pixels, knum, feat_dim,
+          eps);
+      CUDA_CHECK(cudaGetLastError());
+    })
   );
 }
 
