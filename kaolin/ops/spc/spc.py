@@ -242,8 +242,8 @@ def feature_grids_to_spc(feature_grids, masks=None):
 def unbatched_query(octree, exsum, query_coords, level, with_parents=False):
     r"""Query point indices from the octree.
     
-    Given a :ref:`point hierarchy<_spc_points>` (implicitly encoded in ``octree``) and some coordinates, 
-    this function will efficiently find the indices of the points in :ref:`point hierarchy<_spc_points>` 
+    Given a :ref:`point hierarchy<spc_points>` (implicitly encoded in ``octree``) and some coordinates, 
+    this function will efficiently find the indices of the points in :ref:`point hierarchy<spc_points>` 
     corresponding to the coordinates. Returns -1 if the point does not exist.
 
     Args:
