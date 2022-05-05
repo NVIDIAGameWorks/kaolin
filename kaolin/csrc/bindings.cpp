@@ -46,6 +46,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     py::module ops_spc = ops.def_submodule("spc");
 #if WITH_CUDA
     ops_spc.def("query_cuda", &query_cuda);
+    ops_spc.def("query_multiscale_cuda", &query_multiscale_cuda);
     ops_spc.def("points_to_morton_cuda", &points_to_morton_cuda);
     ops_spc.def("morton_to_points_cuda", &morton_to_points_cuda);
     ops_spc.def("coords_to_trilinear_cuda", &coords_to_trilinear_cuda);

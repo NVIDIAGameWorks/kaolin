@@ -30,7 +30,6 @@ from kaolin import _C
 from .uint8 import bits_to_uint8
 from kaolin.rep import Spc
 
-
 def scan_octrees(octrees, lengths):
     r"""Scan batch of octrees tensor.
 
@@ -239,21 +238,51 @@ def feature_grids_to_spc(feature_grids, masks=None):
     coalescent_features = torch.cat(coalescent_features, dim=0)
     return octrees, lengths, coalescent_features
 
-def unbatched_query(octree, exsum, query_points, level):
-    r"""Query point indices from the octree.
 
-    Given a point hierarchy, this function will efficiently find the corresponding indices of the
-    points in the points tensor. For each input in query_points, returns a index to the points tensor.
-    Returns -1 if the point does not exist.
+def unbatched_query(octree, exsum, query_coords, level, with_parents=False):
+    r"""Query point indices from the octree.
+    
+    Given a :ref:`point hierarchy<_spc_points>` (implicitly encoded in ``octree``) and some coordinates, 
+    this function will efficiently find the indices of the points in :ref:`point hierarchy<_spc_points>` 
+    corresponding to the coordinates. Returns -1 if the point does not exist.
 
     Args:
         octree (torch.ByteTensor): The octree, of shape :math:`(\text{num_bytes})`.
         exsum (torch.IntTensor): The exclusive sum of the octree bytes,
                                  of shape :math:`(\text{num_bytes} + 1)`.
                                  See :ref:`spc_pyramids` for more details.
-        query_points (torch.ShortTensor): A collection of query indices,
-                                          of shape :math:`(\text{num_query}, 3)`.
+        query_coords (torch.FloatTensor or torch.IntTensor): 
+            A tensor of locations to sample of shape :math:`(\text{num_query}, 3)`. If the tensor is
+            a FloatTensor, assumes the coordinates are normalized in [-1, 1]. Otherwise if the tensor is
+            an IntTensor, assumes the coordinates are in the [0, 2^level] space.
         level (int): The level of the octree to query from.
+        with_parents (bool): If True, will return an array of indices up to the specified level as opposed
+                             to only a single level (default: False).
+
+    Returns:
+        pidx (torch.LongTensor): The indices into the point hierarchy of shape :math:`(\text{num_query})`.
+            If with_parents is True, then the shape will be :math:`(\text{num_query, level+1})`.
+
+    Examples:
+        >>> import kaolin
+        >>> points = torch.tensor([[3,2,0],[3,1,1],[3,3,3]], device='cuda', dtype=torch.short)
+        >>> octree = kaolin.ops.spc.unbatched_points_to_octree(points, 2)
+        >>> length = torch.tensor([len(octree)], dtype=torch.int32)
+        >>> _, _, prefix = kaolin.ops.spc.scan_octrees(octree, length)
+        >>> query_coords = torch.tensor([[3,2,0]], device='cuda', dtype=torch.short)
+        >>> kaolin.ops.spc.unbatched_query(octree, prefix, query_coords, 2, with_parents=False)
+        tensor([5], device='cuda:0')
+        >>> kaolin.ops.spc.unbatched_query(octree, prefix, query_coords, 2, with_parents=True)
+        tensor([[0, 2, 5]], device='cuda:0')
     """
-    return _C.ops.spc.query_cuda(octree.contiguous(), exsum.contiguous(),
-                                 query_points.contiguous(), level).long()
+    if not query_coords.is_floating_point():
+        input_coords = (query_coords.float() / (2**level)) * 2.0 - 1.0
+    else:
+        input_coords = query_coords
+
+    if with_parents:
+        return _C.ops.spc.query_multiscale_cuda(octree.contiguous(), exsum.contiguous(),
+                                                input_coords.contiguous(), level).long()
+    else:
+        return _C.ops.spc.query_cuda(octree.contiguous(), exsum.contiguous(),
+                                     input_coords.contiguous(), level).long()

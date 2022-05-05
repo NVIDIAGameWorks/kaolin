@@ -27,7 +27,13 @@ namespace kaolin {
 at::Tensor query_cuda(
     at::Tensor octree,
     at::Tensor prefix_sum,
-    at::Tensor query_points,
+    at::Tensor query_coords,
+    uint32_t target_level);
+
+at::Tensor query_multiscale_cuda(
+    at::Tensor octree,
+    at::Tensor prefix_sum,
+    at::Tensor query_coords,
     uint32_t target_level);
 
 } // namespace kaolin

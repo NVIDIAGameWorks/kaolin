@@ -29,10 +29,10 @@ namespace kaolin {
 /// Device Code
 /////////////////////////////////////////////
 
-static inline __device__ int identify(
+static inline __device__ int32_t identify(
     const point_data k,
-    const uint       level,
-    const uint*      prefix_sum,
+    const uint32_t       level,
+    const int32_t*      prefix_sum,
     const uchar*     octree)
 {
     int maxval = (0x1 << level) - 1; // seems you could do this better using Morton codes
@@ -62,6 +62,47 @@ static inline __device__ int identify(
         }
     }
     return ord; // only if called with Level=0
+}
+
+static inline __device__ void identify_multiscale(
+    const point_data k,
+    const uint32_t       level,
+    const int32_t*      prefix_sum,
+    const uchar*     octree,
+    int32_t*         pidx)
+{
+    // Check if in bounds
+    int maxval = (0x1 << level) - 1; // seems you could do this better using Morton codes
+    if (k.x < 0 || k.y < 0 || k.z < 0 || k.x > maxval || k.y > maxval || k.z > maxval) {
+        for (int i=0; i <= level; ++i) {
+            pidx[i] = -1; 
+        }
+        return;
+    } 
+    pidx[0] = 0;
+        
+    int ord = 0;
+    for (uint l = 0; l < level; l++)
+    {
+        uint depth = level - l - 1;
+        uint mask = (0x1 << depth);
+        uint child_idx = ((mask & k.x) << 2 | (mask & k.y) << 1 | (mask & k.z)) >> depth;
+        uchar bits = octree[ord];
+        // if bit set, keep going
+        if (bits & (0x1 << child_idx))
+        {
+            // count set bits up to child - inclusive sum
+            uint cnt = __popc(bits & ((0x2 << child_idx) - 1));
+            ord = prefix_sum[ord] + cnt;
+            pidx[l+1] = ord;
+        } else {
+            // Miss, populate with -1
+            for (int j=l; j < level; ++j) {
+                pidx[j+1] = -1; 
+            }
+            return;
+        }
+    }
 }
 
 /////////////////////////////////////////////
