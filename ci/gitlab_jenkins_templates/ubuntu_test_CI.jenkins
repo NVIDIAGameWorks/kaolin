@@ -111,6 +111,22 @@ spec:
           echo e.toString()
         }
         try {
+          stage("Diffuse lighting Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython diffuse_lighting.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Spherical Gaussian lighting Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython sg_specular_lighting.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
           stage("SPC from Pointcloud Recipe") {
             sh 'cd /kaolin/examples/recipes/dataload/ && python spc_from_pointcloud.py'
           }

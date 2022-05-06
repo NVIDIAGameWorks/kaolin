@@ -57,6 +57,18 @@ Detailed Tutorials
     * Create a camera with ``from_args()`` general constructor
     * Render a mesh with multiple materials with nvdiffrast
     * Move camera and see the resulting rendering
+* `Optimizing Diffuse Lighting <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/diffuse_lighting.ipynb>`_: Optimize lighting parameters with spherical gaussians and spherical harmonics:
+    * Load an obj mesh with normals and materials
+    * Rasterize the diffuse and specular albedo
+    * Render and optimize diffuse lighting:
+      * Spherical harmonics
+      * Spherical gaussian with inner product implementation
+      * Spherical gaussian with fitted approximation
+* `Optimize Diffuse and Specular Lighting with Spherical Gaussians <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/sg_specular_lighting.ipynb>`_:
+    * Load an obj mesh with normals and materials
+    * Generate view rays from camera
+    * Rasterize the diffuse and specular albedo
+    * Render and optimize diffuse and specular lighting with spherical gaussians
 
 Simple Recipes
 --------------

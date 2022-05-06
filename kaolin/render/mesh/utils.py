@@ -81,6 +81,9 @@ def spherical_harmonic_lighting(imnormal, lights):
     Follows convention set by *Wojciech Jarosz* in 
     `Efficient Monte Carlo Methods for Light Transport in Scattering Media`_.
 
+    .. deprecated:: 0.13.0
+       This function is deprecated. Use :func:`kaolin.render.lighting.sh9_irradiance`.
+
     Args:
         imnormal (torch.FloatTensor):
             per pixel normal, of shape :math:`(\text{batch_size}, \text{height}, \text{width}, 3)`

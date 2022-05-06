@@ -114,6 +114,22 @@ spec:
           '''
         }
       }
+      stage("Diffuse lighting Tutorial") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\tutorial
+            ipython diffuse_lighting.ipynb
+          '''
+        }
+      }
+      stage("Spherical Gaussian lighting Tutorial") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\tutorial
+            ipython sg_specular_lighting.ipynb
+          '''
+        }
+      }
       // requires nvdiffrast. not currently supported on Windows
       // stage("Camera and Rasterization Tutorial") {
       //   catchError(stageResult: "failure") {
