@@ -7,3 +7,4 @@ from . import shapenet
 from . import usd
 from . import modelnet
 from . import shrec
+from . import utils

@@ -32,17 +32,19 @@ except ImportError:
     warnings.warn('Warning: module pxr not found', ImportWarning)
 
 from kaolin.io import materials as usd_materials
-
+from kaolin.io import utils
 
 mesh_return_type = namedtuple('mesh_return_type', ['vertices', 'faces',
                                                    'uvs', 'face_uvs_idx', 'face_normals', 'materials_order',
                                                    'materials'])
 pointcloud_return_type = namedtuple('pointcloud_return_type', ['points', 'colors', 'normals'])
 
-
 class NonHomogeneousMeshError(Exception):
     """Raised when expecting a homogeneous mesh but a heterogenous
     mesh is encountered.
+
+    .. deprecated:: 1.11.0
+       This function is deprecated, use :func:`kaolin.io.utils.NonHomogeneousMeshError`.
 
     Attributes:
         message (str)
@@ -50,8 +52,10 @@ class NonHomogeneousMeshError(Exception):
     __slots__ = ['message']
 
     def __init__(self, message):
+        warnings.warn("NonHomogeneousMeshError is deprecated, "
+                      "please use kaolin.io.utils.NonHomogeneousMeshError instead", 
+                      DeprecationWarning, stacklevel=2)
         self.message = message
-
 
 def _get_stage_next_free_path(stage, scene_path):
     """Get next free path in the stage."""
@@ -381,12 +385,29 @@ def create_stage(file_path, up_axis='Y'):
 # Mesh Functions
 # TODO(jlafleche) Support mesh subgroups for materials
 def heterogeneous_mesh_handler_skip(*args):
-    r"""Skip heterogeneous meshes."""
+    r"""Skip heterogeneous meshes.
+
+    .. deprecated:: 1.11.0
+       This function is deprecated, use :func:`kaolin.io.utils.heterogeneous_mesh_handler_skip`.
+
+    """
+    warnings.warn("heterogeneous_mesh_handler_skip is deprecated, "
+                  "please use kaolin.io.utils.heterogeneous_mesh_handler_skip instead", 
+                  DeprecationWarning, stacklevel=2)
+
     return None
 
-
 def heterogeneous_mesh_handler_empty(*args):
-    """Return empty tensors for vertices and faces of heterogeneous meshes."""
+    """Return empty tensors for vertices and faces of heterogeneous meshes.
+
+    .. deprecated:: 1.11.0
+       This function is deprecated, use :func:`kaolin.io.utils.heterogeneous_mesh_handler_empty`.
+
+    """
+    warnings.warn("heterogeneous_mesh_handler_empty is deprecated, "
+                  "please use kaolin.io.utils.heterogeneous_mesh_handler_empty instead", 
+                  DeprecationWarning, stacklevel=2)
+
     return (torch.FloatTensor(size=(0, 3)), torch.LongTensor(size=(0,)),
             torch.LongTensor(size=(0, 3)), torch.FloatTensor(size=(0, 2)),
             torch.LongTensor(size=(0, 3)), torch.FloatTensor(size=(0, 3, 3)),
@@ -397,16 +418,23 @@ def heterogeneous_mesh_handler_naive_homogenize(vertices, face_vertex_counts, *a
     r"""Homogenize list of faces containing polygons of varying number of edges to triangles using fan
     triangulation.
 
+    .. deprecated:: 1.11.0
+       This function is deprecated, use :func:`kaolin.io.utils.heterogeneous_mesh_handler_naive_homogenize`.
+
     Args:
         vertices (torch.FloatTensor): Vertices with shape ``(N, 3)``.
         face_vertex_counts (torch.LongTensor): Number of vertices for each face with shape ``(M)``
             for ``M`` faces.
-        faces (torch.LongTensor): Vertex indices for each face of with shape ``(F)`` where ``F`` is
-            the sum of ``face_vertex_counts``.
+        *args: Variable length features that need to be handled. For example, faces and uvs.
 
     Returns:
-        (list of list of int): Homogeneous list of attributes.
+        (list of torch.tensor): Homogeneous list of attributes.
     """
+
+    warnings.warn("heterogeneous_mesh_handler_naive_homogenize is deprecated, "
+                  "please use kaolin.io.utils.heterogeneous_mesh_handler_naive_homogenize instead", 
+                  DeprecationWarning, stacklevel=2)
+
     def _homogenize(attr, face_vertex_counts):
         if attr is not None:
             attr = attr.tolist()
@@ -552,8 +580,8 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
         if faces is not None:
             if not torch.all(face_vertex_counts == face_vertex_counts[0]):
                 if heterogeneous_mesh_handler is None:
-                    raise NonHomogeneousMeshError(f'Mesh at {scene_path} is non-homogeneous '
-                                                  f'and cannot be imported from {file_path}.')
+                    raise utils.NonHomogeneousMeshError(f'Mesh at {scene_path} is non-homogeneous '
+                                                        f'and cannot be imported from {file_path}.')
                 else:
                     mesh = heterogeneous_mesh_handler(vertices, face_vertex_counts, faces, uvs,
                                                       face_uvs_idx, face_normals, materials_face_idx)

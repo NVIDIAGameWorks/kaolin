@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019,20-22, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ import pytest
 
 import torch
 
+from kaolin.io import utils
 from kaolin.io import obj
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../samples/')
@@ -55,6 +56,14 @@ class TestLoadObj:
         ])
 
     @pytest.fixture(autouse=True)
+    def expected_faces_heterogeneous(self):
+        return torch.LongTensor([
+            [0, 1, 3],
+            [0, 3, 2],
+            [1, 0, 4]
+        ])
+
+    @pytest.fixture(autouse=True)
     def expected_uvs(self):
         return torch.Tensor([
             [0.0, 0.0],
@@ -71,6 +80,14 @@ class TestLoadObj:
         ])
 
     @pytest.fixture(autouse=True)
+    def expected_face_uvs_idx_heterogeneous(self):
+        return torch.LongTensor([
+            [0, 1, 3],
+            [0, 3, 2],
+            [3, 1, 0]
+        ])
+
+    @pytest.fixture(autouse=True)
     def expected_vertex_normals(self):
         return torch.FloatTensor([
             [0., 0., -1.],
@@ -84,6 +101,14 @@ class TestLoadObj:
         return torch.LongTensor([
             [2, 3, 0, 0],
             [3, 2, 1, 1]
+        ])
+
+    @pytest.fixture(autouse=True)
+    def expected_face_normals_heterogeneous(self):
+        return torch.LongTensor([
+            [2, 3, 0],
+            [2, 0, 0],
+            [3, 2, 1]
         ])
 
     @pytest.fixture(autouse=True)
@@ -116,11 +141,11 @@ class TestLoadObj:
     @pytest.mark.parametrize('with_normals', [False, True])
     @pytest.mark.parametrize('with_materials', [False, True])
     def test_import_mesh(self, with_normals, with_materials, expected_vertices, expected_faces,
-                      expected_uvs, expected_face_uvs_idx, expected_vertex_normals,
-                      expected_face_normals, expected_materials):
+                         expected_uvs, expected_face_uvs_idx, expected_vertex_normals,
+                         expected_face_normals, expected_materials):
         outputs = obj.import_mesh(os.path.join(SIMPLE_DIR, 'model.obj'),
-                               with_materials=with_materials, with_normals=with_normals,
-                               error_handler=obj.skip_error_handler)
+                                  with_materials=with_materials, with_normals=with_normals,
+                                  error_handler=obj.skip_error_handler)
         assert torch.equal(outputs.vertices, expected_vertices)
         assert torch.equal(outputs.faces, expected_faces)
         if with_materials:
@@ -148,16 +173,47 @@ class TestLoadObj:
     def test_error_import_mesh(self, with_normals):
         with pytest.raises(obj.MaterialLoadError):
             outputs = obj.import_mesh(os.path.join(SIMPLE_DIR, 'model.obj'),
-                                   with_materials=True, with_normals=with_normals,
-                                   error_handler=obj.default_error_handler)
+                                      with_materials=True, with_normals=with_normals,
+                                      error_handler=obj.default_error_handler)
 
     @pytest.mark.parametrize('with_normals', [False, True])
     def test_warn_import_mesh(self, with_normals):
         with pytest.warns(UserWarning):
             outputs = obj.import_mesh(os.path.join(SIMPLE_DIR, "model.obj"),
-                                   with_materials=True, with_normals=with_normals,
-                                   error_handler=obj.skip_error_handler)
+                                      with_materials=True, with_normals=with_normals,
+                                      error_handler=obj.skip_error_handler)
 
+    @pytest.mark.parametrize('with_normals', [False, True])
+    @pytest.mark.parametrize('with_materials', [False, True])
+    def test_import_mesh_heterogeneous(self, with_normals, with_materials, expected_vertices,
+                                       expected_faces_heterogeneous, expected_face_uvs_idx_heterogeneous,
+                                       expected_uvs, expected_materials,
+                                       expected_vertex_normals, expected_face_normals_heterogeneous):
+        outputs = obj.import_mesh(os.path.join(SIMPLE_DIR, 'model_heterogeneous.obj'),
+                                               with_materials=with_materials, with_normals=with_normals,
+                                               error_handler=obj.skip_error_handler,
+                                               heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_naive_homogenize)
+        assert torch.equal(outputs.vertices, expected_vertices)
+        assert torch.equal(outputs.faces, expected_faces_heterogeneous)
+
+        if with_materials:
+            assert torch.allclose(outputs.uvs, expected_uvs)
+            assert torch.equal(outputs.face_uvs_idx, expected_face_uvs_idx_heterogeneous)
+            for outputs_material, expected_material in zip(outputs.materials, expected_materials):
+                assert outputs_material.keys() == expected_material.keys()
+                for property_name, expected_property_val in expected_material.items():
+                    assert torch.allclose(outputs_material[property_name],
+                                          expected_property_val)
+        else:
+            assert outputs.materials is None
+            assert outputs.materials_order is None
+
+        if with_normals:
+            assert torch.equal(outputs.vertex_normals, expected_vertex_normals)
+            assert torch.equal(outputs.face_normals, expected_face_normals_heterogeneous)
+        else:
+            assert outputs.vertex_normals is None
+            assert outputs.face_normals is None
 
     @pytest.fixture(autouse=True)
     def expected_large_values(self):

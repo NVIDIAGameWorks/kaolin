@@ -22,6 +22,7 @@ import pytest
 from pxr import Usd, UsdGeom
 
 from kaolin.io import usd, obj
+from kaolin.io import utils
 from kaolin.ops.conversions import trianglemeshes_to_voxelgrids
 
 
@@ -125,18 +126,18 @@ class TestMeshes:
 
     def test_import_hetero_fail_import_meshes(self, scene_paths, out_dir, hetero_mesh_path):
         """Test that import fails when importing heterogeneous mesh without handler"""
-        with pytest.raises(usd.NonHomogeneousMeshError):
+        with pytest.raises(utils.NonHomogeneousMeshError):
             usd.import_meshes(hetero_mesh_path, ['/Root'])
 
     def test_import_hetero_fail_import_mesh(self, scene_paths, out_dir, hetero_mesh_path):
         """Test that import fails when importing heterogeneous mesh without handler"""
-        with pytest.raises(usd.NonHomogeneousMeshError):
+        with pytest.raises(utils.NonHomogeneousMeshError):
             usd.import_mesh(file_path=hetero_mesh_path, scene_path='/Root')
 
     def test_import_hetero_skip(self, scene_paths, out_dir, hetero_mesh_path, mesh):
         """Test that import skips mesh when importing heterogeneous mesh with skip handler"""
         meshes = usd.import_meshes(hetero_mesh_path, ['/Root'],
-                                   heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_skip)
+                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
         assert len(meshes) == 0
 
         # Test skip on a batch of mixed homogeneous and heterogeneous meshes
@@ -145,19 +146,19 @@ class TestMeshes:
         out_path = os.path.join(out_dir, 'mixed.usda')
         usd.export_meshes(out_path, vertices=[m.vertices for m in mixed], faces=[m.faces for m in mixed])
 
-        mixed_in = usd.import_meshes(out_path, heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_skip)
+        mixed_in = usd.import_meshes(out_path, heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
         assert len(mixed_in) == 2
 
     def test_import_hetero_empty_import_meshes(self, scene_paths, out_dir, hetero_mesh_path):
         """Test that imports empty mesh when importing heterogeneous mesh with empty handler"""
         mesh = usd.import_meshes(hetero_mesh_path, ['/Root'],
-                                 heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_empty)
+                                 heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_empty)
         for attr in mesh:
             assert len(attr[0]) == 0
 
     def test_import_hetero_empty_import_mesh(self, scene_paths, out_dir, hetero_mesh_path):
         """Test that imports empty mesh when importing heterogeneous mesh with empty handler"""
-        mesh = usd.import_mesh(hetero_mesh_path, scene_path='/Root', heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_empty)
+        mesh = usd.import_mesh(hetero_mesh_path, scene_path='/Root', heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_empty)
         assert len(mesh[0]) == 0
 
     def test_import_hetero_homogenize_import_meshes(self, scene_paths, out_dir, hetero_mesh_path):
@@ -165,7 +166,7 @@ class TestMeshes:
         # TODO(jlafleche) Render meshes before/after homogenize operation
         out_path = os.path.join(out_dir, 'homogenized.usda')
         mesh = usd.import_meshes(hetero_mesh_path, ['/Root'],
-                                 heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_naive_homogenize)
+                                 heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_naive_homogenize)
         usd.export_mesh(out_path, '/World/Rocket', vertices=mesh[0].vertices, faces=mesh[0].faces)
 
         # Confirm we now have a triangle mesh
@@ -180,7 +181,7 @@ class TestMeshes:
         # TODO(jlafleche) Render meshes before/after homogenize operation
         out_path = os.path.join(out_dir, 'homogenized.usda')
         mesh = usd.import_mesh(hetero_mesh_path, scene_path='/Root',
-                               heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_naive_homogenize)
+                               heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_naive_homogenize)
         usd.export_mesh(out_path, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces)
 
         # Confirm we now have a triangle mesh
@@ -194,7 +195,7 @@ class TestMeshes:
         """Test that imports materials from mesh with subsets"""
         out_path = os.path.join(out_dir, 'homogenized_materials.usda')
         mesh = usd.import_mesh(hetero_subsets_materials_mesh_path, scene_path='/Root',
-                               heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_naive_homogenize,
+                               heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_naive_homogenize,
                                with_materials=True)
         usd.export_mesh(out_path, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces,
                         materials_order=mesh.materials_order, materials=mesh.materials, uvs=mesh.uvs)
@@ -210,13 +211,13 @@ class TestMeshes:
         """Test that imports materials from mesh with subsets"""
         out_path = os.path.join(out_dir, 'homogenized_materials.usda')
         mesh = usd.import_mesh(hetero_subsets_materials_mesh_path, scene_path='/Root',
-                               heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_naive_homogenize,
+                               heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_naive_homogenize,
                                with_materials=False)
         assert mesh.materials is None
         assert mesh.materials_order is None
 
         mesh = usd.import_mesh(hetero_subsets_materials_mesh_path, scene_path='/Root',
-                               heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_naive_homogenize,
+                               heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_naive_homogenize,
                                with_materials=True)
         assert mesh.materials is not None
         assert mesh.materials_order is not None
