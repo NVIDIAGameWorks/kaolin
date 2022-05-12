@@ -457,7 +457,7 @@ def import_mesh(file_path, scene_path=None, with_materials=False, with_normals=F
         - **uvs** (torch.FloatTensor): of shape (num_uvs, 2)
         - **face_uvs_idx** (torch.LongTensor): of shape (num_faces, face_size)
         - **face_normals** (torch.FloatTensor): of shape (num_faces, face_size, 3)
-        - **materials** (list of kaolin.io.materials.Material): Material properties (Not yet implemented)
+        - **materials** (list of kaolin.io.materials.Material): Material properties
 
     Example:
         >>> # Create a stage with some meshes
@@ -511,7 +511,7 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
         - **uvs** (list of torch.FloatTensor): of shape (num_uvs, 2)
         - **face_uvs_idx** (list of torch.LongTensor): of shape (num_faces, face_size)
         - **face_normals** (list of torch.FloatTensor): of shape (num_faces, face_size, 3)
-        - **materials** (list of kaolin.io.materials.Material): Material properties (Not yet implemented)
+        - **materials** (list of kaolin.io.materials.Material): Material properties
 
     Example:
         >>> # Create a stage with some meshes
@@ -839,7 +839,7 @@ def import_pointclouds(file_path, scene_paths=None, times=None):
         list of namedtuple of:
             - **points** (list of torch.FloatTensor): of shape (num_points, 3)
             - **colors** (list of torch.FloatTensor): of shape (num_points, 3)
-            - **normals** (list of torch.FloatTensor): of shape (num_points, 2)
+            - **normals** (list of torch.FloatTensor): of shape (num_points, 2) (not yet implemented)
 
     Example:
         >>> points = torch.rand(100, 3)

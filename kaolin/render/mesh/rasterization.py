@@ -29,7 +29,8 @@ try:
 except ImportError:
     _has_nvdiffrast = False
     nvdiff = None
-    logging.info("Cannot import nvdiffrast")
+    logger = logging.getLogger(__name__)
+    logger.info("Cannot import nvdiffrast")
 
 def _get_nvdiff_glctx(device):
     if device not in _device2glctx:

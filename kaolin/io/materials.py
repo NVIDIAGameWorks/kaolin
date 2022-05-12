@@ -246,62 +246,96 @@ class PBRMaterial(Material):
     Supports USD Preview Surface (https://graphics.pixar.com/usd/docs/UsdPreviewSurface-Proposal.html),
     a physically based surface material definition.
 
-    Args:
-        diffuse_color (tuple of floats): RGB values for `Diffuse` parameter (typically referred to as `Albedo`
-            in a metallic workflow) in the range of `(0.0, 0.0, 0.0)` to `(1.0, 1.0, 1.0)`. Default value is grey
-            `(0.5, 0.5, 0.5)`.
-        roughness_value (float): Roughness value of specular lobe in range `0.0` to `1.0`. Default value is `0.5`.
+    Parameters:
+        diffuse_color (tuple of floats):
+            RGB values for `Diffuse` parameter (typically referred to as `Albedo`
+            in a metallic workflow) in the range of `(0.0, 0.0, 0.0)` to `(1.0, 1.0, 1.0)`.
+            Default value is grey `(0.5, 0.5, 0.5)`.
+        roughness_value (float):
+            Roughness value of specular lobe in range `0.0` to `1.0`. Default value is `0.5`.
         metallic_value (float):
             Metallic value, typically set to `0.0` for non-metallic and `1.0` for metallic materials. 
             Ignored if `is_specular_workflow` is `True`. Default value is `0.0`.
-        clearcoat_value (float): Second specular lobe amount. Color is hardcoded to white. Default value is `0.0`.
-        clearcoat_roughness_value (float): Roughness for the clearcoat specular lobe in the range `0.0` to `1.0`.
+        clearcoat_value (float):
+            Second specular lobe amount. Color is hardcoded to white. Default value is `0.0`.
+        clearcoat_roughness_value (float):
+            Roughness for the clearcoat specular lobe in the range `0.0` to `1.0`.
             The default value is `0.01`.
-        opacity_value (float): Opacity, with `1.0` fully opaque and `0.0` as transparent with values within this range
+        opacity_value (float):
+            Opacity, with `1.0` fully opaque and `0.0` as transparent with values within this range
             defining a translucent surface. Default value is `0.0`.
-        opacity_treshold (float): Used to create cutouts based on the `opacity_value`. Surfaces with an opacity
+        opacity_treshold (float):
+            Used to create cutouts based on the `opacity_value`. Surfaces with an opacity
             smaller than the `opacity_threshold` will be fully transparent. Default value is `0.0`.
-        ior_value (float): Index of Refraction used with translucent objects and objects with specular components.
+        ior_value (float):
+            Index of Refraction used with translucent objects and objects with specular components.
             Default value is `1.5`.
-        specular_color (tuple of floats): RGB values for `Specular` lobe. Ignored if `is_specular_workflow` is
-            `False`. Default value is white `(0.0, 0.0, 0.0)`.
-        displacement_value (float): Displacement in the direction of the normal. Default is `0.0`
-        diffuse_texture (torch.FloatTensor): Texture for diffuse parameter, of shape `(3, height, width)`.
-        roughness_texture (torch.FloatTensor): Texture for roughness parameter, of shape `(1, height, width)`.
-        metallic_texture (torch.FloatTensor): Texture for metallic parameter, of shape `(1, height, width)`.
+        specular_color (tuple of floats):
+            RGB values for `Specular` lobe. Ignored if `is_specular_workflow` is `False`.
+            Default value is white `(0.0, 0.0, 0.0)`.
+        displacement_value (float):
+            Displacement in the direction of the normal. Default is `0.0`
+        diffuse_texture (torch.FloatTensor):
+            Texture for diffuse parameter, of shape `(3, height, width)`.
+        roughness_texture (torch.FloatTensor):
+            Texture for roughness parameter, of shape `(1, height, width)`.
+        metallic_texture (torch.FloatTensor):
+            Texture for metallic parameter, of shape `(1, height, width)`.
             Ignored if  `is_specular_workflow` is `True`.
-        clearcoat_texture (torch.FloatTensor): Texture for clearcoat parameter, of shape `(1, height, width)`.
-        clearcoat_roughness_texture (torch.FloatTensor): Texture for clearcoat_roughness parameter, of shape
+        clearcoat_texture (torch.FloatTensor):
+            Texture for clearcoat parameter, of shape `(1, height, width)`.
+        clearcoat_roughness_texture (torch.FloatTensor):
+            Texture for clearcoat_roughness parameter, of shape
             `(1, height, width)`.
-        opacity_texture (torch.FloatTensor): Texture for opacity parameter, of shape `(1, height, width)`.
-        ior_texture (torch.FloatTensor): Texture for opacity parameter, of shape `(1, height, width)`.
-        specular_texture (torch.FloatTensor): Texture for specular parameter, of shape `(3, height, width)`.
+        opacity_texture (torch.FloatTensor):
+            Texture for opacity parameter, of shape `(1, height, width)`.
+        ior_texture (torch.FloatTensor):
+            Texture for opacity parameter, of shape `(1, height, width)`.
+        specular_texture (torch.FloatTensor):
+            Texture for specular parameter, of shape `(3, height, width)`.
             Ignored if `is_specular_workflow` is `False`.
-        normals_texture (torch.FloatTensor): Texture for normal mapping of shape `(3, height, width)`. Normals
-            maps create the illusion of fine three-dimensional detail without increasing the number of polygons.
+        normals_texture (torch.FloatTensor):
+            Texture for normal mapping of shape `(3, height, width)`.
+            Normals maps create the illusion of fine three-dimensional
+            detail without increasing the number of polygons.
             Tensor values must be in the range of `[(-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)]`.
-        displacement_texture (torch.FloatTensor): Texture for displacement in the direction of the normal
-            `(1, height, width)`.
-        is_specular_workflow (bool): Determines whether or not to use a specular workflow. Default
-            is `False` (use a metallic workflow).
-        diffuse_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw, sRGB].
-        roughness_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw].
+        displacement_texture (torch.FloatTensor):
+            Texture for displacement in the direction of the normal `(1, height, width)`.
+        is_specular_workflow (bool):
+            Determines whether or not to use a specular workflow.
+            Default is `False` (use a metallic workflow).
+        diffuse_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw, sRGB].
             Default is 'auto'.
-        metallic_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw].
+        roughness_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw].
             Default is 'auto'.
-        clearcoat_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw].
+        metallic_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw].
             Default is 'auto'.
-        clearcoat_roughness_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw].
+        clearcoat_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw].
             Default is 'auto'.
-        opacity_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw].
+        clearcoat_roughness_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw].
             Default is 'auto'.
-        ior_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw]. Default is 'auto'.
-        specular_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw, sRGB].
+        opacity_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw].
             Default is 'auto'.
-        normals_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw, sRGB].
+        ior_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw]. Default is 'auto'.
+        specular_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw, sRGB].
             Default is 'auto'.
-        displacement_colorspace (string): Colorspace of texture, if provided. Select from [auto, raw].
+        normals_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw, sRGB].
             Default is 'auto'.
+        displacement_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw].
+            Default is 'auto'.
+        shaders (dict):
+            Dictionary mapping a shader name to a reader and writer function.
+            (Currently cannot be set).
     """
     def __init__(
         self,

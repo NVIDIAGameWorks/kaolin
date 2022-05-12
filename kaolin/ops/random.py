@@ -61,9 +61,10 @@ def get_state():
     Mostly used in pair with :func:`set_state`.
 
     See also:
-    - https://pytorch.org/docs/stable/generated/torch.get_rng_state.html#torch.get_rng_state
-    - https://docs.python.org/3/library/random.html#random.getstate
-    - https://numpy.org/doc/stable/reference/random/generated/numpy.random.set_state.html#numpy.random.set_state
+
+    * https://pytorch.org/docs/stable/generated/torch.get_rng_state.html#torch.get_rng_state
+    * https://docs.python.org/3/library/random.html#random.getstate
+    * https://numpy.org/doc/stable/reference/random/generated/numpy.random.set_state.html#numpy.random.set_state
 
     Returns:
        (torch.ByteTensor, tuple, tuple):
