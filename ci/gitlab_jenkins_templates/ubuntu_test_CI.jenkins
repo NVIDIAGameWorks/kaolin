@@ -61,6 +61,18 @@ spec:
               stage("Understanding SPCs Tutorial") {
                 sh 'cd /kaolin/examples/tutorial && ipython understanding_spcs_tutorial.ipynb'
               }
+            }, "SPC from Pointcloud Recipe": {
+              stage("SPC from Pointcloud Recipe") {
+                sh 'cd /kaolin/examples/recipes/dataload/ && python spc_from_pointcloud.py'
+              }
+            }, "SPC Basics Recipe": {
+              stage("SPC Basics Recipe") {
+                sh 'cd /kaolin/examples/recipes/spc/ && python spc_basics.py'
+              }
+            }, "Occupancy Sampling Recipe": {
+              stage("Occupancy Sampling Recipe") {
+                sh 'cd /kaolin/examples/recipes/preprocess/ && python occupancy_sampling.py'
+              }
             }
           ]
           parallel testMap
