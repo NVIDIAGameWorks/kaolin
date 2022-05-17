@@ -488,8 +488,11 @@ class TestDibrRasterization:
     def test_dibr_rasterization(self, height, width, face_vertices_z,
                                 face_vertices_image, face_uvs, face_normals_z,
                                 sigmainv, boxlen, knum, multiplier, rast_backend):
-        if rast_backend in {'nvdiffrast_fwd', 'nvdiffrast'} and face_vertices_z.dtype == torch.double:
-            pytest.skip("nvdiffrast not compatible with double")
+        if rast_backend in {'nvdiffrast_fwd', 'nvdiffrast'}:
+            if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
+                pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
+            if face_vertices_z.dtype == torch.double:
+                pytest.skip("nvdiffrast not compatible with double")
         gt_interpolated_features, gt_face_idx = rasterize(
             height, width,
             face_vertices_z,

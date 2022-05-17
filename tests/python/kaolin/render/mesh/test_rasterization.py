@@ -293,6 +293,8 @@ class TestRasterize:
             self, batch_size, height, width, pixel_coords,
             render_ranges, face_vertices_z, face_vertices_image,
             face_uvs, with_valid_faces, valid_faces):
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
         if face_vertices_image.dtype == torch.double:
             pytest.skip("nvdiffrast not compatible with double")
         kwargs = {}
@@ -328,6 +330,8 @@ class TestRasterize:
             render_ranges, face_vertices_z, face_vertices_image,
             face_uvs, with_valid_faces, valid_faces, dtype):
         """Test with list of tensors as features"""
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
         if face_vertices_image.dtype == torch.double:
             pytest.skip("nvdiffrast not compatible with double")
         kwargs = {}
@@ -370,6 +374,8 @@ class TestRasterize:
             self, batch_size, height, width, pixel_coords,
             render_ranges, face_vertices_z, face_vertices_image,
             face_uvs, with_valid_faces, valid_faces):
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
         if face_vertices_image.dtype == torch.double:
             pytest.skip("nvdiffrast not compatible with double")
         kwargs = {}
@@ -422,6 +428,8 @@ class TestRasterize:
             self, batch_size, height, width, pixel_coords,
             render_ranges, face_vertices_z, face_vertices_image,
             face_uvs, with_valid_faces, valid_faces):
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
         if face_vertices_image.dtype == torch.double:
             pytest.skip("nvdiffrast not compatible with double")
         kwargs = {}
@@ -482,6 +490,8 @@ class TestRasterize:
     def test_nvdiffrast_forward(
             self, batch_size, height, width, face_vertices_z,
             face_vertices_image, face_uvs, with_valid_faces, valid_faces):
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
         if face_vertices_image.dtype == torch.double:
             pytest.skip("nvdiffrast not compatible with double")
         kwargs = {}
@@ -509,6 +519,8 @@ class TestRasterize:
             self, batch_size, height, width, face_vertices_z,
             face_vertices_image, face_uvs, with_valid_faces, valid_faces):
         """Test with list of tensors as features"""
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
         if face_vertices_image.dtype == torch.double:
             pytest.skip("nvdiffrast not compatible with double")
         kwargs = {}
@@ -537,6 +549,8 @@ class TestRasterize:
     def test_nvdiffrast_backward(
             self, batch_size, height, width, face_vertices_z,
             face_vertices_image, face_uvs, with_valid_faces, valid_faces):
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
         if face_vertices_image.dtype == torch.double:
             pytest.skip("nvdiffrast not compatible with double")
         kwargs = {}
@@ -577,4 +591,3 @@ class TestRasterize:
         assert torch.allclose(face_uvs.grad,
                               face_uvs2.grad,
                               rtol=1e-2, atol=1e-2)
-

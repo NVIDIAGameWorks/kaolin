@@ -41,7 +41,10 @@ spec:
               }
             }, "Pytest": {
               stage("Pytest") {
-                sh 'pytest -s --cov=/kaolin/kaolin /kaolin/tests/python/kaolin'
+                sh '''
+                export KAOLIN_TEST_NVIDIFFRAST=1
+                pytest -s --cov=/kaolin/kaolin /kaolin/tests/python/kaolin
+                '''
               }
             }, "Doc examples": {
               if (arch == "TITAN_RTX") {
