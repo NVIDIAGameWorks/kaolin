@@ -91,7 +91,7 @@ class TestUnbatchedTriangleDistanceCuda:
         return torch.randn((num_faces, 3, 3), device='cuda', dtype=dtype)
 
     def test_face_vertices(self, pointcloud, face_vertices):
-        dist, face_idx, dist_type = trianglemesh.UnbatchedTriangleDistanceCuda.apply(
+        dist, face_idx, dist_type = trianglemesh._UnbatchedTriangleDistanceCuda.apply(
             pointcloud, face_vertices)
         dist2, face_idx2, dist_type2 = trianglemesh._unbatched_naive_point_to_mesh_distance(
             pointcloud, face_vertices)
@@ -108,7 +108,7 @@ class TestUnbatchedTriangleDistanceCuda:
         pointcloud2.requires_grad = True
         face_vertices2 = face_vertices.detach()
         face_vertices2.requires_grad = True
-        dist, face_idx, dist_type = trianglemesh.UnbatchedTriangleDistanceCuda.apply(
+        dist, face_idx, dist_type = trianglemesh._UnbatchedTriangleDistanceCuda.apply(
             pointcloud, face_vertices)
         dist2, face_idx2, dist_type2 = trianglemesh._unbatched_naive_point_to_mesh_distance(
             pointcloud2, face_vertices2)

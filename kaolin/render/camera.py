@@ -78,7 +78,7 @@ def generate_rotate_translate_matrices(camera_position, look_at, camera_up_direc
 def generate_transformation_matrix(camera_position, look_at, camera_up_direction):
     r"""Generate transformation matrix for given camera parameters.
 
-    Formula is :math:`\text{P_cam} = \text{P_world} * {\text{transformation_mtx}`,
+    Formula is :math:`\text{P_cam} = \text{P_world} * \text{transformation_mtx}`,
     with :math:`\text{P_world}` being the points coordinates padded with 1.
 
     Args:
@@ -93,7 +93,7 @@ def generate_transformation_matrix(camera_position, look_at, camera_up_direction
 
     Returns:
         (torch.FloatTensor):
-            The camera transformation matrix of shape :math:`(\text{batch_size, 4, 3)`.
+            The camera transformation matrix of shape :math:`(\text{batch_size}, 4, 3)`.
     """
     z_axis = (camera_position - look_at)
     z_axis /= z_axis.norm(dim=1, keepdim=True)

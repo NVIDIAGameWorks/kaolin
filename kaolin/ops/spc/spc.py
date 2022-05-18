@@ -48,13 +48,15 @@ def scan_octrees(octrees, lengths):
     Returns:
         (int, torch.IntTensor, torch.IntTensor):
 
-            - An int containing the depth of the octrees.
-
-            - A tensor containing structural information about the batch of structured point cloud hierarchies,
-              see :ref:`pyramids example <spc_pyramids>`.
-            - A tensor containing the exclusive sum of the bit
+            - max_level, an int containing the depth of the octrees.
+            - :ref:`pyramids<spc_pyramids>`, a tensor containing structural information about
+              the batch of structured point cloud hierarchies,
+              of shape :math:`(\text{batch_size}, 2, \text{max_level + 1})`.
+              See :ref:`the documentation <spc_pyramids>` for more details.
+            - :ref:`exsum<spc_exsum>`, a 1D tensor containing the exclusive sum of the bit
               counts of each byte of the individual octrees within the batched input ``octrees`` tensor,
-              see :ref:`exsum <spc_exsum>`.
+              of size :math:(\text{octree_num_bytes} + \text{batch_size})`.
+              See :ref:`the documentation <spc_exsum>` for more details.
 
     .. note::
 
@@ -79,8 +81,10 @@ def generate_points(octrees, pyramids, exsum):
             counts of individual octrees of shape :math:`(k + \text{batch_size})`
 
     Returns:
-        (torch.Tensor):
-            A tensor containing batched point hierachies derived from a batch of octrees.
+        (torch.ShortTensor):
+            A tensor containing batched point hierachies derived from a batch of octrees,
+            of shape :math:`(\text{num_points_at_all_levels}, 3)`.
+            See :ref:`the documentation<spc_points>` for more details
     """
     return _C.ops.spc.generate_points_cuda(octrees.contiguous(),
                                            pyramids.contiguous(),
@@ -138,9 +142,8 @@ def to_dense(point_hierarchies, pyramids, input, level=-1, **kwargs):
         input (torch.FloatTensor):
             Batched tensor of input feature data,
             of shape :math:`(\text{num_inputs}, \text{feature_dim})`.
-            :math:`\text{num_inputs}`,
-            must correspond to number of points in the
-            batched point hierarchy at `level`.
+            With :math:`\text{num_inputs}` corresponding to a number of points in the
+            batched point hierarchy at ``level``.
 
         level (int):
             The level at which the octree points are converted to feature grids.
@@ -168,8 +171,9 @@ def feature_grids_to_spc(feature_grids, masks=None):
             The sparse 3D feature grids, of shape
             :math:`(\text{batch_size}, \text{feature_dim}, X, Y, Z)`
         masks (optional, torch.BoolTensor):
-            The masks showing where are the features.
-            Default: A feature is determined when not full or zeros.
+            The masks showing where are the features,
+            of shape :math:`(\text{batch_size}, X, Y, Z)`.
+            Default: A feature is determined when not full of zeros.
 
     Returns:
         (torch.ByteTensor, torch.IntTensor, torch.Tensor):
@@ -179,7 +183,7 @@ def feature_grids_to_spc(feature_grids, masks=None):
 
                 - The lengths of each octree, of size :math:`(\text{batch_size})`
 
-                - The coalescent features, of same dtype than `feature_grids`,
+                - The coalescent features, of same dtype than ``feature_grids``,
                   of shape :math:`(\text{num_features}, \text{feature_dim})`.
     """
     batch_size = feature_grids.shape[0]

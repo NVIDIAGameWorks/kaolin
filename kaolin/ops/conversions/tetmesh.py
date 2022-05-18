@@ -112,9 +112,8 @@ def _unbatched_marching_tetrahedra(vertices, tets, sdf, return_tet_idx):
 
 def marching_tetrahedra(vertices, tets, sdf, return_tet_idx=False):
     r"""Convert discrete signed distance fields encoded on tetrahedral grids to triangle 
-    meshes using marching tetrahedra algorithm as described in "An efficient method of 
-    triangulating equi-valued surfaces by using tetrahedral cells":
-    https://search.ieice.org/bin/summary.php?id=e74-d_1_214. The output surface is differentiable with respect to
+    meshes using marching tetrahedra algorithm as described in `An efficient method of 
+    triangulating equi-valued surfaces by using tetrahedral cells`_. The output surface is differentiable with respect to
     input vertex positions and the SDF values. For more details and example usage in learning, see 
     `Deep Marching Tetrahedra\: a Hybrid Representation for High-Resolution 3D Shape Synthesis`_ NeurIPS 2021.
 
@@ -154,7 +153,10 @@ def marching_tetrahedra(vertices, tets, sdf, return_tet_idx=False):
                 [3, 2, 0]])
         >>> tet_idx_list[0]
         tensor([0, 0])
-        
+
+    .. _An efficient method of triangulating equi-valued surfaces by using tetrahedral cells:
+        https://search.ieice.org/bin/summary.php?id=e74-d_1_214
+
     .. _Deep Marching Tetrahedra\: a Hybrid Representation for High-Resolution 3D Shape Synthesis:
             https://arxiv.org/abs/2111.04276
     """

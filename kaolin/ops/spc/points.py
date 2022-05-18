@@ -34,8 +34,8 @@ def quantize_points(x, level):
     If a point is out of the range :math:`[-1, 1]` it will be clipped to it.
 
     Args:
-        x (torch.FloatTensor): Floating point coordinates,
-                               must be of last dimension 3.
+        x (torch.Tensor): Floating point coordinates,
+                          must be of last dimension 3.
         level (int): Level of the grid
 
     Returns
@@ -53,10 +53,12 @@ def unbatched_points_to_octree(points, level, sorted=False):
 
     Args:
         points (torch.ShortTensor):
-            The Quantized 3d points. This is not exactly like SPC points hierarchies
-            as this is only the data for a specific level.
+            Quantized 3d points. This is not exactly like SPC points hierarchies
+            as this is only the data for a specific level,
+            of shape :math:`(\text{num_points}, 3)`.
         level (int): Max level of octree, and the level of the points.
         sorted (bool): True if the points are unique and sorted in morton order.
+                       Default=False.
 
     Returns:
         (torch.ByteTensor):
@@ -170,8 +172,7 @@ def coords_to_trilinear(coords, points):
     with ``features`` of shape :math:`(\text{num_points}, 8)`
 
     Args:
-        coords (torch.FloatTensor): Floating point 3D points,
-                                    of shape :math:`(\text{num_points}, 3)`.
+        coords (torch.FloatTensor): 3D points, of shape :math:`(\text{num_points}, 3)`.
         points (torch.ShortTensor): Quantized 3D points (the 0th bit of the voxel x is in),
                                     of shape :math:`(\text{num_points}, 3)`.
 

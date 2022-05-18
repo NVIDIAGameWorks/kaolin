@@ -59,15 +59,13 @@ def _unbatched_check_sign_cuda(verts, faces, points):
 
 
 def check_sign(verts, faces, points, hash_resolution=512):
-    r"""Checks if a set of points is contained inside a mesh. 
+    r"""Checks if a set of points is contained inside a watertight triangle mesh.
 
-    Each batch takes in v vertices, f faces of a watertight trimesh, 
-    and p points to check if they are inside the mesh. 
     Shoots a ray from each point to be checked
     and calculates the number of intersections 
     between the ray and triangles in the mesh. 
     Uses the parity of the number of intersections
-    to determine if the point is inside the mesh. 
+    to determine if the point is inside the mesh.
 
     Args:
         verts (torch.Tensor):

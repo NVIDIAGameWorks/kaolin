@@ -229,7 +229,12 @@ def tensor_info(t, name='', print_stats=False, detailed=False):
         detailed: if True, includes details about tensor properties
 
     Returns:
-        formatted string
+        (String) formatted string
+
+    Examples:
+        >>> t = torch.Tensor([0., 2., 3.])
+        >>> tensor_info(t, 'mytensor', True, True)
+        'mytensor: torch.Size([3]) (torch.float32)  - [min 0.0000, max 3.0000, mean 1.6667]  - req_grad=False, is_leaf=True, device=cpu, layout=torch.strided'
     """
     def _get_stats_str():
         if torch.is_tensor(t):

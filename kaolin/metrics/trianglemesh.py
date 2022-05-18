@@ -72,7 +72,7 @@ def point_to_mesh_distance(pointclouds, face_vertices):
 
     for i in range(batch_size):
         if pointclouds.is_cuda:
-            cur_dist, cur_face_idx, cur_dist_type = UnbatchedTriangleDistanceCuda.apply(
+            cur_dist, cur_face_idx, cur_dist_type = _UnbatchedTriangleDistanceCuda.apply(
                 pointclouds[i], face_vertices[i])
         else:
             cur_dist, cur_face_idx, cur_dist_type = _unbatched_naive_point_to_mesh_distance(
@@ -108,7 +108,7 @@ def _is_not_above(vertex, edge, norm, point):
 def _point_at(vertex, edge, proj):
     return vertex + edge * proj.view(-1, 1)
 
-class UnbatchedTriangleDistanceCuda(torch.autograd.Function):
+class _UnbatchedTriangleDistanceCuda(torch.autograd.Function):
     @staticmethod
     def forward(ctx, points, face_vertices):
         num_points = points.shape[0]
