@@ -1,4 +1,4 @@
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +18,7 @@ __all__ = [
     'points_to_morton',
     'morton_to_points',
     'points_to_corners',
+    'unbatched_interpolate_trilinear',
     'coords_to_trilinear',
     'unbatched_points_to_octree',
     'quantize_points'
@@ -164,25 +165,94 @@ def points_to_corners(points):
     shape.insert(-1, 8)
     return _C.ops.spc.points_to_corners_cuda(points.contiguous()).reshape(*shape)
 
-def coords_to_trilinear(coords, points):
+class InterpolateTrilinear(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, coords, pidx, point_hierarchy, trinkets, feats, level):
+
+        feats_out = _C.ops.spc.interpolate_trilinear_cuda(coords.contiguous(), pidx.contiguous(), 
+                                                          point_hierarchy.contiguous(), trinkets.contiguous(), 
+                                                          feats.contiguous(), level)
+
+        ctx.save_for_backward(coords, pidx, point_hierarchy, trinkets)
+        ctx.level = level
+        ctx.feats_shape = feats.shape
+        return feats_out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        coords, pidx, point_hierarchy, trinkets = ctx.saved_tensors
+
+        level = ctx.level
+        mask = pidx > -1
+        selected_points = point_hierarchy.index_select(0, pidx[mask])
+        selected_trinkets = trinkets.index_select(0, pidx[mask])
+
+        # TODO(ttakikawa): Support backprop with respect to coords
+        grad_feats = None
+        if ctx.needs_input_grad[4]:
+            # TODO(ttakikawa): Write a fused kernel
+            grad_feats = torch.zeros(ctx.feats_shape, device=grad_output.device, dtype=grad_output.dtype)
+            coeffs = coords_to_trilinear(coords[mask], selected_points[:, None].repeat(1, coords.shape[1], 1), level).type(grad_output.dtype)
+            grad_feats.index_add_(0, selected_trinkets.reshape(-1), 
+                                  (coeffs[..., None] * grad_output[mask][..., None, :]).sum(1).reshape(-1, ctx.feats_shape[-1]))
+        return None, None, None, None, grad_feats, None
+
+def unbatched_interpolate_trilinear(coords, pidx, point_hierarchy, trinkets, feats, level):
+    r"""Performs trilinear interpolation on a SPC feature grid.
+
+    Args:
+        coords (torch.FloatTensor): 3D coordinates of shape
+                                    :math:`(\text{num_coords}, \text{num_samples}, 3)` 
+                                    in normalized space [-1, 1].
+
+        pidx (torch.IntTensor): Index to the point hierarchy which contains the voxel
+                                which the coords exists in. Tensor of shape 
+                                :math:`(\text{num_coords}, \text{num_samples})`
+
+        point_hierarchy (torch.ShortTensor): 
+            The point hierarchy of shape :math:`(\text{num_points}, 3)`.
+            See :ref:`point_hierarchies <spc_points>` for a detailed description.
+
+        trinkets (torch.IntTensor): An indirection pointer (in practice, an index) to the feature
+                                    tensor of shape :math:`(\text{num_points}, 8})`.
+
+        feats (torch.Tensor): Floating point feature vectors to interpolate of shape 
+                              :math:`(\text{num_feats}, \text{feature_dim})`.
+
+        level (int): The level of SPC to interpolate on.
+
+    Returns:
+        (torch.FloatTensor): Interpolated feature vectors of shape
+                             :math:`(\text{num_voxels}, \text{num_samples}, \text{feature_dim}`.
+    """
+    return InterpolateTrilinear.apply(coords, pidx, point_hierarchy, trinkets, feats, level)
+
+def coords_to_trilinear(coords, points, level):
     r"""Calculates the coefficients for trilinear interpolation.
+
+    This calculates coefficients with respect to the dual octree, which represent the corners of the octree
+    where the features are stored.
 
     To interpolate with the coefficients, do:
     ``torch.sum(features * coeffs, dim=-1)``
     with ``features`` of shape :math:`(\text{num_points}, 8)`
 
     Args:
-        coords (torch.FloatTensor): 3D points, of shape :math:`(\text{num_points}, 3)`.
+        coords (torch.FloatTensor): 3D coordinates of shape :math:`(\text{num_points}, 3)`
+                                    in normalized space [-1, 1].
         points (torch.ShortTensor): Quantized 3D points (the 0th bit of the voxel x is in),
-                                    of shape :math:`(\text{num_points}, 3)`.
+                                    of shape :math:`(\text{num_coords}, 3)`.
+        level (int): The level of SPC to interpolate on.
 
     Returns:
         (torch.FloatTensor):
-            The trilinear interpolation coefficients,
-            of shape :math:`(\text{num_points}, 8)`.
+            The trilinear interpolation coefficients of shape :math:`(\text{num_points}, 8)`.
     """
     shape = list(points.shape)
     shape[-1] = 8
     points = points.reshape(-1, 3)
     coords = coords.reshape(-1, 3)
-    return _C.ops.spc.coords_to_trilinear_cuda(coords.contiguous(), points.contiguous()).reshape(*shape)
+    coords_ = (2**level) * (coords * 0.5 + 0.5)
+
+    return _C.ops.spc.coords_to_trilinear_cuda(coords_.contiguous(), points.contiguous()).reshape(*shape)

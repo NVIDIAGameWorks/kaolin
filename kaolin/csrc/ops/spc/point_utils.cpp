@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +25,9 @@ namespace kaolin {
 void morton_to_points_cuda_impl(at::Tensor morton_codes, at::Tensor points);
 void points_to_morton_cuda_impl(at::Tensor points, at::Tensor morton_codes);
 void points_to_corners_cuda_impl(at::Tensor points, at::Tensor corners);
+void interpolate_trilinear_cuda_impl(at::Tensor coords, at::Tensor pidx,
+                                     at::Tensor points, at::Tensor trinkets,
+                                     at::Tensor feats_in, at::Tensor feats_out, int32_t level);
 void coords_to_trilinear_cuda_impl(at::Tensor coord, at::Tensor points, at::Tensor coeffs);
 //void coord_to_trilinear_jacobian_cuda_impl(at::Tensor coord);
 
@@ -73,6 +76,43 @@ at::Tensor points_to_corners_cuda(at::Tensor points) {
   at::Tensor corners = at::zeros({num, 8, 3}, at::device(at::kCUDA).dtype(at::kShort));
   points_to_corners_cuda_impl(points, corners);
   return corners;
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
+}
+
+at::Tensor interpolate_trilinear_cuda(
+        at::Tensor coords, 
+        at::Tensor pidx, 
+        at::Tensor points, 
+        at::Tensor trinkets, 
+        at::Tensor feats,
+        int32_t level) {
+#ifdef WITH_CUDA
+  at::TensorArg coords_arg{coords, "coords", 1};
+  at::TensorArg pidx_arg{pidx, "pidx", 2};
+  at::TensorArg points_arg{points, "points", 3};
+  at::TensorArg trinkets_arg{trinkets, "trinkets", 4};
+  at::TensorArg feats_arg{feats, "feats", 5};
+  at::checkAllSameGPU(__func__, {coords_arg, pidx_arg, points_arg, trinkets_arg, feats_arg});
+  at::checkAllContiguous(__func__, {coords_arg, pidx_arg, points_arg, trinkets_arg, feats_arg});
+  at::checkScalarType(__func__, coords_arg, at::kFloat);
+  at::checkScalarType(__func__, pidx_arg, at::kInt);
+  at::checkScalarType(__func__, points_arg, at::kShort);
+  at::checkScalarType(__func__, trinkets_arg, at::kInt);
+  at::checkScalarTypes(__func__, feats_arg, {at::kHalf, at::kFloat, at::kDouble});
+  at::checkDim(__func__, coords_arg, 3);
+  at::checkDim(__func__, pidx_arg, 1);
+  at::checkDim(__func__, points_arg, 2);
+  at::checkDim(__func__, trinkets_arg, 2);
+  at::checkDim(__func__, feats_arg, 2);
+  
+  int64_t num_voxels = coords.size(0);
+  int64_t num_samples = coords.size(1);
+  int64_t feat_dim = feats.size(1);
+  at::Tensor feats_out = at::zeros({num_voxels, num_samples, feat_dim}, feats.options());
+  interpolate_trilinear_cuda_impl(coords, pidx, points, trinkets, feats, feats_out, level);
+  return feats_out;
 #else
   KAOLIN_NO_CUDA_ERROR(__func__);
 #endif  // WITH_CUDA

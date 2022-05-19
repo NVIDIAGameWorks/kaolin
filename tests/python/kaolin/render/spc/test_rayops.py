@@ -29,12 +29,12 @@ class TestRaytrace:
     
     @pytest.fixture(autouse=True)
     def feats_big(self):
-        feats = torch.rand([100000, 100, 32], device='cuda', dtype=torch.float)
+        feats = torch.rand([10000, 100, 32], device='cuda', dtype=torch.float)
         return feats
 
     @pytest.fixture(autouse=True)
     def boundaries_big(self):
-        boundary = torch.zeros([100000, 100], device='cuda', dtype=torch.bool)
+        boundary = torch.zeros([10000, 100], device='cuda', dtype=torch.bool)
         boundary[:, 0] = True
         return boundary.reshape(-1)
     
