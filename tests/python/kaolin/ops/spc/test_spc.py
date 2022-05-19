@@ -24,6 +24,8 @@ from kaolin.rep import Spc
 
 from kaolin.ops.spc import scan_octrees, generate_points, to_dense, feature_grids_to_spc
 from kaolin.ops.spc import unbatched_query, unbatched_points_to_octree
+from kaolin.ops.spc import unbatched_get_level_points, unbatched_make_dual, unbatched_make_trinkets
+from kaolin.ops.spc import points_to_corners
 
 from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_tensor
 
@@ -158,6 +160,43 @@ class TestBase:
         expected_point_hierarchies = torch.cat(expected_point_hierarchies,
                                                dim=0).cuda().short()
         assert torch.equal(point_hierarchies, expected_point_hierarchies)
+
+
+@pytest.mark.parametrize('device', ['cuda'])
+@pytest.mark.parametrize('max_level', [4, 6, 1])
+@pytest.mark.parametrize('batch_size', [1])
+class TestTrinkets:
+    @pytest.fixture(autouse=True)
+    def octrees_and_lengths(self, batch_size, max_level, device):
+        return random_spc_octrees(batch_size, max_level, device)
+
+    @pytest.fixture(autouse=True)
+    def octrees(self, octrees_and_lengths):
+        return octrees_and_lengths[0]
+
+    @pytest.fixture(autouse=True)
+    def lengths(self, octrees_and_lengths):
+        return octrees_and_lengths[1]
+
+    def test_unbatched_make_trinkets(self, octrees, lengths, max_level):
+        out_level, pyramid, exsum = scan_octrees(octrees, lengths)
+        point_hierarchy = generate_points(octrees, pyramid, exsum)
+        pyramid = pyramid[0]
+        point_hierarchy_dual, pyramid_dual = unbatched_make_dual(point_hierarchy, pyramid)
+        trinkets, parents = unbatched_make_trinkets(point_hierarchy, pyramid, point_hierarchy_dual, pyramid_dual)
+        
+        for i in range(0, max_level+1):
+            _idx = pyramid_dual[1, i] + unbatched_get_level_points(trinkets, pyramid, i)
+            pts = point_hierarchy_dual.index_select(0, _idx.view(-1)).view(-1, 8, 3)
+            expected_pts = points_to_corners(unbatched_get_level_points(point_hierarchy, pyramid, i))
+            assert torch.equal(pts, expected_pts)
+
+        assert parents[0] == -1
+
+        for i in range(1, max_level+1):
+            parent = point_hierarchy.index_select(0, unbatched_get_level_points(parents, pyramid, i))
+        assert torch.equal(parent, unbatched_get_level_points(point_hierarchy, pyramid, i)//2)
+
 
 class TestQuery:
     def test_query(self):

@@ -429,7 +429,7 @@ class TestDeftetSparseRender:
         assert torch.equal(face_idx, gt_face_idx)
         assert torch.allclose(interpolated_features,
                               gt_interpolated_features,
-                              rtol=1e-5, atol=1e-5)
+                              rtol=1e-4, atol=1e-4)
 
     @pytest.mark.parametrize('knum', [20, 30])
     def test_forward_with_mask(self, pixel_coords, render_ranges,
@@ -445,10 +445,10 @@ class TestDeftetSparseRender:
         assert torch.equal(face_idx, gt_face_idx)
         assert torch.allclose(interpolated_features[0],
                               gt_interpolated_features[0],
-                              rtol=1e-5, atol=1e-5)
+                              rtol=1e-4, atol=1e-4)
         assert torch.allclose(interpolated_features[0],
                               gt_interpolated_features[0],
-                              rtol=1e-5, atol=1e-5)
+                              rtol=1e-4, atol=1e-4)
 
     @pytest.mark.parametrize('knum', [20, 30])
     def test_backward(self, pixel_coords, render_ranges, face_vertices_z,

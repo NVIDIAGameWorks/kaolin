@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +15,7 @@
 
 
 #include <ATen/ATen.h>
+#include <c10/cuda/CUDAGuard.h>
 
 #include "../../spc_math.h"
 #include "../../spc_utils.cuh"
@@ -40,10 +41,68 @@ __global__ void points_to_corners_cuda_kernel(
     }
 }
 
+template<typename scalar_t>
+__global__ void interpolate_trilinear_cuda_kernel(
+    const float3* coords, // num_voxels, num_samples, 3
+    const int32_t* pidx, // num_voxels
+    const point_data* points, // point_hierarchy_size, 3
+    const int32_t* trinkets, // point_hierarchy_size, 8
+    const scalar_t* feature_in, // num_feats, feature_dim
+    scalar_t* feature_out, // num_voxels, num_samples, feature_dim
+    const int64_t feature_dim, 
+    const int32_t resolution, 
+    const int64_t num_samples,
+    const int64_t num
+){
+    int64_t idx = blockIdx.x*blockDim.x + threadIdx.x;
+    int64_t stride = blockDim.x*gridDim.x;
+    if (idx > num) return;
+
+    for (int32_t i=idx; i<num; i+=stride) { 
+
+        int32_t _i = pidx[i / num_samples];
+
+        if (_i > -1) {
+            point_data point = points[_i];
+            int32_t trinket[8]; 
+            
+            memcpy(&trinket, trinkets + (_i*8), sizeof(int32_t)*8);
+
+            float3 x_ = make_float3(resolution * (coords[i].x * 0.5 + 0.5) - point.x, 
+                                    resolution * (coords[i].y * 0.5 + 0.5) - point.y, 
+                                    resolution * (coords[i].z * 0.5 + 0.5) - point.z);
+            float3 _x = make_float3(1.0 - x_.x, 1.0 - x_.y, 1.0 - x_.z);
+            
+            float c000 = _x.x * _x.y * _x.z;
+            float c001 = _x.x * _x.y * x_.z;
+            float c010 = _x.x * x_.y * _x.z;
+            float c011 = _x.x * x_.y * x_.z;
+            float c100 = x_.x * _x.y * _x.z;
+            float c101 = x_.x * _x.y * x_.z;
+            float c110 = x_.x * x_.y * _x.z;
+            float c111 = x_.x * x_.y * x_.z;
+            
+            for (uint64_t j=0; j<feature_dim; ++j) {
+                scalar_t feat =
+                    feature_in[trinket[0]*feature_dim+j] * c000 + 
+                    feature_in[trinket[1]*feature_dim+j] * c001 + 
+                    feature_in[trinket[2]*feature_dim+j] * c010 + 
+                    feature_in[trinket[3]*feature_dim+j] * c011 + 
+                    feature_in[trinket[4]*feature_dim+j] * c100 + 
+                    feature_in[trinket[5]*feature_dim+j] * c101 + 
+                    feature_in[trinket[6]*feature_dim+j] * c110 + 
+                    feature_in[trinket[7]*feature_dim+j] * c111; 
+                feature_out[i*feature_dim+j] = feat;
+            }
+        }
+    }
+}
+
+template<typename scalar_t>
 __global__ void coords_to_trilinear_cuda_kernel(
     const float3* coords,
     const point_data* points,
-    float* coeffs,
+    scalar_t* coeffs,
     const int64_t num_coords
 ){
     int64_t idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -128,18 +187,57 @@ void points_to_morton_cuda_impl(at::Tensor points, at::Tensor morton_codes) {
         num_points);
 }
 
+void interpolate_trilinear_cuda_impl(
+    at::Tensor coords,
+    at::Tensor pidx,
+    at::Tensor points,
+    at::Tensor trinkets,
+    at::Tensor feats_in,
+    at::Tensor feats_out,
+    int32_t level
+){
+    int64_t num_voxels = coords.size(0);
+    int64_t num_samples = coords.size(1);
+    int64_t feat_dim = feats_in.size(1);
+    int64_t num = num_voxels * num_samples;
+    int32_t resolution = pow(2, level);
+
+    int num_threads = 128;
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "interpolate_trilinear_cuda", ([&] {
+        const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
+        auto stream = at::cuda::getCurrentCUDAStream();
+        interpolate_trilinear_cuda_kernel<scalar_t><<<(num + num_threads - 1) / num_threads, num_threads, 0, stream>>>(
+            reinterpret_cast<float3*>(coords.data_ptr<float>()),
+            pidx.data_ptr<int32_t>(),
+            reinterpret_cast<point_data*>(points.data_ptr<short>()),
+            trinkets.data_ptr<int32_t>(),
+            feats_in.data_ptr<scalar_t>(),
+            feats_out.data_ptr<scalar_t>(),
+            feat_dim,
+            resolution,
+            num_samples,
+            num
+        );
+    }));
+}
+
+
 void coords_to_trilinear_cuda_impl(
     at::Tensor coords,
     at::Tensor points,
     at::Tensor coeffs
 ) {
     int64_t num_coords = coords.size(0);
-    coords_to_trilinear_cuda_kernel<<<(num_coords + 1023) / 1024, 1024>>>(
-        reinterpret_cast<float3*>(coords.data_ptr<float>()),
-        reinterpret_cast<point_data*>(points.data_ptr<short>()),
-        coeffs.data_ptr<float>(),
-        num_coords
-    );
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(coeffs.type(), "coords_to_trilinear_cuda", ([&] {
+        const at::cuda::OptionalCUDAGuard device_guard(at::device_of(coeffs));
+        auto stream = at::cuda::getCurrentCUDAStream();
+        coords_to_trilinear_cuda_kernel<scalar_t><<<(num_coords + 1023) / 1024, 1024, 0, stream>>>(
+            reinterpret_cast<float3*>(coords.data_ptr<float>()),
+            reinterpret_cast<point_data*>(points.data_ptr<short>()),
+            coeffs.data_ptr<scalar_t>(),
+            num_coords
+        );
+    }));
 }
 
 void coords_to_trilinear_jacobian_cuda_impl(

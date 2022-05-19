@@ -1,4 +1,4 @@
-// Copyright (c) 2020,21 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2020,21-22 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,6 +50,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ops_spc.def("query_multiscale_cuda", &query_multiscale_cuda);
     ops_spc.def("points_to_morton_cuda", &points_to_morton_cuda);
     ops_spc.def("morton_to_points_cuda", &morton_to_points_cuda);
+    ops_spc.def("interpolate_trilinear_cuda", &interpolate_trilinear_cuda);
     ops_spc.def("coords_to_trilinear_cuda", &coords_to_trilinear_cuda);
     //ops_spc.def("coord_to_trilinear_jacobian_cuda", &coord_to_trilinear_jacobian_cuda);
     ops_spc.def("points_to_corners_cuda", &points_to_corners_cuda);

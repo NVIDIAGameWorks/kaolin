@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES
+* Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES
 * All rights reserved.
 *
 * NVIDIA CORPORATION and its licensors retain all intellectual property
@@ -18,6 +18,14 @@ namespace kaolin {
 at::Tensor points_to_morton_cuda(at::Tensor points);
 
 at::Tensor morton_to_points_cuda(at::Tensor morton_codes);
+
+at::Tensor interpolate_trilinear_cuda(
+    at::Tensor coords,
+    at::Tensor pidx,
+    at::Tensor points,
+    at::Tensor trinkets,
+    at::Tensor feats,
+    int32_t level);
 
 at::Tensor coords_to_trilinear_cuda(
     at::Tensor coords,
