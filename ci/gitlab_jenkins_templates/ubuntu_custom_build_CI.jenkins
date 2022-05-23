@@ -8,10 +8,15 @@ currentBuild.description = sourceBranch + ": " + commitHash
 
 podTemplate(
 cloud:'sc-ipp-blossom-prod',
+//volumes: [persistentVolumeClaim(mountPath: '/mount_binaries', claimName: 'kaolin-pvc', readOnly: false)],
 yaml:'''
 apiVersion: v1
 kind: Pod
 spec:
+  volumes:
+  - name: pvc-mount
+    persistentVolumeClaim:
+      claimName: 'kaolin-pvc'
   containers:
   - name: docker
     image: docker:19.03.1
@@ -22,6 +27,9 @@ spec:
     env:
       - name: DOCKER_HOST
         value: tcp://localhost:2375
+    volumeMounts:
+      - mountPath: /mount_binaries
+        name: pvc-mount
   - name: docker-daemon
     image: docker:19.03.1-dind
     securityContext:
@@ -36,6 +44,9 @@ spec:
         limits:
           memory: 32Gi
           cpu: 12
+    volumeMounts:
+      - mountPath: /mount_binaries
+        name: pvc-mount
 ''') {
   node(POD_LABEL) {
     container("docker") {
@@ -60,6 +71,7 @@ spec:
             ])
           }
           docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
+
             stage("Build") {
               baseImage = docker.build(
                   "${targetImageTag}-base",
@@ -77,7 +89,41 @@ spec:
                      .
                   """)
             }
+            if (buildWheel) {
+              stage("Build wheel") {
+                cudaTag = cudaVer.split('\\.')[0..<2].join('')
+                targetImage.inside("-v /mount_binaries:/mount_binaries") {
+                  sh """
+                  mkdir -p /mount_binaries/torch-${torchVer}+cu${cudaTag}
+                  python setup.py bdist_wheel --dist-dir /mount_binaries/torch-${torchVer}+cu${cudaTag}
+                  """
+                }
+                pythonVerTag = pythonVer.split('\\.').join('')
+                Integer pythonVerTagVal = pythonVerTag
+                sh """echo ${pythonVerTagVal}"""
+                pythonVerAbiTag = (pythonVerTagVal < 38) ? pythonVerTag + 'm' : pythonVerTag
+                kaolinVer = sh(script: "cat ./version.txt", returnStdout: true).trim()
+                baseWheelName = "kaolin-${kaolinVer}-cp${pythonVerTag}-cp${pythonVerAbiTag}"
+                srcWheelName = "${baseWheelName}-linux_x86_64.whl"
+                dstWheelName = "${baseWheelName}-manylinux1_x86_64.whl"
+                sh """
+                mv /mount_binaries/torch-${torchVer}+cu${cudaTag}/${srcWheelName} ./${dstWheelName}
+                """
+              }
+              stage("Reinstall from wheel") {
+                targetImage = docker.build(
+                    "${targetImageTag}",
+                    """--no-cache --network host -f ./tools/linux/Dockerfile.install_wheel \
+                       --build-arg BASE_IMAGE=${targetImageTag}-base \
+                       --build-arg WHEEL_NAME=${dstWheelName} \
+                       .
+                    """)
+              }
+            }
             stage("Push") {
+              sh """
+              mv ./${dstWheelName} /mount_binaries/torch-${torchVer}+cu${cudaTag}/${dstWheelName}
+              """
               targetImage.push()
             }
           }

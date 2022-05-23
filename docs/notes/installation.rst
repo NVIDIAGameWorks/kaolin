@@ -11,13 +11,13 @@ Requirements
 ------------
 
 * Linux, macOS (CPU-only) or Windows
-* Python >= 3.6 (3.6 and 3.7 recommended for Windows)
+* Python >= 3.7, <= 3.9
 * CUDA >= 10.0 (with 'nvcc' installed)
 
 Dependencies
 ------------
 
-* torch >= 1.5, <= 1.10.2
+* torch >= 1.5, <= 1.11.0
 * cython == 0.29.20 (auto-installed)
 * scipy >= 1.2.0 (auto-installed)
 * Pillow >= 8.0.0 (auto-installed)
@@ -43,7 +43,7 @@ Clone and optionally check out an `official release <https://github.com/NVIDIAGa
 
     $ git clone --recursive https://github.com/NVIDIAGameWorks/kaolin
     $ cd kaolin
-    $ git checkout v0.10.0
+    $ git checkout v0.11.0 # optional
 
 2. Install Pytorch
 ^^^^^^^^^^^^^^^^^^
