@@ -76,6 +76,14 @@ spec:
               stage("Occupancy Sampling Recipe") {
                 sh 'cd /kaolin/examples/recipes/preprocess/ && python occupancy_sampling.py'
               }
+            }, "SPC Dual Octree Recipe": {
+              stage("SPC Dual Octree Recipe") {
+                sh 'cd /kaolin/examples/recipes/spc/ && python spc_dual_octree.py'
+              }
+            }, "SPC Trilinear Interpolation Recipe": {
+              stage("SPC Trilinear Interpolation Recipe") {
+                sh 'cd /kaolin/examples/recipes/spc/ && python spc_trilinear_interp.py'
+              }
             }
           ]
           parallel testMap
