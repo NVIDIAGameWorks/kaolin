@@ -139,7 +139,8 @@ __global__ void deftet_sparse_render_forward_cuda_kernel(
 	      scalar_t _w1 = c_edge_x * a_edge_y - c_edge_y * a_edge_x;
 	      scalar_t _w2 = a_edge_x * b_edge_y - a_edge_y * b_edge_x;
 	      scalar_t norm = _w0 + _w1 + _w2;
-	      scalar_t norm_eps = copysignf(eps, norm);
+	      scalar_t norm_eps = copysignf(static_cast<double>(eps),
+                                      static_cast<double>(norm));
 	      w0 = _w0 / (norm + norm_eps);
 	      w1 = _w1 / (norm + norm_eps);
 	      w2 = _w2 / (norm + norm_eps);
@@ -323,7 +324,8 @@ __global__ void deftet_sparse_render_backward_cuda_kernel(
       const scalar_t k1 = s * q - n * t;
       const scalar_t k2 = m * t - s * p;
       scalar_t k3 = m * q - n * p;
-      k3 += copysign(eps, k3);
+      // Need to explicitly cast because there is a bug on windows.
+      k3 += copysign(static_cast<double>(eps), static_cast<double>(k3));
 
       const scalar_t dk1dm = 0;
       const scalar_t dk1dn = -t;
