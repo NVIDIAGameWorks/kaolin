@@ -138,7 +138,8 @@ __global__ void packed_rasterize_forward_cuda_kernel(
           scalar_t w1 = c_edge_x * a_edge_y - c_edge_y * a_edge_x;
           scalar_t w2 = a_edge_x * b_edge_y - a_edge_y * b_edge_x;
           scalar_t norm = w0 + w1 + w2;
-          norm += copysign(eps, norm);
+          norm += copysign(static_cast<double>(eps),
+                           static_cast<double>(norm));
           w0 /= norm;
           w1 /= norm;
           w2 /= norm;
@@ -318,7 +319,7 @@ __global__ void rasterize_backward_cuda_kernel(
       const scalar_t k1 = s * q - n * t;
       const scalar_t k2 = m * t - s * p;
       scalar_t k3 = m * q - n * p;
-      k3 += copysign(eps, k3);
+      k3 += copysign(static_cast<double>(eps), static_cast<double>(k3));
 
       const scalar_t dk1dm = 0;
       const scalar_t dk1dn = -t;
