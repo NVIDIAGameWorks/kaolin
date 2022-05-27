@@ -20,6 +20,7 @@ __all__ = [
     'points_to_corners',
     'unbatched_interpolate_trilinear',
     'coords_to_trilinear',
+    'coords_to_trilinear_coeffs',
     'unbatched_points_to_octree',
     'quantize_points'
 ]
@@ -193,7 +194,7 @@ class InterpolateTrilinear(torch.autograd.Function):
         if ctx.needs_input_grad[4]:
             # TODO(ttakikawa): Write a fused kernel
             grad_feats = torch.zeros(ctx.feats_shape, device=grad_output.device, dtype=grad_output.dtype)
-            coeffs = coords_to_trilinear(coords[mask], selected_points[:, None].repeat(1, coords.shape[1], 1), level).type(grad_output.dtype)
+            coeffs = coords_to_trilinear_coeffs(coords[mask], selected_points[:, None].repeat(1, coords.shape[1], 1), level).type(grad_output.dtype)
             grad_feats.index_add_(0, selected_trinkets.reshape(-1), 
                                   (coeffs[..., None] * grad_output[mask][..., None, :]).sum(1).reshape(-1, ctx.feats_shape[-1]))
         return None, None, None, None, grad_feats, None
@@ -204,18 +205,24 @@ def unbatched_interpolate_trilinear(coords, pidx, point_hierarchy, trinkets, fea
     Args:
         coords (torch.FloatTensor): 3D coordinates of shape
                                     :math:`(\text{num_coords}, \text{num_samples}, 3)` 
-                                    in normalized space [-1, 1].
+                                    in normalized space [-1, 1]. ``num_samples`` indicates the number of
+                                    coordinates that are grouped inside the same SPC node for performance
+                                    optimization purposes. In many cases the ``pidx`` is 
+                                    generated from :func:`kaolin.ops.spc.unbatched_query`
+                                    and so the ``num_samples`` will be 1.
 
         pidx (torch.IntTensor): Index to the point hierarchy which contains the voxel
                                 which the coords exists in. Tensor of shape 
-                                :math:`(\text{num_coords}, \text{num_samples})`
+                                :math:`(\text{num_coords})`. 
+                                This can be computed with :func:`kaolin.ops.spc.unbatched_query`.
+
 
         point_hierarchy (torch.ShortTensor): 
             The point hierarchy of shape :math:`(\text{num_points}, 3)`.
             See :ref:`point_hierarchies <spc_points>` for a detailed description.
 
         trinkets (torch.IntTensor): An indirection pointer (in practice, an index) to the feature
-                                    tensor of shape :math:`(\text{num_points}, 8})`.
+                                    tensor of shape :math:`(\text{num_points}, 8)`.
 
         feats (torch.Tensor): Floating point feature vectors to interpolate of shape 
                               :math:`(\text{num_feats}, \text{feature_dim})`.
@@ -223,12 +230,41 @@ def unbatched_interpolate_trilinear(coords, pidx, point_hierarchy, trinkets, fea
         level (int): The level of SPC to interpolate on.
 
     Returns:
-        (torch.FloatTensor): Interpolated feature vectors of shape
-                             :math:`(\text{num_voxels}, \text{num_samples}, \text{feature_dim}`.
+        (torch.FloatTensor): 
+            Interpolated feature vectors of shape :math:`(\text{num_voxels}, \text{num_samples}, \text{feature_dim})`.
     """
     return InterpolateTrilinear.apply(coords, pidx, point_hierarchy, trinkets, feats, level)
 
 def coords_to_trilinear(coords, points, level):
+    r"""Calculates the coefficients for trilinear interpolation.
+
+    .. deprecated:: 0.11.0
+       This function is deprecated. Use :func:`coords_to_trilinear_coeffs`.
+
+    This calculates coefficients with respect to the dual octree, which represent the corners of the octree
+    where the features are stored.
+
+    To interpolate with the coefficients, do:
+    ``torch.sum(features * coeffs, dim=-1)``
+    with ``features`` of shape :math:`(\text{num_points}, 8)`
+
+    Args:
+        coords (torch.FloatTensor): 3D coordinates of shape :math:`(\text{num_points}, 3)`
+                                    in normalized space [-1, 1].
+        points (torch.ShortTensor): Quantized 3D points (the 0th bit of the voxel x is in),
+                                    of shape :math:`(\text{num_coords}, 3)`.
+        level (int): The level of SPC to interpolate on.
+
+    Returns:
+        (torch.FloatTensor):
+            The trilinear interpolation coefficients of shape :math:`(\text{num_points}, 8)`.
+    """
+    warnings.warn("coords_to_trilinear is deprecated, "
+                  "please use kaolin.ops.spc.coords_to_trilinear_coeffs instead",
+                  DeprecationWarning, stacklevel=2)
+    return coords_to_trilinear_coeffs(coords, points, level)
+
+def coords_to_trilinear_coeffs(coords, points, level):
     r"""Calculates the coefficients for trilinear interpolation.
 
     This calculates coefficients with respect to the dual octree, which represent the corners of the octree
