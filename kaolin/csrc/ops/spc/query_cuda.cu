@@ -35,7 +35,7 @@ __global__ void query_cuda_kernel(
     int stride = blockDim.x*gridDim.x;
     if (idx > n) return;
         
-    int32_t resolution = pow(2, level);
+    int32_t resolution = 1 << level;
 
     for (int i=idx; i<n; i+=stride) {
         point_data point = make_point_data(
@@ -60,7 +60,7 @@ __global__ void query_multiscale_cuda_kernel(
     int stride = blockDim.x*gridDim.x;
     if (idx > n) return;
     
-    int32_t resolution = pow(2, level);
+    int32_t resolution = 1 << level;
 
     for (int i=idx; i<n; i+=stride) {
         point_data point = make_point_data(

@@ -200,7 +200,7 @@ void interpolate_trilinear_cuda_impl(
     int64_t num_samples = coords.size(1);
     int64_t feat_dim = feats_in.size(1);
     int64_t num = num_voxels * num_samples;
-    int32_t resolution = pow(2, level);
+    int32_t resolution = 1 << level;
 
     int num_threads = 128;
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "interpolate_trilinear_cuda", ([&] {
