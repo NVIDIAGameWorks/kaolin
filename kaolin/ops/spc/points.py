@@ -25,6 +25,7 @@ __all__ = [
     'quantize_points'
 ]
 
+import warnings
 import torch
 
 from kaolin import _C
