@@ -163,8 +163,9 @@ a comprehensive model zoo comprising many state-of-the-art 3D deep learning arch
 for future research endeavours.
 """
 
-version = '0.10.0'
-
+version_txt = os.path.join(cwd, 'version.txt')
+with open(version_txt) as f:
+    version = f.readline().strip()
 
 def write_version_file():
     version_path = os.path.join(cwd, 'kaolin', 'version.py')
@@ -288,7 +289,7 @@ if __name__ == '__main__':
         url=URL,
         long_description=LONG_DESCRIPTION,
         license=LICENSE,
-        python_requires='~=3.6',
+        python_requires='~=3.7',
 
         # Package info
         packages=find_packages(exclude=('docs', 'tests', 'examples')),

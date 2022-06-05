@@ -542,7 +542,7 @@ class TestDeftetSparseRender:
         assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
         assert torch.allclose(face_vertices_image.grad,
                               face_vertices_image2.grad,
-                              rtol=5e-3, atol=5e-3)
+                              rtol=5e-2, atol=5e-2)
         assert torch.allclose(face_uvs.grad,
                               face_uvs2.grad,
                               rtol=1e-3, atol=1e-3)
