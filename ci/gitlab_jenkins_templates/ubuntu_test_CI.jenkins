@@ -60,7 +60,7 @@ spec:
                 // using wheel you don't have /kaolin/kaolin
                 sh '''
                 if [ -f "/kaolin/kaolin" ]; then
-                    pytest --doctest-modules --ignore=/kaolin/kaolin/experimental /kaolin/kaolin'
+                    pytest --doctest-modules --ignore=/kaolin/kaolin/experimental /kaolin/kaolin
                 fi
                 '''
               }

@@ -182,7 +182,8 @@ node {
             commitHash = sh(script: "git log -1 --pretty=format:%h",
                             returnStdout: true).trim()
             sh "echo ${commitHash}"
-            if (gitlabMergeRequestTitle.contains("[for wheels]")) {
+            if (gitlabActionType == "MERGE" &&
+                gitlabMergeRequestTitle.contains("[for wheels]")) {
                 for (config in ubuntu_for_wheels_configs) {
                     for (pythonVer in ['3.7', '3.8', '3.9']) {
                         def configName = "custom-wheels-torch${config['torchVer']}-" + \
