@@ -205,7 +205,9 @@ node {
                 // Check if the last commit message has a [with custom] tag
                 def hasNoCustomInMess = sh(script: "git log -1 | grep '.*\\[with custom\\].*'",
                                            returnStatus: true)
-                sh "echo ${gitlabMergeRequestTitle}"
+                if (gitlabActionType == "MERGE") {
+                    sh "echo ${gitlabMergeRequestTitle}"
+                }
                 // We try to build from cuda docker image if the commit has such tag
                 // or CI is applied on master
                 if (hasNoCustomInMess == 0 || gitlabSourceBranch == "master" ||
