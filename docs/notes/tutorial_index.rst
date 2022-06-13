@@ -44,7 +44,7 @@ Detailed Tutorials
     * understanding output file format
     * visualizing 3D checkpoints using Omniverse Kaolin App
     * visualizing 3D checkpoints using bundled ``kaolin-dash3d`` commandline utility
-* `Reconstructing Point Cloud with DMTet <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/dmtet_tutorial.ipynb>`_:
+* `Reconstructing Point Cloud with DMTet <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/dmtet_tutorial.ipynb>`_: Trains an SDF estimator to reconstruct a mesh from a point cloud covering:
     * using point clouds data generated with Omniverse Kaolin App
     * loading point clouds from an USD file.
     * defining losses and regularizer for a mesh with point cloud ground truth
