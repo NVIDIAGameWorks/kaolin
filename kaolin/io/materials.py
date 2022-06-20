@@ -745,7 +745,7 @@ class PBRMaterial(Material):
                     params['normals_texture'] = output * 2. - 1.
                     if 'colorspace' in data:
                         params['normals_colorspace'] = data['colorspace']['value']
-            if 'displacement':
+            elif 'displacement' in name.lower():
                 output, is_value = _read_data(data)
                 params[f'displacement_{["texture", "value"][is_value]}'] = output
                 if 'colorspace' in data:
