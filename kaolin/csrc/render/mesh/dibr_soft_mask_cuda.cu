@@ -17,6 +17,8 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <THC/THCAtomics.cuh>
 
+#include "../../utils.h"
+
 #define EPS 1e-7
 
 namespace kaolin {
@@ -209,7 +211,7 @@ void dibr_soft_mask_forward_cuda_impl(
         const dim3 threads(block_size, 1, 1);
         const dim3 blocks(grid_size, 1, 1);
 
-        dibr_soft_mask_forward_cuda_kernel<scalar_t><<<blocks, threads>>>(
+        dibr_soft_mask_forward_cuda_kernel<scalar_t><<<blocks, threads, 0, stream>>>(
             face_vertices_image.data_ptr<scalar_t>(),
             face_large_bboxes.data_ptr<scalar_t>(),
             selected_face_idx.data_ptr<int64_t>(),
@@ -217,8 +219,10 @@ void dibr_soft_mask_forward_cuda_impl(
             close_face_idx.data_ptr<int64_t>(),
             close_face_dist_type.data_ptr<uint8_t>(),
             soft_mask.data_ptr<scalar_t>(),
-            batch_size, height, width, num_faces, knum, sigmainv, multiplier);
-      });
+            batch_size, height, width, num_faces, knum, sigmainv, multiplier
+	);
+        CUDA_CHECK(cudaGetLastError());
+  });
   return;
 }
 
@@ -378,7 +382,7 @@ void dibr_soft_mask_backward_cuda_impl(
         const dim3 threads(block_size, 1, 1);
         const dim3 blocks(grid_size, 1, 1);
 
-        dibr_soft_mask_backward_cuda_kernel<scalar_t><<<blocks, threads>>>(
+        dibr_soft_mask_backward_cuda_kernel<scalar_t><<<blocks, threads, 0, stream>>>(
              grad_soft_mask.data_ptr<scalar_t>(),
              soft_mask.data_ptr<scalar_t>(),
              selected_face_idx.data_ptr<int64_t>(),
@@ -388,9 +392,11 @@ void dibr_soft_mask_backward_cuda_impl(
              face_vertices_image.data_ptr<scalar_t>(),
              grad_face_vertices_image.data_ptr<scalar_t>(),
              batch_size, height, width, num_faces,
-             knum, sigmainv, multiplier);
+             knum, sigmainv, multiplier
+	);
+	CUDA_CHECK(cudaGetLastError());
 
-      });
+  });
   return;
 }
 

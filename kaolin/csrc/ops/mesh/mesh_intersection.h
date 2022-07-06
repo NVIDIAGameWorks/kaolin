@@ -19,12 +19,11 @@
 
 namespace kaolin {
 
-void unbatched_mesh_intersection_cuda(
+at::Tensor unbatched_mesh_intersection_cuda(
     const at::Tensor points,
     const at::Tensor verts_1,
     const at::Tensor verts_2,
-    const at::Tensor verts_3,
-    const at::Tensor ints);
+    const at::Tensor verts_3);
 
 }  // namespace kaolin
 

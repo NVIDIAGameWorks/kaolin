@@ -42,7 +42,7 @@ import torch
 from . import triangle_hash
 from kaolin import _C
 
-__all__ = ['check_sign']
+__all__ = ['check_sign', '_unbatched_check_sign_cuda']
 
 def _unbatched_check_sign_cuda(verts, faces, points):
     n, _ = points.size()
@@ -51,9 +51,9 @@ def _unbatched_check_sign_cuda(verts, faces, points):
     v2 = torch.index_select(verts, 0, faces[:, 1]).view(-1, 3).contiguous()
     v3 = torch.index_select(verts, 0, faces[:, 2]).view(-1, 3).contiguous()
 
-    ints = torch.zeros(n, device=points.device)
-    _C.ops.mesh.unbatched_mesh_intersection_cuda(points, v1, v2, v3, ints)
-    contains = ints % 2 == 1
+    ints = _C.ops.mesh.unbatched_mesh_intersection_cuda(points, v1, v2, v3)
+    
+    contains = ints % 2 == 1.
 
     return contains
 
@@ -69,17 +69,20 @@ def check_sign(verts, faces, points, hash_resolution=512):
 
     Args:
         verts (torch.Tensor):
-            vertices, of shape :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
+            Vertices, of shape :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
         faces (torch.Tensor):
-            faces, of shape :math:`(\text{num_faces}, 3)`.
+            Faces, of shape :math:`(\text{num_faces}, 3)`.
         points (torch.Tensor):
-            points to check, of shape :math:`(\text{batch_size}, \text{num_points}, 3)`.
-        hash_resolution (int): resolution used to check the points sign.
+            Points to check, of shape :math:`(\text{batch_size}, \text{num_points}, 3)`.
+        hash_resolution (int):
+            Resolution used to check the points sign. Only used with CPU.
+            Default: 512.
+                               
 
     Returns:
         (torch.BoolTensor): 
             Tensor indicating whether each point is inside the mesh,
-            of shape :math:`(\text{batch_size}, \text{num_vertices})`.
+            of shape :math:`(\text{batch_size}, \text{num_points})`.
 
     Example:
         >>> device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -104,15 +107,9 @@ def check_sign(verts, faces, points, hash_resolution=512):
     assert faces.device == points.device
     device = points.device
 
-    if not verts.dtype == torch.float32:
-        raise TypeError(f"Expected verts entries to be torch.float32 "
-                        f"but got {verts.dtype}.")
     if not faces.dtype == torch.int64:
         raise TypeError(f"Expected faces entries to be torch.int64 "
                         f"but got {faces.dtype}.")
-    if not points.dtype == torch.float32:
-        raise TypeError(f"Expected points entries to be torch.float32 "
-                        f"but got {points.dtype}.")
     if not isinstance(hash_resolution, int):
         raise TypeError(f"Expected hash_resolution to be int "
                         f"but got {type(hash_resolution)}.")
@@ -146,7 +143,6 @@ def check_sign(verts, faces, points, hash_resolution=512):
     maxlen = torch.max(torch.stack([xlen, ylen, zlen]), 0)[0]
     verts = verts / maxlen.view(-1, 1, 1)
     points = points / maxlen.view(-1, 1, 1)
-
     results = []
     if device.type == 'cuda':
         for i_batch in range(verts.shape[0]):
@@ -188,7 +184,7 @@ class _UnbatchedMeshIntersector:
         points = self.rescale(points)
 
         # placeholder result with no hits we'll fill in later
-        contains = np.zeros(len(points), dtype=np.bool)
+        contains = np.zeros(len(points), dtype=bool)
 
         # cull points outside of the axis aligned bounding box
         # this avoids running ray tests unless points are close
@@ -275,7 +271,7 @@ class _TriangleIntersector2d:
         return point_indices, tri_indices
 
     def check_triangles(self, points, triangles):
-        contains = np.zeros(points.shape[0], dtype=np.bool)
+        contains = np.zeros(points.shape[0], dtype=bool)
         A = triangles[:, :2] - triangles[:, 2:]
         A = A.transpose([0, 2, 1])
         y = points - triangles[:, 2]
