@@ -39,9 +39,9 @@ __global__ void query_cuda_kernel(
 
     for (int i=idx; i<n; i+=stride) {
         point_data point = make_point_data(
-            resolution * (query_coords[i*3 + 0] * 0.5 + 0.5),
-            resolution * (query_coords[i*3 + 1] * 0.5 + 0.5),
-            resolution * (query_coords[i*3 + 2] * 0.5 + 0.5)
+            floor(resolution * (query_coords[i*3 + 0] * 0.5 + 0.5)),
+            floor(resolution * (query_coords[i*3 + 1] * 0.5 + 0.5)),
+            floor(resolution * (query_coords[i*3 + 2] * 0.5 + 0.5))
         );
         pidx[i] = identify(point, level, prefix_sum, octree);
     }

@@ -234,6 +234,25 @@ class TestQuery:
         assert torch.equal(point_hierarchy[results_float[:-2]], query_points[:-2])
         assert torch.equal(point_hierarchy[results_int[:-2]], query_points[:-2])
 
+    def test_query_flooredge(self):
+        points = torch.tensor(
+            [[0,0,0]], device='cuda', dtype=torch.short)
+        level = 1
+        octree = unbatched_points_to_octree(points, level)
+        length = torch.tensor([len(octree)], dtype=torch.int32)
+        _, pyramid, prefix = scan_octrees(octree, length)
+        query_coords = torch.tensor(
+            [[-3.0,-3.0,-3.0],
+             [-2.5,-2.5,-2.5],
+             [2.5,2.5,2.5],
+             [3.0,3.0,3.0],
+             [0.0,0.0,0.0],
+             [0.5,0.5,0.5]], device='cuda', dtype=torch.float)
+        results = unbatched_query(octree, prefix, query_coords, 0)
+        expected_results = torch.tensor(
+            [-1,-1,-1,-1,0,0], dtype=torch.long, device='cuda')
+        assert torch.equal(expected_results, results)
+
     def test_query_multiscale(self):
         points = torch.tensor(
             [[3,2,0],
