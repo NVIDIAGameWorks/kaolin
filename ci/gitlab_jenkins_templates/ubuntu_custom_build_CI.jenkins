@@ -71,7 +71,6 @@ spec:
             ])
           }
           docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
-
             stage("Build") {
               baseImage = docker.build(
                   "${targetImageTag}-base",
@@ -89,7 +88,7 @@ spec:
                      .
                   """)
             }
-            if (buildWheel) {
+            if (buildWheel.toBoolean()) {
               stage("Build wheel") {
                 cudaTag = cudaVer.split('\\.')[0..<2].join('')
                 targetImage.inside("-v /mount_binaries:/mount_binaries") {
@@ -119,11 +118,13 @@ spec:
                        .
                     """)
               }
+              stage("Push wheel to volume") {
+                sh """
+                mv ./${dstWheelName} /mount_binaries/torch-${torchVer}+cu${cudaTag}/${dstWheelName}
+                """
+              }
             }
             stage("Push") {
-              sh """
-              mv ./${dstWheelName} /mount_binaries/torch-${torchVer}+cu${cudaTag}/${dstWheelName}
-              """
               targetImage.push()
             }
           }
