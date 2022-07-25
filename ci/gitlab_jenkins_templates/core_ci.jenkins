@@ -184,23 +184,23 @@ node {
             sh "echo ${commitHash}"
             if (gitlabActionType == "MERGE" &&
                 gitlabMergeRequestTitle.contains("[for wheels]")) {
-                for (config in ubuntu_for_wheels_configs) {
-                    for (pythonVer in ['3.7', '3.8', '3.9']) {
-                        def configName = "custom-wheels-torch${config['torchVer']}-" + \
-                                         "cuda${config['cudaVer']}-" +
-                                         "cudnn${config['cudnnVer']}-" +
-                                         "py${pythonVer}"
-                        jobMap["${configName}"] = prepareUbuntuFromCUDAJob(
-                            configName,
-                            config['cudaVer'],
-                            config['cudnnVer'],
-                            pythonVer,
-                            config['torchVer'],
-                            config['archsToTest'],
-                            true
-                        )
+                    for (config in ubuntu_for_wheels_configs) {
+                        for (pythonVer in ['3.7', '3.8', '3.9']) {
+                            def configName = "custom-wheels-torch${config['torchVer']}-" + \
+                                             "cuda${config['cudaVer']}-" +
+                                             "cudnn${config['cudnnVer']}-" +
+                                             "py${pythonVer}"
+                            jobMap["${configName}"] = prepareUbuntuFromCUDAJob(
+                                configName,
+                                config['cudaVer'],
+                                config['cudnnVer'],
+                                pythonVer,
+                                config['torchVer'],
+                                config['archsToTest'],
+                                true
+                            )
+                        }
                     }
-                }
             } else {
                 // Check if the last commit message has a [with custom] tag
                 def hasNoCustomInMess = sh(script: "git log -1 | grep '.*\\[with custom\\].*'",
