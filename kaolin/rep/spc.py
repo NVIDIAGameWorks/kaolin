@@ -38,7 +38,6 @@ class Spc(object):
     e.g: 8 bits for 8 cells.
 
     Bits describe the octree cells in Morton Order::
-    ```
 
          . . . . . . . .
          | .   3  .  7  | .                    3   7
@@ -51,8 +50,6 @@ class Spc(object):
               . . | . . . . .   |
                 . | 0  .  4   . |
                   . . . . . . . .
-
-    ```
 
     If a cell is occupied, an additional cell byte may be generated in the next level,
     up till the argument ``level``.
@@ -296,22 +293,20 @@ class Spc(object):
         can be thought of as voxels with 8 corners. The dual of the octree represents the corners
         of the primary octree nodes as another tree of nodes with a hierarchy of points and a pyramid.
         The mapping from the primary octree nodes to the nodes in the dual tree can be obtained through
-        the ``trinkets`` property.
+        the ``trinkets`` property::
 
-        ```
-                       [Primary octree]                        [Dual octree]
-                       . . . . . . . .                        X . . .X. . . X
-                       | .   X  .  X  | .                     | .      .     | .
-                       |   . . . . . . . .           ===>     |   X . . X . . . X
-                       |   | .   X  . | X   .                 X   | .      . |     .
-                       |   |   . . . . . . . .                |   |   X . . .X. . . X
-                       |   |    |     |       |               |   X    |     |       |
-                        . .|. . | . . .       |      ===>      X .|. . X . . X       |
-                          .| X  |.  X   .     |                  .|    |.      .     X
-                            . . | . . . . .   |                    X . | . X . . X   |
-                              . | X  .  X   . |                      . |    .      . |
-                                . . . . . . . .                        X . . X . . . X
-        ```
+            [Primary octree]                        [Dual octree]
+            . . . . . . . .                        X . . .X. . . X
+            | .   X  .  X  | .                     | .      .     | .
+            |   . . . . . . . .           ===>     |   X . . X . . . X
+            |   | .   X  . | X   .                 X   | .      . |     .
+            |   |   . . . . . . . .                |   |   X . . .X. . . X
+            |   |    |     |       |               |   X    |     |       |
+             . .|. . | . . .       |      ===>      X .|. . X . . X       |
+               .| X  |.  X   .     |                  .|    |.      .     X
+                 . . | . . . . .   |                    X . | . X . . X   |
+                   . | X  .  X   . |                      . |    .      . |
+                     . . . . . . . .                        X . . X . . . X
 
         seealso:: :func:`kaolin.ops.spc.unbatched_make_dual`
 
