@@ -62,6 +62,7 @@ Simple Recipes
     * `spc_basics.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/spc/spc_basics.py>`_: showing attributes of an SPC object
     * `spc_dual_octree.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/spc/spc_dual_octree.py>`_: computing and explaining the dual of an SPC octree
     * `spc_trilinear_interp.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/spc/spc_trilinear_interp.py>`_: computing trilinear interpolation of a point cloud on an SPC
+    * `spc_batching.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/spc/spc_batching.py>`_: using SPC objects with unbatched ops in kaolin
 * Visualization:
     * `visualize_main.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/visualize_main.py>`_: using Timelapse API to write mock 3D checkpoints
 
