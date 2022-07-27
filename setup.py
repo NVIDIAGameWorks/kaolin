@@ -178,7 +178,7 @@ write_version_file()
 
 def get_requirements():
     requirements = []
-    requirements.append('scipy>=1.2.0,<=1.5.2')
+    requirements.append('scipy>=1.2.0,<=1.7.2')
     requirements.append('Pillow>=8.0.0')
     requirements.append('tqdm>=4.51.0')
     if sys.version_info >= (3, 10):

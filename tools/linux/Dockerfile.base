@@ -26,6 +26,8 @@ RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-p
          git \
          unzip \
          gfortran \
+         libopenblas-dev \
+         liblapack-dev \
          libgtk2.0-0 \
          libgtk-3-0 \
          libgbm-dev \
@@ -50,8 +52,7 @@ ENV PATH /opt/conda/bin:$PATH
 
 RUN export CUDA_MAJOR="$(echo ${CUDA_VERSION} | cut -d'.' -f1)" \
     && export CUDA_MINOR="$(echo ${CUDA_VERSION} | cut -d'.' -f2)" \
-    && conda install -y pytorch==${PYTORCH_VERSION} cudatoolkit=${CUDA_MAJOR}.${CUDA_MINOR} -c pytorch -c conda-forge \
-    && conda clean -y --all --force-pkgs-dirs
+    && pip install torch==${PYTORCH_VERSION}+cu${CUDA_MAJOR}${CUDA_MINOR} -f https://download.pytorch.org/whl/torch_stable.html
 
 RUN conda install -c conda-forge nodejs==16.13.0 \
     && conda clean --all --force-pkgs-dirs
