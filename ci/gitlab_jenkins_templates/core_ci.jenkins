@@ -249,7 +249,7 @@ node {
                         configName,
                         baseImageTag,
                         config['archsToTest']
-                    )
+                    )   
                 }
 
                 for (config in ubuntu_cpuonly_configs) {

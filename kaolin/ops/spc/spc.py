@@ -258,7 +258,7 @@ def unbatched_query(octree, exsum, query_coords, level, with_parents=False):
         octree (torch.ByteTensor): The octree, of shape :math:`(\text{num_bytes})`.
         exsum (torch.IntTensor): The exclusive sum of the octree bytes,
                                  of shape :math:`(\text{num_bytes} + 1)`.
-                                 See :ref:`spc_pyramids` for more details.
+                                 See :ref:`spc_exsum` for more details.
         query_coords (torch.FloatTensor or torch.IntTensor): 
             A tensor of locations to sample of shape :math:`(\text{num_query}, 3)`. If the tensor is
             a FloatTensor, assumes the coordinates are normalized in [-1, 1]. Otherwise if the tensor is
@@ -303,7 +303,7 @@ def unbatched_get_level_points(point_hierarchy, pyramid, level):
             The point hierarchy of shape :math:`(\text{num_points}, 3)`.
             See :ref:`point_hierarchies <spc_points>` for a detailed description.
 
-        pyramid (torch.LongTensor): 
+        pyramid (torch.IntTensor): 
             The pyramid of shape :math:`(2, \text{max_level}+2)`
             See :ref:`pyramids <spc_pyramids>` for a detailed description.
 
@@ -329,12 +329,12 @@ def unbatched_make_dual(point_hierarchy, pyramid):
             The point hierarchy of shape :math:`(\text{num_points}, 3)`.
             See :ref:`point_hierarchies <spc_points>` for a detailed description.
 
-        pyramid (torch.LongTensor): 
+        pyramid (torch.IntTensor): 
             The pyramid of shape :math:`(2, \text{max_level}+2)`
             See :ref:`pyramids <spc_pyramids>` for a detailed description.
 
     Returns:
-        (torch.ShortTensor, torch.LongTensor):
+        (torch.ShortTensor, torch.IntTensor):
 
             - The point hierarchy of the dual octree of shape :math:`(\text{num_dual_points}, 3)`.
             - The dual pyramid of shape :math:`(2, \text{max_level}+2)`
@@ -402,10 +402,10 @@ def unbatched_make_trinkets(point_hierarchy, pyramid, point_hierarchy_dual, pyra
 
     Args:
         point_hierarchy (torch.ShortTensor): The point hierarchy of shape :math:`(\text{num_points}, 3)`.
-        pyramid (torch.LongTensor): The pyramid of shape :math:`(2, \text{max_level}+2)`
+        pyramid (torch.IntTensor): The pyramid of shape :math:`(2, \text{max_level}+2)`
         point_hierarchy_dual (torch.ShortTensor): The point hierarchy of the dual octree of shape
                                                   :math:`(\text{num_dual_points}, 3)`.
-        pyramid_dual (torch.LongTensor): The dual pyramid of shape :math:`(2, \text{max_level}+2)`
+        pyramid_dual (torch.IntTensor): The dual pyramid of shape :math:`(2, \text{max_level}+2)`
 
     Returns:
         (torch.IntTensor, torch.IntTensor):
