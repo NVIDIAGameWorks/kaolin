@@ -522,7 +522,7 @@ class CameraExtrinsics():
         #
         #                                =     [ P @ Rt | P @ (-Rt @ t) ]
         #                                      [ 0      |       1       ]
-        basis_change = torch.tensor(basis_change, device=self.device, dtype=self.dtype)
+        basis_change = self._to_tensor_input(basis_change, device=self.device, dtype=self.dtype)
 
         # Cache basis change matrix to be able to revert later if desired
         self._base_change_matrix = self._base_change_matrix @ basis_change
