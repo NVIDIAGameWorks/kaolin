@@ -22,11 +22,11 @@ API
 {{ pkgname | e | heading }}
 {%- endif -%}
 
-{%- if subpackages or submodules -%}
+{%- if subpackages or submodules %}
 .. toctree::
    :maxdepth: {{ maxdepth }}
    :titlesonly:
-{%- endif -%}
+{% endif -%}
 {{ unfoldtree(subpackages + submodules) }}
 
 {% if not is_namespace -%}

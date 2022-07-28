@@ -48,7 +48,16 @@ def run_apidoc(_):
             "kaolin/render/mesh/utils.py",
             "kaolin/render/spc/raytrace.py",
             "kaolin/rep/spc.py",
-            "kaolin/visualize/timelapse.py"
+            "kaolin/visualize/timelapse.py",
+            "kaolin/framework/*",
+            "kaolin/render/camera/camera.py",
+            "kaolin/render/camera/coordinates.py",
+            "kaolin/render/camera/extrinsics_backends.py",
+            "kaolin/render/camera/extrinsics.py",
+            "kaolin/render/camera/intrinsics_ortho.py",
+            "kaolin/render/camera/intrinsics_pinhole.py",
+            "kaolin/render/camera/intrinsics.py",
+            "kaolin/render/camera/legacy.py"
         ]
     ]
 
