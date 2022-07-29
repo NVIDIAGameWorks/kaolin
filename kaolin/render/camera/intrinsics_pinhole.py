@@ -84,7 +84,7 @@ class PinholeIntrinsics(CameraIntrinsics):
         - **n**, **f**: are the near and far clipping planes,
           which define the min / max depth of the view frustum.
           The near and far planes are also used to normalize the depth values to
-          normalized device coordinates (see ndc_matrix() documentation).
+          normalized device coordinates (see :func:`ndc_matrix()` documentation).
         - **r**, **l**, **t**, **b**: are the right, left, top and bottom borders of the
           view frustum, and are defined by the perspective
           fov (derived from the focal length) and image plane dimensions.
@@ -95,7 +95,7 @@ class PinholeIntrinsics(CameraIntrinsics):
           :math:`ty = -(t + b) / (t - b)`
 
           :math:`tz = -(f + n) / (f - n)`
-        - **U**, **V**: are elements which define the NDC range, see ndc_matrix() for
+        - **U**, **V**: are elements which define the NDC range, see :func:`ndc_matrix()` for
           an elaboration on how these are defined.
         - **A**, **B**: can be reverse engineered from U, V and are uniquely defined by them
           (and in fact serve a similar function).
@@ -318,14 +318,14 @@ class PinholeIntrinsics(CameraIntrinsics):
 
         .. math::
 
-            ndc &= Ortho \times Depth Scale
+            ndc &= Ortho \times Depth Scale \\
             &= \begin{bmatrix}
                 2. / (r - l) & 0. & 0. & tx \\
                 0. & 2. / (t - b) & 0. & ty \\
                 0. & 0. & -2. / (\text{far} - \text{near}) & tz \\
                 0. & 0. & 0. & 1.
-            \end{bmatrix} \\
-            &\times \begin{bmatrix}
+            \end{bmatrix}
+            \times \begin{bmatrix}
                 1. & 0. & 0. & 0. \\
                 0. & 1. & 0. & 0. \\
                 0. & 0. & B  & A \\
@@ -341,7 +341,7 @@ class PinholeIntrinsics(CameraIntrinsics):
         - **n**, **f**: are the near and far clipping planes,
           which define the min / max depth of the view frustum.
           The near and far planes are also used to normalize the depth values to
-          normalized device coordinates (see ndc_matrix() documentation).
+          normalized device coordinates.
         - **r**, **l**, **t**, **b**: are the right, left, top and bottom borders of the
           view frustum, and are defined by the perspective
           fov (derived from the focal length) and image plane dimensions.
@@ -352,16 +352,18 @@ class PinholeIntrinsics(CameraIntrinsics):
           :math:`ty = -(t + b) / (t - b)`
 
           :math:`tz = -(f + n) / (f - n)`
-        - **U**, **V**: are elements which define the NDC range, see ndc_matrix() for
-          an elaboration on how these are defined.
+        - **U**, **V**: are elements which define the NDC range.
         - **A**, **B**: can be reverse engineered from U, V and are uniquely defined by them
           (and in fact serve a similar function).
 
-        Input values are determined by the screen dimensions and intrinsic coordinate conventions, for example:
-        i. (``left``=0, ``right``=``width``, ``bottom``=``height``, ``top``=0):
-        for origin at top-left of the screen, y axis pointing downwards
-        ii. (``left``=-``width``/2, ``right``=``width``/2, ``bottom``=-``height``/2, ``top``=``height``/2):
-        for origin at center of the screen, and y axis pointing upwards.
+        Input values are determined by the screen dimensions and intrinsic coordinate conventions,
+        for example:
+
+            1) :math:`(\text{left}=0, \text{right}=\text{width}, \text{bottom}=\text{height}, \text{top}=0)`
+               for origin at top-left of the screen, y axis pointing downwards.
+            2) :math:`(\text{left}=-\dfrac{\text{width}}{2}, \text{right}=\dfrac{\text{width}}{2},
+               \text{bottom}=-\dfrac{\text{height}}{2}, \text{top}=\dfrac{\text{height}}{2})`
+               for origin at center of the screen, and y axis pointing upwards.
 
         Args:
             left (float): location of the left face of the view-frustum.

@@ -105,10 +105,12 @@ class OrthographicIntrinsics(CameraIntrinsics):
         This method is similar in behaviour to the now deprecated OpenGL function :func:`glOrtho()`.
 
         Input values are determined by the screen dimensions and intrinsic coordinate conventions, for example:
-        i. (``left``=0, ``right``=``width``, ``bottom``=``height``, ``top``=0):
-        for origin at top-left of the screen, y axis pointing downwards
-        ii. (``left``=-``width``/2, ``right``=``width``/2, ``bottom``=-``height``/2, ``top``=``height``/2):
-        for origin at center of the screen, and y axis pointing upwards.
+
+            1) :math:`(\text{left}=0, \text{right}=\text{width}, \text{bottom}=\text{height}, \text{top}=0)`
+               for origin at top-left of the screen, y axis pointing downwards
+            2) :math:`(\text{left}=-\dfrac{\text{width}}{2}, \text{right}=\dfrac{\text{width}}{2},
+               \text{bottom}=-\dfrac{\text{height}}{2}, \text{top}=\dfrac{\text{height}}{2})`
+               for origin at center of the screen, and y axis pointing upwards.
 
         Args:
             left (float): location of the left face of the view-frustum.

@@ -106,9 +106,9 @@ def _gather_constructors(*cam_modules: CameraModuleType) -> Dict[FrozenSet, Tupl
 
 
 class Camera:
-    r"""kaolin Cameras are a one-stop class for all camera related differentiable / non-differentiable transformations.
+    r"""Camera is a one-stop class for all camera related differentiable / non-differentiable transformations.
 
-    Cameras are represented by *batched* instances of 2 submodules:
+    Camera objects are represented by *batched* instances of 2 submodules:
 
         - :class:`CameraExtrinsics`: The extrinsics properties of the camera (position, orientation).
           These are usually embedded in the view matrix, used to transform vertices from world space to camera space.
@@ -145,39 +145,50 @@ class Camera:
     How to apply transformations with kaolin's Camera:
 
         1. Linear camera types, such as the commonly used pinhole camera,
-           support the view_projection_matrix() method.
+           support the :func:`view_projection_matrix()` method.
            The returned matrix can be used to transform vertices through pytorch's matrix multiplication, or even be
            passed to shaders as a uniform.
-        2. All Cameras are guaranteed to support a general transform() function
+        2. All Cameras are guaranteed to support a general :func:`transform()` function
            which maps coordinates from world space to Normalized Device Coordinates space.
            For some lens types which perform non linear transformations,
-           the view_projection_matrix() is non-defined. Therefore the camera transformation must be applied through
-           a dedicated function. For linear cameras, transform() may use matrices under the hood.
-        3. Camera parameters may also be queried directly. This is useful when implementing camera params aware code
-           such as ray tracers.
+           the :func:`view_projection_matrix()` is non-defined.
+           Therefore the camera transformation must be applied through
+           a dedicated function. For linear cameras,
+           :func:`transform()` may use matrices under the hood.
+        3. Camera parameters may also be queried directly.
+           This is useful when implementing camera params aware code such as ray tracers.
 
     How to control kaolin's Camera:
 
         - :class:`CameraExtrinsics`: is packed with useful methods for controlling the camera position and orientation:
-          :func:`translate()`, :func:`rotate()`, :func:`move_forward()`, :func:`move_up()`, :func:`move_right()`,
-          :func:`cam_pos()`, :func:`cam_up()`, :func:`cam_forward()`, :func:`cam_up()`.
-        - :class:`CameraIntrinsics`: exposes a lens :func:`zoom()` operation.
-          The exact functionality depends on the camera type.
+          :func:`translate() <CameraExtrinsics.translate()>`,
+          :func:`rotate() <CameraExtrinsics.rotate()>`,
+          :func:`move_forward() <CameraExtrinsics.move_forward()>`,
+          :func:`move_up() <CameraExtrinsics.move_up()>`,
+          :func:`move_right() <CameraExtrinsics.move_right()>`,
+          :func:`cam_pos() <CameraExtrinsics.cam_pos()>`,
+          :func:`cam_up() <CameraExtrinsics.cam_up()>`,
+          :func:`cam_forward() <CameraExtrinsics.cam_forward()>`,
+          :func:`cam_up() <CameraExtrinsics.cam_up()>`.
+        - :class:`CameraIntrinsics`: exposes a lens :func:`zoom() <CameraIntrinsics.zoom()>`
+          operation. The exact functionality depends on the camera type.
 
     How to optimize the Camera parameters:
 
-        - Both :class:`CameraExtrinsics`: and :class:`CameraIntrinsics` maintain ``torch.Tensor`` buffers of parameters
-          which support pytorch differentiable operations.
+        - Both :class:`CameraExtrinsics`: and :class:`CameraIntrinsics` maintain
+          :class:`torch.Tensor` buffers of parameters which support pytorch differentiable operations.
         - Setting ``camera.requires_grad_(True)`` will turn on the optimization mode.
-        - The ``gradient_mask`` function can be used to mask out gradients of specific Camera parameters.
+        - The :func:`gradient_mask` function can be used to mask out gradients of specific Camera parameters.
 
         .. note::
 
             :class:`CameraExtrinsics`: supports multiple representions of camera parameters
-            (see: :func:`switch_backend`).
-            Specific representations are better fit for optimization (e.g.: they maintain an orthogonal view matrix).
+            (see: :func:`switch_backend <CameraExtrinsics.switch_backend()>`).
+            Specific representations are better fit for optimization
+            (e.g.: they maintain an orthogonal view matrix).
             Kaolin will automatically switch to using those representations when gradient flow is enabled
-            For non-differentiable uses, the default representation may provide better speed and numerical accuracy.
+            For non-differentiable uses, the default representation may provide better
+            speed and numerical accuracy.
 
     Other useful camera properties:
 
@@ -187,14 +198,13 @@ class Camera:
         - :class:`CameraExtrinsics`: and :class:`CameraIntrinsics`: individually support the :func:`requires_grad`
           property.
         - Cameras implement :func:`torch.allclose` for comparing camera parameters under controlled numerical accuracy.
-          The :func:`__eq__()`` function is reserved for comparison by ref.
+          The operator ``==`` is reserved for comparison by ref.
         - Cameras support batching, either through construction, or through the :func:`cat()` method.
 
         .. note::
 
-            Since kaolin's cameras are batched, the view/projection matrices are of shape ``(C, 4, 4)``,
-            and some operations, such as `:func:transform()` may return values as shapes of ``(C, B, 3)``.
-            Here ``C`` is the number of cameras and ``B`` is the number of transformed vertices.
+            Since kaolin's cameras are batched, the view/projection matrices are of shapes :math:`(\text{num_cameras}, 4, 4)`,
+            and some operations, such as :func:`transform()` may return values as shapes of :math:`(\text{num_cameras}, \text{num_vectors}, 3)`.
 
     Concluding remarks on coordinate systems and other confusing conventions:
 
@@ -223,7 +233,8 @@ class Camera:
 
         - kaolin's cameras do not assume any specific coordinate system for the camera axes. By default, the
           right handed cartesian coordinate system is used. Other coordinate systems are supported through
-          :func:`change_coordinate_system()` and the ``coordinates.py`` module::
+          :func:`change_coordinate_system() <CameraExtrinsics.change_coordinate_system()>`
+          and the ``coordinates.py`` module::
 
                 Y
                 ^
@@ -232,8 +243,8 @@ class Camera:
                /
              Z
 
-        - kaolin's NDC space is assumed to be left handed (depth goes inwards to the screen). The default range
-          of values is [-1, 1].
+        - kaolin's NDC space is assumed to be left handed (depth goes inwards to the screen).
+          The default range of values is [-1, 1].
     """
 
     _extrinsics_constructors = _gather_constructors(*_EXTRINSICS_MODULES)
@@ -247,7 +258,7 @@ class Camera:
     """
 
     def __init__(self, extrinsics: CameraExtrinsics, intrinsics: CameraIntrinsics):
-        r""" Constructs a new camera module from the pre-constructed extrinsics and intrinsics components.
+        r"""Constructs a new camera module from the pre-constructed extrinsics and intrinsics components.
 
         .. seealso::
 
@@ -389,7 +400,7 @@ class Camera:
         """Creates a gradient mask, which allows to backpropagate only through
         params designated as trainable.
 
-        This function does not consider the requires_grad field when creating this mask.
+        This function does not consider the :attr:`requires_grad` field when creating this mask.
 
         .. note::
 
@@ -397,9 +408,10 @@ class Camera:
             This design choice ensures that these axes, as well as the view matrix, remain orthogonal.
 
         Args:
-            *args : A vararg list of the extrinsic and intrinsic params that should allow gradient flow.
+            *args :
+                A vararg list of the extrinsic and intrinsic params that should allow gradient flow.
                 This function also supports conversion of params from their string names.
-                (i.e: 't' will convert to PinholeParamsDefEnum.t)
+                (i.e: 't' will convert to ``PinholeParamsDefEnum.t``).
 
         Returns:
             (torch.BoolTensor, torch.BoolTensor):
@@ -426,18 +438,19 @@ class Camera:
         return self.extrinsics.gradient_mask(*extrinsic_args), self.intrinsics.gradient_mask(*intrinsic_args)
 
     @property
-    def width(self):
+    def width(self) -> int:
         """Camera image plane width (pixel resolution)"""
         return self.intrinsics.width
 
     @property
-    def height(self):
+    def height(self) -> int:
         """Camera image plane height (pixel resolution)"""
         return self.intrinsics.height
 
     @property
     def lens_type(self) -> str:
-        """ A textual description of the camera lens type (i.e: 'pinhole', 'ortho') """
+        r"""A textual description of the camera lens type. (i.e 'pinhole', 'ortho')
+        """
         return self.intrinsics.lens_type
 
     @property
@@ -514,7 +527,7 @@ class Camera:
             Works only for cameras with linear projection transformations.
 
         Returns:
-            (torch.Tensor): The view projection matrix, of shape ``(C, 4, 4)`` where C is the number of cameras.
+            (torch.Tensor): The view projection matrix, of shape :math:`(\text{num_cameras}, 4, 4)`
         """
         view = self.extrinsics.view_matrix()
         projection = self.intrinsics.projection_matrix()

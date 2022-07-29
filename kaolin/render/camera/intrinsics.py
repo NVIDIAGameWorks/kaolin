@@ -377,15 +377,6 @@ class CameraIntrinsics(ABC):
         output.params = torch.cat(params, dim=0)
         return output
 
-    def c_struct(self):
-        """Returns a CUDA compatible buffer of this classe's parameters
-        
-        .. warning::
-
-            This method is not implemented
-        """
-        raise NotImplementedError('Not yet implemented')
-
     def set_ndc_range(self, ndc_min, ndc_max):
         """
         .. warning::
