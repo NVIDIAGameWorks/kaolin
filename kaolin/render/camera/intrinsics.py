@@ -86,7 +86,7 @@ class CameraIntrinsics(ABC):
     normalized screen / clip space.
 
     The instrinsics are determined by the camera type, meaning parameters may differ according to the lens structure.
-    Typical computer graphics systems commonly assume the intrinsics of a pinhole camera (see: PinholeIntrinsics class).
+    Typical computer graphics systems commonly assume the intrinsics of a pinhole camera (see: :class:`PinholeIntrinsics` class).
 
     One implication is that some camera types do not use a linear projection (i.e: Fisheye lens).
     There are therefore numerous ways to use CameraIntrinsics subclasses:
@@ -376,15 +376,6 @@ class CameraIntrinsics(ABC):
         output = copy.deepcopy(cameras[0])
         output.params = torch.cat(params, dim=0)
         return output
-
-    def c_struct(self):
-        """Returns a CUDA compatible buffer of this classe's parameters
-        
-        .. warning::
-
-            This method is not implemented
-        """
-        raise NotImplementedError('Not yet implemented')
 
     def set_ndc_range(self, ndc_min, ndc_max):
         """

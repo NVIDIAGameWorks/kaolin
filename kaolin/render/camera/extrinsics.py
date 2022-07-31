@@ -75,31 +75,35 @@ class CameraExtrinsics():
     Transformations and matrices returned by this class support differentiable torch operations,
     which in turn may update the extrinsic parameters of the camera::
 
-                                             convert_to_mat
-            Backend                              ---- >              Extrinsics
-        Representation R                                                   View Matrix M
-        Shape :math:`(\text{num_cameras}, K)`,                  Shape :math:`(\text{num_cameras}, 4, 4)`
-                                                < ----
-                                            convert_from_mat
+                                 convert_to_mat
+            Backend                 ---- >            Extrinsics
+        Representation R                             View Matrix M
+        Shape (num_cameras, K),                    Shape (num_cameras, 4, 4)
+                                    < ----
+                                 convert_from_mat
 
-    Note::
-        Unless specified manually with :func:`switch_backend`, kaolin will choose the optimal representation backend
-        depending on the status of ``requires_grad``.
-    Note::
-        Users should be aware, not not concerned about the conversion from internal representations to view matrices.
+    .. note::
+
+        Unless specified manually with :func:`switch_backend`,
+        kaolin will choose the optimal representation backend depending on the status of ``requires_grad``.
+    .. note::
+
+        Users should be aware, but not concerned about the conversion from internal representations to view matrices.
         kaolin performs these conversions where and if needed.
 
     Supported backends:
-        - **"matrix_se3"**: A flattened view matrix representation, containing the full information of
-            special eucilidean transformations (translations and rotations).
-            This representation is quickly converted to a view matrix, but differentiable ops may cause
-            the view matrix to learn an incorrect, non-orthogonal transformation.
-        - **"matrix_6dof_rotation"**: A compact representation with 6 degrees of freedom, ensuring the view matrix
-            remains orthogonal under optimizations. The conversion to matrix requires a single Gram-Schmidt step.
+
+        - **"matrix_se3"**\: A flattened view matrix representation, containing the full information of
+          special euclidean transformations (translations and rotations).
+          This representation is quickly converted to a view matrix, but differentiable ops may cause
+          the view matrix to learn an incorrect, non-orthogonal transformation.
+        - **"matrix_6dof_rotation"**\: A compact representation with 6 degrees of freedom, ensuring the view matrix
+          remains orthogonal under optimizations. The conversion to matrix requires a single Gram-Schmidt step.
 
         .. seealso::
 
-            On the Continuity of Rotation Representations in Neural Networks, Zhou et al. 2019
+            `On the Continuity of Rotation Representations in Neural Networks, Zhou et al. 2019
+            <https://arxiv.org/abs/1812.07035>`_
 
     Unless stated explicitly, the definition of the camera coordinate system used by this class is up to the
     choice of the user.
@@ -179,13 +183,14 @@ class CameraExtrinsics():
             For most use cases, it is advised to let kaolin choose the representation backend automatically,
             and avoid using this function explicitly.
 
-        .. note::
+        .. warning::
 
             This function does not allow gradient flow, as it is error prone.
 
         Args:
-            backend_name (str): the backend to switch to, must be a registered backend.
-            Values supported by default: ‘matrix_se3’, ‘matrix_6dof_rotation’ (see class description).
+            backend_name (str):
+                the backend to switch to, must be a registered backend.
+                Values supported by default\: ``matrix_se3``, ``matrix_6dof_rotation`` (see class description).
         """
         self._internal_switch_backend(backend_name=backend_name)
         self._shared_fields['user_requested_backend'] = True
@@ -256,7 +261,7 @@ class CameraExtrinsics():
         return extrinsics
 
     @staticmethod
-    def _to_tensor_input(data: Union[np.Array, torch.Tensor], dtype: torch.dtype, device: Union[torch.device, str]):
+    def _to_tensor_input(data: Union[np.ndarray, torch.Tensor], dtype: torch.dtype, device: Union[torch.device, str]):
         """ A convenience method allocate torch tensors from data of other numpy arrays / torch tensors """
         if isinstance(data, torch.Tensor):
             return data.to(dtype=dtype, device=device)
@@ -265,8 +270,8 @@ class CameraExtrinsics():
 
     @classmethod
     def from_camera_pose(cls,
-                         cam_pos: Union[np.Array, torch.Tensor],
-                         cam_dir: Union[np.Array, torch.Tensor],
+                         cam_pos: Union[np.ndarray, torch.Tensor],
+                         cam_dir: Union[np.ndarray, torch.Tensor],
                          dtype: torch.dtype = default_dtype,
                          device: Union[torch.device, str] = None,
                          requires_grad: bool = False,
@@ -274,16 +279,16 @@ class CameraExtrinsics():
         r"""Constructs the extrinsics from the camera pose and orientation in world coordinates.
 
         Args:
-            cam_pos (np.Array or torch.Tensor):
+            cam_pos (numpy.ndarray or torch.Tensor):
                 the location of the camera center in world-coordinates,
                 of shape :math:`(3,)`, :math:`(3, 1)`, :math:`(\text{num_cameras}, 3)` or
                 :math:`(\text{num_cameras}, 3, 1)`
-            cam_dir (np.Array or torch.Tensor):
+            cam_dir (numpy.ndarray or torch.Tensor):
                 the camera's orientation with respect to the world,
                 of shape :math:`(3, 3)` or :math:`(\text{num_cameras}, 3, 3)`
             dtype (optional, str):
                 the dtype used for the tensors managed by the CameraExtrinsics.
-                If dtype is None, the ``torch.get_default_dtype()`` will be used
+                If dtype is None, :func:`torch.get_default_dtype()` will be used
             device (optional, str):
                 the device on which the CameraExtrinsics object will manage its tensors.
                 If device is None, the default torch device will be used
@@ -295,7 +300,7 @@ class CameraExtrinsics():
                 Different representations are tuned to varied use cases:
                 speed, differentiability w.r.t rigid transformations space, and so forth.
                 Normally this should be left as ``None`` to let kaolin automatically select the optimal backend.
-                Valid values: matrix_se3’, ‘matrix_6dof_rotation’ (see class description).
+                Valid values: ``matrix_se3``, ``matrix_6dof_rotation`` (see class description).
 
         Returns:
             (CameraExtrinsics): the camera extrinsics
@@ -317,9 +322,9 @@ class CameraExtrinsics():
 
     @classmethod
     def from_lookat(cls,
-                    eye: Union[np.Array, torch.Tensor],
-                    at: Union[np.Array, torch.Tensor],
-                    up: Union[np.Array, torch.Tensor],
+                    eye: Union[np.ndarray, torch.Tensor],
+                    at: Union[np.ndarray, torch.Tensor],
+                    up: Union[np.ndarray, torch.Tensor],
                     dtype: torch.dtype = default_dtype,
                     device: Union[torch.device, str] = None,
                     requires_grad: bool = False,
@@ -331,21 +336,21 @@ class CameraExtrinsics():
         cartesian right-handed coordinate system (z axis positive direction points outwards from screen).
 
         Args:
-            eye (np.Array or torch.Tensor):
+            eye (numpy.ndarray or torch.Tensor):
                 the location of the camera center in world-coordinates,
                 of shape :math:`(3,)`, :math:`(3, 1)`, :math:`(\text{num_cameras}, 3)` or
                 :math:`(\text{num_cameras}, 3, 1)`
-            up (np.Array or torch.Tensor):
+            up (numpy.ndarray or torch.Tensor):
                 the vector pointing up from the camera in world-coordinates,
                 of shape :math:`(3,)`, :math:`(3, 1)`, :math:`(\text{num_cameras}, 3)`
                 or :math:`(\text{num_cameras}, 3, 1)`
-            at (np.Array or torch.Tensor) of [C]x3 or [C]x3x1,
+            at (numpy.ndarray or torch.Tensor) of [C]x3 or [C]x3x1,
                 the direction the camera is looking at in world-coordinates,
                 of shape :math:`(3,)`, :math:`(3, 1)`, :math:`(\text{num_cameras}, 3)`
                 or :math:`(\text{num_cameras}, 3, 1)`
             dtype (optional, str):
                 the dtype used for the tensors managed by the CameraExtrinsics.
-                If dtype is None, the ``torch.get_default_dtype()`` will be used
+                If dtype is None, the :func:`torch.get_default_dtype()` will be used
             device (optional, str):
                 the device on which the CameraExtrinsics object will manage its tensors.
                 If device is None, the default torch device will be used
@@ -357,7 +362,7 @@ class CameraExtrinsics():
                 Different representations are tuned to varied use cases:
                 speed, differentiability w.r.t rigid transformations space, and so forth.
                 Normally this should be left as ``None`` to let kaolin automatically select the optimal backend.
-                Valid values: matrix_se3’, ‘matrix_6dof_rotation’ (see class description).
+                Valid values: ``matrix_se3``, ``matrix_6dof_rotation`` (see class description).
 
         Returns:
             (CameraExtrinsics): the camera extrinsics
@@ -442,11 +447,11 @@ class CameraExtrinsics():
             :func:`change_coordinate_system()`
 
         Args:
-            view_matrix (np.Array or torch.Tensor):
+            view_matrix (numpy.ndarray or torch.Tensor):
                 view matrix, of shape :math:`(\text{num_cameras}, 4, 4)`
             dtype (optional, str):
                 the dtype used for the tensors managed by the CameraExtrinsics.
-                If dtype is None, the ``torch.get_default_dtype()`` will be used
+                If dtype is None, the :func:`torch.get_default_dtype()` will be used
             device (optional, str):
                 the device on which the CameraExtrinsics object will manage its tensors.
                 If device is None, the default torch device will be used
@@ -458,7 +463,7 @@ class CameraExtrinsics():
                 Different representations are tuned to varied use cases:
                 speed, differentiability w.r.t rigid transformations space, and so forth.
                 Normally this should be left as ``None`` to let kaolin automatically select the optimal backend.
-                Valid values: matrix_se3’, ‘matrix_6dof_rotation’ (see class description).
+                Valid values: ``matrix_se3``, ``matrix_6dof_rotation`` (see class description).
 
         Returns:
             (CameraExtrinsics): the camera extrinsics
@@ -498,10 +503,10 @@ class CameraExtrinsics():
 
         .. seealso::
 
-            :func:`kaolin.render.camera.coordinates`
+            :func:`blender_coords()` and :func:`opengl_coords()`
 
         Args:
-            basis_change (np.Array or torch.Tensor):
+            basis_change (numpy.ndarray or torch.Tensor):
                 a composition of axes permutation and reflections, of shape :math:`(3, 3)`
         """
         # One prevalent form of performing coordinate change is swapping / negating the inverse view matrix rows.
@@ -654,10 +659,10 @@ class CameraExtrinsics():
         Args:
             ray_orig (torch.Tensor):
                 the origins of rays, of shape :math:`(\text{num_rays}, 3)` or
-                :math:`(\text{num_cameras} \text{num_rays}, 3)`
+                :math:`(\text{num_cameras}, \text{num_rays}, 3)`
             ray_dir (torch.Tensor):
                 the directions of rays, of shape :math:`(\text{num_rays}, 3)` or
-                :math:`(\text{num_cameras} \text{num_rays}, 3)`
+                :math:`(\text{num_cameras}, \text{num_rays}, 3)`
 
         Returns:
             (torch.Tensor, torch.Tensor):
@@ -781,10 +786,10 @@ class CameraExtrinsics():
         The camera orientation axes will not change.
 
         Args:
-            t (torch.Tensor): Amount of translation in world space coordinates.
-            t can take any of the following shapes: ``(3,)``, ``(3, 1)``, ``(C, 3, 1)``,
-            where the former performs broadcasting and applies the same translation on all cameras.
-            The latter allows a unique translation for per-camera.
+            t (torch.Tensor):
+                Amount of translation in world space coordinates,
+                of shape :math:`(3,)` or :math:`(3, 1)` broadcasting over all the cameras,
+                or :math:`(\text{num_cameras}, 3, 1)` for applying unique translation per camera.
         """
         assert self.dtype == t.dtype,\
             f"CameraExtrinsics of dtype {self.dtype} cannot translate with tensor of dtype {t.dtype}"
@@ -800,9 +805,8 @@ class CameraExtrinsics():
                roll: Union[float, torch.Tensor]=None):
         r"""Executes an inplace rotation of the camera using the given yaw, pitch, and roll amounts.
         
-        Input can be float / tensor.
-        float units will apply the same rotation on all cameras, where torch.Tensors allow for applying a per-camera
-        rotation.
+        Input can be float / tensor float units will apply the same rotation on all cameras,
+        where torch.Tensors allow for applying a per-camera rotation.
         Rotation is applied in camera space.
 
         Args:
@@ -972,6 +976,10 @@ class CameraExtrinsics():
         """An instance of this object with the parameters tensor on the given device.
         If the specified device is the same as this object, this object will be returned.
         Otherwise a new object with a copy of the parameters tensor on the requested device will be created.
+
+        .. seealso::
+
+            :func:`torch.Tensor.to`
         """
         converted_backend = self._backend.to(*args, **kwargs)
         if self._backend == converted_backend:
@@ -1082,7 +1090,7 @@ class CameraExtrinsics():
     def gradient_mask(self, *args: Union[str, ExtrinsicsParamsDefEnum]) -> torch.Tensor:
         r"""Creates a gradient mask, which allows to backpropagate only through params designated as trainable.
 
-        This function does not consider the requires_grad field when creating this mask.
+        This function does not consider the ``requires_grad`` field when creating this mask.
 
         .. note::
             The 3 camera axes are always masked as trainable together.
@@ -1124,15 +1132,6 @@ class CameraExtrinsics():
                A subset of camera's extrinsics from this batched object,
                of shape :math:`(\text{size_slice}, 4, 4)`"""
         return CameraExtrinsics(self._backend[item], self._shared_fields)
-
-    def c_struct(self):
-        """Returns a CUDA compatible buffer of this classe's parameters
-        
-        .. warning::
-
-            This method is not implemented
-        """
-        raise NotImplementedError('Not yet implemented')
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
