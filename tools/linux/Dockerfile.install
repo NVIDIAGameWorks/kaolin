@@ -41,11 +41,8 @@ ENV PYTHONUNBUFFERED=1
 ENV LD_LIBRARY_PATH /usr/lib64:$LD_LIBRARY_PATH
 
 # nvidia-container-runtime
-#ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility,graphics
-
-# Default pyopengl to EGL for good headless rendering support
-ENV PYOPENGL_PLATFORM egl
 
 ## Install Dash3D Requirements ###
 RUN conda install -c conda-forge nodejs==16.13.0 \
