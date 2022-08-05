@@ -94,6 +94,14 @@ spec:
           echo e.toString()
         }
         try {
+          stage("Camera and Rasterization Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython camera_and_rasterization.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
           stage("SPC from Pointcloud Recipe") {
             sh 'cd /kaolin/examples/recipes/dataload/ && python spc_from_pointcloud.py'
           }
