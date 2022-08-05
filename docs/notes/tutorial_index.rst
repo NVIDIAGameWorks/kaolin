@@ -51,6 +51,12 @@ Detailed Tutorials
     * applying marching tetrahedra
     * using Timelapse API for 3D checkpoints
     * visualizing 3D checkpoints using ``kaolin-dash3d``
+* `Camera and Rasterization <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/camera_and_rasterization.ipynb>`_: Rasterize ShapeNet mesh with nvdiffrast and camera:
+    * Load ShapeNet mesh
+    * Preprocess mesh and materials
+    * Create a camera with ``from_args()`` general constructor
+    * Render a mesh with multiple materials with nvdiffrast
+    * Move camera and see the resulting rendering
 
 Simple Recipes
 --------------
