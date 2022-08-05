@@ -10,6 +10,10 @@ yaml:"""
 apiVersion: v1
 kind: Pod
 spec:
+  volumes:
+  - name: pvc-mount
+    persistentVolumeClaim:
+      claimName: 'kaolin-pvc'
   containers:
   - name: docker
     image: ${imageTag}
@@ -21,6 +25,9 @@ spec:
         limits:
           nvidia.com/gpu: 1
     tty: true
+    volumeMounts:
+      - mountPath: /mnt
+        name: pvc-mount
   nodeSelector:
     kubernetes.io/os: linux
     nvidia.com/gpu_type: ${arch}
