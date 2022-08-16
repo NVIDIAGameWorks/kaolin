@@ -150,7 +150,7 @@ def prepare_vertices(vertices, faces, camera_proj, camera_rot=None, camera_trans
             of shape :math:`(\text{batch_size}, \text{num_faces}, \text{face_size}, 3)`.
             The vertices in camera plan coordinate indexed by faces,
             of shape :math:`(\text{batch_size}, \text{num_faces}, \text{face_size}, 2)`.
-            The face normals, of shape :math:`(\text{batch_size}, \text{num_faces})`.
+            The face normals, of shape :math:`(\text{batch_size}, \text{num_faces}, 3)`.
     """
     # Apply the transformation from camera_rot and camera_trans or camera_transform
     if camera_transform is None:
