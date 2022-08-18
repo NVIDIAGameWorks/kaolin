@@ -1,63 +1,127 @@
 # Note: Keep C:\Program Files (x86)\Microsoft Visual Studio\Installer directory.
 #       disutils/setuptools calls vswhere.exe from that location unconditionally.
 
-# Build Kaolin Windows Base
 FROM mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2019
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-
-RUN Invoke-WebRequest "https://aka.ms/vs/16/release/vs_buildtools.exe" -OutFile vs_buildtools.exe -UseBasicParsing; \
-    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Workload.VCTools', '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '--add', 'Microsoft.VisualStudio.Workload.MSBuildTools', '--add', 'Microsoft.Component.VC.Runtime.UCRTSDK', '--add', 'Microsoft.VisualStudio.Component.Windows10SDK.18362'; \
-    Remove-Item .\vs_buildtools.exe
-
-ARG CUDA_VERSION=10.1
+# set up conda and python environment
+ARG CUDA_VERSION=11.1
 ENV CUDA_VERSION=${CUDA_VERSION}
-ARG PYTHON_VERSION=3.6
+ARG PYTHON_VERSION=3.7
 ENV PYTHON_VERSION=${PYTHON_VERSION}
-ARG PYTORCH_VERSION=1.6
+ARG PYTORCH_VERSION=1.8
 ENV PYTORCH_VERSION=${PYTORCH_VERSION}
 ARG FORCE_CUDA=1
 ENV FORCE_CUDA=${FORCE_CUDA}
 
-# PATH must be updated before attempting to run "conda" or it will error out strangely on web requests
-RUN setx /M PATH $('C:\Users\Administrator\miniconda3\Library\bin;C:\Users\Administrator\miniconda3\Scripts;C:\Users\Administrator\miniconda3;' + $Env:PATH)
-RUN Invoke-WebRequest "https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe" -OutFile miniconda3.exe -UseBasicParsing; \
-    Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Users\Administrator\miniconda3'; \
-    Remove-Item .\miniconda3.exe; \
-    conda install -y -c conda-forge 7za; \
-    conda install -y python=3.6 7za pytorch=$Env:PYTORCH_VERSION cudatoolkit=$Env:CUDA_VERSION cython -c pytorch
+ARG CUDA_URL="http://developer.download.nvidia.com/compute/cuda/11.1.1/local_installers/cuda_11.1.1_456.81_win10.exe"
+ENV CUDA_URL=${CUDA_URL}
+ARG CUDA_FILENAME=cuda_${CUDA_VERSION}_win10.exe
+ENV CUDA_FILENAME=${CUDA_FILENAME}
 
-ARG CUDA_FILENAME=cuda_10.1.243_426.00_win10.exe
-RUN Invoke-WebRequest "http://developer.download.nvidia.com/compute/cuda/10.1/Prod/local_installers/$Env:CUDA_FILENAME" -OutFile $Env:CUDA_FILENAME -UseBasicParsing; \
-    Start-Process -FilePath "$Env:CUDA_FILENAME" -Wait -ArgumentList '-s', 'nvcc_10.1', 'cusparse_10.1', 'cusparse_dev_10.1', 'cublas_10.1', 'cublas_dev_10.1', 'curand_10.1', 'curand_dev_10.1'; \
-    \
-    7za x $Env:CUDA_FILENAME universal\Display.Driver\nvcuda64.dl_ universal\Display.Driver\nvfatbinaryloader64.dl_; \
-    \
-    expand universal\Display.Driver\nvcuda64.dl_ c:\windows\system32\nvcuda.dll; \
-    expand universal\Display.Driver\nvfatbinaryloader64.dl_ c:\windows\system32\nvfatbinaryloader.dll; \
-    Remove-Item -Path universal -Recurse -Confirm:$false -Force; \
-    del $Env:CUDA_FILENAME
+
+#### BUILD TOOLS ####
+
+# pulling downloads to top to not repeat
+# download & install VS build tools 2019
+RUN Invoke-WebRequest "https://aka.ms/vs/16/release/vs_buildtools.exe" -OutFile vs_buildtools.exe -UseBasicParsing; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Workload.VCTools'; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Workload.MSBuildTools'; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.Component.VC.Runtime.UCRTSDK'; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Component.Windows10SDK.18362'; \
+    Remove-Item .\vs_buildtools.exe
+
 
 # The msvc version (subdir) has been shown to change over time.
 # The winsdk version (subdir) may change over time either through changes by MS or our own arguments to vs_buildtools.exe above.
 # Keeping that in mind, let's dynamically pick up the paths which get created.
 RUN setx /M PATH $('c:\buildtools\vc\tools\msvc\' + $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc' -Force -Directory | Select-Object -First 1).Name + '\bin\hostx64\x64;' \
+    + 'c:\buildtools\vc\tools\msvc\' + $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc' -Force -Directory | Select-Object -First 1).Name + '\lib\x64;' \
+    + 'c:\buildtools\vc\tools\msvc\' + $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc' -Force -Directory | Select-Object -First 1).Name + '\include;' \
     + 'C:\Program Files (x86)\Windows Kits\10\bin\' + $(Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin\' -Force -Directory | Select-Object -First 1).Name + '\x64;' \
     + 'C:\BuildTools\VC\Auxiliary\Build;' \
     + $Env:PATH)
+
+#### CUDA ####
+
+# needed:
+# nvcc
+# cusparse
+# cusparse_dev
+# cublas
+# cublas_dev
+# curand
+# curand_dev
+# cudart_11.1  # for vector_types.h
+# cusolver_11.1
+# cusolver_dev_11.1
+# cuda_thrust_11.3 # if CUDA >= 11.3, needed to build
+
+# install CUDA toolkit
+# TODO: may need to add more packages or alter names for later CUDA versions...
+# CUDA 11.3+ adds 'thrust' to the set of requirements we need to install
+RUN Invoke-WebRequest $Env:CUDA_URL -OutFile $Env:CUDA_FILENAME -UseBasicParsing; \
+    if ([convert]::ToDouble(${Env:CUDA_VERSION}) -ge 11.3) { Start-Process -FilePath \"$Env:CUDA_FILENAME\" -Wait -ArgumentList '-s', \"nvcc_${Env:CUDA_VERSION}\", \"cusparse_${Env:CUDA_VERSION}\", \"cusparse_dev_${Env:CUDA_VERSION}\", \"cublas_${Env:CUDA_VERSION}\", \"cublas_dev_${Env:CUDA_VERSION}\", \"curand_${Env:CUDA_VERSION}\", \"curand_dev_${Env:CUDA_VERSION}\", \"cudart_${Env:CUDA_VERSION}\", \"cusolver_${Env:CUDA_VERSION}\", \"cusolver_dev_${Env:CUDA_VERSION}\", \"thrust_${Env:CUDA_VERSION}\" } \
+    else { Start-Process -FilePath \"$Env:CUDA_FILENAME\" -Wait -ArgumentList '-s', \"nvcc_${Env:CUDA_VERSION}\", \"cusparse_${Env:CUDA_VERSION}\", \"cusparse_dev_${Env:CUDA_VERSION}\", \"cublas_${Env:CUDA_VERSION}\", \"cublas_dev_${Env:CUDA_VERSION}\", \"curand_${Env:CUDA_VERSION}\", \"curand_dev_${Env:CUDA_VERSION}\", \"cudart_${Env:CUDA_VERSION}\", \"cusolver_${Env:CUDA_VERSION}\", \"cusolver_dev_${Env:CUDA_VERSION}\"; } \
+    Remove-Item $Env:CUDA_FILENAME
+
+# TODO: can we use conda cuda install instead? only once we need cuda 11.3.0+
+# RUN conda install -y cuda cuda-nvcc -c nvidia/label/cuda-11.3.1
+# RUN setx /M PATH $('C:\Users\Administrator\miniconda3\bin;C:\Users\Administrator\miniconda3\include;' + $Env:Path)
+
+
+#### ANACONDA ####
+RUN Invoke-WebRequest "https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe" -OutFile miniconda3.exe -UseBasicParsing;
+
+# install conda & python packages
+# PATH must be updated before attempting to run "conda" or it will error out strangely on web requests
+RUN setx /M PATH $('C:\Users\Administrator\miniconda3\Library\bin;C:\Users\Administrator\miniconda3\Scripts;C:\Users\Administrator\miniconda3;' + $Env:PATH)
+RUN Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Users\Administrator\miniconda3'; \
+    Remove-Item .\miniconda3.exe; \
+    conda install -y python=$Env:PYTHON_VERSION
+
+# TODO: forcing torch LTS
+# RUN pip install torch==1.8.2 torchvision "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.5.2 cython==0.29.20 numpy==1.21.6 ninja --extra-index-url https://download.pytorch.org/whl/lts/1.8
+
+# NOTE: update the install list (2 lines here) if SSL_CERTIFICATE errors crop up to pip install the related dependency
+# conditional: bespoke logic for 1.8.2 LTS install, otherwise generic wheel lookup
+RUN $Env:TORCH_STR = ${Env:PYTORCH_VERSION} + '+cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
+    $Env:TORCH_URL='https://download.pytorch.org/whl/cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
+    if (${Env:PYTORCH_VERSION} -eq '1.8.2') { pip install torch==1.8.2 torchvision "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.5.2 cython==0.29.20 numpy==1.21.6 tornado==6.1 ninja --extra-index-url https://download.pytorch.org/whl/lts/1.8 } \
+    else { pip install torch==${Env:TORCH_STR} torchvision "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.5.2 cython==0.29.20 numpy==1.21.6 tornado==6.1 ninja --extra-index-url ${Env:TORCH_URL}; }
+
+
+# CUDA setup for running & testing on CI machine
+COPY tools/windows/SetupDriver.ps1 C:/data/
+COPY tools/windows/Test.ps1 C:/data/
+COPY tools/windows/main.ps1 C:/data/
+COPY tools/windows/deviceQuery.exe c:/data/
+COPY tools/windows/bandwidthTest.exe c:/data/
+
+# #### Kaolin ####
 
 WORKDIR /kaolin
 
 RUN conda list > conda_build.txt
 
-#################################### Build Kaolin ####################################
-
 COPY . .
 
+# NOTE: pin setuptools to avoid directory copy bug
+RUN pip install --upgrade setuptools==46.4.0
+RUN pip install --upgrade certifi
 RUN pip install -r tools\ci_requirements.txt
 
+ENV KAOLIN_INSTALL_EXPERIMENTAL "1"
+ENV IGNORE_TORCH_VER "1"
 ENV TORCH_CUDA_ARCH_LIST "7.0 7.5+PTX"
-RUN python setup.py bdist_wheel
+RUN python setup.py develop
+# RUN pip install --trusted-host pypi.python.org --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
 
-ENTRYPOINT ["powershell.exe", "-Command"]
+# fix for paging memory issue on CI machines
+#   see: https://gist.github.com/cobryan05/7d1fe28dd370e110a372c4d268dcb2e5
+RUN pip install pefile
+COPY tools/fixNvPe.py c:/data/
+
+# pip3 install --upgrade certifi

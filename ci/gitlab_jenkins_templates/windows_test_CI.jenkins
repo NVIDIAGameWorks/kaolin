@@ -1,0 +1,237 @@
+#!/usr/bin/env groovy
+
+docker_registry_server = ImageTag.split(':')[0..1].join(':')
+currentBuild.displayName = ImageTag.split(':')[2] + "-${arch}"
+currentBuild.description = sourceBranch + ": " + commitHash
+
+// to manage image secrets:
+// 1) log into docker
+//  docker login gitlab-master.nvidia.com:5005
+// 2) create secret
+//  kubectl create secret docker-registry test-secret -n kaolin --docker-server=gitlab-master.nvidia.com:5005 --docker-username azook --docker-password XXX
+// 3) add to service account
+//  https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account
+//  kubectl patch kaolin-sa default -p '{"imagePullSecrets": [{"name": "myregistrykey"}]}'
+// 4) add to pod template
+
+podTemplate(cloud:'sc-ipp-blossom-prod', 
+slaveConnectTimeout: 4000,
+yaml: """
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: jnlp
+    image: jenkins/jnlp-agent:latest-windows
+    env:
+    - name: JENKINS_AGENT_WORKDIR
+      value: C:/Jenkins/agent
+  - name: windows
+    image: ${imageTag}
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+    restartPolicy: Never
+    backoffLimit: 4
+    tty: true
+  imagePullSecrets:
+  - name: test-secret-config2
+  nodeSelector:
+    kubernetes.io/os: windows
+    nvidia.com/node_type: ${arch}
+"""
+) 
+{
+  node(POD_LABEL) {
+    container("windows") {
+      updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "running")
+      stage('Enable cuda') {
+        powershell '''
+        $Env:driver_store=$(ls $($($(Get-WmiObject Win32_VideoController).InstalledDisplayDrivers | sort -Unique).ToString().Split(',')| sort -Unique).ToString().Replace("\\DriverStore\\", "\\HostDriverStore\\")).Directory.FullName
+        cp "$Env:driver_store\\nvcuda64.dll" C:\\Windows\\System32\\nvcuda.dll
+        cp "$Env:driver_store\\nvapi64.dll" C:\\Windows\\System32\\nvapi64.dll
+      '''
+      }
+      stage("Check cuda") {
+        powershell '''
+        dir c:\\
+        dir c:\\kaolin
+        dir c:\\data
+        '''
+        powershell '''
+        c:\\data\\deviceQuery.exe
+        c:\\data\\bandwidthTest.exe
+        '''
+      }
+      stage("Fix paging memory") {
+        // addresses this error on Windows with pytorch consuming too much paging memory: https://stackoverflow.com/a/69489193
+        powershell '''
+        python c:\\data\\fixNvPe.py --input=C:\\Users\\Administrator\\miniconda3\\Lib\\site-packages\\torch\\lib\\*.dll
+        '''
+      }
+      stage("Prepare data") {
+        powershell '''
+          python --version
+          Expand-Archive c:\\kaolin\\examples\\samples\\rendered_clock.zip c:\\kaolin\\examples\\samples
+        '''
+      }
+      stage("DIB-R Tutorial") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\tutorial
+            ipython dibr_tutorial.ipynb
+          '''          
+        }
+      }
+      stage("DMTet Tutorial") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\tutorial
+            ipython dmtet_tutorial.ipynb
+          '''
+        }
+      }
+      stage("Understanding SPCs Tutorial") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\tutorial
+            ipython understanding_spcs_tutorial.ipynb  --matplotlib
+          '''
+        }
+      }
+      // requires nvdiffrast. not currently supported on Windows
+      // stage("Camera and Rasterization Tutorial") {
+      //   catchError(stageResult: "failure") {
+      //     powershell '''
+      //       cd c:\\kaolin\\examples\\tutorial
+      //       ipython camera_and_rasterization.ipynb
+      //     '''
+      //   }
+      // }
+      stage("SPC from Pointcloud Recipe") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\recipes\\dataload
+            python spc_from_pointcloud.py
+          '''
+        }
+      }
+      stage("SPC Basics Recipe") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\recipes\\spc
+            python spc_basics.py
+          '''
+        }
+      }
+      stage("Occupancy Sampling Recipe") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\recipes\\preprocess
+            python occupancy_sampling.py
+          '''
+        }
+      }
+      stage("SPC Dual Octree Recipe") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\recipes\\spc
+            python spc_dual_octree.py
+          '''
+        }
+      }
+      stage("SPC Trilinear Interpolation Recipe") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\recipes\\spc
+            python spc_trilinear_interp.py
+          '''
+        }
+      }
+      stage("Run pytest - io") {
+        catchError(stageResult: "failure") {
+          timeout(time: 5, unit: "MINUTES") {
+              powershell '''
+              set CI=true
+              pytest -s /kaolin/tests/python/kaolin/io
+            '''
+          }
+        }
+      }
+      stage("Run pytest - metrics") {
+        catchError(stageResult: "failure") {
+          timeout(time: 5, unit: "MINUTES") {
+              powershell '''
+              set CI=true
+              pytest -s /kaolin/tests/python/kaolin/metrics
+            '''
+          }
+        }
+      }
+      stage("Run pytest - ops") {
+        catchError(stageResult: "failure") {
+          timeout(time: 50, unit: "MINUTES") {
+              powershell '''
+              set CI=true
+              pytest -s /kaolin/tests/python/kaolin/ops
+            '''
+          }
+        }
+      }
+      stage("Run pytest - render") {
+        catchError(stageResult: "failure") {
+          timeout(time: 50, unit: "MINUTES") {
+              powershell '''
+              set CI=true
+              set KAOLIN_TEST_NVDIFFRAST=0
+              pytest -s /kaolin/tests/python/kaolin/render
+            '''
+          }
+        }
+      }
+      stage("Run pytest - rep") {
+        catchError(stageResult: "failure") {
+          timeout(time: 5, unit: "MINUTES") {
+              powershell '''
+              set CI=true
+              pytest -s /kaolin/tests/python/kaolin/rep
+            '''
+          }
+        }
+      }
+      stage("Run pytest - utils") {
+        catchError(stageResult: "failure") {
+          timeout(time: 5, unit: "MINUTES") {
+              powershell '''
+              set CI=true
+              pytest -s /kaolin/tests/python/kaolin/utils
+            '''
+          }
+        }
+      }
+      stage("Run pytest - visualize") {
+        catchError(stageResult: "failure") {
+          timeout(time: 5, unit: "MINUTES") {
+              powershell '''
+              set CI=true
+              pytest -s /kaolin/tests/python/kaolin/visualize
+            '''
+          }
+        }
+      }
+      stage("Update build status") {
+        // update build result gitlab status
+        //  catchError only updates the pipeline
+        if (currentBuild.getCurrentResult() == "FAILURE") {
+          echo "failed"
+          echo "updating test-${configName}-${arch}"
+          updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "failed")
+        } else {
+          echo "success"
+          echo "updating test-${configName}-${arch}"
+          updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "success")
+        }
+      }
+    }
+  }
+}

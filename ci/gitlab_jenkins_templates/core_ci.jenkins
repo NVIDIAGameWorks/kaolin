@@ -151,6 +151,24 @@ def ubuntu_for_wheels_configs = [
     ]
 ]
 
+// Configs for build from Windows server docker images
+// (See: https://hub.docker.com/_/microsoft-dotnet-framework-sdk)
+def windows_from_server_configs = [
+    // CUDA drivers on test machines only available for CUDA version >= 11.0
+    //  see: https://gitlab-master.nvidia.com/ipp/cloud-infra/blossom/dev/windows-gpu-pods/-/tree/master/ContainerDriverSetup
+    // test machines currently are the only option, named 'gpu_tester'
+    //      two machines exist, only the TITAN RTX will pass tests
+    [
+        'cudaVer': '11.1',
+        'pythonVer': '3.7', 'torchVer': '1.8.2',
+        'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
+    ],
+    [
+        'cudaVer': '11.3',
+        'pythonVer': '3.8', 'torchVer': '1.11.0',
+        'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
+    ]
+]
 
 dockerRegistryServer = 'gitlab-master.nvidia.com:5005'
 dockerRegistryName = 'toronto_dl_lab/kaolin'
@@ -245,7 +263,7 @@ node {
                         configName,
                         baseImageTag,
                         config['archsToTest']
-                    )   
+                    )
                 }
 
                 for (config in ubuntu_cpuonly_configs) {
@@ -256,6 +274,20 @@ node {
                         configName,
                         config['pythonVer'],
                         config['torchVer']
+                    )
+                }
+
+                for (config in windows_from_server_configs) {
+                    def cudaVerLabel = config['cudaVer'].split('\\.').join('')
+                    def torchVerLabel = config['torchVer'].split('\\.')[0..1].join('')
+                    def pythonVerLabel = config['pythonVer'].split('\\.').join('')
+                    def configName = "windows-cuda${cudaVerLabel}-py${pythonVerLabel}-torch${torchVerLabel}"
+                    jobMap["${configName}"] = prepareWindowsJob(
+                        configName,
+                        config['cudaVer'],
+                        config['pythonVer'],
+                        config['torchVer'],
+                        config['archsToTest']
                     )
                 }
             }
@@ -346,6 +378,32 @@ def prepareUbuntuCPUOnlyJob(configName, pythonVer, torchVer) {
         string(name: 'sourceBranch', value: "${env.gitlabSourceBranch}"),
         string(name: 'repoUrl', value: "${scm.userRemoteConfigs[0].url}" ),
         string(name: 'commitHash', value: "${commitHash}")
+      ],
+      wait: false,
+      propagate: false
+    }
+  }
+}
+
+def prepareWindowsJob(configName, cudaVer, pythonVer, torchVer, archsToTest) {
+  return {
+    stage("${configName}") {
+      updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
+      for (arch in archsToTest.split(';')) {
+        updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "pending")
+      }
+      build job: "windows_build_template_CI",
+      parameters: [
+        string(name: 'configName', value: "${configName}"),
+        string(name: 'cudaVer', value: "${cudaVer}"),
+        string(name: 'pythonVer', value: "${pythonVer}"),
+        string(name: 'torchVer', value: "${torchVer}"),
+        string(name: 'targetImageTag',
+               value: "${imageBaseTag}:${branchRef}-${BUILD_ID}-${configName}"),
+        string(name: 'sourceBranch', value: "${gitlabSourceBranch}"),
+        string(name: 'repoUrl', value: "${scm.userRemoteConfigs[0].url}" ),
+        string(name: 'commitHash', value: "${commitHash}"),
+        string(name: 'archsToTest', value: "${archsToTest}")
       ],
       wait: false,
       propagate: false

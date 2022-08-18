@@ -151,7 +151,7 @@ void unbatched_mesh_intersection_cuda_kernel(
           // Can the point be projected on the face?
           if (dist_1 * dist_2 >= 0) {
             scalar_t dist_3 = signed_area(q1_2d, p3_2d, p1_2d);
-            if (dist_3 * dist_1 >= 0 and dist_2 * dist_3 >= 0) {
+            if (dist_3 * dist_1 >= 0 && dist_2 * dist_3 >= 0) {
               // Is the point is projected on an edge or vertice?
               bool is_on_edge = false;
               bool is_on_vertice = false;
