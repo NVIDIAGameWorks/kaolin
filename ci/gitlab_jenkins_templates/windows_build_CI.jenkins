@@ -1,0 +1,126 @@
+#!/usr/bin/env groovy
+
+// Map from CUDA version to URL to obtain windows installer
+def cuda_version_url = [
+    // CUDA drivers on test machines only available for CUDA version >= 11.0
+    //  see: https://gitlab-master.nvidia.com/ipp/cloud-infra/blossom/dev/windows-gpu-pods/-/tree/master/ContainerDriverSetup
+    // test machines currently are the only option, named 'gpu_tester'
+    //      two machines exist, only the TITAN RTX will pass tests
+    '11.1': 'http://developer.download.nvidia.com/compute/cuda/11.1.1/local_installers/cuda_11.1.1_456.81_win10.exe',
+    '11.3': 'https://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda_11.3.1_465.89_win10.exe',
+]
+
+
+docker_registry_server = targetImageTag.split(':')[0..1].join(':')
+// This will be the "RUN" displayed on Blue Ocean
+currentBuild.displayName = targetImageTag.split(':')[2]
+// This will be the "MESSAGE" displayed on Blue Ocean
+currentBuild.description = sourceBranch + ": " + commitHash
+
+podTemplate(
+cloud:'sc-ipp-blossom-prod',
+envVars:[envVar(key:"JENKINS_URL", value:"${env.JENKINS_URL}")],
+yaml:'''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: jnlp
+    image: jenkins/jnlp-agent:latest-windows
+    env: 
+    - name: JENKINS_AGENT_WORKDIR
+      value: C:/Jenkins/agent
+    - name: DOCKER_HOST
+      value: "win-docker-proxy.blossom-system.svc.cluster.local"
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+    resources:
+        requests:
+          memory: 16Gi
+        limits:
+          memory: 16Gi
+  nodeSelector:
+    kubernetes.io/os: windows
+''') 
+{
+  node(POD_LABEL) {
+    try {
+      gitlabCommitStatus("build-${configName}") {
+        timeout(time: 300, unit: 'MINUTES') {
+          stage("Checkout") {
+            checkout([
+                $class: 'GitSCM',
+                branches: [[name: "${commitHash}"]],
+                // We need submodules
+                extensions: [[
+                    $class: 'SubmoduleOption',
+                    disableSubmodules: false,
+                    parentCredentials: false,
+                    recursiveSubmodules: true,
+                    reference: '',
+                    trackingSubmodules: false
+                ]],
+                userRemoteConfigs: [[
+                    credentialsId: 'gitlab-credentials',
+                    url: "${repoUrl}"
+                ]]
+            ])
+          }
+          docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
+            stage("Build") {
+              cudaUrl = cuda_version_url[cudaVer]
+              targetImage = docker.build(
+                  "${targetImageTag}",
+                  """-m 16g --no-cache -f ./tools/windows/Dockerfile \
+                      --build-arg CUDA_VERSION=${cudaVer} \
+                      --build-arg CUDA_URL=${cudaUrl} \
+                      --build-arg PYTHON_VERSION=${pythonVer} \
+                      --build-arg PYTORCH_VERSION=${torchVer} \
+                      .
+                  """)
+              powershell '''
+                docker images
+              '''
+            }
+            stage("Push") {
+              targetImage.push()
+            }
+          }
+        }
+      }
+    } catch (e) {
+        // In case of build failure, we need to update the following tests as we won't run them.
+        for (arch in archsToTest.split(';')) {
+          updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: 'canceled')
+        }
+        throw e
+    }
+    stage("Launch tests") {
+      jobMap = [:]
+      for (arch in archsToTest.split(';')) {
+        jobMap["${arch}"] = prepareWindowsTestJob(arch)
+      }
+      parallel jobMap
+    }
+  }
+}
+
+def prepareWindowsTestJob(arch) {
+  return {
+    stage("Test ${arch}") {
+      build job: "windows_test_template_CI",
+      parameters: [
+        string(name: 'sourceBranch', value: "${sourceBranch}"),
+        string(name: 'configName', value: "${configName}"),
+        string(name: 'imageTag', value: "${targetImageTag}"),
+        string(name: 'arch', value: "${arch}"),
+        string(name: 'commitHash', value: "${commitHash}")
+      ],
+      // This node doesn't need to be held while tests run.
+      wait: false,
+      // Success of this script depends only on successful build
+      // and launch of tests, not successful tests.
+      propagate: false
+    }
+  }
+}
