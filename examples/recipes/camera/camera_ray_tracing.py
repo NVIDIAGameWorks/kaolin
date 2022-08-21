@@ -23,7 +23,7 @@ def generate_perspective_rays(camera: Camera, pixel_grid: Tuple[torch.Tensor, to
     pixel_x = pixel_x.to(camera.device, camera.dtype)
     pixel_y = pixel_y.to(camera.device, camera.dtype)
 
-    # Account for principal point
+    # Account for principal point offset from canvas center
     pixel_x = pixel_x - camera.x0
     pixel_y = pixel_y + camera.y0
 
