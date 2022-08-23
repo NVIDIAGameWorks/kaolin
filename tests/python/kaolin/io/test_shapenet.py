@@ -11,70 +11,113 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from pathlib import Path
 
+from pathlib import Path
 import os
+import copy
 
 import pytest
 import torch
 import random
 
 from kaolin.io.obj import return_type
+from kaolin.io.dataset import KaolinDatasetItem
 from kaolin.io import shapenet
 
 SHAPENETV1_PATH = '/data/ShapeNetCore.v1'
 SHAPENETV2_PATH = '/data/ShapeNetCore.v2'
-SHAPENET_TEST_CATEGORY_SYNSETS = ['02691156']
-SHAPENET_TEST_CATEGORY_LABELS = ['plane']
-SHAPENET_TEST_CATEGORY_SYNSETS_2 = ['02958343']
-SHAPENET_TEST_CATEGORY_LABELS_2 = ['car']
-SHAPENET_TEST_CATEGORY_SYNSETS_MULTI = ['02691156', '02958343']
-SHAPENET_TEST_CATEGORY_LABELS_MULTI = ['plane', 'car']
+SHAPENET_TEST_CATEGORY_SYNSETS = ['02933112']
+SHAPENET_TEST_CATEGORY_LABELS = ['dishwasher']
+SHAPENET_TEST_CATEGORY_MULTI = ['mailbox', '04379243']
 
 ALL_CATEGORIES = [
     None,
     SHAPENET_TEST_CATEGORY_SYNSETS,
     SHAPENET_TEST_CATEGORY_LABELS,
-    SHAPENET_TEST_CATEGORY_SYNSETS_2,
-    SHAPENET_TEST_CATEGORY_LABELS_2,
-    SHAPENET_TEST_CATEGORY_SYNSETS_MULTI,
-    SHAPENET_TEST_CATEGORY_LABELS_MULTI,
+    SHAPENET_TEST_CATEGORY_MULTI
 ]
 
 # Skip test in a CI environment
 @pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
 @pytest.mark.parametrize('version', ['v1', 'v2'])
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
-@pytest.mark.parametrize('train', [True, False])
 @pytest.mark.parametrize('with_materials', [True, False])
+@pytest.mark.parametrize('output_dict', [True, False])
+@pytest.mark.parametrize('use_transform', [True, False])
 class TestShapeNet(object):
 
     @pytest.fixture(autouse=True)
-    def shapenet_dataset(self, version, categories, train, with_materials):
+    def transform(self, output_dict, use_transform):
+        if use_transform:
+            if output_dict:
+                def transform(inputs):
+                    outputs = copy.copy(inputs)
+                    outputs['mesh'] = return_type(
+                        vertices=outputs['mesh'].vertices + 1.,
+                        faces=outputs['mesh'].faces,
+                        uvs=outputs['mesh'].uvs,
+                        face_uvs_idx=outputs['mesh'].face_uvs_idx,
+                        materials=outputs['mesh'].materials,
+                        materials_order=outputs['mesh'].materials_order,
+                        vertex_normals=outputs['mesh'].vertex_normals,
+                        face_normals=outputs['mesh'].face_normals
+                    )
+                    return outputs
+                return transform
+            else:
+                def transform(inputs):
+                    outputs = KaolinDatasetItem(
+                        data=return_type(
+                            vertices=inputs.data.vertices + 1.,
+                            faces=inputs.data.faces,
+                            uvs=inputs.data.uvs,
+                            face_uvs_idx=inputs.data.face_uvs_idx,
+                            materials=inputs.data.materials,
+                            materials_order=inputs.data.materials_order,
+                            vertex_normals=inputs.data.vertex_normals,
+                            face_normals=inputs.data.face_normals
+                        ),
+                        attributes=inputs.attributes)
+                    return outputs
+                return transform
+        else:
+            return None
+
+    @pytest.fixture(autouse=True)
+    def shapenet_dataset(self, version, categories, with_materials, transform, output_dict):
         if version == 'v1':
-            return shapenet.ShapeNetV1(root=SHAPENETV1_PATH,
-                                       categories=categories,
-                                       train=train,
-                                       split=0.7,
-                                       with_materials=with_materials)
+            ds = shapenet.ShapeNetV1(root=SHAPENETV1_PATH,
+                                     categories=categories,
+                                     train=True,
+                                     split=0.7,
+                                     with_materials=with_materials,
+                                     transform=transform,
+                                     output_dict=output_dict)
         elif version == 'v2':
-            return shapenet.ShapeNetV2(root=SHAPENETV2_PATH,
-                                       categories=categories,
-                                       train=train,
-                                       split=0.7,
-                                       with_materials=with_materials)
+            ds = shapenet.ShapeNetV2(root=SHAPENETV2_PATH,
+                                     categories=categories,
+                                     train=True,
+                                     split=0.7,
+                                     with_materials=with_materials,
+                                     transform=transform,
+                                     output_dict=output_dict)
         else:
             raise ValueError(f"version {version} not recognized")
+        return ds
 
     @pytest.mark.parametrize('index', [0, -1, None, None])
-    def test_basic_getitem(self, shapenet_dataset, index, with_materials):
+    def test_basic_getitem(self, shapenet_dataset, index, with_materials, output_dict):
         if index is None:
             index = random.randint(0, len(shapenet_dataset) - 1)
         assert len(shapenet_dataset) > 0
 
         item = shapenet_dataset[index]
-        data = item.data
-        attributes = item.attributes
+        if output_dict:
+            data = item['mesh']
+            attributes = item
+        else:
+            data = item.data
+            attributes = item.attributes
         assert isinstance(data, return_type)
         assert isinstance(attributes, dict)
 
@@ -114,17 +157,25 @@ class TestShapeNet(object):
         assert isinstance(attributes['labels'], list)
 
     @pytest.mark.parametrize('index', [-1, -2])
-    def test_neg_index(self, shapenet_dataset, index, with_materials):
+    def test_neg_index(self, shapenet_dataset, index, with_materials, output_dict):
 
         assert len(shapenet_dataset) > 0
 
         gt_item = shapenet_dataset[len(shapenet_dataset) + index]
-        gt_data = gt_item.data
-        gt_attributes = gt_item.attributes
+        if output_dict:
+            gt_data = gt_item['mesh']
+            gt_attributes = gt_item
+        else:
+            gt_data = gt_item.data
+            gt_attributes = gt_item.attributes
 
         item = shapenet_dataset[index]
-        data = item.data
-        attributes = item.attributes
+        if output_dict:
+            data = item['mesh']
+            attributes = item
+        else:
+            data = item.data
+            attributes = item.attributes
 
         assert torch.equal(data.vertices, gt_data.vertices)
         assert torch.equal(data.faces, gt_data.faces)
@@ -144,3 +195,30 @@ class TestShapeNet(object):
         assert attributes['path'] == gt_attributes['path']
         assert attributes['synset'] == gt_attributes['synset']
         assert attributes['labels'] == gt_attributes['labels']
+
+    def test_test_split(self, shapenet_dataset, with_materials, output_dict,
+                        version, categories):
+        if version == 'v1':
+            test_dataset = shapenet.ShapeNetV1(root=SHAPENETV1_PATH,
+                                               categories=categories,
+                                               train=False,
+                                               split=0.7,
+                                               with_materials=with_materials,
+                                               output_dict=output_dict)
+        else:
+            test_dataset = shapenet.ShapeNetV2(root=SHAPENETV2_PATH,
+                                               categories=categories,
+                                               train=False,
+                                               split=0.7,
+                                               with_materials=with_materials,
+                                               output_dict=output_dict)
+        train_item = shapenet_dataset[0]
+        test_item = test_dataset[0]
+        if output_dict:
+            train_attributes = train_item
+            test_attributes = test_item
+        else:
+            train_attributes = train_item.attributes
+            test_attributes = test_item.attributes
+        assert train_attributes['name'] != test_attributes['name']
+        assert test_attributes['name'] not in shapenet_dataset.names

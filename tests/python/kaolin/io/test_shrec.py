@@ -15,11 +15,13 @@
 from pathlib import Path
 
 import os
+import copy
 
 import pytest
 import torch
 
 from kaolin.io.obj import return_type
+from kaolin.io.dataset import KaolinDatasetItem
 from kaolin.io.shrec import SHREC16
 
 SHREC16_PATH = '/data/shrec16/'
@@ -45,24 +47,69 @@ ALL_CATEGORIES = [
 @pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
 @pytest.mark.parametrize('split', ['train', 'val', 'test'])
+@pytest.mark.parametrize('use_transform', [True, False])
+@pytest.mark.parametrize('output_dict', [True, False])
 class TestSHREC16(object):
 
     @pytest.fixture(autouse=True)
-    def shrec16_dataset(self, categories, split):
+    def transform(self, output_dict, use_transform):
+        if use_transform:
+            if output_dict:
+                def transform(inputs):
+                    outputs = copy.copy(inputs)
+                    outputs['mesh'] = return_type(
+                        vertices=outputs['mesh'].vertices + 1.,
+                        faces=outputs['mesh'].faces,
+                        uvs=outputs['mesh'].uvs,
+                        face_uvs_idx=outputs['mesh'].face_uvs_idx,
+                        materials=outputs['mesh'].materials,
+                        materials_order=outputs['mesh'].materials_order,
+                        vertex_normals=outputs['mesh'].vertex_normals,
+                        face_normals=outputs['mesh'].face_normals
+                    )
+                    return outputs
+                return transform
+            else:
+                def transform(inputs):
+                    outputs = KaolinDatasetItem(
+                        data=return_type(
+                            vertices=inputs.data.vertices + 1.,
+                            faces=inputs.data.faces,
+                            uvs=inputs.data.uvs,
+                            face_uvs_idx=inputs.data.face_uvs_idx,
+                            materials=inputs.data.materials,
+                            materials_order=inputs.data.materials_order,
+                            vertex_normals=inputs.data.vertex_normals,
+                            face_normals=inputs.data.face_normals
+                        ),
+                        attributes=inputs.attributes)
+                    return outputs
+                return transform
+        else:
+            return None
+
+    @pytest.fixture(autouse=True)
+    def shrec16_dataset(self, categories, split, transform, output_dict):
         return SHREC16(root=SHREC16_PATH,
                        categories=categories,
-                       split=split)
+                       split=split,
+                       transform=transform,
+                       output_dict=output_dict)
 
     @pytest.mark.parametrize('index', [0, -1])
-    def test_basic_getitem(self, shrec16_dataset, index, split):
+    def test_basic_getitem(self, shrec16_dataset, index, split, output_dict):
         assert len(shrec16_dataset) > 0
 
         if index == -1:
             index = len(shrec16_dataset) - 1
 
         item = shrec16_dataset[index]
-        data = item.data
-        attributes = item.attributes
+        if output_dict:
+            data = item['mesh']
+            attributes = item
+        else:
+            data = item.data
+            attributes = item.attributes
         assert isinstance(data, return_type)
         assert isinstance(attributes, dict)
 
@@ -77,23 +124,28 @@ class TestSHREC16(object):
         
         if split == "test":
             assert attributes['synset'] is None
-            assert attributes['label'] is None
+            assert attributes['labels'] is None
         else:
             assert isinstance(attributes['synset'], str)
-            assert isinstance(attributes['label'], list)
+            assert isinstance(attributes['labels'], list)
     
     @pytest.mark.parametrize('index', [-1, -2])
-    def test_neg_index(self, shrec16_dataset, index):
+    def test_neg_index(self, shrec16_dataset, index, output_dict):
 
         assert len(shrec16_dataset) > 0
 
         gt_item = shrec16_dataset[len(shrec16_dataset) + index]
-        gt_data = gt_item.data
-        gt_attributes = gt_item.attributes
-
         item = shrec16_dataset[index]
-        data = item.data
-        attributes = item.attributes
+        if output_dict:
+            data = item['mesh']
+            attributes = item
+            gt_data = gt_item['mesh']
+            gt_attributes = gt_item
+        else:
+            data = item.data
+            attributes = item.attributes
+            gt_data = gt_item.data
+            gt_attributes = gt_item.attributes
 
         assert torch.equal(data.vertices, gt_data.vertices)
         assert torch.equal(data.faces, gt_data.faces)

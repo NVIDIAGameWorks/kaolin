@@ -132,6 +132,14 @@ spec:
           '''
         }
       }
+      stage("Fast Mesh Sampling Recipe") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\recipes\\preprocess
+            python fast_mesh_sampling.py --shapenet-dir=/mnt/data/ci_shapenetv2/
+          '''
+        }
+      }
       stage("SPC Dual Octree Recipe") {
         catchError(stageResult: "failure") {
           powershell '''
