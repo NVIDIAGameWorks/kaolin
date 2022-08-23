@@ -25,8 +25,8 @@ __all__ = [
 ]
 
 class PinholeParamsDefEnum(IntrinsicsParamsDefEnum):
-    x0 = 0          # Principal point offset (x)
-    y0 = 1          # Principal point offset (y)
+    x0 = 0          # Principal point offset (x), by default assumes offset from the canvas center
+    y0 = 1          # Principal point offset (y), by default assumes offset from the canvas center
     focal_x = 2     # Focal length (x), measured in pixels
     focal_y = 3     # Focal length (y), measured in pixels
     # Following common practice, the axis skew of pinhole cameras is always assumed to be zero
@@ -79,8 +79,8 @@ class PinholeIntrinsics(CameraIntrinsics):
         - **focal_x**, **focal_y**, **x0**, **y0**: are the intrinsic parameters of the camera
           The focal length, together with the image plane width / height,
           determines the field of view (fov). This is the effective lens zoom of the scene.
-          The principal points x0, y0 allow another DoF to translate the origin of the image plane
-          (can be used to control where the origin of NDC space resides).
+          The principal point offsets: x0, y0 allow another DoF to translate the origin of the image plane.
+          By default, kaolin assumes the NDC origin is at the canvas center (see projection_matrix())
         - **n**, **f**: are the near and far clipping planes,
           which define the min / max depth of the view frustum.
           The near and far planes are also used to normalize the depth values to
@@ -101,7 +101,7 @@ class PinholeIntrinsics(CameraIntrinsics):
           (and in fact serve a similar function).
 
     This matrix sometimes appear in the literature in a slightly simplified form, for example,
-    if the principal points x0 = 0, y0 = 0 and the
+    if the principal point offsets x0 = 0, y0 = 0 and the
     NDC coords are defined in the range :math:`[-1, 1]`:
 
     .. math::
@@ -172,8 +172,8 @@ class PinholeIntrinsics(CameraIntrinsics):
              height (int): height of the camera resolution
              focal_x (float): focal on x-axis
              focal_y (optional, float): focal on y-axis. Default: same that focal_x
-             x0 (optional, float): horizontal origin of the image plane. Default: 0.
-             y0 (optional, float): vertical origin of the image place. Default: 0.
+             x0 (optional, float): horizontal offset from origin of the image plane (by default the center). Default: 0.
+             y0 (optional, float): vertical offset origin of the image place (by default the center). Default: 0.
              near (optional, float):
                  near clipping plane, define the min depth of the view frustrum
                  or to normalize the depth values. Default: 1e-2
@@ -211,8 +211,8 @@ class PinholeIntrinsics(CameraIntrinsics):
              height (int): height of the camera resolution
              fov (float): the field of view, in radians
              fov_direction (optional, CameraFOV): the direction of the field-of-view
-             x0 (optional, float): horizontal origin of the image plane. Default: 0.
-             y0 (optional, float): vertical origin of the image place. Default: 0.
+             x0 (optional, float): horizontal offset from origin of the image plane (by default the center). Default: 0.
+             y0 (optional, float): vertical offset origin of the image place (by default the center). Default: 0.
              near (optional, float):
                  near clipping plane, define the min depth of the view frustrum
                  or to normalize the depth values. Default: 1e-2
@@ -290,8 +290,8 @@ class PinholeIntrinsics(CameraIntrinsics):
         (that is: it normalizes a cuboid-shaped view-frustum to clip coordinates, which are
         SCALED normalized device coordinates).
 
-        When used in conjunction with a :func:`perspective_matrix()`, a transformation from camera view space to clip space
-        can be obtained. 
+        When used in conjunction with a :func:`perspective_matrix()`, a transformation from camera view space to
+        clip space can be obtained.
         
         .. seealso::
 
@@ -427,7 +427,7 @@ class PinholeIntrinsics(CameraIntrinsics):
         # We want to map specific values of z, the near and far planes, to specific NDC values
         # (for example, such that near --> -1,  far --> 1 ).
         #
-        # kaolin assumes a left handed NDC space (precision goes inwards the screen), so we substitute
+        # kaolin assumes a left handed NDC space (depth goes inwards the screen), so we substitute
         # z = -near and z = -far in the equation above, paired with the requested z_ndc values.
         # A simple linear system of 2 equations is obtained, that once solved, yields U and V.
         #              -1 = -U / (-n) - V
@@ -458,6 +458,8 @@ class PinholeIntrinsics(CameraIntrinsics):
 
     def projection_matrix(self) -> torch.Tensor:
         r"""Creates an OpenGL compatible perspective projection matrix to clip coordinates.
+        This is the default perspective projection matrix used by kaolin: it assumes the NDC origin is at the
+        center of the canvas (hence x0, y0 offsets are measured relative to the center).
         
         Return:
             (torch.Tensor): the projection matrix, of shape :math:`(\text{num_cameras}, 4, 4)`
@@ -549,7 +551,9 @@ class PinholeIntrinsics(CameraIntrinsics):
 
     @property
     def x0(self) -> torch.FloatTensor:
-        """The horizontal origin in image space"""
+        """The horizontal offset from the NDC origin in image space
+        By default, kaolin defines the NDC origin at the canvas center.
+        """
         return self.params[:, PinholeParamsDefEnum.x0]
 
     @x0.setter
@@ -558,7 +562,9 @@ class PinholeIntrinsics(CameraIntrinsics):
 
     @property
     def y0(self) -> torch.FloatTensor:
-        """The vertical origin in image space"""
+        """The vertical offset from the NDC origin in image space
+        By default, kaolin defines the NDC origin at the canvas center.
+        """
         return self.params[:, PinholeParamsDefEnum.y0]
 
     @y0.setter
