@@ -16,13 +16,21 @@
 #ifndef KAOLIN_OPS_SPC_SPC_H_
 #define KAOLIN_OPS_SPC_SPC_H_
 
+#include <ATen/ATen.h>
+
 #ifdef WITH_CUDA
 #include "../../spc_math.h"
 #endif
 
-#include <ATen/ATen.h>
-
 namespace kaolin {
+
+at::Tensor morton_to_octree(
+    at::Tensor mortons,
+    uint32_t level);
+
+at::Tensor points_to_octree(
+    at::Tensor points,
+    uint32_t level);
 
 std::tuple<int, at::Tensor, at::Tensor> scan_octrees_cuda(
     at::Tensor octrees,

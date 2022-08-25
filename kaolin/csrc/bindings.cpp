@@ -44,7 +44,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ops_mesh.def("unbatched_mesh_intersection_cuda", &unbatched_mesh_intersection_cuda);
     py::module ops_conversions = ops.def_submodule("conversions");
     ops_conversions.def("unbatched_mcube_forward_cuda", &unbatched_mcube_forward_cuda);
-    ops_conversions.def("mesh_to_spc", &mesh_to_spc);
+    ops_conversions.def("mesh_to_spc_cuda", &mesh_to_spc_cuda);
     py::module ops_spc = ops.def_submodule("spc");
 #if WITH_CUDA
     ops_spc.def("query_cuda", &query_cuda);
@@ -57,6 +57,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ops_spc.def("points_to_corners_cuda", &points_to_corners_cuda);
 #endif  // WITH_CUDA
     ops_spc.def("points_to_octree", &points_to_octree);
+    ops_spc.def("morton_to_octree", &morton_to_octree);
     ops_spc.def("scan_octrees_cuda", &scan_octrees_cuda);
     ops_spc.def("generate_points_cuda", &generate_points_cuda);
     ops_spc.def("Conv3d_forward", &Conv3d_forward);

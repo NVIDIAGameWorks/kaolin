@@ -16,22 +16,14 @@
 #ifndef KAOLIN_OPS_CONVERSIONS_MESH_TO_SPC_MESH_TO_SPC_H_
 #define KAOLIN_OPS_CONVERSIONS_MESH_TO_SPC_MESH_TO_SPC_H_
 
-#ifdef WITH_CUDA
-#include "../../../spc_math.h"
-#endif
-
 #include <ATen/ATen.h>
 
 namespace kaolin {
 
-at::Tensor points_to_octree(
-    at::Tensor points,
-    uint32_t level);
-
-at::Tensor mesh_to_spc(
-    at::Tensor vertices,
-    at::Tensor triangles,
+std::vector<at::Tensor> mesh_to_spc_cuda(
+    at::Tensor face_vertices,
     uint32_t Level) ;
+
 
 }  // namespace kaolin
 
