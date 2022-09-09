@@ -71,7 +71,7 @@ Simple Recipes
 * Visualization:
     * `visualize_main.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/visualize_main.py>`_: using Timelapse API to write mock 3D checkpoints
 * Camera:
-    * `camera_differentiable.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_differentiable.py>`_: optimize a camera position
+    * `cameras_differentiable.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/cameras_differentiable.py>`_: optimize a camera position
     * `camera_transforms.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_transforms.py>`_: using :func:`Camera.transform()` function
     * `camera_ray_tracing.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_ray_tracing.py>`_: how to design a ray generating function using :class:`Camera` objects
     * `camera_properties.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_properties.py>`_: exposing some the camera attributes and properties
