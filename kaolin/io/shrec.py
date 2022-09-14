@@ -14,11 +14,13 @@
 # limitations under the License.
 
 import os
+from typing import Callable
 import warnings
-
 from pathlib import Path
 
-from kaolin.io.dataset import KaolinDataset
+from torch.utils.data import Dataset
+
+from kaolin.io.dataset import KaolinDataset, KaolinDatasetItem
 from kaolin.io.obj import import_mesh, ignore_error_handler
 
 synset_to_labels = {
@@ -92,14 +94,35 @@ def _convert_categories(categories):
                else c for c in categories]
     return synsets
 
-class SHREC16(KaolinDataset):
+class SHREC16(Dataset):
     r"""Dataset class for SHREC16, used for the "Large-scale 3D shape retrieval
     from ShapeNet Core55" contest at Eurographics 2016.
     More details about the challenge and the dataset are available
     `here <https://shapenet.cs.stanford.edu/shrec16/>`_.
 
-    The `__getitem__` method will return a `KaolinDatasetItem`, with its `data`
-    field containing a `kaolin.io.obj.return_type`.
+    The `__getitem__` method will return:
+
+        * if output_dict=True: a dictionary with the following key-value pairs:
+
+            * 'mesh': containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * 'name': the model name (i.e the subfolder name)
+            * 'path': the full path to the .off
+            * 'synset': the synset associated to the category
+            * 'labels': the labels associated to the category (see ``synset_to_labels``)
+
+        * if output_dict=False (deprecated): a :class:`KaolinDatasetItem` with the fields:
+
+            * ``data``: containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * ``attributes``: containing a dictionary with the following key-value pairs:
+
+                * 'name': the model name (i.e the subfolder name)
+                * 'path': the full path to the .off
+                * 'synset': the synset associated to the category
+                * 'labels': the labels associated to the category (see ``synset_to_labels``)
+
+    .. deprecated:: 0.13.0
+       output_dict=False is deprecated.
+       Datasets should always output a dictionary to be compatible with :class:`ProcessedDataset`.
 
     Args:
         root (str): Path to the root directory of the dataset.
@@ -109,11 +132,18 @@ class SHREC16(KaolinDataset):
                            are loaded by default.
         split (str): String to indicate what split to load, among ["train", "val", "test"].
                      Default: "train".
+        transform (Callable):
+            A function/transform that takes in a dictionary or :class:`KaolinDatasetItem`
+            and returns a transformed version.
+        output_dict (bool):
+            If True, __getitem__ output a dictionary, else :class:`KaolinDatasetItem` (deprecated)
+            Default: False.
     """
 
-    def __init__(self, root: str, categories: list = None, split: str = "train"):
-
+    def __init__(self, root: str, categories: list = None, split: str = "train",
+                 transform: Callable = None, output_dict: bool = False):
         self.root = Path(root)
+        self.transform = transform
         self.paths = []
         self.synset_idxs = []
 
@@ -127,6 +157,14 @@ class SHREC16(KaolinDataset):
             else:
                 self.synsets = _convert_categories(categories)
             self.labels = [synset_to_labels[s] for s in self.synsets]
+
+        if not output_dict:
+            warnings.warn("output_dict=False is deprecated, "
+                          "datasets __getitem__ should always output a dictionary "
+                          "to be compatible with :func:`ProcessedDatasetV2`",
+                          DeprecationWarning, stacklevel=2)
+        self.output_dict = output_dict
+
 
         # loops through desired classes
         if split == "test":
@@ -165,6 +203,23 @@ class SHREC16(KaolinDataset):
     def __len__(self):
         return len(self.paths)
 
+    def __getitem__(self, index):
+        if self.output_dict:
+            output = {
+                'mesh': self.get_data(index),
+                **self.get_attributes(index)
+            }
+        else:
+            output = KaolinDatasetItem(
+                data=self.get_data(index),
+                attributes=self.get_attributes(index)
+            )
+
+        if self.transform is not None:
+            output = self.transform(output)
+
+        return output
+
     def get_data(self, index):
         obj_location = self.paths[index]
         mesh = import_mesh(str(obj_location), error_handler=ignore_error_handler)
@@ -176,7 +231,7 @@ class SHREC16(KaolinDataset):
             'name': self.names[index],
             'path': self.paths[index],
             'synset': self.synsets[synset_idx],
-            'label': self.labels[synset_idx]
+            'labels': self.labels[synset_idx]
         }
         return attributes
 

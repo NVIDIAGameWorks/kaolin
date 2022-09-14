@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21-22 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +14,10 @@
 # limitations under the License.
 
 import functools
+import collections
 import numpy as np
 import torch
+from torch._six import string_classes
 
 import kaolin.ops.random as random
 from kaolin.ops.spc.uint8 import uint8_bits_sum
@@ -272,3 +274,44 @@ def tensor_info(t, name='', print_stats=False, detailed=False):
             (name_str, shape_str, type_str,
              (_get_stats_str() if print_stats else ''),
              (_get_details_str() if detailed else '')))
+
+def contained_torch_equal(elem, other):
+    """Check for equality of two objects potentially containing tensors.
+
+    :func:`torch.equal` do not support data structure like dictionary / arrays
+    and `==` is ambiguous on :class:`torch.Tensor`.
+    This class will try to apply recursion through :class:`collections.abc.Mapping`,
+    :class:`collections.abc.Sequence`, :func:`torch.equal` if the objects are `torch.Tensor`,
+    of else `==` operator.
+    
+    Args:
+        elem (object): The first object
+        other (object): The other object to compare to ``elem``
+
+    Return (bool): the comparison result
+    """
+    elem_type = type(elem)
+    if elem_type != type(other):
+        return False
+
+    if isinstance(elem, torch.Tensor):
+        return torch.equal(elem, other)
+    elif isinstance(elem, string_classes):
+        return elem == other
+    elif isinstance(elem, collections.abc.Mapping):
+        if elem.keys() != other.keys():
+            return False
+        return all(contained_torch_equal(elem[key], other[key]) for key in elem)
+    elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
+        if set(elem._fields()) != set(other._fields()):
+            return False
+        return all(contained_torch_equal(
+            getattr(elem, f), getattr(other, f)) for f in elem._fields()
+        )
+    elif isinstance(elem, collections.abc.Sequence):
+        if len(elem) != len(other):
+            return False
+        return all(contained_torch_equal(a, b) for a, b in zip(elem, other))
+    else:
+        return elem == other
+

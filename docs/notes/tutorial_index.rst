@@ -70,6 +70,7 @@ Simple Recipes
     * `spc_trilinear_interp.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/spc/spc_trilinear_interp.py>`_: computing trilinear interpolation of a point cloud on an SPC
 * Visualization:
     * `visualize_main.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/visualize_main.py>`_: using Timelapse API to write mock 3D checkpoints
+    * `fast_mesh_sampling.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/preprocess/fast_mesh_sampling.py>_`: Using CachedDataset to preprocess a ShapeNet dataset we can sample point clouds efficiently at runtime
 * Camera:
     * `camera_differentiable.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera_differentiable.py>`_: optimize a camera position
     * `camera_transforms.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera_transforms.py>`_: using :func:`Camera.transform()` function

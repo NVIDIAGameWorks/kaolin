@@ -135,6 +135,14 @@ spec:
           echo e.toString()
         }
         try {
+          stage("Fast Mesh Sampling Recipe") {
+            sh 'cd /kaolin/examples/recipes/preprocess/ && python fast_mesh_sampling.py --shapenet-dir=/mnt/data/ci_shapenetv2/'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
           stage("SPC Dual Octree Recipe") {
             sh 'cd /kaolin/examples/recipes/spc/ && python spc_dual_octree.py'
           }

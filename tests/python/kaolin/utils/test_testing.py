@@ -17,8 +17,9 @@ import logging
 import numpy as np
 import pytest
 import random
-import torch
+import copy
 
+import torch
 
 from kaolin.ops.random import random_tensor
 from kaolin.ops.spc.uint8 import bits_to_uint8
@@ -537,3 +538,20 @@ class TestTensorInfo:
         str = testing.tensor_info(t, tensor_name, print_stats=print_stats, detailed=detailed)
         logger.debug(str)
         assert len(str) > len(tensor_name)  # Just check that runs and produces output
+
+class TestContainedTorchEqual:
+    def test_true(self):
+        elem = [1, 'a', {'b': torch.rand(3, 3), 'c': 0.1}]
+        other = copy.deepcopy(elem)
+        assert testing.contained_torch_equal(elem, other)
+
+    def test_false(self):
+        elem = [1, 'a', {'b': torch.rand(3, 3), 'c': 0.1}]
+        other = copy.deepcopy(elem)
+        other[2]['b'][1, 1] += 1.
+        assert not testing.contained_torch_equal(elem, other)
+
+
+
+
+

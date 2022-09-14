@@ -13,16 +13,262 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import hashlib
+import warnings
+import copy
+from collections.abc import Sequence
 from abc import abstractmethod
 from collections import namedtuple
 from pathlib import Path
+import shutil
+from tqdm import tqdm
 
 import torch
 from torch.multiprocessing import Pool
 from torch.utils.data import Dataset
-from tqdm import tqdm
 
+from  ..utils.testing import contained_torch_equal
+
+def _parallel_save_task(args):
+    torch.set_num_threads(1)
+    return _save_task(*args)
+
+def _save_task(cache_dir, idx, getitem, to_save_on_disk, to_not_save):
+    with torch.no_grad():
+        if len(to_save_on_disk) > 0:
+            data_dir = cache_dir / str(idx)
+            data_dir.mkdir(exist_ok=True)
+        data = getitem(idx)
+        outputs = {}
+        for k, v in data.items():
+            if k in to_save_on_disk:
+                torch.save(v, data_dir / f'{k}.pt')
+            elif k not in to_not_save:
+                outputs[k] = v
+        return outputs
+
+def _get_saving_actions(dataset, cache_dir, save_on_disk=False,
+                        force_overwrite=False, ignore_diff_error=False):
+    size = len(dataset)
+    # Is there anything to save on disk?
+    if isinstance(save_on_disk, bool):
+        any_save_on_disk = save_on_disk
+    elif isinstance(save_on_disk, Sequence):
+        any_save_on_disk = len(save_on_disk) > 0
+    else:
+        raise TypeError("save_on_disk must be a boolean or a sequence of str")
+
+    # We need to query the data from dataset[0] for sanity check
+    # of saved files and arguments such as `save_on_disk`
+    _data = dataset[0]
+    if not isinstance(_data, dict):
+        raise TypeError("the dataset.__getitem__ must output a dictionary")
+
+    # Convert save_on_disk to a set of strings
+    if isinstance(save_on_disk, bool):
+        save_on_disk = set(_data.keys()) if save_on_disk else set()
+    else:
+        save_on_disk = set(save_on_disk)
+
+    to_save_on_ram = set(_data.keys()).difference(save_on_disk)
+    to_not_save = set() # Values that are already saved on disk
+    to_save_on_disk = set() # Values that will be force stored on disk
+
+    if any_save_on_disk:
+        if cache_dir is None:
+            raise ValueError("cache_dir should be provided with save_on_disk")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cached_ids = list(p.stem for p in cache_dir.glob(r'*'))
+
+        # Check that the keys on save_on_disk are actual outputs from preprocessing
+        for k in save_on_disk:
+            if k not in _data.keys():
+                raise ValueError(f"the dataset doesn't provide an output field '{k}'")
+
+        if force_overwrite:
+            if len(cached_ids) != len(dataset):
+                shutil.rmtree(cache_dir)
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            to_save_on_disk = save_on_disk
+        else:
+            # If the number of folder (len(dataset)) is different, 
+            # something is probably wrong with the existing data
+            if len(cached_ids) > 0 and len(cached_ids) != len(dataset):
+                raise RuntimeError(f"{len(cached_ids)} files already exist on "
+                                   f"{cache_dir} this dataset as {len(dataset)} files "
+                                   "so caching is too ambiguous and error-prone "
+                                   "please force rewriting by setting 'force_overwrite'")
+
+            # We accept that the cache has partial values defined,
+            # for instance if we add/remove a key from save_on_disk
+            # TODO(cfujitsang): need to check if avoiding store isn't over-optimization
+            #                   at the cost of potential user errors
+            #                   since we are not avoiding to run the preprocessing
+            for k, v in _data.items():
+                if k in save_on_disk:
+                    path = cache_dir / f'0/{k}.pt'
+                    if path.exists(): # There is already a file for a given key 
+                        # Is the value stored the same than the one from the data?
+                        assert ignore_diff_error or contained_torch_equal(v, torch.load(path)), \
+                            f"file '{cache_dir / f'0/{k}.pt'}' is different than " \
+                            "its matching field from the input dataset, set 'force_overwriting' " \
+                            "to True to overwrite the files cached."
+                        to_not_save.add(k)
+                    else:
+                        to_save_on_disk.add(k)
+    return to_save_on_disk, to_save_on_ram, to_not_save
+    
+class CachedDataset(Dataset):
+    """A wrapper dataset that caches the data to disk or RAM depending on
+    ``save_on_disk``.
+
+    For all ``dataset[i]`` with ``i`` from 0 to ``len(dataset)`` the output is store on RAM
+    or disk depending on ``save_on_disk``.
+
+    The base dataset or the ``preprocessing_transform`` if defined,
+    should have a ``__getitem__(idx)`` method that returns a dictionary.
+
+    .. note::
+    
+        if CUDA is used in preprocessing, ``num_workers`` must be set to 0.
+
+    Args:
+        dataset (torch.utils.data.Dataset or Sequence):
+            The base dataset to use.
+        cache_dir (optional, str):
+            Path where the data must be saved. Must be given if
+            ``save_on_disk`` is not False.
+        save_on_disk (optional, bool or Sequence[str]):
+            If True all the preprocessed outputs are stored on disk,
+            if False all the preprocessed outputs are stored on RAM,
+            if it's a sequence of strings then all the corresponding fields
+            are stored on disk.
+        num_workers (optional, int):
+            Number of process used in parallel for preprocessing.
+            Default: 0 (run in main process).
+        force_overwrite (optional, bool):
+            If True, force overwriting on disk even if files already exist.
+            Default: False.
+        cache_at_runtime (optional, bool):
+            If True, instead of preprocessing everything at construction
+            of the dataset, each new ``__getitem__`` will cache if necessary.
+            Default: False.
+        progress_message (optional, str):
+            Message to be displayed during preprocessing.
+            This is unuse with cache_at_runtime=True.
+            Default: don't show any message.
+        transform (optional, Callable):
+            If defined, called on the data at ``__getitem__``.
+            The result of this function is not cached.
+            Default: don't apply any transform.
+    """
+
+    def __init__(self, dataset, cache_dir=None, save_on_disk=False,
+                 num_workers=0, force_overwrite=False, cache_at_runtime=False,
+                 progress_message=None, ignore_diff_error=False, transform=None):
+        self.size = len(dataset)
+        self.transform = transform
+        self.cache_dir = None if cache_dir is None else Path(cache_dir)
+        self.to_save_on_disk, self.to_save_on_ram, self.to_not_save = _get_saving_actions(
+            dataset,
+            self.cache_dir,
+            save_on_disk=save_on_disk,
+            force_overwrite=force_overwrite,
+            ignore_diff_error=ignore_diff_error
+        )
+        self.on_disk = self.to_save_on_disk.union(self.to_not_save)
+
+        if len(self.to_save_on_ram) == 0 and len(self.to_save_on_disk) == 0:
+            # If nothing is to be stored on RAM and everything is already stored on disk
+            # there is no point in running the preprocessing
+            self.data = [{} for i in range(len(self))]
+        elif cache_at_runtime:
+            # __getitem__(idx) will execute the preprocessing task
+            # at runtime in case self.data[idx] is None.
+            self.data = [None] * len(self)
+            self.dataset = dataset
+            self.num_not_saved = len(self)
+        else:
+            self.data = []
+            # Run the preprocessing + saving
+            try:
+               if num_workers > 0:
+                   # With multiprocessing
+                   p = Pool(num_workers)
+                   try:
+                       iterator = p.imap(
+                           _parallel_save_task, [(
+                               self.cache_dir, idx, dataset.__getitem__,
+                               self.to_save_on_disk, self.to_not_save,
+                           ) for idx in range(len(self))])
+                       for _ in tqdm(range(len(self)), desc=progress_message):
+                           self.data.append(next(iterator))
+                   finally:
+                       p.close()
+                       p.join()
+               else:
+                   for idx in tqdm(range(len(self)), desc=progress_message):
+                       self.data.append(_save_task(
+                           self.cache_dir,
+                           idx,
+                           dataset.__getitem__,
+                           self.to_save_on_disk,
+                           self.to_not_save
+                       ))
+            except Exception as e:
+                # Cleaning if the preprocessing is returning an error
+                # there is not point in keeping the files that have been
+                # generated since they are most likely wrong
+                self._clean_cache_dir()
+                raise e
+
+    def _clean_cache_dir(self):
+        to_remove_paths = set()
+        if len(self.to_save_on_disk) > 0:
+            for k in self.to_save_on_disk:
+                to_remove_paths.update(set(self.cache_dir.glob(f'[0-9]*/{k}.pt')))
+            if set(self.cache_dir.glob('[0-9]*/*.pt')) == set(to_remove_paths):
+                shutil.rmtree(self.cache_dir)
+            else:
+                for k in self.to_save_on_disk:
+                    for path in self.cache_dir.glob(f'[0-9]*/{k}.pt'):
+                        os.remove(path)
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        outputs = copy.copy(self.data[idx])
+        if outputs is None:
+            try:
+                self.data[idx] = _save_task(
+                    self.cache_dir,
+                    idx,
+                    self.dataset.__getitem__,
+                    self.to_save_on_disk,
+                    self.to_not_save
+                )
+            except Exception as e:
+                # Cleaning if the preprocessing is returning an error
+                # there is not point in keeping the files that have been
+                # generated since they are most likely wrong
+                self._clean_cache_dir()
+                raise e
+            self.num_not_saved -= 1
+            if self.num_not_saved == 0:
+                # This is to save memory
+                self.dataset = None
+            outputs = copy.copy(self.data[idx])
+
+        for k in self.on_disk:
+             outputs[k] = torch.load(self.cache_dir / str(idx) / f'{k}.pt')
+
+        if self.transform is not None:
+            outputs = self.transform(outputs)
+        return outputs
+
+### DEPRECATED ###
 
 def _get_hash(x):
     """Generate a hash from a string, or dictionary.
@@ -32,11 +278,33 @@ def _get_hash(x):
 
     return hashlib.md5(bytes(repr(x), 'utf-8')).hexdigest()
 
+def _preprocess_task(args):
+    torch.set_num_threads(1)
+    with torch.no_grad():
+        idx, get_data, get_cache_key, cache_transform = args
+        key = get_cache_key(idx)
+        data = get_data(idx)
+        cache_transform(key, data)
+
+def _get_data(dataset, index):
+    return dataset.get_data(index) if hasattr(dataset, 'get_data') else \
+        dataset[index]
+
+def _get_attributes(dataset, index):
+    return dataset.get_attributes(index) if hasattr(dataset, 'get_attributes') \
+        else {}
+
+def _get_cache_key(dataset, index):
+    return dataset.get_cache_key(index) if hasattr(dataset, 'get_cache_key') \
+        else str(index)
 
 class Cache(object):
     """Caches the results of a function to disk.
     If already cached, data is returned from disk. Otherwise,
     the function is executed. Output tensors are always on CPU device.
+
+    .. deprecated:: 0.13.0
+       :class:`Cache` is deprecated.
 
     Args:
         func (Callable): The function to cache.
@@ -101,30 +369,7 @@ class Cache(object):
         # Read file to move tensors to CPU.
         return self._read(fpath)
 
-
-def _preprocess_task(args):
-    torch.set_num_threads(1)
-    with torch.no_grad():
-        idx, get_data, get_cache_key, cache_transform = args
-        key = get_cache_key(idx)
-        data = get_data(idx)
-        cache_transform(key, data)
-
-
-def _get_data(dataset, index):
-    return dataset.get_data(index) if hasattr(dataset, 'get_data') else \
-        dataset[index]
-
-
-def _get_attributes(dataset, index):
-    return dataset.get_attributes(index) if hasattr(dataset, 'get_attributes') \
-        else {}
-
-
-def _get_cache_key(dataset, index):
-    return dataset.get_cache_key(index) if hasattr(dataset, 'get_cache_key') \
-        else str(index)
-
+### DEPRECATED ###
 
 KaolinDatasetItem = namedtuple('KaolinDatasetItem', ['data', 'attributes'])
 
@@ -136,15 +381,19 @@ class KaolinDataset(Dataset):
     The difference between `get_data` and `get_attributes` is that data are able
     to be transformed or preprocessed (such as using `ProcessedDataset`), while
     attributes are generally not.
-    """
 
+    .. deprecated:: 0.13.0
+       :class:`KaolinDataset` is deprecated.
+       Datasets should always output a dictionary to be compatible with :class:`ProcessedDataset`.
+    """
     def __getitem__(self, index):
         """Returns the item at the given index.
         Will contain a named tuple of both data and attributes.
         """
-        attributes = self.get_attributes(index)
-        data = self.get_data(index)
-        return KaolinDatasetItem(data=data, attributes=attributes)
+        return KaolinDatasetItem(
+            data=self.get_data(index),
+            attributes=self.get_attributes(index)
+        )
 
     @abstractmethod
     def get_data(self, index):
@@ -169,6 +418,10 @@ class ProcessedDataset(KaolinDataset):
                  cache_dir=None, num_workers=None, transform=None,
                  no_progress: bool = False):
         """
+        
+        .. deprecated:: 0.13.0
+           :class:`ProcessedDataset` is deprecated. See :class:`ProcessedDatasetV2`.
+
         A wrapper dataset that applies a preprocessing transform to a given base
         dataset. The result of the preprocessing transform will be cached to
         disk.
@@ -208,6 +461,9 @@ class ProcessedDataset(KaolinDataset):
             no_progress (bool): Disable tqdm progress bar for preprocessing.
         """
         # TODO: Consider integrating combination into `ProcessedDataset`.
+        warnings.warn("ProcessedDataset is deprecated, "
+                      "please use ProcessedDatasetV2",
+                      DeprecationWarning, stacklevel=2)
 
         self.dataset = dataset
         self.transform = transform
@@ -276,6 +532,9 @@ class ProcessedDataset(KaolinDataset):
 
 class CombinationDataset(KaolinDataset):
     """Dataset combining a list of datasets into a unified dataset object.
+        
+    .. deprecated:: 0.13.0
+       :class:`CombinationDataset` is deprecated. See :class:`ProcessedDatasetV2`.
 
     Useful when multiple output representations are needed from a common base
     representation (Eg. when a mesh is to be served as both a pointcloud and a

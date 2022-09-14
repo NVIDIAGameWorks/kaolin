@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21-22 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,9 @@ import os
 import warnings
 from pathlib import Path
 
-from kaolin.io.dataset import KaolinDataset
+from torch.utils.data import Dataset
+
+from kaolin.io.dataset import KaolinDataset, KaolinDatasetItem
 from kaolin.io.obj import import_mesh, ignore_error_handler
 
 # Synset to Label mapping (for ShapeNet core classes)
@@ -95,11 +97,32 @@ def _convert_categories(categories):
                else c for c in categories]
     return synsets
 
-class ShapeNetV1(KaolinDataset):
+class ShapeNetV1(Dataset):
     r"""ShapeNetV1 Dataset class for meshes.
 
-    The `__getitem__` method will return a `KaolinDatasetItem`, with its `data`
-    field containing a `kaolin.io.obj.ObjMesh`.
+    The `__getitem__` method will return:
+
+        * if output_dict=True: a dictionary with the following key-value pairs:
+
+            * 'mesh': containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * 'name': the model name (i.e the subfolder name)
+            * 'path': the full path to the .off
+            * 'synset': the synset associated to the category
+            * 'labels': the labels associated to the category (see ``synset_to_labels``)
+
+        * if output_dict=False (deprecated): a :class:`KaolinDatasetItem` with the fields:
+
+            * ``data``: containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * ``attributes``: containing a dictionary with the following key-value pairs:
+
+                * 'name': the model name (i.e the subfolder name)
+                * 'path': the full path to the .off
+                * 'synset': the synset associated to the category
+                * 'labels': the labels associated to the category (see ``synset_to_labels``)
+
+    .. deprecated:: 0.13.0
+       output_dict=False is deprecated.
+       Datasets should always output a dictionary to be compatible with :class:`ProcessedDataset`.
 
     Args:
         root (str): path to ShapeNet root directory
@@ -110,9 +133,16 @@ class ShapeNetV1(KaolinDataset):
             If True, return the training set, otherwise the test set.
             Default: True.
         split (float):
-            fraction of the dataset to be used for training (>=0 and <=1).
+            Fraction of the dataset to be used for training (>=0 and <=1).
             Default: 0.7
-        with_materials (bool): If True, load and return materials. Default: True.
+        with_materials (bool):
+            If True, load and return materials. Default: True.
+        transform (Callable):
+            A function/transform that takes in a dictionary or :class:`KaolinDatasetItem`
+            and returns a transformed version.
+        output_dict (bool):
+            If True, __getitem__ output a dictionary, else :class:`KaolinDatasetItem` (deprecated)
+            Default: False.
     """
     SUPPORTED_SYNSETS = {
         '04330267',
@@ -175,9 +205,9 @@ class ShapeNetV1(KaolinDataset):
     }
 
     def __init__(self, root: str, categories: list = None, train: bool = True,
-                 split: float = .7, with_materials=True):
-
+                 split: float = .7, with_materials=True, transform=None, output_dict=False):
         self.root = Path(root)
+        self.transform = transform
         self.paths = []
         self.synset_idxs = []
         if categories is None:
@@ -189,6 +219,12 @@ class ShapeNetV1(KaolinDataset):
                     f"{s} is not supported in ShapeNetV1"
         self.labels = [synset_to_labels[s] for s in self.synsets]
         self.with_materials = with_materials
+        if not output_dict:
+            warnings.warn("output_dict=False is deprecated, "
+                          "datasets __getitem__ should always output a dictionary "
+                          "to be compatible with :func:`ProcessedDatasetV2`",
+                          DeprecationWarning, stacklevel=2)
+        self.output_dict = output_dict
 
         # loops through desired classes
         for i, syn in enumerate(self.synsets):
@@ -213,6 +249,23 @@ class ShapeNetV1(KaolinDataset):
     def __len__(self):
         return len(self.paths)
 
+    def __getitem__(self, index):
+        if self.output_dict:
+            output = {
+                'mesh': self.get_data(index),
+                **self.get_attributes(index)
+            }
+        else:
+            output = KaolinDatasetItem(
+                data=self.get_data(index),
+                attributes=self.get_attributes(index)
+            )
+
+        if self.transform is not None:
+            output = self.transform(output)
+
+        return output
+
     def get_data(self, index):
         obj_location = self.paths[index] / 'model.obj'
         mesh = import_mesh(str(obj_location), with_materials=self.with_materials,
@@ -232,11 +285,32 @@ class ShapeNetV1(KaolinDataset):
     def get_cache_key(self, index):
         return self.names[index]
 
-class ShapeNetV2(KaolinDataset):
+class ShapeNetV2(Dataset):
     r"""ShapeNetV2 Dataset class for meshes.
 
-    The `__getitem__` method will return a `KaolinDatasetItem`, with its `data`
-    field containing a `kaolin.io.obj.ObjMesh`.
+    The `__getitem__` method will return:
+
+        * if output_dict=True: a dictionary with the following key-value pairs:
+
+            * 'mesh': containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * 'name': the model name (i.e the subfolder name)
+            * 'path': the full path to the .off
+            * 'synset': the synset associated to the category
+            * 'labels': the labels associated to the category (see ``synset_to_labels``)
+
+        * if output_dict=False (deprecated): a :class:`KaolinDatasetItem` with the fields:
+
+            * ``data``: containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * ``attributes``: containing a dictionary with the following key-value pairs:
+
+                * 'name': the model name (i.e the subfolder name)
+                * 'path': the full path to the .off
+                * 'synset': the synset associated to the category
+                * 'labels': the labels associated to the category (see ``synset_to_labels``)
+
+    .. deprecated:: 0.13.0
+       output_dict=False is deprecated.
+       Datasets should always output a dictionary to be compatible with :class:`ProcessedDataset`.
 
     Args:
         root (str): path to ShapeNet root directory
@@ -250,7 +324,14 @@ class ShapeNetV2(KaolinDataset):
         split (float):
             fraction of the dataset to be used for training (>=0 and <=1).
             Default: 0.7
-        with_materials (bool): If True, load and return materials. Default: True.
+        with_materials (bool):
+            If True, load and return materials. Default: True.
+        transform (Callable):
+            A function/transform that takes in a dictionary or :class:`KaolinDatasetItem`
+            and returns a transformed version.
+        output_dict (bool):
+            If True, __getitem__ output a dictionary, else :class:`KaolinDatasetItem` (deprecated)
+            Default: False.
     """
 
     SUPPORTED_SYNSETS = {
@@ -312,9 +393,9 @@ class ShapeNetV2(KaolinDataset):
     }
 
     def __init__(self, root: str, categories: list = None, train: bool = True,
-                 split: float = .7, with_materials=True):
-
+                 split: float = .7, with_materials=True, transform=None, output_dict=False):
         self.root = Path(root)
+        self.transform = transform
         self.paths = []
         self.synset_idxs = []
         if categories is None:
@@ -326,6 +407,12 @@ class ShapeNetV2(KaolinDataset):
                     f"{s} is not supported in ShapeNetV2"
         self.labels = [synset_to_labels[s] for s in self.synsets]
         self.with_materials = with_materials
+        if not output_dict:
+            warnings.warn("output_dict=False is deprecated, "
+                          "datasets __getitem__ should always output a dictionary "
+                          "to be compatible with :func:`ProcessedDatasetV2`",
+                          DeprecationWarning, stacklevel=2)
+        self.output_dict = output_dict
 
         # loops through desired classes
         for i, syn in enumerate(self.synsets):
@@ -353,6 +440,23 @@ class ShapeNetV2(KaolinDataset):
 
     def __len__(self):
         return len(self.paths)
+
+    def __getitem__(self, index):
+        if self.output_dict:
+            output = {
+                'mesh': self.get_data(index),
+                **self.get_attributes(index)
+            }
+        else:
+            output = KaolinDatasetItem(
+                data=self.get_data(index),
+                attributes=self.get_attributes(index)
+            )
+
+        if self.transform is not None:
+            output = self.transform(output)
+
+        return output
 
     def get_data(self, index):
         obj_location = self.paths[index] / 'models/model_normalized.obj'
