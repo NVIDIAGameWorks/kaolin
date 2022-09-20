@@ -174,66 +174,105 @@ class InterpolateTrilinear(torch.autograd.Function):
     @staticmethod
     def forward(ctx, coords, pidx, point_hierarchy, trinkets, feats, level):
 
-        feats_out = _C.ops.spc.interpolate_trilinear_cuda(coords.contiguous(), pidx.contiguous(), 
-                                                          point_hierarchy.contiguous(), trinkets.contiguous(), 
+        feats_out = _C.ops.spc.interpolate_trilinear_cuda(coords.contiguous(), pidx.contiguous(),
+                                                          point_hierarchy.contiguous(), trinkets.contiguous(),
                                                           feats.contiguous(), level)
 
-        ctx.save_for_backward(coords, pidx, point_hierarchy, trinkets)
+        ctx.save_for_backward(coords, pidx, point_hierarchy, trinkets, feats)
         ctx.level = level
         ctx.feats_shape = feats.shape
+        ctx.coords_shape = coords.shape
         return feats_out
 
     @staticmethod
     def backward(ctx, grad_output):
-        coords, pidx, point_hierarchy, trinkets = ctx.saved_tensors
+        coords, pidx, point_hierarchy, trinkets, feats = ctx.saved_tensors
 
         level = ctx.level
         mask = pidx > -1
         selected_points = point_hierarchy.index_select(0, pidx[mask])
         selected_trinkets = trinkets.index_select(0, pidx[mask])
 
-        # TODO(ttakikawa): Support backprop with respect to coords
+        is_needs_grad_by_coords = ctx.needs_input_grad[0]
+        is_needs_grad_by_features = ctx.needs_input_grad[4]
+
         grad_feats = None
-        if ctx.needs_input_grad[4]:
+        if is_needs_grad_by_features:
             # TODO(ttakikawa): Write a fused kernel
             grad_feats = torch.zeros(ctx.feats_shape, device=grad_output.device, dtype=grad_output.dtype)
             coeffs = coords_to_trilinear_coeffs(coords[mask], selected_points[:, None].repeat(1, coords.shape[1], 1), level).type(grad_output.dtype)
-            grad_feats.index_add_(0, selected_trinkets.reshape(-1), 
-                                  (coeffs[..., None] * grad_output[mask][..., None, :]).sum(1).reshape(-1, ctx.feats_shape[-1]))
-        return None, None, None, None, grad_feats, None
+            grad_per_corner = (coeffs[..., None] * grad_output[mask][..., None, :]).sum(1)
+            grad_feats.index_add_(0, selected_trinkets.reshape(-1),
+                                  grad_per_corner.reshape(-1, ctx.feats_shape[-1]).to(grad_feats.dtype))
+
+        # TODO (operel): May want to reimplement with CUDA
+        grad_coords = None
+        if is_needs_grad_by_coords:
+            # Let N be the number of intersected cells in a batch (e.g. pidx > -1)
+            # Let D be the features dimensionality
+            # Shape (N, 3), xyz coords of intersected cells in range [0, 2^lod]
+            coords_ = (2 ** level) * (coords[mask].reshape(-1, 3) * 0.5 + 0.5)
+            # Shape (N, 3), quantized xyz coords of intersected cells in range [0, 2^lod]
+            points_ = selected_points[:, None].repeat(1, coords.shape[1], 1).reshape(-1, 3)
+            # Shape (N, 3), local cell coordinates in range [0.0, 1.0]
+            x_ = coords_ - points_
+            # Shape (N, 3), 1.0 - local cell coordinates in range [0.0, 1.0]
+            _x = 1.0 - x_
+            # Shape (N, 8 x 3) tensor of @(coeffs)/@(xyz) where
+            # coeffs is the tensor of c000, c001, .. c111, the trilinear interp coefficients
+            # (see coords_to_trilinear_coeffs), and xyz is the coords
+            grad_coeffs_by_xyz = torch.stack([
+                -_x[:, 1] * _x[:, 2],      -_x[:, 0] * _x[:, 2],      -_x[:, 0] * _x[:, 1],
+                -_x[:, 1] * x_[:, 2],      -_x[:, 0] * x_[:, 2],       _x[:, 0] * _x[:, 1],
+                -x_[:, 1] * _x[:, 2],      _x[:, 0] * _x[:, 2],       -_x[:, 0] * x_[:, 1],
+                -x_[:, 1] * x_[:, 2],      _x[:, 0] * x_[:, 2],       _x[:, 0] * x_[:, 1],
+                _x[:, 1] * _x[:, 2],       -x_[:, 0] * _x[:, 2],      -x_[:, 0] * _x[:, 1],
+                _x[:, 1] * x_[:, 2],       -x_[:, 0] * x_[:, 2],       x_[:, 0] * _x[:, 1],
+                 x_[:, 1] * _x[:, 2],       x_[:, 0] * _x[:, 2],      -x_[:, 0] * x_[:, 1],
+                 x_[:, 1] * x_[:, 2],       x_[:, 0] * x_[:, 2],       x_[:, 0] * x_[:, 1]
+            ], dim=1).to(dtype=grad_output.dtype, device=grad_output.device)
+            # Shape (N, 8, 3) tensor of @(coeffs)/@(xyz)
+            grad_coeffs_by_xyz = grad_coeffs_by_xyz.reshape(-1, 8, 3)
+            # Shape (N, D, 8) tensor of @(feats_out)/@(coeffs)
+            grad_fout_by_coeffs = feats[selected_trinkets.long()].permute(0,2,1)
+            # Shape (N, D, 3) tensor of @(feats_out)/@(xyz), after applying chain rule
+            grad_fout_by_xyz = grad_fout_by_coeffs @ grad_coeffs_by_xyz
+            # Shape (N, 1, 3) tensor of @(out)/@(xyz) applying chain rule again
+            grad_coords = grad_output @ grad_fout_by_xyz
+        return grad_coords, None, None, None, grad_feats, None
 
 def unbatched_interpolate_trilinear(coords, pidx, point_hierarchy, trinkets, feats, level):
     r"""Performs trilinear interpolation on a SPC feature grid.
 
     Args:
         coords (torch.FloatTensor): 3D coordinates of shape
-                                    :math:`(\text{num_coords}, \text{num_samples}, 3)` 
+                                    :math:`(\text{num_coords}, \text{num_samples}, 3)`
                                     in normalized space [-1, 1]. ``num_samples`` indicates the number of
                                     coordinates that are grouped inside the same SPC node for performance
-                                    optimization purposes. In many cases the ``pidx`` is 
+                                    optimization purposes. In many cases the ``pidx`` is
                                     generated from :func:`kaolin.ops.spc.unbatched_query`
                                     and so the ``num_samples`` will be 1.
 
         pidx (torch.IntTensor): Index to the point hierarchy which contains the voxel
-                                which the coords exists in. Tensor of shape 
-                                :math:`(\text{num_coords})`. 
+                                which the coords exists in. Tensor of shape
+                                :math:`(\text{num_coords})`.
                                 This can be computed with :func:`kaolin.ops.spc.unbatched_query`.
 
 
-        point_hierarchy (torch.ShortTensor): 
+        point_hierarchy (torch.ShortTensor):
             The point hierarchy of shape :math:`(\text{num_points}, 3)`.
             See :ref:`point_hierarchies <spc_points>` for a detailed description.
 
         trinkets (torch.IntTensor): An indirection pointer (in practice, an index) to the feature
                                     tensor of shape :math:`(\text{num_points}, 8)`.
 
-        feats (torch.Tensor): Floating point feature vectors to interpolate of shape 
+        feats (torch.Tensor): Floating point feature vectors to interpolate of shape
                               :math:`(\text{num_feats}, \text{feature_dim})`.
 
         level (int): The level of SPC to interpolate on.
 
     Returns:
-        (torch.FloatTensor): 
+        (torch.FloatTensor):
             Interpolated feature vectors of shape :math:`(\text{num_voxels}, \text{num_samples}, \text{feature_dim})`.
     """
     return InterpolateTrilinear.apply(coords, pidx, point_hierarchy, trinkets, feats, level)
