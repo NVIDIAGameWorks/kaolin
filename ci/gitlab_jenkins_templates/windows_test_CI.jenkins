@@ -156,6 +156,14 @@ spec:
           '''
         }
       }
+      stage("SPC Convolution 3D Recipe") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            cd c:\\kaolin\\examples\\recipes\\spc
+            python spc_conv3d_example.py
+          '''
+        }
+      }
       stage("Run pytest - io") {
         catchError(stageResult: "failure") {
           timeout(time: 5, unit: "MINUTES") {
