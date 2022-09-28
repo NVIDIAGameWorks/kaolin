@@ -1,4 +1,4 @@
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -229,6 +229,61 @@ class TestRaytrace:
             [3.5, 4.0]], device='cuda', dtype=torch.float)
         
         assert torch.equal(depth, expected_depth)
+
+    @pytest.mark.parametrize('return_depth,with_exit', [(False, False), (True, False), (True, True)])
+    def test_raytrace_inside(self, octree, point_hierarchy, pyramid, exsum, return_depth, with_exit):
+        height = 4
+        width = 4
+        direction = torch.tensor([[0., 0., -1.]], dtype=torch.float,
+                                 device='cuda').repeat(height * width , 1)
+        origin = self._generate_rays_origin(height, width, 0.9)
+        outputs = unbatched_raytrace(
+            octree, point_hierarchy, pyramid, exsum, origin, direction, 2,
+            return_depth=return_depth, with_exit=with_exit)
+
+        ridx = outputs[0]
+        pidx = outputs[1]
+
+        expected_nuggets = torch.tensor([
+            [ 0, 13],
+            [ 0,  6],
+            [ 0,  5],
+            [ 1,  8],
+            [ 1,  7],
+            [ 2, 15],
+            [ 4, 10],
+            [ 4,  9],
+            [ 5, 12],
+            [ 5, 11]], device='cuda', dtype=torch.int)
+        assert torch.equal(ridx, expected_nuggets[...,0])
+        assert torch.equal(pidx, expected_nuggets[...,1])
+        if return_depth:
+            depth = outputs[2]
+            if with_exit:
+                expected_depth = torch.tensor([
+                    [0.4, 0.9],
+                    [0.9, 1.4],
+                    [1.4, 1.9],
+                    [0.9, 1.4],
+                    [1.4, 1.9],
+                    [1.4, 1.9],
+                    [0.9, 1.4],
+                    [1.4, 1.9],
+                    [0.9, 1.4],
+                    [1.4, 1.9]], device='cuda', dtype=torch.float)
+            else:
+                expected_depth = torch.tensor([
+                    [0.4],
+                    [0.9],
+                    [1.4],
+                    [0.9],
+                    [1.4],
+                    [1.4],
+                    [0.9],
+                    [1.4],
+                    [0.9],
+                    [1.4]], device='cuda', dtype=torch.float)
+            assert torch.allclose(depth, expected_depth)
 
     def test_ambiguous_raytrace(self):
         # TODO(ttakikawa):
