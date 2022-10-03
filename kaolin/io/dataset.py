@@ -94,9 +94,10 @@ def _get_saving_actions(dataset, cache_dir, save_on_disk=False,
         else:
             # If the number of folder (len(dataset)) is different, 
             # something is probably wrong with the existing data
+            #   note: reporting error directory with POSIX path to ease regex matching without raising encoding errors due to Windows backslashes
             if len(cached_ids) > 0 and len(cached_ids) != len(dataset):
                 raise RuntimeError(f"{len(cached_ids)} files already exist on "
-                                   f"{cache_dir} this dataset as {len(dataset)} files "
+                                   f"{cache_dir.resolve().as_posix()} this dataset as {len(dataset)} files "
                                    "so caching is too ambiguous and error-prone "
                                    "please force rewriting by setting 'force_overwrite'")
 
@@ -107,11 +108,13 @@ def _get_saving_actions(dataset, cache_dir, save_on_disk=False,
             #                   since we are not avoiding to run the preprocessing
             for k, v in _data.items():
                 if k in save_on_disk:
-                    path = cache_dir / f'0/{k}.pt'
+                    path:Path = cache_dir / '0' / f'{k}.pt'
+                    # note: reporting error directory with POSIX path to ease regex matching without raising encoding errors due to Windows backslashes
+                    path_str = path.resolve().as_posix()
                     if path.exists(): # There is already a file for a given key 
                         # Is the value stored the same than the one from the data?
                         assert ignore_diff_error or contained_torch_equal(v, torch.load(path)), \
-                            f"file '{cache_dir / f'0/{k}.pt'}' is different than " \
+                            f"file '{path_str}' is different than " \
                             "its matching field from the input dataset, set 'force_overwriting' " \
                             "to True to overwrite the files cached."
                         to_not_save.add(k)

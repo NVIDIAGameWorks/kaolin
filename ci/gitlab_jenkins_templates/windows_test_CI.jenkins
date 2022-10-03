@@ -20,6 +20,10 @@ yaml: """
 apiVersion: v1
 kind: Pod
 spec:
+  volumes:
+  - name: pvc-mount
+    persistentVolumeClaim:
+      claimName: 'kaolin-pvc'
   containers:
   - name: jnlp
     image: jenkins/jnlp-agent:latest-windows
@@ -34,8 +38,11 @@ spec:
     restartPolicy: Never
     backoffLimit: 4
     tty: true
+    volumeMounts:
+      - mountPath: c:/mnt
+        name: pvc-mount
   imagePullSecrets:
-  - name: test-secret-config2
+  - name: gitlabregcred
   nodeSelector:
     kubernetes.io/os: windows
     nvidia.com/node_type: ${arch}
@@ -62,6 +69,14 @@ spec:
         c:\\data\\deviceQuery.exe
         c:\\data\\bandwidthTest.exe
         '''
+      }
+      stage("Check mount") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            dir c:\\
+            dir c:\\mnt
+          '''
+        }
       }
       stage("Fix paging memory") {
         // addresses this error on Windows with pytorch consuming too much paging memory: https://stackoverflow.com/a/69489193
@@ -136,7 +151,7 @@ spec:
         catchError(stageResult: "failure") {
           powershell '''
             cd c:\\kaolin\\examples\\recipes\\preprocess
-            python fast_mesh_sampling.py --shapenet-dir=/mnt/data/ci_shapenetv2/
+            python fast_mesh_sampling.py --shapenet-dir=c:/mnt/data/ci_shapenetv2/
           '''
         }
       }
