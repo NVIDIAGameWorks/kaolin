@@ -14,6 +14,7 @@
 
 import os
 import glob
+from pathlib import Path
 import time
 import shutil
 
@@ -240,8 +241,12 @@ class TestCachedDataset:
         time.sleep(0.01) # This is just in case I/O is so fast that files get greated in the same time
 
         # An error should be raised in the size of the dataset is different than the number of cached subfolder
+        # using a POSIX path to avoid regex issues with Windows path backslashes.
+        #   this is only a problem for the `pytest.raises` regex logic, not a problem with file saving.
+        cache_check_str = Path(CACHE_DIR).resolve().as_posix()
         with pytest.raises(RuntimeError,
-                           match=f"{len(dummy_dataset)} files already exist on {CACHE_DIR} "
+                        #    match=f"{len(dummy_dataset)} files already exist "):
+                           match=f"{len(dummy_dataset)} files already exist on {cache_check_str} "
                                  f"this dataset as {len(larger_dataset)} files so caching "
                                  "is too ambiguous and error-prone please force rewriting "
                                  "by setting 'force_overwrite'"):
@@ -280,6 +285,8 @@ class TestCachedDataset:
                                    num_workers, save_on_disk, cache_at_runtime):
         assert not os.path.exists(CACHE_DIR)
 
+        
+
         transform = DummyTransform(10, True) if use_transform else None
         ds = CachedDataset(dummy_dataset,
                            transform=transform,
@@ -294,8 +301,13 @@ class TestCachedDataset:
         expected_files = glob.glob(os.path.join(CACHE_DIR, '*', '*.pt'))
         files_mtime = {path: os.path.getmtime(path) for path in expected_files}
         time.sleep(0.01) # This is just in case I/O is so fast that files get greated in the same time
+        f"file '{os.path.join(CACHE_DIR, '0')}"
+        
+        # using a POSIX path to avoid regex issues with Windows path backslashes.
+        #   this is only a problem for the `pytest.raises` regex logic, not a problem with file saving.
+        cache_check_str = (Path(CACHE_DIR) / "0").resolve().as_posix()
         with pytest.raises(AssertionError,
-                           match=f"file '{os.path.join(CACHE_DIR, '0')}"
+                           match=f"file '{cache_check_str}"
                                  r"/.\.pt' is different than its matching field from the "
                                  "input dataset, set 'force_overwriting' to True "
                                  "to overwrite the files cached."):
