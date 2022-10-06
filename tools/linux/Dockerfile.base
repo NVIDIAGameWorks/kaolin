@@ -71,4 +71,4 @@ RUN npm install -g npm@8.5.4
 COPY package.json package-lock.json ./
 RUN npm install
 
-RUN pip install --no-cache-dir ninja setuptools==46.4.0 numpy==1.18.0
+RUN pip install --no-cache-dir ninja setuptools==58.0.0 numpy==1.18.0

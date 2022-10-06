@@ -51,7 +51,7 @@ RUN npm install -g npm@8.5.4
 RUN npm install 
 
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir setuptools==46.4.0 ninja cython==0.29.20 \
+    pip install --no-cache-dir setuptools==58.0.0 ninja cython==0.29.20 \
         imageio imageio-ffmpeg
 #
 #ENV TORCH_CUDA_ARCH_LIST="6.0;6.1;6.2;7.0;7.5;8.0;8.6"
