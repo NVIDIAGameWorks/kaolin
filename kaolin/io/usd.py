@@ -91,6 +91,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
         mesh_st = mesh.GetPrimvar('st')
         mesh_subsets = UsdGeom.Subset.GetAllGeomSubsets(UsdGeom.Imageable(mesh_prim))
         mesh_material = UsdShade.MaterialBindingAPI(mesh_prim).ComputeBoundMaterial()[0]
+        transform = torch.from_numpy(np.array(UsdGeom.Xformable(mesh_prim).ComputeLocalToWorldTransform(time), dtype=np.float32))
 
         # Parse mesh UVs
         if mesh_st:
@@ -101,10 +102,10 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
 
         # Parse mesh geometry
         if mesh_vertices:
-            mesh_vertices = torch.tensor(mesh_vertices)
+            mesh_vertices = torch.from_numpy(np.array(mesh_vertices, dtype=np.float32))
             mesh_vertices_homo = torch.nn.functional.pad(mesh_vertices, (0, 1), mode='constant', value=1.)
             mesh_vertices = (mesh_vertices_homo @ transform)[:, :3]
-            attrs.setdefault('vertices', []).append(torch.from_numpy(np.array(mesh_vertices, dtype=np.float32)))
+            attrs.setdefault('vertices', []).append(mesh_vertices)
         if mesh_vertex_indices:
             attrs.setdefault('face_vertex_counts', []).append(torch.from_numpy(
                 np.array(mesh_face_vertex_counts, dtype=np.int64)))
@@ -710,9 +711,10 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         for i, subset in enumerate(subsets):
             subset_prim = stage.DefinePrim(f'{scene_path}/subset_{i}', 'GeomSubset')
             subset_prim.GetAttribute('indices').Set(subsets[subset])
-            materials[subset]._write_usd_preview_surface(stage, f'{scene_path}/Looks/material_{subset}',
-                                                         [subset_prim], time, texture_dir=f'material_{subset}',
-                                                         texture_file_prefix='')    # TODO file path
+            if isinstance(materials[subset], usd_materials.Material):
+                materials[subset]._write_usd_preview_surface(stage, f'{scene_path}/Looks/material_{subset}',
+                                                             [subset_prim], time, texture_dir=f'material_{subset}',
+                                                             texture_file_prefix='')    # TODO file path
 
     return usd_mesh.GetPrim()
 
