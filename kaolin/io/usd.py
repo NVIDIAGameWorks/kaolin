@@ -23,6 +23,7 @@ import re
 import warnings
 from collections import namedtuple
 import numpy as np
+from tqdm import tqdm
 
 import torch
 
@@ -562,6 +563,9 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
     # TODO  add arguments to selectively import UVs and normals
     assert os.path.exists(file_path)
     stage = Usd.Stage.Open(file_path)
+    # remove instanceable flags
+    for p in stage.Traverse():
+        p.SetInstanceable(False)
     if scene_paths is None:
         scene_paths = get_scene_paths(file_path, prim_types=['Mesh'])
     if times is None:
@@ -569,7 +573,7 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
 
     vertices_list, faces_list, uvs_list, face_uvs_idx_list, face_normals_list = [], [], [], [], []
     materials_order_list, materials_list = [], []
-    for scene_path, time in zip(scene_paths, times):
+    for scene_path, time in zip(tqdm(scene_paths, desc="Importing from USD", unit="mesh"), times):
         mesh_attr = _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_normals, time=time)
         vertices = mesh_attr['vertices']
         face_vertex_counts = mesh_attr['face_vertex_counts']
@@ -602,7 +606,7 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
         if face_normals is not None and faces is not None and face_normals.size(0) > 0:
             face_normals = face_normals.reshape(-1, faces.size(1), 3)
         if faces is not None and materials_face_idx is not None:            # Create material order list
-            materials_face_idx.view(-1, faces.size(1))
+            materials_face_idx = materials_face_idx.view(-1, faces.size(1))
             cur_mat_idx = -1
             materials_order = []
             for idx in range(len(materials_face_idx)):
@@ -714,7 +718,7 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
             if isinstance(materials[subset], usd_materials.Material):
                 materials[subset]._write_usd_preview_surface(stage, f'{scene_path}/Looks/material_{subset}',
                                                              [subset_prim], time, texture_dir=f'material_{subset}',
-                                                             texture_file_prefix='')    # TODO file path
+                                                             texture_file_prefix='')    # TODO allow users to pass root path to save textures to
 
     return usd_mesh.GetPrim()
 
@@ -815,7 +819,7 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
     if times is None:
         times = [Usd.TimeCode.Default()] * len(scene_paths)
 
-    for i, scene_path in enumerate(scene_paths):
+    for i, scene_path in enumerate(tqdm(scene_paths, desc="Exporting to USD", unit="mesh")):
         mesh_params = {k: p[i] for k, p in supplied_parameters.items()}
         add_mesh(stage, scene_path, **mesh_params)
     stage.Save()
