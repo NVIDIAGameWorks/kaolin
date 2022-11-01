@@ -113,8 +113,7 @@ def uniform_laplacian(num_vertices, faces):
 
     L = torch.div(dense_adjacency, num_neighbour)
 
-    mask = torch.eye(num_vertices, num_vertices, device=faces.device, dtype=torch.bool)
-    L = L.masked_fill_(mask, -1)
+    torch.diagonal(L)[:] = -1
 
     # Fill NaN value with 0
     L[torch.isnan(L)] = 0
