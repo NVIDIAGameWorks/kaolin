@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAGuard.h>
 
@@ -231,7 +231,7 @@ void packed_rasterize_forward_cuda_impl(
           interpolated_features.data_ptr<scalar_t>(),
           batch_size, height, width, num_faces, num_features,
 	  multiplier, eps);
-      CUDA_CHECK(cudaGetLastError());
+      AT_CUDA_CHECK(cudaGetLastError());
     });
 }
 
@@ -437,7 +437,7 @@ void rasterize_backward_cuda_impl(
           grad_face_vertices_image.data_ptr<scalar_t>(),
           grad_face_features.data_ptr<scalar_t>(),
           batch_size, height, width, num_faces, feat_dim, eps);
-      CUDA_CHECK(cudaGetLastError());
+      AT_CUDA_CHECK(cudaGetLastError());
     }));
 }
 

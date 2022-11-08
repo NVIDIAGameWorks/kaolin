@@ -21,6 +21,7 @@
 #define CUB_NS_POSTFIX }
 #define CUB_NS_QUALIFIER ::kaolin::cub
 
+#include <ATen/cuda/CUDAContext.h>
 #include <cub/device/device_scan.cuh>
 
 namespace kaolin {
@@ -187,7 +188,7 @@ void ProcessKernelMaps(
     int* OutmapX) {
   cub::DeviceScan::InclusiveSum(d_temp_storageA, temp_storage_bytesA,
                            Info, PSum, K*Cnt);
-  CUDA_CHECK(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 
   CompactifyMaps<<<(K*Cnt + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK,
                    THREADS_PER_BLOCK>>>(
@@ -199,7 +200,7 @@ void ProcessKernelMaps(
       OutmapX,
       Info,
       PSum);
-  CUDA_CHECK(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 
   in_map.clear();
   out_map.clear();
@@ -219,7 +220,7 @@ void ProcessKernelMaps(
     Ox += size;
   }
 
-  CUDA_CHECK(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 }
 
 void Conv3d_forward_cuda(
@@ -269,7 +270,7 @@ void Conv3d_forward_cuda(
         scale_factor,
         dO, dP, Qlevel, offset);
 
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     ProcessKernelMaps(
         Ksize,
@@ -285,7 +286,7 @@ void Conv3d_forward_cuda(
         d_InmapX,
         d_OutmapX);
 
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     cublasHandle_t handle = NULL; //TODO: get from Pytorch (and stream)
 
@@ -295,7 +296,7 @@ void Conv3d_forward_cuda(
         Params, d_inmap, d_outmap, Psize,
         handle, 0);
 
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     X += N * Qsize;
     Y += M * Psize;
@@ -305,7 +306,7 @@ void Conv3d_forward_cuda(
     dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel) + 1;
   }
 
-  CUDA_CHECK(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 }
 
 void Conv3d_backward_cuda(
@@ -356,7 +357,7 @@ void Conv3d_backward_cuda(
         scale_factor,
         dO, dP, Plevel, offset);
 
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     ProcessKernelMaps(
         Ksize,
@@ -380,7 +381,7 @@ void Conv3d_backward_cuda(
         Params, Grad_Params,
         d_outmap, d_inmap, Psize, // note the swapping of i/o maps
         handle, 0);
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     X += N * Qsize;
     Grad_Inputs += N * Qsize;
@@ -439,7 +440,7 @@ void ConvTranspose3d_forward_cuda(
         Ksize, Kvec,
         scale_factor,
         dO, dP, Qlevel, offset);
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     ProcessKernelMaps(
         Ksize,
@@ -462,7 +463,7 @@ void ConvTranspose3d_forward_cuda(
         Y, M,
         Params, d_inmap, d_outmap, Psize,
         handle, 0);
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     d_Proot += GetPyramid(Pyramid, batch, 1, Olevel + 1, Olevel);
     X += N * Qsize;
@@ -470,7 +471,7 @@ void ConvTranspose3d_forward_cuda(
     dO += GetPyramid(Pyramid, batch, 1, Olevel, Olevel);
     dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel) + 1;
   }
-  CUDA_CHECK(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 }
 
 void ConvTranspose3d_backward_cuda(
@@ -521,7 +522,7 @@ void ConvTranspose3d_backward_cuda(
         Ksize, Kvec,
         scale_factor,
         dO, dP, Plevel, offset);
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     ProcessKernelMaps(
         Ksize,
@@ -545,7 +546,7 @@ void ConvTranspose3d_backward_cuda(
         Params, Grad_Params,
         d_outmap, d_inmap, Psize,
         handle, 0);
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     d_Proot += GetPyramid(Pyramid, batch, 1, Olevel + 1, Olevel);
     X += N * Qsize;

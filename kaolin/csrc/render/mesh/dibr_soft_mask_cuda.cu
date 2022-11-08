@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <THC/THCAtomics.cuh>
 
@@ -221,7 +222,7 @@ void dibr_soft_mask_forward_cuda_impl(
             soft_mask.data_ptr<scalar_t>(),
             batch_size, height, width, num_faces, knum, sigmainv, multiplier
 	);
-        CUDA_CHECK(cudaGetLastError());
+        AT_CUDA_CHECK(cudaGetLastError());
   });
   return;
 }
@@ -394,7 +395,7 @@ void dibr_soft_mask_backward_cuda_impl(
              batch_size, height, width, num_faces,
              knum, sigmainv, multiplier
 	);
-	CUDA_CHECK(cudaGetLastError());
+	AT_CUDA_CHECK(cudaGetLastError());
 
   });
   return;

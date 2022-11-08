@@ -21,6 +21,7 @@
 #include <cub/device/device_scan.cuh>
 
 #include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
 
 #include "../../spc_math.h"
 #include "../../utils.h"
@@ -93,7 +94,7 @@ int scan_octrees_cuda_impl(
       S += Lsize;
 
       cudaMemcpy(&currSum, EX0 + prevSum + 1, sizeof(uint), cudaMemcpyDeviceToHost);
-      CUDA_CHECK(cudaGetLastError());
+      AT_CUDA_CHECK(cudaGetLastError());
 
       Lsize = currSum - prevSum;
       prevSum = currSum;
@@ -107,7 +108,7 @@ int scan_octrees_cuda_impl(
     EX0 += (osize + 1);
     h0 += 2 * (KAOLIN_SPC_MAX_LEVELS + 2);
   }
-  CUDA_CHECK(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 
   return level;
 }

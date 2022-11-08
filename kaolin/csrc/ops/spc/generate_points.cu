@@ -15,6 +15,7 @@
 
 
 #include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
 
 #include "../../spc_math.h"
 #include "../../utils.h"
@@ -51,7 +52,7 @@ void generate_points_cuda_impl(
 
     morton_code m0 = 0;
     cudaMemcpy(curr_morton_ptr, &m0, sizeof(morton_code), cudaMemcpyHostToDevice);
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     l = 0;
     while (l < max_level) {
@@ -68,7 +69,7 @@ void generate_points_cuda_impl(
 
     morton_to_points_cuda_kernel<<<(total_points + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK,
                                    THREADS_PER_BLOCK>>>(morton_ptr, points_ptr, total_points);
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
 
     points_ptr += total_points;
     octree_ptr += osize;
@@ -76,7 +77,7 @@ void generate_points_cuda_impl(
     pyramid_ptr += 2 * (max_level + 2);
   }
 
-  CUDA_CHECK(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 }
 
 }  // namespace kaolin

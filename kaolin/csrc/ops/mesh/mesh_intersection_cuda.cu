@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <THC/THCAtomics.cuh>
 
@@ -244,7 +245,7 @@ void unbatched_mesh_intersection_cuda_impl(
           verts_3.data_ptr<scalar_t>(),
           result.data_ptr<scalar_t>()
       );
-      CUDA_CHECK(cudaGetLastError());
+      AT_CUDA_CHECK(cudaGetLastError());
   });
   return;
 }

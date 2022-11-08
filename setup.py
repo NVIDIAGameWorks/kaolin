@@ -13,8 +13,8 @@ from pkg_resources import parse_version
 import subprocess
 import warnings
 
-TORCH_MIN_VER = '1.5.0'
-TORCH_MAX_VER = '1.12.1'
+TORCH_MIN_VER = '1.6.0'
+TORCH_MAX_VER = '1.13.0'
 CYTHON_MIN_VER = '0.29.20'
 INCLUDE_EXPERIMENTAL = os.getenv('KAOLIN_INSTALL_EXPERIMENTAL') is not None
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
