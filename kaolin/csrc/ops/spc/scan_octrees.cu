@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -54,7 +54,7 @@ int scan_octrees_cuda_impl(
   
   void* temp_storage_ptr = NULL;
   uint64_t temp_storage_bytes = get_cub_storage_bytes(
-        temp_storage_ptr, num_childrens_per_node_ptr, prefix_sum_ptr, num_childrens_per_node.size(0) + 1);
+        temp_storage_ptr, num_childrens_per_node_ptr, prefix_sum_ptr + 1, num_childrens_per_node.size(0));
   at::Tensor temp_storage = at::zeros({(int64_t) temp_storage_bytes },
                                       octrees.options().dtype(at::kByte));
   temp_storage_ptr = (void*) temp_storage.data_ptr<uint8_t>();
@@ -73,9 +73,9 @@ int scan_octrees_cuda_impl(
     // compute exclusive sum 1 element beyond end of list to get inclusive sum starting at prefix_sum_ptr+1
     scan_nodes_cuda_kernel<<< (osize + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >>>(
         osize, O0, num_childrens_per_node_ptr);
-    CubDebugExit(cub::DeviceScan::ExclusiveSum(
+    CubDebugExit(cub::DeviceScan::InclusiveSum(
         temp_storage_ptr, temp_storage_bytes, num_childrens_per_node_ptr,
-        EX0, osize + 1)); // carful with the +1
+        EX0 + 1, osize));
 
     int* Pmid = h0;
     int* PmidSum = h0 + KAOLIN_SPC_MAX_LEVELS + 2;

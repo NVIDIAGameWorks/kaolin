@@ -195,7 +195,7 @@ class TestTrinkets:
 
         for i in range(1, max_level+1):
             parent = point_hierarchy.index_select(0, unbatched_get_level_points(parents, pyramid, i))
-        assert torch.equal(parent, unbatched_get_level_points(point_hierarchy, pyramid, i)//2)
+        assert torch.equal(parent, torch.div(unbatched_get_level_points(point_hierarchy, pyramid, i), 2, rounding_mode='trunc'))
 
 
 class TestQuery:
