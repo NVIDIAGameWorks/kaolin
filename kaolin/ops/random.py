@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21-22 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,11 +14,11 @@
 # limitations under the License.
 
 import random
+import math
 
 import numpy as np
 import torch
 from .spc.uint8 import uint8_to_bits
-
 
 def manual_seed(torch_seed, random_seed=None, numpy_seed=None):
     """Set the seed for random and torch modules.
@@ -171,3 +171,34 @@ def random_spc_octrees(batch_size, max_level, device='cpu'):
             octree_length += cur_nodes.shape[0]
         lengths.append(octree_length)
     return torch.cat(octrees, dim=0), torch.tensor(lengths, dtype=torch.torch.int32)
+
+def sample_spherical_coords(shape,
+                            azimuth_low=0., azimuth_high=math.pi * 2.,
+                            elevation_low=0., elevation_high=math.pi * 0.5,
+                            device='cpu', dtype=torch.float):
+    """Sample spherical coordinates with a uniform distribution.
+
+    Args:
+        shape (Sequence): shape of outputs.
+        azimuth_low (float, optional): lower bound for azimuth, in radian. Default: 0.
+        azimuth_high (float, optional): higher bound for azimuth, in radian. Default: 2 * pi.
+        elevation_low (float, optional): lower bound for elevation, in radian. Default: 0.
+        elevation_high (float, optional): higher bound for elevation, in radian. Default: pi / 2.
+        device (torch.device, optional): device of the output tensor. Default: 'cpu'.
+        dtype (torch.dtype, optional): dtype of the output tensor. Default: torch.float.
+
+    Returns:
+        (torch.Tensor, torch.Tensor): the azimuth and elevation, both of desired ``shape``.
+    """
+    low = torch.tensor([
+        [azimuth_low], [math.sin(elevation_low)]
+    ], device=device, dtype=dtype).reshape(2, *[1 for _ in shape])
+    high = torch.tensor([
+        [azimuth_high], [math.sin(elevation_high)]
+    ], device=device, dtype=dtype).reshape(2, *[1 for _ in shape])
+
+    rand = torch.rand([2, *shape], dtype=dtype, device=device)
+    inter_samples = low + rand * (high - low)
+    azimuth = inter_samples[0]
+    elevation = torch.asin(inter_samples[1])
+    return azimuth, elevation

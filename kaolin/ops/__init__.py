@@ -1,5 +1,6 @@
 from . import batch
 from . import conversions
+from . import coords
 from . import gcn
 from . import mesh
 from . import random

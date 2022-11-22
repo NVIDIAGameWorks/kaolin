@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import pytest
+import math
 import torch
 from kaolin.utils.testing import FLOAT_TYPES, check_tensor
 from kaolin.render.mesh.utils import texture_mapping
