@@ -39,6 +39,7 @@
 // SOFTWARE.
 
 #include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <THC/THCAtomics.cuh>
 
@@ -261,7 +262,7 @@ void sided_distance_forward_cuda_impl(
         p2.data_ptr<scalar_t>(),
         dist.data_ptr<scalar_t>(),
         idx.data_ptr<int64_t>());
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
   });
 }
 
@@ -291,7 +292,7 @@ void sided_distance_backward_cuda_impl(
         idx.data_ptr<int64_t>(),
         grad_input1.data_ptr<scalar_t>(),
         grad_input2.data_ptr<scalar_t>());
-    CUDA_CHECK(cudaGetLastError());
+    AT_CUDA_CHECK(cudaGetLastError());
   });
 }
 

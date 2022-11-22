@@ -25,15 +25,19 @@ def ubuntu_from_pytorch_configs = [
         'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.12.0',
         'archsToTest': 'A100_PCIE_40GB'
     ],
+    [
+        'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.12.1',
+        'archsToTest': 'TITAN_RTX;A100_PCIE_40GB'
+    ],
 ]
 
 // Configs for build from NGC pytorch docker images
 // (See: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch/tags)
 def ubuntu_from_nvcr_configs = [
     [
-        'baseImageTag': '22.02-py3',
+        'baseImageTag': '22.10-py3',
         'archsToTest': 'A100_PCIE_40GB'
-    ]
+    ],
 ]
 
 // Configs for build from cuda container
@@ -59,7 +63,7 @@ def ubuntu_cpuonly_configs = [
         'pythonVer': '3.7', 'torchVer': '1.8.1',
     ],
     [
-        'pythonVer': '3.9', 'torchVer': '1.11.0',
+        'pythonVer': '3.9', 'torchVer': '1.12.1',
     ]
 ]
 
@@ -148,7 +152,7 @@ def ubuntu_for_wheels_configs = [
     [
         'cudaVer': '11.6.1', 'cudnnVer': '8',
         'torchVer': '1.12.1', 'archsToTest': 'A100_PCIE_40GB'
-    ]
+    ],
 ]
 
 // Configs for build from Windows server docker images
@@ -165,7 +169,7 @@ def windows_from_server_configs = [
     ],
     [
         'cudaVer': '11.3',
-        'pythonVer': '3.8', 'torchVer': '1.11.0',
+        'pythonVer': '3.8', 'torchVer': '1.12.1',
         'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
     ]
 ]

@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include <ATen/ATen.h>
+
 #include <vector>
 
 #include "../../check.h"
@@ -160,8 +161,6 @@ std::vector<at::Tensor> generate_primary_rays_cuda(
 
   generate_primary_rays_cuda_impl(width, height, mWVPInv, d_org, d_dir);
 
-  CUDA_CHECK(cudaGetLastError());
-
   return {Org, Dir};
 #else
   KAOLIN_NO_CUDA_ERROR(__func__);
@@ -276,8 +275,6 @@ std::vector<at::Tensor> generate_shadow_rays_cuda(
   result.push_back(Src.index({Slice(None, cnt)}));
   result.push_back(Dst.index({Slice(None, cnt)}));
   result.push_back(Map.index({Slice(None, cnt)}));
-
-  CUDA_CHECK(cudaGetLastError());
 
   return result;
 #else

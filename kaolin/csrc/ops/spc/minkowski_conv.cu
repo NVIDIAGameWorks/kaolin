@@ -45,6 +45,7 @@
 #include "convolution.cuh"
 #include "../../utils.h"
 
+#include <ATen/cuda/CUDAContext.h>
 #include <THC/THCAtomics.cuh>
 
 namespace kaolin {
@@ -235,7 +236,7 @@ namespace minkowski {
 		int out_nrows, cublasHandle_t cuhandle,
 		cudaStream_t stream) {
 
-		CUDA_CHECK(cudaDeviceSynchronize());
+		AT_CUDA_CHECK(cudaDeviceSynchronize());
 
 		int n_active_in_volume, shared_mem_size = -1;
 
@@ -297,9 +298,9 @@ namespace minkowski {
 					break;
 				}
 			}
-			CUDA_CHECK(cudaGetLastError());
+			AT_CUDA_CHECK(cudaGetLastError());
 		}
-		CUDA_CHECK(cudaDeviceSynchronize());
+		AT_CUDA_CHECK(cudaDeviceSynchronize());
 	}
 
 	template void ConvolutionForwardKernelGPU<float, int32_t>(
@@ -324,7 +325,7 @@ namespace minkowski {
 		int out_nrows, cublasHandle_t cuhandle,
 		cudaStream_t stream) {
 
-		CUDA_CHECK(cudaDeviceSynchronize());
+		AT_CUDA_CHECK(cudaDeviceSynchronize());
 
 		int n_active_in_volume, shared_mem_size = -1;
 
@@ -401,9 +402,9 @@ namespace minkowski {
 					break;
 				}
 			}
-			CUDA_CHECK(cudaGetLastError());
+			AT_CUDA_CHECK(cudaGetLastError());
 		}
-		CUDA_CHECK(cudaDeviceSynchronize());
+		AT_CUDA_CHECK(cudaDeviceSynchronize());
 	}
 
 	template void ConvolutionBackwardKernelGPU<float, int32_t>(

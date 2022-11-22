@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAGuard.h>
 
@@ -230,7 +231,7 @@ void deftet_sparse_render_forward_cuda_impl(
         w1_arr.data_ptr<scalar_t>(),
         batch_size, num_faces, num_pixels, knum,
 	eps);
-      CUDA_CHECK(cudaGetLastError());
+      AT_CUDA_CHECK(cudaGetLastError());
   }));
   return;
 }
@@ -443,7 +444,7 @@ void deftet_sparse_render_backward_cuda_impl(
           grad_face_features.data_ptr<scalar_t>(),
           batch_size, num_faces, num_pixels, knum, feat_dim,
           eps);
-      CUDA_CHECK(cudaGetLastError());
+      AT_CUDA_CHECK(cudaGetLastError());
     })
   );
 }
