@@ -12,6 +12,7 @@ Tensor batching operators are in :ref:`kaolin.ops.batch`, conversions of 3D mode
    :titlesonly:
 
    kaolin.ops.batch
+   kaolin.ops.coords
    kaolin.ops.conversions
    kaolin.ops.gcn
    kaolin.ops.mesh
