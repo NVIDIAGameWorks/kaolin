@@ -170,7 +170,7 @@ class TestMeshes:
         usd.export_mesh(out_path, '/World/Rocket', vertices=mesh[0].vertices, faces=mesh[0].faces)
 
         # Confirm we now have a triangle mesh
-        assert mesh.faces.size(1) == 3
+        assert mesh[0].faces.size(1) == 3
 
         # Confirm exported USD matches golden file
         golden = os.path.join(out_dir, '../../../../samples/golden/rocket_homogenized.usda')

@@ -154,7 +154,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
                         attrs['material_idx_map'][mesh_material_path] = material_idx
                     except usd_materials.MaterialNotSupportedError as e:
                         warnings.warn(e.args[0])
-                    except usd_materials.MaterialReadError as e:
+                    except usd_materials.MaterialLoadError as e:
                         warnings.warn(e.args[0])
             if mesh_subsets:
                 for subset in mesh_subsets:
@@ -174,7 +174,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
                     except usd_materials.MaterialNotSupportedError as e:
                         warnings.warn(e.args[0])
                         continue
-                    except usd_materials.MaterialReadError as e:
+                    except usd_materials.MaterialLoadError as e:
                         warnings.warn(e.args[0])
 
                     subset_material_path = str(subset_material.GetPath())
