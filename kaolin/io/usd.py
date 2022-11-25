@@ -575,7 +575,8 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
 
     vertices_list, faces_list, uvs_list, face_uvs_idx_list, face_normals_list = [], [], [], [], []
     materials_order_list, materials_list = [], []
-    for scene_path, time in zip(tqdm(scene_paths, desc="Importing from USD", unit="mesh"), times):
+    silence_tqdm = len(scene_paths) < 10 # Silence tqdm if fewer than 10 paths are found
+    for scene_path, time in zip(tqdm(scene_paths, desc="Importing from USD", unit="mesh", disable=silence_tqdm), times):
         mesh_attr = _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_normals, time=time)
         vertices = mesh_attr['vertices']
         face_vertex_counts = mesh_attr['face_vertex_counts']
