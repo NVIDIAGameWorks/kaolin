@@ -563,7 +563,9 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
     # TODO  add arguments to selectively import UVs and normals
     assert os.path.exists(file_path)
     stage = Usd.Stage.Open(file_path)
-    # remove instanceable flags
+    # Remove `instanceable` flags
+    # USD Scene Instances are an optimization to avoid duplicating mesh data in memory
+    # Removing the instanceable flag allows for easy retrieval of mesh data
     for p in stage.Traverse():
         p.SetInstanceable(False)
     if scene_paths is None:
