@@ -190,6 +190,7 @@ class TestMeshes:
         # Confirm exported USD matches golden file
         golden = os.path.join(out_dir, '../../../../samples/golden/rocket_homogenized.usda')
         assert open(golden).read() == open(out_path).read()
+
     def test_import_with_transform(self, scene_paths, out_dir, hetero_mesh_path):
         """Test that mesh transforms are correctly applied during import"""
         out_path = os.path.join(out_dir, 'transformed.usda')
