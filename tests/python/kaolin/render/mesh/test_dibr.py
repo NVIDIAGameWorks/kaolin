@@ -24,7 +24,6 @@ import os
 from kaolin.render.camera import perspective_camera, rotate_translate_points
 from kaolin.render.mesh import rasterize
 import kaolin as kal
-from PIL import Image
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(ROOT_DIR, os.pardir, os.pardir,

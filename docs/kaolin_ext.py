@@ -42,6 +42,8 @@ def run_apidoc(_):
             "kaolin/ops/spc/convolution.py",
             "kaolin/ops/spc/points.py",
             "kaolin/ops/spc/uint8.py",
+            "kaolin/render/lighting/sg.py",
+            "kaolin/render/lighting/sh.py",
             "kaolin/render/mesh/deftet.py",
             "kaolin/render/mesh/dibr.py",
             "kaolin/render/mesh/rasterization.py",

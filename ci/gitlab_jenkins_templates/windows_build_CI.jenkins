@@ -37,9 +37,9 @@ spec:
       value: ""
     resources:
         requests:
-          memory: 16Gi
+          memory: 32Gi
         limits:
-          memory: 16Gi
+          memory: 32Gi
   nodeSelector:
     kubernetes.io/os: windows
 ''') 
@@ -72,7 +72,7 @@ spec:
               cudaUrl = cuda_version_url[cudaVer]
               targetImage = docker.build(
                   "${targetImageTag}",
-                  """-m 16g --no-cache -f ./tools/windows/Dockerfile \
+                  """-m 32g --no-cache -f ./tools/windows/Dockerfile \
                       --build-arg CUDA_VERSION=${cudaVer} \
                       --build-arg CUDA_URL=${cudaUrl} \
                       --build-arg PYTHON_VERSION=${pythonVer} \

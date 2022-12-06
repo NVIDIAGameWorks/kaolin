@@ -22,8 +22,9 @@
 #include "./metrics/sided_distance.h"
 #include "./metrics/unbatched_triangle_distance.h"
 #include "./render/mesh/deftet.h"
-#include "./render/mesh/rasterization.h"
 #include "./render/mesh/dibr_soft_mask.h"
+#include "./render/mesh/rasterization.h"
+#include "./render/sg/unbatched_reduced_sg_inner_product.h"
 #include "./ops/conversions/mesh_to_spc/mesh_to_spc.h"
 #include "./ops/spc/spc.h"
 #include "./ops/spc/feature_grids.h"
@@ -89,6 +90,11 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   render_spc.def("sum_reduce_cuda", &sum_reduce_cuda);
   render_spc.def("cumsum_cuda", &cumsum_cuda);
   render_spc.def("cumprod_cuda", &cumprod_cuda);
+  py::module render_sg = render.def_submodule("sg");
+  render_sg.def("unbatched_reduced_sg_inner_product_forward_cuda",
+		&unbatched_reduced_sg_inner_product_forward_cuda);
+  render_sg.def("unbatched_reduced_sg_inner_product_backward_cuda",
+		&unbatched_reduced_sg_inner_product_backward_cuda);
 }
 
 }  // namespace kaolin
