@@ -6,29 +6,21 @@ import groovy.transform.Field
 // (See: https://hub.docker.com/r/pytorch/pytorch/tags)
 def ubuntu_from_pytorch_configs = [
     [
-        'cudaVer': '10.2', 'cudnnVer': '7', 'torchVer': '1.9.0',
-        'archsToTest': 'Tesla_V100_PCIE_32GB'
-    ],
-    [
-        'cudaVer': '11.1', 'cudnnVer': '8', 'torchVer': '1.9.1',
-        'archsToTest': 'TITAN_RTX;A100_PCIE_40GB'
-    ],
-    [
         'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.10.0',
-        'archsToTest': 'A100_PCIE_40GB'
+        'archsToTest': 'TITAN_V'
     ],
     [
         'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.11.0',
-        'archsToTest': 'A100_PCIE_40GB'
+        'archsToTest': 'A10'
     ],
     [
         'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.12.0',
-        'archsToTest': 'A100_PCIE_40GB'
+        'archsToTest': 'A30'
     ],
     [
         'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.12.1',
-        'archsToTest': 'TITAN_RTX;A100_PCIE_40GB'
-    ],
+        'archsToTest': 'A100_PCIE_40GB'
+    ]
 ]
 
 // Configs for build from NGC pytorch docker images
@@ -36,7 +28,7 @@ def ubuntu_from_pytorch_configs = [
 def ubuntu_from_nvcr_configs = [
     [
         'baseImageTag': '22.10-py3',
-        'archsToTest': 'A100_PCIE_40GB'
+        'archsToTest': 'GA100-E4720-DVT'
     ],
 ]
 
@@ -45,13 +37,13 @@ def ubuntu_from_nvcr_configs = [
 // (See: https://hub.docker.com/r/nvidia/cuda/tags)
 def ubuntu_from_cuda_configs = [
     [
-        'cudaVer': '10.2', 'cudnnVer': '7',
-        'pythonVer': '3.7', 'torchVer': '1.9.1',
+        'cudaVer': '11.3.0', 'cudnnVer': '8',
+        'pythonVer': '3.7', 'torchVer': '1.10.2',
         'archsToTest': 'Tesla_V100_PCIE_32GB;TITAN_RTX'
     ],
     [
         'cudaVer': '11.6.1', 'cudnnVer': '8',
-        'pythonVer': '3.9', 'torchVer': '1.12.1',
+        'pythonVer': '3.9', 'torchVer': '1.13.1',
         'archsToTest': 'A100_PCIE_40GB'
     ],
 ]
@@ -60,38 +52,31 @@ def ubuntu_from_cuda_configs = [
 // (Use docker image ubuntu:18.04 as a base)
 def ubuntu_cpuonly_configs = [
     [
-        'pythonVer': '3.7', 'torchVer': '1.8.1',
+        'pythonVer': '3.7', 'torchVer': '1.10.0',
     ],
     [
-        'pythonVer': '3.9', 'torchVer': '1.12.1',
+        'pythonVer': '3.9', 'torchVer': '1.13.1',
     ]
 ]
 
 // Configs for building python wheels
 def ubuntu_for_wheels_configs = [
-    [
-        'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.9.0', 'archsToTest': 'TITAN_V'
-    ],
-    [
-        'cudaVer': '11.1.1', 'cudnnVer': '8',
-        'torchVer': '1.9.0', 'archsToTest': 'TITAN_RTX'
-    ],
-    [
-        'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.9.1', 'archsToTest': 'TITAN_V'
-    ],
-    [
-        'cudaVer': '11.1.1', 'cudnnVer': '8',
-        'torchVer': '1.9.1', 'archsToTest': 'TITAN_RTX'
-    ],
+/*
     [
         'cudaVer': '10.2', 'cudnnVer': '7',
         'torchVer': '1.10.0', 'archsToTest': 'TITAN_V'
     ],
     [
         'cudaVer': '11.1.1', 'cudnnVer': '8',
-        'torchVer': '1.10.0', 'archsToTest': 'Tesla_T4'
+        'torchVer': '1.10.0', 'archsToTest': 'TITAN_V'
+    ],
+    [
+        'cudaVer': '11.1.1', 'cudnnVer': '8',
+        'torchVer': '1.10.1', 'archsToTest': 'TITAN_V'
+    ],
+    [
+        'cudaVer': '11.1.1', 'cudnnVer': '8',
+        'torchVer': '1.10.2', 'archsToTest': 'TITAN_V'
     ],
     [
         'cudaVer': '11.3.1', 'cudnnVer': '8',
@@ -126,33 +111,119 @@ def ubuntu_for_wheels_configs = [
         'torchVer': '1.11.0', 'archsToTest': 'TITAN_V'
     ],
     [
-        'cudaVer': '11.3.1', 'cudnnVer': '8',
+        'cudaVer': '11.5.1', 'cudnnVer': '8',
         'torchVer': '1.11.0', 'archsToTest': 'A100_PCIE_40GB'
     ],
     [
         'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.12.0', 'archsToTest': 'A100_PCIE_40GB'
+        'torchVer': '1.12.0', 'archsToTest': 'TITAN_V'
     ],
     [
         'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.12.0', 'archsToTest': 'A100_PCIE_40GB'
+        'torchVer': '1.12.0', 'archsToTest': 'A10'
     ],
     [
         'cudaVer': '11.6.1', 'cudnnVer': '8',
-        'torchVer': '1.12.0', 'archsToTest': 'A100_PCIE_40GB'
+        'torchVer': '1.12.0', 'archsToTest': 'A30'
     ],
     [
         'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.12.1', 'archsToTest': 'A100_PCIE_40GB'
+        'torchVer': '1.12.1', 'archsToTest': 'TITAN_V'
     ],
     [
         'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.12.1', 'archsToTest': 'A100_PCIE_40GB'
+        'torchVer': '1.12.1', 'archsToTest': 'A30'
     ],
     [
         'cudaVer': '11.6.1', 'cudnnVer': '8',
-        'torchVer': '1.12.1', 'archsToTest': 'A100_PCIE_40GB'
+        'torchVer': '1.12.1', 'archsToTest': 'GA100-E4720-DVT'
     ],
+    [
+        'cudaVer': '11.6.1', 'cudnnVer': '8',
+        'torchVer': '1.13.0', 'archsToTest': 'GA100-E4720-DVT'
+    ],
+    [
+        'cudaVer': '11.7.1', 'cudnnVer': '8',
+        'torchVer': '1.13.0', 'archsToTest': 'A100_PCIE_40GB'
+    ],
+    [
+        'cudaVer': '11.6.1', 'cudnnVer': '8',
+        'torchVer': '1.13.1', 'archsToTest': 'A10'
+    ],
+    [
+        'cudaVer': '11.7.1', 'cudnnVer': '8',
+        'torchVer': '1.13.1', 'archsToTest': 'A30'
+    ],
+*/
+]
+
+def windows_for_wheels_configs = [
+/*
+    [
+        'cudaVer': '11.1', 'cudnnVer': '8',
+        'torchVer': '1.10.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.3', 'cudnnVer': '8',
+        'torchVer': '1.10.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.1', 'cudnnVer': '8',
+        'torchVer': '1.10.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.3', 'cudnnVer': '8',
+        'torchVer': '1.10.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.1', 'cudnnVer': '8',
+        'torchVer': '1.10.2', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.3', 'cudnnVer': '8',
+        'torchVer': '1.10.2', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.3', 'cudnnVer': '8',
+        'torchVer': '1.11.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.5', 'cudnnVer': '8',
+        'torchVer': '1.11.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.3', 'cudnnVer': '8',
+        'torchVer': '1.12.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.6', 'cudnnVer': '8',
+        'torchVer': '1.12.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.3', 'cudnnVer': '8',
+        'torchVer': '1.12.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.6', 'cudnnVer': '8',
+        'torchVer': '1.12.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.6', 'cudnnVer': '8',
+        'torchVer': '1.13.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.7', 'cudnnVer': '8',
+        'torchVer': '1.13.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.6', 'cudnnVer': '8',
+        'torchVer': '1.13.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.7', 'cudnnVer': '8',
+        'torchVer': '1.13.1', 'archsToTest': ''
+    ],
+*/
 ]
 
 // Configs for build from Windows server docker images
@@ -163,13 +234,13 @@ def windows_from_server_configs = [
     // test machines currently are the only option, named 'gpu_tester'
     //      two machines exist, only the TITAN RTX will pass tests
     [
-        'cudaVer': '11.1',
-        'pythonVer': '3.7', 'torchVer': '1.8.2',
+        'cudaVer': '11.3',
+        'pythonVer': '3.7', 'torchVer': '1.10.0',
         'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
     ],
     [
-        'cudaVer': '11.3',
-        'pythonVer': '3.8', 'torchVer': '1.12.1',
+        'cudaVer': '11.6',
+        'pythonVer': '3.9', 'torchVer': '1.13.1',
         'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
     ]
 ]
@@ -212,6 +283,23 @@ node {
                                 configName,
                                 config['cudaVer'],
                                 config['cudnnVer'],
+                                pythonVer,
+                                config['torchVer'],
+                                config['archsToTest'],
+                                true
+                            )
+                        }
+                    }
+                    for (config in windows_for_wheels_configs) {
+                        for (pythonVer in ['3.7', '3.8', '3.9']) {
+
+                            def cudaVerLabel = config['cudaVer'].split('\\.').join('')
+                            def torchVerLabel = config['torchVer'].split('\\.').join('')
+                            def pythonVerLabel = pythonVer.split('\\.').join('')
+                            def configName = "windows-wheels-cuda${cudaVerLabel}-py${pythonVerLabel}-torch${torchVerLabel}"
+                            jobMap["${configName}"] = prepareWindowsJob(
+                                configName,
+                                config['cudaVer'],
                                 pythonVer,
                                 config['torchVer'],
                                 config['archsToTest'],
@@ -271,7 +359,7 @@ node {
                 }
 
                 for (config in ubuntu_cpuonly_configs) {
-                    def torchVerLabel = config['torchVer'].split('\\.')[0..1].join('')
+                    def torchVerLabel = config['torchVer'].split('\\.').join('')
                     def pythonVerLabel = config['pythonVer'].split('\\.').join('')
                     def configName = "cpuonly-py${config['pythonVer']}-torch${config['torchVer']}"
                     jobMap["${configName}"] = prepareUbuntuCPUOnlyJob(
@@ -283,7 +371,7 @@ node {
 
                 for (config in windows_from_server_configs) {
                     def cudaVerLabel = config['cudaVer'].split('\\.').join('')
-                    def torchVerLabel = config['torchVer'].split('\\.')[0..1].join('')
+                    def torchVerLabel = config['torchVer'].split('\\.').join('')
                     def pythonVerLabel = config['pythonVer'].split('\\.').join('')
                     def configName = "windows-cuda${cudaVerLabel}-py${pythonVerLabel}-torch${torchVerLabel}"
                     jobMap["${configName}"] = prepareWindowsJob(
@@ -291,7 +379,8 @@ node {
                         config['cudaVer'],
                         config['pythonVer'],
                         config['torchVer'],
-                        config['archsToTest']
+                        config['archsToTest'],
+                        false
                     )
                 }
             }
@@ -389,12 +478,17 @@ def prepareUbuntuCPUOnlyJob(configName, pythonVer, torchVer) {
   }
 }
 
-def prepareWindowsJob(configName, cudaVer, pythonVer, torchVer, archsToTest) {
+def prepareWindowsJob(configName, cudaVer, pythonVer, torchVer, archsToTest,
+                      buildWheel) {
   return {
     stage("${configName}") {
       updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
-      for (arch in archsToTest.split(';')) {
-        updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "pending")
+      if (buildWheel.toBoolean()) {
+        updateGitlabCommitStatus(name: "test-${configName}", state: "pending")
+      } else {
+        for (arch in archsToTest.split(';')) {
+          updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "pending")
+        }
       }
       build job: "windows_build_template_CI",
       parameters: [
@@ -407,7 +501,8 @@ def prepareWindowsJob(configName, cudaVer, pythonVer, torchVer, archsToTest) {
         string(name: 'sourceBranch', value: "${gitlabSourceBranch}"),
         string(name: 'repoUrl', value: "${scm.userRemoteConfigs[0].url}" ),
         string(name: 'commitHash', value: "${commitHash}"),
-        string(name: 'archsToTest', value: "${archsToTest}")
+        string(name: 'archsToTest', value: "${archsToTest}"),
+        booleanParam(name: 'buildWheel', value: "${buildWheel}")
       ],
       wait: false,
       propagate: false

@@ -1,7 +1,7 @@
-Camera summary
-**************
+Differentiable Camera
+*********************
 
-.. _camera_summary:
+.. _differentiable_camera:
 
 Camera class
 ============

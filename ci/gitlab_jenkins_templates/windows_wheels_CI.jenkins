@@ -1,0 +1,88 @@
+#!/usr/bin/env groovy
+
+docker_registry_server = ImageTag.split(':')[0..1].join(':')
+currentBuild.displayName = ImageTag.split(':')[2]
+currentBuild.description = sourceBranch + ": " + commitHash
+
+// to manage image secrets:
+// 1) log into docker
+//  docker login gitlab-master.nvidia.com:5005
+// 2) create secret
+//  kubectl create secret docker-registry test-secret -n kaolin --docker-server=gitlab-master.nvidia.com:5005 --docker-username azook --docker-password XXX
+// 3) add to service account
+//  https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account
+//  kubectl patch kaolin-sa default -p '{"imagePullSecrets": [{"name": "myregistrykey"}]}'
+// 4) add to pod template
+
+podTemplate(cloud:'sc-ipp-blossom-prod', 
+slaveConnectTimeout: 4000,
+yaml: """
+apiVersion: v1
+kind: Pod
+spec:
+  volumes:
+  - name: pvc-mount
+    persistentVolumeClaim:
+      claimName: 'kaolin-pvc'
+  containers:
+  - name: jnlp
+    image: jenkins/jnlp-agent:latest-windows
+    env:
+    - name: JENKINS_AGENT_WORKDIR
+      value: C:/Jenkins/agent
+  - name: windows
+    image: ${imageTag}
+    restartPolicy: Never
+    backoffLimit: 4
+    tty: true
+    volumeMounts:
+      - mountPath: c:/mnt
+        name: pvc-mount
+  imagePullSecrets:
+  - name: gitlabregcred
+  nodeSelector:
+    kubernetes.io/os: windows
+"""
+) 
+{
+  node(POD_LABEL) {
+    container("windows") {
+      updateGitlabCommitStatus(name: "test-${configName}", state: "running")
+      stage("Basic test") {
+        catchError(stageResult: "failure") {
+          powershell '''
+            python --version
+            python -c "import kaolin; print(kaolin.__version__)"
+            python -c "import torch; print(torch.__version__)"
+          '''
+        }
+      }
+      if (currentBuild.getCurrentResult() != "FAILURE") {
+        stage("Push wheels on volume") {
+          catchError(stageResult: "failure") {
+            def cudaTag = cudaVer.split('\\.')[0..<2].join('')
+            withEnv(["cudaTag=$cudaTag"]) {
+              powershell '''
+              New-Item -Path /mnt/whl/torch-"$env:torchVer"_cu"$env:cudaTag" -ItemType "directory" -Force
+              cp /tmp/kaolin-*.whl /mnt/whl/torch-"$env:torchVer"_cu"$env:cudaTag"/
+              '''
+            }
+          }
+        }
+      }
+      stage("Update build status") {
+        // update build result gitlab status
+        //  catchError only updates the pipeline
+        if (currentBuild.getCurrentResult() == "FAILURE") {
+          echo "failed"
+          echo "updating test-${configName}"
+          updateGitlabCommitStatus(name: "test-${configName}", state: "failed")
+        } else {
+          echo "success"
+          echo "updating test-${configName}"
+          updateGitlabCommitStatus(name: "test-${configName}", state: "success")
+        }
+      }
+    }
+  }
+}

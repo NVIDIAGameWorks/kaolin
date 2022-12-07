@@ -93,34 +93,30 @@ spec:
                 cudaTag = cudaVer.split('\\.')[0..<2].join('')
                 targetImage.inside("-v /mount_binaries:/mount_binaries") {
                   sh """
-                  mkdir -p /mount_binaries/torch-${torchVer}+cu${cudaTag}
-                  python setup.py bdist_wheel --dist-dir /mount_binaries/torch-${torchVer}+cu${cudaTag}
+                  ls .
+                  python setup.py bdist_wheel --dist-dir .
                   """
                 }
                 pythonVerTag = pythonVer.split('\\.').join('')
                 Integer pythonVerTagVal = pythonVerTag
-                sh """echo ${pythonVerTagVal}"""
                 pythonVerAbiTag = (pythonVerTagVal < 38) ? pythonVerTag + 'm' : pythonVerTag
                 kaolinVer = sh(script: "cat ./version.txt", returnStdout: true).trim()
                 baseWheelName = "kaolin-${kaolinVer}-cp${pythonVerTag}-cp${pythonVerAbiTag}"
-                srcWheelName = "${baseWheelName}-linux_x86_64.whl"
-                dstWheelName = "${baseWheelName}-manylinux1_x86_64.whl"
-                sh """
-                mv /mount_binaries/torch-${torchVer}+cu${cudaTag}/${srcWheelName} ./${dstWheelName}
-                """
+                wheelName = "${baseWheelName}-linux_x86_64.whl"
               }
               stage("Reinstall from wheel") {
                 targetImage = docker.build(
                     "${targetImageTag}",
                     """--no-cache --network host -f ./tools/linux/Dockerfile.install_wheel \
                        --build-arg BASE_IMAGE=${targetImageTag}-base \
-                       --build-arg WHEEL_NAME=${dstWheelName} \
+                       --build-arg WHEEL_NAME=${wheelName} \
                        .
                     """)
               }
               stage("Push wheel to volume") {
                 sh """
-                mv ./${dstWheelName} /mount_binaries/torch-${torchVer}+cu${cudaTag}/${dstWheelName}
+                mkdir -p /mount_binaries/torch-${torchVer}_cu${cudaTag}
+                mv ./${wheelName} /mount_binaries/whl/torch-${torchVer}_cu${cudaTag}/${wheelName}
                 """
               }
             }

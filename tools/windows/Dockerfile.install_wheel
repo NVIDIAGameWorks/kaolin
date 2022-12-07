@@ -1,0 +1,15 @@
+# Note: Keep C:\Program Files (x86)\Microsoft Visual Studio\Installer directory.
+#       disutils/setuptools calls vswhere.exe from that location unconditionally.
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+RUN python setup.py bdist_wheel --dist-dir /tmp
+
+WORKDIR /tmp
+RUN pip uninstall -y kaolin
+RUN ls .
+RUN pip install kaolin --find-link=/tmp
+WORKDIR /kaolin

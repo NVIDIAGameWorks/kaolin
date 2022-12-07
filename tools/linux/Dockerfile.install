@@ -16,7 +16,12 @@ WORKDIR /kaolin
 
 COPY . .
 
-RUN apt-get -y update \
+RUN sed -i -e 's|^deb http://[^.]*[.]ubuntu[.]com/ubuntu|deb  https://urm.nvidia.com/artifactory/ubuntu-remote|' /etc/apt/sources.list
+
+RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-peer.conf \
+    && apt-get -y update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated ca-certificates \
+    && rm /etc/apt/apt.conf.d/99verify-peer.conf \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libgl1-mesa-dev \
         libgles2-mesa-dev \
@@ -29,6 +34,7 @@ RUN apt-get -y update \
         libegl1 \
         libgles2 \
         libglvnd-dev \
+	curl \
         cmake \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -36,6 +42,9 @@ RUN apt-get -y update \
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
+# fix for a weird pytorch bug (see: https://discuss.pytorch.org/t/not-able-to-include-cusolverdn-h/169122/5)
+ENV PATH /usr/local/cuda/bin:$PATH
 
 # for GLEW
 ENV LD_LIBRARY_PATH /usr/lib64:$LD_LIBRARY_PATH
@@ -45,16 +54,15 @@ ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility,graphics
 
 ## Install Dash3D Requirements ###
-RUN conda install -c conda-forge nodejs==16.13.0 \
-    && conda clean --all --force-pkgs-dirs
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x --insecure | bash - \
+    && apt-get install -y nodejs
+
 RUN npm install -g npm@8.5.4
 RUN npm install 
 
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir setuptools==58.0.0 ninja cython==0.29.20 \
         imageio imageio-ffmpeg
-#
-#ENV TORCH_CUDA_ARCH_LIST="6.0;6.1;6.2;7.0;7.5;8.0;8.6"
 
 RUN cd /tmp && \
     git clone https://github.com/NVlabs/nvdiffrast && \
