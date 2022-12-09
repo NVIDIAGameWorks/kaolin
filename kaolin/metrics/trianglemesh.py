@@ -33,7 +33,7 @@ def point_to_mesh_distance(pointclouds, face_vertices):
             pointclouds, of shape :math:`(\text{batch_size}, \text{num_points}, 3)`.
         face_vertices (torch.Tensor):
             vertices of each face of meshes,
-            of shape :math:`(\text{batch_size}, \text{num_faces}, 3, 3})`.
+            of shape :math:`(\text{batch_size}, \text{num_faces}, 3, 3)`.
 
     Returns:
         (torch.Tensor, torch.LongTensor, torch.IntTensor):
@@ -147,7 +147,7 @@ def _unbatched_naive_point_to_mesh_distance(points, face_vertices):
 
     Args:
         points (torch.Tensor): of shape (num_points, 3).
-        faces_vertices (torch.LongTensor): of shape (num_faces, 3, 3).
+        face_vertices (torch.LongTensor): of shape (num_faces, 3, 3).
 
     Returns:
         (torch.Tensor, torch.LongTensor, torch.IntTensor):
