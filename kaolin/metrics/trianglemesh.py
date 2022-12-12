@@ -18,9 +18,15 @@ from kaolin import _C
 from ..ops.mesh import uniform_laplacian
 
 def point_to_mesh_distance(pointclouds, face_vertices):
-    r"""Computes the distances from pointclouds to meshes (represented by vertices and faces.)
+    r"""Computes the distances from pointclouds to meshes (represented by vertices and faces).
+
     For each point in the pointcloud, it finds the nearest triangle
     in the mesh, and calculated its distance to that triangle.
+
+    .. note::
+
+        The calculated distance is the squared euclidean distance.
+        
 
     Type 0 indicates the distance is from a point on the surface of the triangle.
 
