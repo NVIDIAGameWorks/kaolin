@@ -121,8 +121,8 @@ def marching_tetrahedra(vertices, tets, sdf, return_tet_idx=False):
     Args:
         vertices (torch.tensor): batched vertices of tetrahedral meshes, of shape
                                  :math:`(\text{batch_size}, \text{num_vertices}, 3)`.
-        faces (torch.tensor): unbatched tetrahedral mesh topology, of shape
-                              :math:`(\text{num_tetrahedrons}, 4)`.
+        tets (torch.tensor): unbatched tetrahedral mesh topology, of shape
+                             :math:`(\text{num_tetrahedrons}, 4)`.
         sdf (torch.tensor): batched SDFs which specify the SDF value of each vertex, of shape
                             :math:`(\text{batch_size}, \text{num_vertices})`.
         return_tet_idx (optional, bool): if True, return index of tetrahedron

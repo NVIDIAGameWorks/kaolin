@@ -29,7 +29,7 @@ if torch_spec is None:
     )
 else:
     import torch
-    torch_ver = parse_version(torch.__version__)
+    torch_ver = parse_version(parse_version(torch.__version__).base_version)
     if (torch_ver < parse_version(TORCH_MIN_VER) or
         torch_ver > parse_version(TORCH_MAX_VER)):
         if IGNORE_TORCH_VER:
@@ -178,9 +178,12 @@ write_version_file()
 
 def get_requirements():
     requirements = []
-    requirements.append('scipy>=1.2.0,<=1.7.2')
     requirements.append('Pillow>=8.0.0')
     requirements.append('tqdm>=4.51.0')
+    if sys.version_info < (3, 8):
+        requirements.append('scipy>=1.2.0,<=1.7.3')
+    else:
+        requirements.append('scipy>=1.2.0')
     if sys.version_info >= (3, 10):
         warnings.warn("usd-core is not compatible with python_version >= 3.10 "
                       "and won't be installed, please use supported python_version "

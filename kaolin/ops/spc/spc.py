@@ -268,7 +268,9 @@ def unbatched_query(octree, exsum, query_coords, level, with_parents=False):
                              to only a single level (default: False).
 
     Returns:
-        pidx (torch.LongTensor): The indices into the point hierarchy of shape :math:`(\text{num_query})`.
+        pidx (torch.LongTensor):
+
+            The indices into the point hierarchy of shape :math:`(\text{num_query})`.
             If with_parents is True, then the shape will be :math:`(\text{num_query, level+1})`.
 
     Examples:
