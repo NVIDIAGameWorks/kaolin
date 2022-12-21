@@ -191,6 +191,19 @@ class TestMeshes:
         golden = os.path.join(out_dir, '../../../../samples/golden/rocket_homogenized.usda')
         assert open(golden).read() == open(out_path).read()
 
+    def test_import_with_transform(self, scene_paths, out_dir, hetero_mesh_path):
+        """Test that mesh transforms are correctly applied during import"""
+        out_path = os.path.join(out_dir, 'transformed.usda')
+        mesh = usd.import_mesh(hetero_mesh_path, '/Root',
+                               heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_naive_homogenize)
+        stage = usd.create_stage(out_path)
+        prim = usd.add_mesh(stage, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces)
+        UsdGeom.Xformable(prim).AddTranslateOp().Set((10, 10, 10))
+        stage.Save()
+
+        mesh_import = usd.import_mesh(out_path)
+        assert torch.allclose(mesh_import.vertices, mesh.vertices + 10.)
+
     def test_import_material_subsets(self, scene_paths, out_dir, hetero_subsets_materials_mesh_path):
         """Test that imports materials from mesh with subsets"""
         out_path = os.path.join(out_dir, 'homogenized_materials.usda')

@@ -45,6 +45,10 @@ class MaterialLoadError(MaterialError):
     pass
 
 
+class MaterialWriteError(MaterialError):
+    pass
+
+
 class MaterialFileError(MaterialError):
     pass
 
@@ -263,7 +267,7 @@ class PBRMaterial(Material):
             The default value is `0.01`.
         opacity_value (float):
             Opacity, with `1.0` fully opaque and `0.0` as transparent with values within this range
-            defining a translucent surface. Default value is `0.0`.
+            defining a translucent surface. Default value is `1.0`.
         opacity_treshold (float):
             Used to create cutouts based on the `opacity_value`. Surfaces with an opacity
             smaller than the `opacity_threshold` will be fully transparent. Default value is `0.0`.
@@ -721,6 +725,9 @@ class PBRMaterial(Material):
                 params[f'clearcoat_roughness_{["texture", "value"][is_value]}'] = output
                 if 'colorspace' in data:
                     params['clearcoat_roughness_colorspace'] = data['colorspace']['value']
+            elif 'opacitythreshold' in name.lower():
+                output, _ = _read_data(data)
+                params['opacity_threshold'] = output
             elif 'opacity' in name.lower():
                 output, is_value = _read_data(data)
                 params[f'opacity_{["texture", "value"][is_value]}'] = output

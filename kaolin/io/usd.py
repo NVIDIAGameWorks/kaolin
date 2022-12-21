@@ -23,6 +23,7 @@ import re
 import warnings
 from collections import namedtuple
 import numpy as np
+from tqdm import tqdm
 
 import torch
 
@@ -81,7 +82,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
 
     attrs = {}
 
-    def _process_mesh(mesh_prim, ref_path, attrs):
+    def _process_mesh(mesh_prim, ref_path, attrs, time):
         cur_first_idx_faces = sum([len(v) for v in attrs.get('vertices', [])])
         cur_first_idx_uvs = sum([len(u) for u in attrs.get('uvs', [])])
         mesh = UsdGeom.Mesh(mesh_prim)
@@ -91,6 +92,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
         mesh_st = mesh.GetPrimvar('st')
         mesh_subsets = UsdGeom.Subset.GetAllGeomSubsets(UsdGeom.Imageable(mesh_prim))
         mesh_material = UsdShade.MaterialBindingAPI(mesh_prim).ComputeBoundMaterial()[0]
+        transform = torch.from_numpy(np.array(UsdGeom.Xformable(mesh_prim).ComputeLocalToWorldTransform(time), dtype=np.float32))
 
         # Parse mesh UVs
         if mesh_st:
@@ -101,7 +103,10 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
 
         # Parse mesh geometry
         if mesh_vertices:
-            attrs.setdefault('vertices', []).append(torch.from_numpy(np.array(mesh_vertices, dtype=np.float32)))
+            mesh_vertices = torch.from_numpy(np.array(mesh_vertices, dtype=np.float32))
+            mesh_vertices_homo = torch.nn.functional.pad(mesh_vertices, (0, 1), mode='constant', value=1.)
+            mesh_vertices = (mesh_vertices_homo @ transform)[:, :3]
+            attrs.setdefault('vertices', []).append(mesh_vertices)
         if mesh_vertex_indices:
             attrs.setdefault('face_vertex_counts', []).append(torch.from_numpy(
                 np.array(mesh_face_vertex_counts, dtype=np.int64)))
@@ -149,7 +154,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
                         attrs['material_idx_map'][mesh_material_path] = material_idx
                     except usd_materials.MaterialNotSupportedError as e:
                         warnings.warn(e.args[0])
-                    except usd_materials.MaterialReadError as e:
+                    except usd_materials.MaterialLoadError as e:
                         warnings.warn(e.args[0])
             if mesh_subsets:
                 for subset in mesh_subsets:
@@ -169,7 +174,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
                     except usd_materials.MaterialNotSupportedError as e:
                         warnings.warn(e.args[0])
                         continue
-                    except usd_materials.MaterialReadError as e:
+                    except usd_materials.MaterialLoadError as e:
                         warnings.warn(e.args[0])
 
                     subset_material_path = str(subset_material.GetPath())
@@ -197,16 +202,16 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
                             # Assign to `None` material (ie. index 0)
                             attrs.setdefault('materials_face_idx', []).extend([0] * mesh_face_vertex_counts[face_idx])
 
-    def _traverse(cur_prim, ref_path, attrs):
+    def _traverse(cur_prim, ref_path, attrs, time):
         metadata = cur_prim.GetMetadata('references')
         if metadata:
             ref_path = os.path.dirname(metadata.GetAddedOrExplicitItems()[0].assetPath)
         if UsdGeom.Mesh(cur_prim):
-            _process_mesh(cur_prim, ref_path, attrs)
+            _process_mesh(cur_prim, ref_path, attrs, time)
         for child in cur_prim.GetChildren():
-            _traverse(child, ref_path, attrs)
+            _traverse(child, ref_path, attrs, time)
 
-    _traverse(stage.GetPrimAtPath(scene_path), '', attrs)
+    _traverse(stage.GetPrimAtPath(scene_path), '', attrs, time)
 
     if not attrs.get('vertices'):
         warnings.warn(f'Scene object at {scene_path} contains no vertices.', UserWarning)
@@ -558,6 +563,11 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
     # TODO  add arguments to selectively import UVs and normals
     assert os.path.exists(file_path)
     stage = Usd.Stage.Open(file_path)
+    # Remove `instanceable` flags
+    # USD Scene Instances are an optimization to avoid duplicating mesh data in memory
+    # Removing the instanceable flag allows for easy retrieval of mesh data
+    for p in stage.Traverse():
+        p.SetInstanceable(False)
     if scene_paths is None:
         scene_paths = get_scene_paths(file_path, prim_types=['Mesh'])
     if times is None:
@@ -565,7 +575,8 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
 
     vertices_list, faces_list, uvs_list, face_uvs_idx_list, face_normals_list = [], [], [], [], []
     materials_order_list, materials_list = [], []
-    for scene_path, time in zip(scene_paths, times):
+    silence_tqdm = len(scene_paths) < 10 # Silence tqdm if fewer than 10 paths are found
+    for scene_path, time in zip(tqdm(scene_paths, desc="Importing from USD", unit="mesh", disable=silence_tqdm), times):
         mesh_attr = _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_normals, time=time)
         vertices = mesh_attr['vertices']
         face_vertex_counts = mesh_attr['face_vertex_counts']
@@ -598,7 +609,7 @@ def import_meshes(file_path, scene_paths=None, with_materials=False, with_normal
         if face_normals is not None and faces is not None and face_normals.size(0) > 0:
             face_normals = face_normals.reshape(-1, faces.size(1), 3)
         if faces is not None and materials_face_idx is not None:            # Create material order list
-            materials_face_idx.view(-1, faces.size(1))
+            materials_face_idx = materials_face_idx.view(-1, faces.size(1))
             cur_mat_idx = -1
             materials_order = []
             for idx in range(len(materials_face_idx)):
@@ -707,9 +718,10 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         for i, subset in enumerate(subsets):
             subset_prim = stage.DefinePrim(f'{scene_path}/subset_{i}', 'GeomSubset')
             subset_prim.GetAttribute('indices').Set(subsets[subset])
-            materials[subset]._write_usd_preview_surface(stage, f'{scene_path}/Looks/material_{subset}',
-                                                         [subset_prim], time, texture_dir=f'material_{subset}',
-                                                         texture_file_prefix='')    # TODO file path
+            if isinstance(materials[subset], usd_materials.Material):
+                materials[subset]._write_usd_preview_surface(stage, f'{scene_path}/Looks/material_{subset}',
+                                                             [subset_prim], time, texture_dir=f'material_{subset}',
+                                                             texture_file_prefix='')    # TODO allow users to pass root path to save textures to
 
     return usd_mesh.GetPrim()
 
@@ -810,7 +822,7 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
     if times is None:
         times = [Usd.TimeCode.Default()] * len(scene_paths)
 
-    for i, scene_path in enumerate(scene_paths):
+    for i, scene_path in enumerate(tqdm(scene_paths, desc="Exporting to USD", unit="mesh")):
         mesh_params = {k: p[i] for k, p in supplied_parameters.items()}
         add_mesh(stage, scene_path, **mesh_params)
     stage.Save()
