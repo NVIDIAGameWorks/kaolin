@@ -11,6 +11,16 @@ Kaolin library is part of a larger suite of tools for 3D deep learning research.
 
 ## Installation and Getting Started
 
+Starting with v0.12.0, Kaolin supports installation with wheels:
+```
+# Replace TORCH_VERSION and CUDA_VERSION with your torch / cuda versions
+pip install kaolin==0.12.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
+```
+For example, to install kaolin over torch 1.12.1 and cuda 11.3:
+```
+pip install kaolin==0.12.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
+```
+
 Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest/) to get started!
 
 ## About the Latest Release (0.12.0)
