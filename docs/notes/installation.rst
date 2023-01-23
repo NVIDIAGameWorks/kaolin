@@ -12,18 +12,52 @@ Kaolin on other systems, only a fraction of operations will be available for a C
 Requirements
 ------------
 
-* Linux, macOS (CPU-only) or Windows
+* Linux, Windows, or macOS (CPU-only)
 * Python >= 3.7, <= 3.9
 * `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ >= 10.0 (with 'nvcc' installed) See `CUDA Toolkit Archive <https://developer.nvidia.com/cuda-toolkit-archive>`_ to install older version.
+* torch >= 1.8, <= 1.13.1
 
-Dependencies
-------------
+Quick Start (Linux, Windows)
+----------------------------
+| Make sure any of the supported CUDA and torch versions below are pre-installed.
+| The latest version of Kaolin can be installed with pip:
 
-* torch >= 1.8, <= 1.12.1
-* cython == 0.29.20 (auto-installed)
-* scipy >= 1.2.0 (auto-installed)
-* Pillow >= 8.0.0 (auto-installed)
-* usd-core >= 20.11 (auto-installed; required for USD I/O and 3D checkpoints with :class:`~kaolin.visualize.Timelapse`)
+.. code-block:: bash
+
+    $ pip install kaolin==0.12.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/{TORCH_VER}_{CUDA_VER}.html
+
+.. Note::
+    Replace *TORCH_VER* and *CUDA_VER* with any of the compatible options below.
+
+
+.. rst-class:: center-align-center-col
+
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+    | **torch / CUDA** | **cu102** | **cu111** | **cu113** | **cu116** | **cu117** |
+    +==================+===========+===========+===========+===========+===========+
+    | **torch-1.13.1** |           |           |           |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-1.13.0** |           |           |           |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-1.12.1** |     ✓     |           |     ✓     |     ✓     |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-1.12.0** |     ✓     |           |     ✓     |     ✓     |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-1.11.0** |     ✓     |           |     ✓     |           |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-1.10.2** |     ✓     |     ✓     |     ✓     |           |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-1.10.1** |     ✓     |     ✓     |     ✓     |           |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-1.10.0** |     ✓     |     ✓     |     ✓     |           |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+
+For example, to install kaolin for torch 1.12.1 and CUDA 11.3:
+
+.. code-block:: bash
+
+    $ pip install kaolin==0.12.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
+
 
 Installation from source
 ------------------------
@@ -35,6 +69,15 @@ Installation from source
     
         $ conda create --name kaolin python=3.7
         $ conda activate kaolin
+
+Dependencies
+^^^^^^^^^^^^
+
+* torch >= 1.8, <= 1.13.1
+* cython == 0.29.20 (auto-installed)
+* scipy >= 1.2.0 (auto-installed)
+* Pillow >= 8.0.0 (auto-installed)
+* usd-core >= 20.11 (auto-installed; required for USD I/O and 3D checkpoints with :class:`~kaolin.visualize.Timelapse`)
 
 1. Clone Repository
 ^^^^^^^^^^^^^^^^^^^
