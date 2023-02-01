@@ -90,8 +90,8 @@ class TestUnbatchedSgInnerProduct:
 
 @pytest.mark.parametrize("device", ["cuda"])
 @pytest.mark.parametrize("dtype", [torch.float])
-@pytest.mark.parametrize("num_sg", [1, 32, 511, 10000])
-@pytest.mark.parametrize("num_other", [1, 32, 511])
+@pytest.mark.parametrize("num_sg", [1, 17, 32, 511, 10000])
+@pytest.mark.parametrize("num_other", [1, 17, 32, 511])
 class TestUnbatchedReducedSgInnerProduct:
     @pytest.fixture(autouse=True)
     def intensity(self, num_sg, device, dtype):

@@ -190,9 +190,9 @@ void unbatched_reduced_sg_inner_product_backward_cuda_kernel(
     }
     float sharp = sharpness[sg_idx];
     __syncthreads();
-    float direction_x = shm[threadIdx.y][0];
-    float direction_y = shm[threadIdx.y][1];
-    float direction_z = shm[threadIdx.y][2];
+    float direction_x = is_active_sg ? shm[threadIdx.y][0] : zero;
+    float direction_y = is_active_sg ? shm[threadIdx.y][1] : zero;
+    float direction_z = is_active_sg ? shm[threadIdx.y][2] : zero;
     __syncthreads();
     if (threadIdx.y == 0) {
 #pragma unroll
@@ -204,9 +204,10 @@ void unbatched_reduced_sg_inner_product_backward_cuda_kernel(
       }
     }
     __syncthreads();
-    float intensity_x = shm[threadIdx.y][0];
-    float intensity_y = shm[threadIdx.y][1];
-    float intensity_z = shm[threadIdx.y][2];
+    // need to put zero because of some NaN bug on ampere
+    float intensity_x = is_active_sg ? shm[threadIdx.y][0] : zero;
+    float intensity_y = is_active_sg ? shm[threadIdx.y][1] : zero;
+    float intensity_z = is_active_sg ? shm[threadIdx.y][2] : zero;
     __syncthreads();
     if (threadIdx.y == 0) {
 #pragma unroll
@@ -218,9 +219,9 @@ void unbatched_reduced_sg_inner_product_backward_cuda_kernel(
       }
     }
     __syncthreads();
-    float grad_re_x = shm[threadIdx.y][0];
-    float grad_re_y = shm[threadIdx.y][1];
-    float grad_re_z = shm[threadIdx.y][2];
+    float grad_re_x = is_active_sg ? shm[threadIdx.y][0] : zero;
+    float grad_re_y = is_active_sg ? shm[threadIdx.y][1] : zero;
+    float grad_re_z = is_active_sg ? shm[threadIdx.y][2] : zero;
     float sum_grad_intensity_x = zero;
     float sum_grad_intensity_y = zero;
     float sum_grad_intensity_z = zero;
@@ -539,6 +540,7 @@ void unbatched_reduced_sg_inner_product_backward_cuda_impl(
       grad_other_intensity_cache.data_ptr<float>(),
       grad_other_direction_cache.data_ptr<float>(),
       grad_other_sharpness_cache.data_ptr<float>());
+
   AT_CUDA_CHECK(cudaGetLastError());
   at::sum_out(grad_other_intensity, grad_other_intensity_cache, 0);
   at::sum_out(grad_other_direction, grad_other_direction_cache, 0);

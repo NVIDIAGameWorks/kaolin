@@ -89,8 +89,8 @@ RUN Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Us
 # conditional: bespoke logic for 1.8.2 LTS install, otherwise generic wheel lookup
 RUN $Env:TORCH_STR = ${Env:PYTORCH_VERSION} + '+cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
     $Env:TORCH_URL='https://download.pytorch.org/whl/cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
-    if (${Env:PYTORCH_VERSION} -eq '1.8.2') { pip install torch==1.8.2 torchvision "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.5.2 cython==0.29.20 numpy==1.21.6 tornado==6.1 ninja --extra-index-url https://download.pytorch.org/whl/lts/1.8 } \
-    else { pip install torch==${Env:TORCH_STR} torchvision "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.5.2 cython==0.29.20 numpy==1.21.6 tornado==6.1 ninja --extra-index-url ${Env:TORCH_URL}; }
+    if (${Env:PYTORCH_VERSION} -eq '1.8.2') { pip install torch==1.8.2 torchvision "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.7.3 cython==0.29.20 numpy==1.21.6 tornado==6.1 "tqdm>=4.51.0" ninja --extra-index-url https://download.pytorch.org/whl/lts/1.8 } \
+    else { pip install torch==${Env:TORCH_STR} torchvision "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.7.3 cython==0.29.20 numpy==1.21.6 tornado==6.1 "tqdm>=4.51.0" ninja --extra-index-url ${Env:TORCH_URL}; }
 
 
 # CUDA setup for running & testing on CI machine
@@ -109,7 +109,7 @@ RUN conda list > conda_build.txt
 COPY . .
 
 # NOTE: pin setuptools to avoid directory copy bug
-RUN pip install --upgrade setuptools==46.4.0
+RUN pip install --upgrade setuptools==58.0.0
 RUN pip install --upgrade certifi
 RUN pip install -r tools\ci_requirements.txt
 

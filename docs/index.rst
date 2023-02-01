@@ -18,7 +18,7 @@ Kaolin library is part of a larger suite of tools for 3D deep learning research.
    notes/checkpoints
    notes/diff_render
    notes/spc_summary
-   notes/camera_summary
+   notes/differentiable_camera
 
 .. toctree::
    :titlesonly:

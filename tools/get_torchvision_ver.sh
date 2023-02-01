@@ -49,6 +49,10 @@ case $1 in
     echo "0.14.0"
     ;;
 
+  "1.13.1")
+    echo "0.14.1"
+    ;;
+
   *)
     printf "ERROR $1 unsupported torch version\n" >&2
     exit 3

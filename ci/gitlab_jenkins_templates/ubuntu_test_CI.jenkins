@@ -36,7 +36,7 @@ spec:
 """) {
   node(POD_LABEL) {
     container("docker") {
-      timeout(time: 25, unit: 'MINUTES') {
+      timeout(time: 30, unit: 'MINUTES') {
         updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "running")
         stage("Install deps") {
           sh 'pip install -r /kaolin/tools/ci_requirements.txt'
@@ -56,7 +56,7 @@ spec:
           stage("Pytest") {
             sh '''
             export KAOLIN_TEST_NVIDIFFRAST=1
-            pytest -s --cov=/kaolin/kaolin /kaolin/tests/python/kaolin
+            pytest -s --cov=/kaolin/kaolin /kaolin/tests/python/kaolin/
             '''
           }
         } catch(e) {
