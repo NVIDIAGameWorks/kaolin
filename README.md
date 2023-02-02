@@ -21,6 +21,8 @@ For example, to install kaolin 0.13.0 over torch 1.12.1 and cuda 11.3:
 pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
 ```
 
+We now support version 0.12.0 to 0.13.0
+
 Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest/) to get started!
 
 ## About the Latest Release (0.13.0)
@@ -32,11 +34,13 @@ We also:
   * Fixed bug and improved speed on SPC raytracing, and added gradient on trilinear interpolation
   * Improved memory consumption on [uniform_laplacian](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.mesh.html#kaolin.ops.mesh.uniform_laplacian)
 
-Checkout our new [tutorials](https://kaolin.readthedocs.io/en/latest/notes/tutorial_index.html):
+Check out our new [tutorials](https://kaolin.readthedocs.io/en/latest/notes/tutorial_index.html):
   * Recipe for fast mesh sampling preprocessing in [examples/recipes/preprocess/fast_mesh_sampling.py](./examples/recipes/preprocess/fast_mesh_sampling.py)
   * Recipe for SPC 3d convolution in [examples/recipes/spc/spc_conv3d_example.py](./examples/recipes/spc/spc_conv3d_example.py)
   * Tutorial for diffuse lighting in [examples/tutorial/diffuse_lighting.ipynb](./examples/tutorial/diffuse_lighting.ipynb)
   * Tutorial for spherical gaussian specular lighting [examples/tutorial/sg_specular_lighting.ipynb](./examples/tutorial/sg_specular_lighting.ipynb)
+
+![](./assets/diffuse.png) ![](./assets/specular.png)
 
 See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.13.0) for details.
 
