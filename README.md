@@ -27,6 +27,8 @@ Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest
 
 ## About the Latest Release (0.13.0)
 
+[![](./assets/diffuse.png)](./examples/tutorial/diffuse_lighting.ipynb) [![](./assets/specular.png)](./examples/tutorial/sg_specular_lighting.ipynb)
+
 With the version 0.13.0 we have added new [lighting features](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html), most notably spherical gaussian [diffuse](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_diffuse_fitted) and [specular](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_warp_specular_term) reflectance, we also improved the spherical harmonics API and coefficients.
 
 We also:
@@ -39,8 +41,6 @@ Check out our new [tutorials](https://kaolin.readthedocs.io/en/latest/notes/tuto
   * Recipe for SPC 3d convolution in [examples/recipes/spc/spc_conv3d_example.py](./examples/recipes/spc/spc_conv3d_example.py)
   * Tutorial for diffuse lighting in [examples/tutorial/diffuse_lighting.ipynb](./examples/tutorial/diffuse_lighting.ipynb)
   * Tutorial for spherical gaussian specular lighting [examples/tutorial/sg_specular_lighting.ipynb](./examples/tutorial/sg_specular_lighting.ipynb)
-
-[![](./assets/diffuse.png)](./examples/tutorial/diffuse_lighting.ipynb) [![](./assets/specular.png)](./examples/tutorial/sg_specular_lighting.ipynb)
 
 See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.13.0) for details.
 
