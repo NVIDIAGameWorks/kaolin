@@ -30,6 +30,7 @@ Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest
 With the version 0.13.0 we have added new [lighting features](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html), most notably spherical gaussian [diffuse](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_diffuse_fitted) and [specular](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_warp_specular_term) reflectance, we also improved the spherical harmonics API and coefficients.
 
 See tutorials below.
+
 [![Diffuse lighting tutorial](./assets/diffuse.png)](./examples/tutorial/diffuse_lighting.ipynb) [![Specular lighting tutorial](./assets/specular.png)](./examples/tutorial/sg_specular_lighting.ipynb)
 
 
