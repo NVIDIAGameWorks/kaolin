@@ -27,9 +27,11 @@ Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest
 
 ## About the Latest Release (0.13.0)
 
-[![](./assets/diffuse.png)](./examples/tutorial/diffuse_lighting.ipynb) [![](./assets/specular.png)](./examples/tutorial/sg_specular_lighting.ipynb)
-
 With the version 0.13.0 we have added new [lighting features](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html), most notably spherical gaussian [diffuse](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_diffuse_fitted) and [specular](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_warp_specular_term) reflectance, we also improved the spherical harmonics API and coefficients.
+
+See tutorials below.
+[![Diffuse lighting tutorial](./assets/diffuse.png)](./examples/tutorial/diffuse_lighting.ipynb) [![Specular lighting tutorial](./assets/specular.png)](./examples/tutorial/sg_specular_lighting.ipynb)
+
 
 We also:
   * Reformated the data preprocessing with a new [CachedDataset](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.dataset.html#kaolin.io.dataset.CachedDataset) replacing [ProcessedDataset](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.dataset.html#kaolin.io.dataset.ProcessedDataset)
