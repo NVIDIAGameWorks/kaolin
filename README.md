@@ -16,22 +16,36 @@ Starting with v0.12.0, Kaolin supports installation with wheels:
 # Replace TORCH_VERSION and CUDA_VERSION with your torch / cuda versions
 pip install kaolin==0.12.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
 ```
-For example, to install kaolin over torch 1.12.1 and cuda 11.3:
+For example, to install kaolin 0.13.0 over torch 1.12.1 and cuda 11.3:
 ```
-pip install kaolin==0.12.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
+pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
 ```
+
+We now support version 0.12.0 to 0.13.0
 
 Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest/) to get started!
 
-## About the Latest Release (0.12.0)
+## About the Latest Release (0.13.0)
 
-With the version 0.12.0 we have added a [Camera API](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.camera.html), allowing to use all our renderers and multiple coordinate systems.
+With the version 0.13.0 we have added new [lighting features](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html), most notably spherical gaussian [diffuse](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_diffuse_fitted) and [specular](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_warp_specular_term) reflectance, we also improved the spherical harmonics API and coefficients.
 
-Checkout our news [tutorials](https://kaolin.readthedocs.io/en/latest/notes/tutorial_index.html):
-  * plenty of camera recipes in [examples/recipes/camera](./examples/recipes/camera)
-  * a tutorial using the new camera API with nvdiffrast [examples/tutorial/camera_and_rasterization.ipynb](./examples/tutorial/camera_and_rasterization.ipynb)
+See tutorials below.
 
-See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.12.0) for details.
+[![Diffuse lighting tutorial](./assets/diffuse.png)](./examples/tutorial/diffuse_lighting.ipynb) [![Specular lighting tutorial](./assets/specular.png)](./examples/tutorial/sg_specular_lighting.ipynb)
+
+
+We also:
+  * Reformated the data preprocessing with a new [CachedDataset](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.dataset.html#kaolin.io.dataset.CachedDataset) replacing [ProcessedDataset](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.dataset.html#kaolin.io.dataset.ProcessedDataset)
+  * Fixed bug and improved speed on SPC raytracing, and added gradient on trilinear interpolation
+  * Improved memory consumption on [uniform_laplacian](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.mesh.html#kaolin.ops.mesh.uniform_laplacian)
+
+Check out our new [tutorials](https://kaolin.readthedocs.io/en/latest/notes/tutorial_index.html):
+  * Recipe for fast mesh sampling preprocessing in [examples/recipes/preprocess/fast_mesh_sampling.py](./examples/recipes/preprocess/fast_mesh_sampling.py)
+  * Recipe for SPC 3d convolution in [examples/recipes/spc/spc_conv3d_example.py](./examples/recipes/spc/spc_conv3d_example.py)
+  * Tutorial for diffuse lighting in [examples/tutorial/diffuse_lighting.ipynb](./examples/tutorial/diffuse_lighting.ipynb)
+  * Tutorial for spherical gaussian specular lighting [examples/tutorial/sg_specular_lighting.ipynb](./examples/tutorial/sg_specular_lighting.ipynb)
+
+See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.13.0) for details.
 
 ## Contributing
 
