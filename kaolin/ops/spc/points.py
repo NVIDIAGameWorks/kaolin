@@ -234,10 +234,14 @@ class InterpolateTrilinear(torch.autograd.Function):
             # Shape (N, 8, 3) tensor of @(coeffs)/@(xyz)
             grad_coeffs_by_xyz = grad_coeffs_by_xyz.reshape(-1, 8, 3)
             # Shape (N, D, 8) tensor of @(feats_out)/@(coeffs)
-            grad_fout_by_coeffs = feats[selected_trinkets.long()].permute(0,2,1)
+            grad_fout_by_coeffs = feats[selected_trinkets.long()].permute(0, 2, 1)
             # Shape (N, D, 3) tensor of @(feats_out)/@(xyz), after applying chain rule
-            grad_fout_by_xyz = grad_fout_by_coeffs @ grad_coeffs_by_xyz
+            _grad_fout_by_xyz = grad_fout_by_coeffs @ grad_coeffs_by_xyz
             # Shape (N, 1, 3) tensor of @(out)/@(xyz) applying chain rule again
+            grad_fout_by_xyz = torch.zeros(
+                (grad_output.shape[0], *_grad_fout_by_xyz.shape[1:]),
+                device='cuda', dtype=_grad_fout_by_xyz.dtype)
+            grad_fout_by_xyz[mask] = _grad_fout_by_xyz
             grad_coords = grad_output @ grad_fout_by_xyz
         return grad_coords, None, None, None, grad_feats, None
 
@@ -291,10 +295,10 @@ def coords_to_trilinear(coords, points, level):
     with ``features`` of shape :math:`(\text{num_points}, 8)`
 
     Args:
-        coords (torch.FloatTensor): 3D coordinates of shape :math:`(\text{num_points}, 3)`
+        coords (torch.FloatTensor): 3D coordinates of shape :math:`(\text{num_coords}, 3)`
                                     in normalized space [-1, 1].
         points (torch.ShortTensor): Quantized 3D points (the 0th bit of the voxel x is in),
-                                    of shape :math:`(\text{num_coords}, 3)`.
+                                    of shape :math:`(\text{num_points}, 3)`.
         level (int): The level of SPC to interpolate on.
 
     Returns:
@@ -317,23 +321,24 @@ def coords_to_trilinear_coeffs(coords, points, level):
     with ``features`` of shape :math:`(\text{num_points}, 8)`
 
     Args:
-        coords (torch.FloatTensor): 3D coordinates of shape :math:`(\text{num_points}, 3)`
+        coords (torch.FloatTensor): 3D coordinates of shape :math:`(\text{num_coords}, 3)`
                                     in normalized space [-1, 1].
         points (torch.ShortTensor): Quantized 3D points (the 0th bit of the voxel x is in),
-                                    of shape :math:`(\text{num_coords}, 3)`.
+                                    of shape :math:`(\text{num_points}, 3)`.
         level (int): The level of SPC to interpolate on.
 
     Returns:
         (torch.FloatTensor):
-            The trilinear interpolation coefficients of shape :math:`(\text{num_points}, 8)`.
+            The trilinear interpolation coefficients of shape :math:`(\text{num_coords}, 8)`.
     """
-    shape = list(points.shape)
+    shape = list(coords.shape)
     shape[-1] = 8
     points = points.reshape(-1, 3)
     coords = coords.reshape(-1, 3)
-    coords_ = (2**level) * (coords * 0.5 + 0.5)
+    coords_ = (2 ** level) * (coords * 0.5 + 0.5)
 
-    return _C.ops.spc.coords_to_trilinear_cuda(coords_.contiguous(), points.contiguous()).reshape(*shape)
+    return _C.ops.spc.coords_to_trilinear_cuda(
+        coords_.contiguous(), points.contiguous()).reshape(*shape)
 
 
 def create_dense_spc(level, device):

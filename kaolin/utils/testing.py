@@ -315,3 +315,8 @@ def contained_torch_equal(elem, other):
     else:
         return elem == other
 
+def check_allclose(tensor, other, rtol=1e-5, atol=1e-8, equal_nan=False):
+    if not torch.allclose(tensor, other, atol, rtol, equal_nan):
+        diff_idx = torch.where(~torch.isclose(tensor, other, atol, rtol, equal_nan))
+        raise ValueError(f"Tensors are not close on indices {diff_idx}:",
+                         f"Example values: {tensor[diff_idx][:10]} vs {other[diff_idx][:10]}.")
