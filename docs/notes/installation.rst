@@ -24,7 +24,7 @@ Quick Start (Linux, Windows)
 
 .. code-block:: bash
 
-    $ pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/{TORCH_VER}_{CUDA_VER}.html
+    $ pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VER}_cu{CUDA_VER}.html
 
 .. Note::
     Replace *TORCH_VER* and *CUDA_VER* with any of the compatible options below.
@@ -58,7 +58,7 @@ For example, to install kaolin for torch 1.12.1 and CUDA 11.3:
 
     $ pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
 
-You can check https://nvidia-kaolin.s3.us-east-2.amazonaws.com to see all the wheels available.
+You can check https://nvidia-kaolin.s3.us-east-2.amazonaws.com/index.html to see all the wheels available.
 
 Installation from source
 ------------------------
