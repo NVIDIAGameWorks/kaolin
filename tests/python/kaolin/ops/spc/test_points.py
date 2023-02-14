@@ -20,6 +20,7 @@ import itertools
 
 import torch
 
+from kaolin.utils.testing import check_allclose
 from kaolin.ops.spc import points_to_morton, morton_to_points, points_to_corners, \
                            coords_to_trilinear_coeffs, quantize_points, unbatched_query, \
                            scan_octrees, unbatched_points_to_octree, generate_points, \
@@ -90,114 +91,15 @@ class TestPoints:
         ], dim=-1)
 
         level = 3
-        coords = (x / (2**level)) * 2.0 - 1.0
-        assert torch.allclose(coords_to_trilinear_coeffs(coords, points, level), expected_coeffs, atol=1e-5)
+        coords = (x / (2 ** level)) * 2.0 - 1.0
+        check_allclose(coords_to_trilinear_coeffs(coords, points, level), expected_coeffs, atol=1e-5)
 
     def test_interpolate_trilinear_forward(self, points):
         w = torch.rand(points.shape, device='cuda')
-        x = points + w
-
-        level = 3
-
-        octree = unbatched_points_to_octree(points, level)
-        length = torch.tensor([len(octree)], dtype=torch.int32)
-        _, pyramid, prefix = scan_octrees(octree, length)
-        point_hierarchy = generate_points(octree, pyramid, prefix)
-
-        pyramid = pyramid[0]
-        point_hierarchy_dual, pyramid_dual = unbatched_make_dual(point_hierarchy, pyramid)
-        trinkets, parents = unbatched_make_trinkets(point_hierarchy, pyramid, point_hierarchy_dual, pyramid_dual)
-
-        coords = (x / (2**level)) * 2.0 - 1.0
-        pidx = unbatched_query(octree, prefix, coords, level, with_parents=False)
-
-        feats = torch.rand([pyramid_dual[0, level], 16], device='cuda')
-
-        corner_feats = feats.index_select(0, trinkets[pidx].view(-1)).view(-1, 8, 16)
-        coeffs = coords_to_trilinear_coeffs(coords, points, level)
-        expected_results = (corner_feats * coeffs[..., None]).sum(-2)
-
-        results = unbatched_interpolate_trilinear(coords[:, None], pidx.int(), point_hierarchy, trinkets, feats, level)[:, 0]
-
-        assert torch.allclose(results, expected_results, rtol=1e-5, atol=1e-5)
-
-    def test_interpolate_trilinear_forward_dtypes(self, points):
-        w = torch.rand(points.shape, device='cuda')
-        x = points + w
-
-        level = 3
-
-        octree = unbatched_points_to_octree(points, level)
-        length = torch.tensor([len(octree)], dtype=torch.int32)
-        _, pyramid, prefix = scan_octrees(octree, length)
-        point_hierarchy = generate_points(octree, pyramid, prefix)
-
-        pyramid = pyramid[0]
-        point_hierarchy_dual, pyramid_dual = unbatched_make_dual(point_hierarchy, pyramid)
-        trinkets, parents = unbatched_make_trinkets(point_hierarchy, pyramid, point_hierarchy_dual, pyramid_dual)
-
-        coords = (x / (2**level)) * 2.0 - 1.0
-        pidx = unbatched_query(octree, prefix, coords, level, with_parents=False)
-
-        feats = torch.rand([pyramid_dual[0, level], 16], device='cuda')
-
-        corner_feats = feats.index_select(0, trinkets[pidx].view(-1)).view(-1, 8, 16)
-        coeffs = coords_to_trilinear_coeffs(coords, points, level)
-        expected_results = (corner_feats * coeffs[..., None]).sum(-2)
-
-        results_float = unbatched_interpolate_trilinear(coords[:, None], pidx.int(), point_hierarchy, trinkets, feats, level)[:, 0]
-        results_double = unbatched_interpolate_trilinear(coords[:, None], pidx.int(), point_hierarchy, trinkets, feats.double(), level)[:, 0]
-        results_half = unbatched_interpolate_trilinear(coords[:, None], pidx.int(), point_hierarchy, trinkets, feats.half(), level)[:, 0]
-
-        assert torch.allclose(results_float, results_double.float(), rtol=1e-4, atol=1e-4)
-        assert torch.allclose(results_float.half(), results_half, rtol=1e-3, atol=1e-3)
-
-    def test_interpolate_trilinear_backward(self, points):
-        w = torch.rand(points.shape, device='cuda')
-        x = points + w
-
-        level = 3
-
-        octree = unbatched_points_to_octree(points, level)
-        length = torch.tensor([len(octree)], dtype=torch.int32)
-        _, pyramid, prefix = scan_octrees(octree, length)
-        point_hierarchy = generate_points(octree, pyramid, prefix)
-
-        pyramid = pyramid[0]
-        point_hierarchy_dual, pyramid_dual = unbatched_make_dual(point_hierarchy, pyramid)
-        trinkets, parents = unbatched_make_trinkets(point_hierarchy, pyramid, point_hierarchy_dual, pyramid_dual)
-
-        coords = (x / (2**level)) * 2.0 - 1.0
-        pidx = unbatched_query(octree, prefix, coords, level, with_parents=False)
-
-        feats = torch.rand([pyramid_dual[0, level], 16], device='cuda')
-        feats.requires_grad_(True)
-        if feats.grad is not None:
-            feats.grad.detach()
-            feats.grad.zero_()
-
-        corner_feats = feats.index_select(0, trinkets[pidx].view(-1)).view(-1, 8, 16)
-        coeffs = coords_to_trilinear_coeffs(coords, points, level)
-        expected_results = (corner_feats * coeffs[..., None]).sum(-2)
-
-        loss = expected_results.sum()
-        loss.backward()
-        expected_grad = feats.grad.clone()
-        
-        if feats.grad is not None:
-            feats.grad.detach_()
-            feats.grad.zero_()
-
-        results = unbatched_interpolate_trilinear(coords[:, None], pidx.int(), point_hierarchy, trinkets, feats, level)[:, 0]
-        loss = results.sum()
-        loss.backward()
-        grad = feats.grad.clone()
-
-        assert torch.allclose(grad, expected_grad, rtol=1e-5, atol=1e-5)
-
-    def test_interpolate_trilinear_by_coords_backward(self, points):
-        w = torch.rand(points.shape, device='cuda')
-        x = points + w
+        x = torch.cat([
+            points + w,
+            -torch.rand((4, 3), device='cuda')
+        ], dim=0)
 
         level = 3
 
@@ -212,9 +114,124 @@ class TestPoints:
 
         coords = (x / (2 ** level)) * 2.0 - 1.0
         pidx = unbatched_query(octree, prefix, coords, level, with_parents=False)
+
+        feats = torch.rand([pyramid_dual[0, level], 16], device='cuda')
+
+        corner_feats = feats.index_select(0, trinkets[pidx].view(-1)).view(-1, 8, 16)
+        coeffs = coords_to_trilinear_coeffs(coords, points, level)
+        expected_results = (corner_feats * coeffs[..., None]).sum(-2)
+        expected_results[points.shape[0]:] = 0.
+
+        results = unbatched_interpolate_trilinear(
+            coords[:, None], pidx.int(), point_hierarchy, trinkets, feats, level
+        )[:, 0]
+
+        check_allclose(results, expected_results, rtol=1e-5, atol=1e-5)
+
+    def test_interpolate_trilinear_forward_dtypes(self, points):
+        w = torch.rand(points.shape, device='cuda')
+        x = torch.cat([
+            points + w,
+            -torch.rand((4, 3), device='cuda')
+        ], dim=0)
+
+        level = 3
+
+        octree = unbatched_points_to_octree(points, level)
+        length = torch.tensor([len(octree)], dtype=torch.int32)
+        _, pyramid, prefix = scan_octrees(octree, length)
+        point_hierarchy = generate_points(octree, pyramid, prefix)
+
+        pyramid = pyramid[0]
+        point_hierarchy_dual, pyramid_dual = unbatched_make_dual(point_hierarchy, pyramid)
+        trinkets, parents = unbatched_make_trinkets(point_hierarchy, pyramid, point_hierarchy_dual, pyramid_dual)
+
+        coords = (x / (2**level)) * 2.0 - 1.0
+        pidx = unbatched_query(octree, prefix, coords, level, with_parents=False)
+
+        feats = torch.rand([pyramid_dual[0, level], 16], device='cuda')
+
+        results_float = unbatched_interpolate_trilinear(coords[:, None], pidx.int(), point_hierarchy, trinkets, feats, level)[:, 0]
+        results_double = unbatched_interpolate_trilinear(coords[:, None], pidx.int(), point_hierarchy, trinkets, feats.double(), level)[:, 0]
+        results_half = unbatched_interpolate_trilinear(coords[:, None], pidx.int(), point_hierarchy, trinkets, feats.half(), level)[:, 0]
+
+        check_allclose(results_float, results_double.float(), rtol=1e-4, atol=1e-4)
+        check_allclose(results_float.half(), results_half, rtol=1e-3, atol=1e-3)
+
+    def test_interpolate_trilinear_backward(self, points):
+        w = torch.rand(points.shape, device='cuda')
+        x = torch.cat([
+            points + w,
+            -torch.rand((4, 3), device='cuda')
+        ], dim=0)
+
+        level = 3
+
+        octree = unbatched_points_to_octree(points, level)
+        length = torch.tensor([len(octree)], dtype=torch.int32)
+        _, pyramid, prefix = scan_octrees(octree, length)
+        point_hierarchy = generate_points(octree, pyramid, prefix)
+
+        pyramid = pyramid[0]
+        point_hierarchy_dual, pyramid_dual = unbatched_make_dual(point_hierarchy, pyramid)
+        trinkets, parents = unbatched_make_trinkets(point_hierarchy, pyramid, point_hierarchy_dual, pyramid_dual)
+
+        coords = (x / (2 ** level)) * 2.0 - 1.0
+        pidx = unbatched_query(octree, prefix, coords, level, with_parents=False)
+
+        feats = torch.rand([pyramid_dual[0, level], 16], device='cuda')
+        feats.requires_grad_(True)
+        if feats.grad is not None:
+            feats.grad.detach()
+            feats.grad.zero_()
+
+        corner_feats = feats.index_select(0, trinkets[pidx].view(-1)).view(-1, 8, 16)
+        coeffs = coords_to_trilinear_coeffs(coords, points, level)
+        expected_results = (corner_feats * coeffs[..., None]).sum(-2)
+        expected_results[points.shape[0]:] = 0.
+
+        loss = expected_results.sum()
+        loss.backward()
+        expected_grad = feats.grad.clone()
+        
+        if feats.grad is not None:
+            feats.grad.detach_()
+            feats.grad.zero_()
+
+        results = unbatched_interpolate_trilinear(
+            coords[:, None], pidx.int(), point_hierarchy, trinkets, feats, level
+        )[:, 0]
+        loss = results.sum()
+        loss.backward()
+        grad = feats.grad.clone()
+
+        check_allclose(grad, expected_grad, rtol=1e-5, atol=1e-5)
+
+    def test_interpolate_trilinear_by_coords_backward(self, points):
+        w = torch.rand(points.shape, device='cuda')
+        x = torch.cat([
+            points + w,
+            -torch.rand((4, 3), device='cuda')
+        ], dim=0)
+
+        level = 3
+
+        octree = unbatched_points_to_octree(points, level)
+        length = torch.tensor([len(octree)], dtype=torch.int32)
+        _, pyramid, prefix = scan_octrees(octree, length)
+        point_hierarchy = generate_points(octree, pyramid, prefix)
+
+        pyramid = pyramid[0]
+        point_hierarchy_dual, pyramid_dual = unbatched_make_dual(point_hierarchy, pyramid)
+        trinkets, parents = unbatched_make_trinkets(
+            point_hierarchy, pyramid, point_hierarchy_dual, pyramid_dual)
+
+        coords = (x / (2 ** level)) * 2.0 - 1.0
+        pidx = unbatched_query(octree, prefix, coords, level, with_parents=False)
         feats = torch.rand([pyramid_dual[0, level], 16], device='cuda')
 
         # w is the relative position inside a cell
+        w = w.detach()
         w.requires_grad_(True)
         if w.grad is not None:
             w.grad.detach()
@@ -222,29 +239,36 @@ class TestPoints:
 
         # (5, 8, 16)
         corner_feats = feats.index_select(0, trinkets[pidx].view(-1)).view(-1, 8, 16)
+        corner_feats[points.shape[0]:] = 0.
 
         # (5, 8)
-        expected_coeffs = torch.stack([
-            (1 - w[:, 0]) * (1 - w[:, 1]) * (1 - w[:, 2]),
-            (1 - w[:, 0]) * (1 - w[:, 1]) * w[:, 2],
-            (1 - w[:, 0]) * w[:, 1] * (1 - w[:, 2]),
-            (1 - w[:, 0]) * w[:, 1] * w[:, 2],
-            w[:, 0] * (1 - w[:, 1]) * (1 - w[:, 2]),
-            w[:, 0] * (1 - w[:, 1]) * w[:, 2],
-            w[:, 0] * w[:, 1] * (1 - w[:, 2]),
-            w[:, 0] * w[:, 1] * w[:, 2]
-        ], dim=-1)
+        expected_coeffs = torch.cat([torch.stack([
+                (1 - w[:, 0]) * (1 - w[:, 1]) * (1 - w[:, 2]),
+                (1 - w[:, 0]) * (1 - w[:, 1]) * w[:, 2],
+                (1 - w[:, 0]) * w[:, 1] * (1 - w[:, 2]),
+                (1 - w[:, 0]) * w[:, 1] * w[:, 2],
+                w[:, 0] * (1 - w[:, 1]) * (1 - w[:, 2]),
+                w[:, 0] * (1 - w[:, 1]) * w[:, 2],
+                w[:, 0] * w[:, 1] * (1 - w[:, 2]),
+                w[:, 0] * w[:, 1] * w[:, 2]
+            ], dim=-1),
+            torch.zeros((4, 8), device='cuda', dtype=torch.float)
+        ], dim=0)
         expected_coeffs = expected_coeffs.requires_grad_(True)  # prevents element0 error
         expected_results = (corner_feats * expected_coeffs[..., None]).sum(1)
+        expected_results[points.shape[0]:] = 0.
+
         loss = expected_results.sum()
         loss.backward()
-        expected_grad = w.grad.clone()
+        expected_grad = torch.zeros_like(x)
+        expected_grad[:points.shape[0]] = w.grad.clone()
 
         coords.requires_grad_(True)
         if coords.grad is not None:
             coords.grad.detach()
             coords.grad.zero_()
-        results = unbatched_interpolate_trilinear(coords[:, None], pidx.int(), point_hierarchy, trinkets, feats, level)
+        results = unbatched_interpolate_trilinear(
+            coords[:, None], pidx.int(), point_hierarchy, trinkets, feats, level)
         loss = results[:, 0].sum()
         loss.backward()
         coords_grad = coords.grad.clone()
@@ -254,7 +278,11 @@ class TestPoints:
     def test_interpolate_trilinear_by_coords_toggleable(self, points):
         # Test that features only grad does not generate coords grad
         w = torch.rand(points.shape, device='cuda')
-        x = points + w
+        x = torch.cat([
+            points + w,
+            -torch.rand((4, 3), device='cuda')
+        ], dim=0)
+
 
         level = 3
 
