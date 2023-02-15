@@ -89,6 +89,7 @@ Current Team:
 - Or Perel
 - Towaki Takikawa
 - Jiehan Wang
+- Alexander Zook
 
 Other Majors Contributors:
 
