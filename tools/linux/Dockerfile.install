@@ -34,6 +34,7 @@ RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-p
         libglvnd-dev \
 	curl \
         cmake \
+        xvfb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -60,7 +61,8 @@ RUN npm install
 
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir setuptools==58.0.0 ninja cython==0.29.20 \
-        imageio imageio-ffmpeg
+        imageio imageio-ffmpeg && \
+    pip install --no-cache-dir -r tools/viz_requirements.txt
 
 RUN cd /tmp && \
     git clone https://github.com/NVlabs/nvdiffrast && \

@@ -14,7 +14,7 @@ import subprocess
 import warnings
 
 TORCH_MIN_VER = '1.6.0'
-TORCH_MAX_VER = '1.13.0'
+TORCH_MAX_VER = '1.13.1'
 CYTHON_MIN_VER = '0.29.20'
 INCLUDE_EXPERIMENTAL = os.getenv('KAOLIN_INSTALL_EXPERIMENTAL') is not None
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
@@ -190,8 +190,11 @@ def get_requirements():
                       "to use USD related features")
     requirements.append('usd-core<22.8; python_version < "3.10"')
     if INCLUDE_EXPERIMENTAL:
-        requirements.append('tornado==6.1')
+    #    requirements.append('tornado==6.1')
         requirements.append('flask==2.0.3')
+    with open(os.path.join(cwd, 'tools', 'viz_requirements.txt'), 'r') as f:
+        for line in f.readlines():
+            requirements.append(line.strip())
     return requirements
 
 

@@ -1,0 +1,4 @@
+ipycanvas
+ipyevents
+jupyter_client<8
+pyzmq<25
