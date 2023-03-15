@@ -25,6 +25,9 @@ namespace kaolin {
 
 #ifdef WITH_CUDA
 
+at::Tensor morton_to_octree_cuda_impl(at::Tensor mortons, uint32_t level);
+at::Tensor points_to_octree_cuda_impl(at::Tensor points, uint32_t level);
+
 int scan_octrees_cuda_impl(
     at::Tensor octrees,
     at::Tensor lengths,
@@ -42,12 +45,36 @@ void generate_points_cuda_impl(
 #endif  // WITH_CUDA
 
 #define CHECK_TRIPLE(x) TORCH_CHECK(x.dim() == 2 && x.size(1) == 3, #x " must be Nx3")
-
 #define CHECK_OCTREES(x) CHECK_BYTE(x); CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 #define CHECK_POINTS(x) CHECK_SHORT(x); CHECK_TRIPLE(x); CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 #define CHECK_INPUT(x) CHECK_FLOAT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 
 using namespace at::indexing;
+
+
+at::Tensor morton_to_octree(
+    at::Tensor mortons,
+    uint32_t level) {
+#ifdef WITH_CUDA
+    
+    return morton_to_octree_cuda_impl(mortons, level);
+
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif
+}
+
+at::Tensor points_to_octree(
+    at::Tensor points,
+    uint32_t level) {
+#ifdef WITH_CUDA
+    
+    return points_to_octree_cuda_impl(points, level);
+
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif
+}
 
 std::tuple<int, at::Tensor, at::Tensor> scan_octrees_cuda(
     at::Tensor octrees,
@@ -69,14 +96,13 @@ std::tuple<int, at::Tensor, at::Tensor> scan_octrees_cuda(
   at::Tensor pyramid = at::zeros({ batch_size, 2, KAOLIN_SPC_MAX_LEVELS + 2 },
                                  at::device(at::kCPU).dtype(at::kInt));
 
-
   int level = scan_octrees_cuda_impl(octrees, lengths, num_childrens_per_node,
                                      prefix_sum, pyramid);
   return {level,
           pyramid.index({ Slice(None), Slice(None), Slice(None, level + 2) }).contiguous(),
           prefix_sum};
 #else
-  AT_ERROR("scan_octrees not built with CUDA");
+  KAOLIN_NO_CUDA_ERROR(__func__);
 #endif  // WITH_CUDA
 }
 
@@ -103,7 +129,7 @@ at::Tensor generate_points_cuda(
   generate_points_cuda_impl(octrees, points, morton, pyramid, exsum);
   return points;
 #else
-  AT_ERROR("generate_points not build with CUDA");
+  KAOLIN_NO_CUDA_ERROR(__func__);
 #endif  // WITH_CUDA
 }
 

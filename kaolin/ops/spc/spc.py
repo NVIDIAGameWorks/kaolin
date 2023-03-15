@@ -30,6 +30,8 @@ from torch.autograd import Function
 import torch
 
 from kaolin import _C
+
+import math
 from .uint8 import bits_to_uint8
 from kaolin.rep import Spc
 from .points import points_to_morton, points_to_corners

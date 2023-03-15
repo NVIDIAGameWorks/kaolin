@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21-23 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,10 +15,15 @@
 
 import torch
 
+from kaolin import _C
+
 from ..mesh.trianglemesh import _unbatched_subdivide_vertices
 from .pointcloud import _base_points_to_voxelgrids
 
-__all__ = ['trianglemeshes_to_voxelgrids']
+__all__ = [
+    'trianglemeshes_to_voxelgrids',
+    'unbatched_mesh_to_spc'
+]
 
 
 def trianglemeshes_to_voxelgrids(
@@ -103,3 +108,33 @@ def trianglemeshes_to_voxelgrids(
         voxelgrids.append(voxelgrid)
 
     return torch.cat(voxelgrids)
+
+def unbatched_mesh_to_spc(face_vertices, level):
+    r"""Convert a mesh into a :ref:`Structured Point Cloud octree<spc_octree>`.
+
+    The conversion is using a conservative rasterization process,
+    the resulting octree is fully wrapping the mesh.
+
+    .. note::
+        The mesh will be voxelized in the range :math:`[-1, 1]` of the vertices coordinate system.
+
+    Args:
+        face_vertices (torch.LongTensor):
+            The vertices indexed by faces (see :func:`kaolin.ops.mesh.index_vertices_by_faces`),
+            of shape :math:`(\text{num_faces}, 3, 3)`.
+        level (int): number of levels in the returned SPC.
+
+    Returns:
+        (torch.ByteTensor, torch.LongTensor, torch.FloatTensor):
+
+            - The generated octree, of size :math:`(\text{num_nodes})`, 
+              where :math:`\text{num_nodes}` depends on the geometry of the input mesh.
+            - The indices of the face corresponding to each voxel at the highest level, 
+              of shape :math:`(\text{num_voxels})`.
+            - The barycentric coordinates of the voxel with respect to corresponding face
+              of shape :math:`(\text{num_vertices}, 2)`.
+    """
+    if face_vertices.shape[-1] != 3:
+        raise NotImplementedError("unbatched_mesh_to_spc is only implemented for triangle meshes")
+
+    return _C.ops.conversions.mesh_to_spc_cuda(face_vertices.contiguous(), level)

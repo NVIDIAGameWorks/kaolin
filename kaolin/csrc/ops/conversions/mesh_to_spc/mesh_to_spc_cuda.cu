@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021,23 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,520 +17,451 @@
 #define CUB_NS_POSTFIX }
 #define CUB_NS_QUALIFIER ::kaolin::cub
 
+#include <ATen/ATen.h>
+
 #define CUB_STDERR
 #include <cub/device/device_scan.cuh>
 #include <cub/device/device_radix_sort.cuh>
 
+#include "math_constants.h"
+
+#include "../../spc/spc.h"
 #include "../../../spc_math.h"
+#include "../../../spc_utils.cuh"
+
 
 namespace kaolin {
 
 using namespace std;
+using namespace at::indexing;
+
+#define NUM_THREADS 64
 
 
-uint64_t GetStorageBytes(void* d_temp_storageA, morton_code* d_M0, morton_code* d_M1, uint max_total_points)
+size_t get_cub_storage_bytes_sort_pairs(
+  void* d_temp_storage, 
+  const uint64_t* d_morton_codes_in, 
+  uint64_t* d_morton_codes_out, 
+  const uint64_t* d_values_in, 
+  uint64_t* d_values_out, 
+  uint32_t num_items)
 {
-    uint64_t    temp_storage_bytesA = 0;
+    size_t    temp_storage_bytes = 0;
     CubDebugExit(
-        cub::DeviceRadixSort::SortKeys(d_temp_storageA, temp_storage_bytesA,
-                                       d_M0, d_M1, max_total_points)
+        cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
+                                        d_morton_codes_in, d_morton_codes_out, 
+                                        d_values_in, d_values_out, num_items)
     );
-    return temp_storage_bytesA;
+    return temp_storage_bytes;
 }
 
 
 __global__ void
-d_Transform2VNC(uint num, float3* pnts, float4x4 mM)
-{
-  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx < num)
-    pnts[tidx] = mul3x4(pnts[tidx], mM);
-}
-
-
-__global__ void
-d_RemoveDuplicates(uint num, morton_code* mcode, uint* info)
+d_MarkDuplicates(
+  uint num, 
+  morton_code* mcode, 
+  uint* occupancy)
 {
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num)
   {
     if (tidx == 0)
-      info[tidx] = 1;
+      occupancy[tidx] = 1;
     else
-      info[tidx] = mcode[tidx - 1] == mcode[tidx] ? 0 : 1;
+      occupancy[tidx] = mcode[tidx - 1] == mcode[tidx] ? 0 : 1;
   }
 }
 
 
 __global__ void
-d_Compactify(uint num, morton_code* mIn, morton_code* mOut, uint* info, uint* prefix_sum)
+d_Compactify(
+  uint num, 
+  morton_code* mIn, 
+  morton_code* mOut, 
+  uint* occupancy, 
+  uint* prefix_sum, 
+  uint64_t* idx_in, 
+  uint64_t* idx_out)
 {
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
-  if (tidx < num && info[tidx])
+  if (tidx < num && occupancy[tidx]) {
     mOut[prefix_sum[tidx]] = mIn[tidx];
+    idx_out[prefix_sum[tidx]] = idx_in[tidx];
+  }
+}
+
+// determine if triangle and voxel overlap w.r.t. axis using separating axis theorem
+__device__ bool 
+TriangleVoxelSAT(double3 v0, double3 v1, double3 v2, float voxelHalfSize, double3 axis)
+{
+    double d0 = dot(v0, axis);
+    double d1 = dot(v1, axis);
+    double d2 = dot(v2, axis);
+
+    double maxd = max(d0, max(d1, d2));
+    double mind = min(d0, min(d1, d2));
+
+    double r = voxelHalfSize * (abs(axis.x) + abs(axis.y) + abs(axis.z));
+
+    float fd = (float)max(-maxd, mind);
+    float fr = (float)r;
+
+    return fd <= fr;
 }
 
 
-__global__ void
-d_ProcessTriangles(uint npnts, float3* P, uint ntris, tri_index* T, float3* dl0, float3* dl1, float3* dl2, float3* dF, uchar* daxis, ushort* dW, ushort2* dpmin, uint* info)
+// determine if triangle and voxel overlap by testing against 13 critical axis
+__device__ bool 
+TriangleVoxelTest(float3 fva, float3 fvb, float3 fvc, float3 voxelcenter, float voxelHalfSize)
 {
+    double3 va = make_double3(fva.x-voxelcenter.x, fva.y-voxelcenter.y, fva.z-voxelcenter.z);
+    double3 vb = make_double3(fvb.x-voxelcenter.x, fvb.y-voxelcenter.y, fvb.z-voxelcenter.z);
+    double3 vc = make_double3(fvc.x-voxelcenter.x, fvc.y-voxelcenter.y, fvc.z-voxelcenter.z);
+
+    double3 ab = normalize(vb - va);
+    double3 bc = normalize(vc - vb);
+    double3 ca = normalize(va - vc);
+
+    //Cross ab, bc, and ca with (1, 0, 0)
+    double3 a00 = make_double3(0.0, -ab.z, ab.y);
+    double3 a01 = make_double3(0.0, -bc.z, bc.y);
+    double3 a02 = make_double3(0.0, -ca.z, ca.y);
+
+    //Cross ab, bc, and ca with (0, 1, 0)
+    double3 a10 = make_double3(ab.z, 0.0, -ab.x);
+    double3 a11 = make_double3(bc.z, 0.0, -bc.x);
+    double3 a12 = make_double3(ca.z, 0.0, -ca.x);
+
+    //Cross ab, bc, and ca with (0, 0, 1)
+    double3 a20 = make_double3(-ab.y, ab.x, 0.0);
+    double3 a21 = make_double3(-bc.y, bc.x, 0.0);
+    double3 a22 = make_double3(-ca.y, ca.x, 0.0);
+    
+    if (!TriangleVoxelSAT(va, vb, vc, voxelHalfSize, a00) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, a01) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, a02) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, a10) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, a11) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, a12) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, a20) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, a21) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, a22) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, make_double3(1, 0, 0)) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, make_double3(0, 1, 0)) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, make_double3(0, 0, 1)) ||
+        !TriangleVoxelSAT(va, vb, vc, voxelHalfSize, cross(ab, bc))) {
+        return false;
+    }
+
+    return true;
+}
+
+
+// This function will iterate over t(triangle intersection proposals) and determine if they result in an 
+// intersection. If they do, the occupancy tensor is set to number of voxels in subdivision or compaction
+__global__ void
+decide_cuda_kernel(
+  const uint num, 
+  const float3* __restrict__ face_vertices, 
+  const uint64_t* __restrict__ morton_codes, // voxel morton codes
+  const uint64_t* __restrict__ triangle_id, // face ids
+  uint* __restrict__ occupancy, 
+  const uint32_t level, 
+  const uint32_t not_done) {
+
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
-  if (tidx < ntris)
-  {
-    tri_index t = T[tidx];
+  if (tidx < num) {
+    occupancy[tidx] = 0;
 
-    float3 h0 = P[t.x];
-    float3 h1 = P[t.y];
-    float3 h2 = P[t.z];
+    uint64_t tri_idx = triangle_id[tidx];
 
-    // quantize vertex coords
-    float3 p0 = make_float3((int)(h0.x+0.5), (int)(h0.y+0.5), (int)(h0.z+0.5));
-    float3 p1 = make_float3((int)(h1.x+0.5), (int)(h1.y+0.5), (int)(h1.z+0.5));
-    float3 p2 = make_float3((int)(h2.x+0.5), (int)(h2.y+0.5), (int)(h2.z+0.5));
+    float two_level = (float)(0x1 << level);
+    float voxelSize = 2.0f/two_level;
+    float voxelHalfSize = 0.5*voxelSize;
 
-    float3 l0;
-    float3 l1;
-    float3 l2;
-    float3 F;
-    float3 q0, q1, q2;
-    uint axis;
-    // compute spanning plane
-    float4 pln = crs4(p0, p1, p2);
+    point_data gridPos = to_point(morton_codes[tidx]);
 
-    if (pln.x == 0.0f && pln.y == 0.0f && pln.z == 0.0f && pln.w == 0.0f)
-    {
-      // IMPLEMENTATION FOR 1D/2D CORNER CASEs
-      float3 pmin = make_float3(10000000.0f, 10000000.0f, 10000000.0f);
-      float3 pmax = make_float3(-10000000.0f, -10000000.0f, -10000000.0f);
+    float3 p;
+    p.x = fmaf(gridPos.x, voxelSize, voxelHalfSize-1.0f);
+    p.y = fmaf(gridPos.y, voxelSize, voxelHalfSize-1.0f);
+    p.z = fmaf(gridPos.z, voxelSize, voxelHalfSize-1.0f);
 
-      if (p0.x > pmax.x) pmax.x = p0.x;
-      if (p1.x > pmax.x) pmax.x = p1.x;
-      if (p2.x > pmax.x) pmax.x = p2.x;
+    if (TriangleVoxelTest(face_vertices[3*tri_idx], face_vertices[3*tri_idx+1], face_vertices[3*tri_idx+2], p, voxelHalfSize))
+      occupancy[tidx] = not_done ? 8 : 1;
 
-      if (p0.y > pmax.y) pmax.y = p0.y;
-      if (p1.y > pmax.y) pmax.y = p1.y;
-      if (p2.y > pmax.y) pmax.y = p2.y;
+  }
+}
 
-      if (p0.z > pmax.z) pmax.z = p0.z;
-      if (p1.z > pmax.z) pmax.z = p1.z;
-      if (p2.z > pmax.z) pmax.z = p2.z;
 
-      if (p0.x < pmin.x) pmin.x = p0.x;
-      if (p1.x < pmin.x) pmin.x = p1.x;
-      if (p2.x < pmin.x) pmin.x = p2.x;
+// This function will subdivide input voxel to out voxels 
+__global__ void
+subdivide_cuda_kernel(
+    const uint num, 
+    const uint64_t* __restrict__ morton_codes_in, // input voxel morton codes
+    const uint64_t* __restrict__ triangle_id_in, // input face ids
+    uint64_t* __restrict__ morton_codes_out, // output voxel morton codes
+    uint64_t* __restrict__ triangle_id_out, // output face ids
+    const uint* __restrict__ occupancy,  
+    const uint* __restrict__ prefix_sum) {
 
-      if (p0.y < pmin.y) pmin.y = p0.y;
-      if (p1.y < pmin.y) pmin.y = p1.y;
-      if (p2.y < pmin.y) pmin.y = p2.y;
+  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
-      if (p0.z < pmin.z) pmin.z = p0.z;
-      if (p1.z < pmin.z) pmin.z = p1.z;
-      if (p2.z < pmin.z) pmin.z = p2.z;
+  if (tidx < num && occupancy[tidx]) {
+    uint64_t triangle_id = triangle_id_in[tidx]; //triangle id
 
-      if (pmin.x == pmax.y && pmin.y == pmax.y && pmin.z == pmax.z)
-      {
-        // IMPLEMENTATION FOR 1D CORNER CASE
-        q0 = q1 = q2 = pmin;
-        l0 = l1 = l2 = -1.0f*pmin;
-        F = make_float3(0.0f, 0.0f, pmin.z);
-        axis = 2;
-      }
-      else
-      {
-        // IMPLEMENTATION FOR 2D CORNER CASE
-        float3 diff = pmax - pmin;
-        if (diff.x < diff.y)
-          if (diff.x < diff.z)
-            axis = 0; //x
-          else
-            axis = 2; //z
-        else
-          if (diff.y < diff.z)
-            axis = 1; //y
-          else
-            axis = 2; //z
+    point_data p_in = to_point(morton_codes_in[tidx]);
+    point_data p_out = make_point_data(2 * p_in.x, 2 * p_in.y, 2*p_in.z);
 
-        switch (axis)
-        {
-        case 0:
-          q0 = make_float3(pmin.y, pmin.z, 1.0f);
-          q1 = make_float3(pmax.y, pmax.z, 1.0f);
-          q2 = q1;
+    uint base_idx = prefix_sum[tidx];
 
-          if (diff.y != 0.0)
-            F = make_float3(diff.x/diff.y, 0.0f, (pmin.x*pmax.y-pmin.y*pmax.x)/diff.y);
-          else
-            F = make_float3(0.0f, diff.x/diff.z, (pmin.x*pmax.z-pmin.z*pmax.x)/diff.z);
+    for (uint i = 0; i < 8; i++) {
+      point_data p = make_point_data(p_out.x+(i>>2), p_out.y+((i>>1)&0x1), p_out.z+(i&0x1));
+      morton_codes_out[base_idx] = to_morton(p);
+      triangle_id_out[base_idx] = triangle_id;
+      base_idx++;
+    }
+  }
+}
 
-          break;
-        case 1:
-          q0 = make_float3(pmin.z, pmin.x, 1.0f);
-          q1 = make_float3(pmax.z, pmax.x, 1.0f);
-          q2 = q1;
 
-          if (diff.z != 0.0)
-            F = make_float3(diff.y/diff.z, 0.0f, (pmin.y*pmax.z-pmin.z*pmax.y)/diff.z);
-          else
-            F = make_float3(0.0f, diff.y/diff.x, (pmin.y*pmax.x-pmin.x*pmax.y)/diff.x);
+// compacify input buffers
+__global__ void
+compactify_cuda_kernel(
+    const uint num, 
+    const uint64_t* __restrict__ morton_codes_in, 
+    const uint64_t* __restrict__ triangle_id_in, 
+    uint64_t* __restrict__ morton_codes_out, 
+    uint64_t* __restrict__ triangle_id_out, 
+    const uint* __restrict__ occupancy,
+    const uint* __restrict__ prefix_sum) {
 
-          break;
-        case 2:
-          q0 = make_float3(pmin.x, pmin.y, 1.0f);
-          q1 = make_float3(pmax.x, pmax.y, 1.0f);
-          q2 = q1;
+  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
-          if (diff.x != 0.0)
-            F = make_float3(diff.z/diff.x, 0.0f, (pmin.z*pmax.x-pmin.x*pmax.z)/diff.x);
-          else
-            F = make_float3(0.0f, diff.z/diff.y, (pmin.z*pmax.y-pmin.y*pmax.z)/diff.y);
+  if (tidx < num && occupancy[tidx]) { 
+    morton_codes_out[prefix_sum[tidx]] = morton_codes_in[tidx];
+    triangle_id_out[prefix_sum[tidx]] = triangle_id_in[tidx];
+  }
+}
 
-          break;
-        }
-        // find bounding lines
-        l1 = -1.0f*crs3(q0, q1);
-        l0 = -1.0f*crs3(q1, q0);
-        l2 = l1;
-      }
+
+// compute 3x3 matrix that maps 3d cartesian coords to 3d barycentriuc coods, w.r.t a given triangle
+__global__ void
+d_ComputeBaryCoords(
+    uint num, 
+    const float3* __restrict__ face_vertices,
+    const uint64_t* __restrict__ morton_codes, 
+    const uint64_t* __restrict__ triangle_id, 
+    float2* barycoords,
+    const uint32_t level) {
+  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
+
+  if (tidx < num) {
+    float two_level = (float)(0x1 << level);
+    float voxelSize = 2.0f / two_level;
+    float voxelHalfSize = 0.5 * voxelSize;
+
+    point_data gridPos = to_point(morton_codes[tidx]);
+
+    float3 p; // voxel centriod
+    p.x = fmaf(gridPos.x, voxelSize, voxelHalfSize-1.0f);
+    p.y = fmaf(gridPos.y, voxelSize, voxelHalfSize-1.0f);
+    p.z = fmaf(gridPos.z, voxelSize, voxelHalfSize-1.0f);
+
+
+    uint64_t face_id = triangle_id[tidx];
+
+    float3 v1 = face_vertices[face_id * 3 + 0];
+    float3 v2 = face_vertices[face_id * 3 + 1];
+    float3 v3 = face_vertices[face_id * 3 + 2];
+    float3 closest_p = triangle_closest_point(v1, v2, v3, p);
+    float delta = dot2(cross(v1 - v2, v1 - v3));
+    float3 d1 = closest_p - v1;
+    float3 d2 = closest_p - v2;
+    float3 d3 = closest_p - v3;
+    float da = sqrtf(dot2(cross(d2, d3)));
+    float db = sqrtf(dot2(cross(d1, d3)));
+    float dc = sqrtf(dot2(cross(d1, d2)));
+    float3 b = make_float3(da * rsqrtf(delta),
+                           db * rsqrtf(delta),
+                           dc * rsqrtf(delta));
+    // handle negative barycentric coordinates
+    if (b.x < 0.0f) {
+      b.x = 0.;
+    }
+
+    if (b.y < 0.0f) {
+      b.y = 0.;
+    }
+
+    if (b.z < 0.0f) {
+      b.z = 0.;
+    }
+    b *= 1. / (b.x + b.y + b.z); // normalize to x+y+z==1 plane
+    
+    barycoords[tidx] = make_float2(b.x, b.y);
+  }
+}
+
+
+std::vector<at::Tensor> mesh_to_spc_cuda_impl(
+    at::Tensor face_vertices, 
+    uint target_level) {
+  // number of triangles, and indices pointer 
+  int ntris = face_vertices.size(0);
+ 
+  // allocate local GPU storage
+  at::Tensor morton_codes0 = at::zeros({ntris}, face_vertices.options().dtype(at::kLong));
+  at::Tensor triangle_id0 = at::arange(ntris, face_vertices.options().dtype(at::kLong));
+  at::Tensor morton_codes1;
+  at::Tensor triangle_id1;
+
+  at::Tensor occupancy;
+  at::Tensor prefix_sum;
+  at::Tensor temp_storage;
+ 
+  uint64_t temp_storage_bytes;
+
+  uint next_cnt, buffer = 0; 
+  uint curr_cnt = ntris;
+  for (uint32_t l = 0; l <= target_level; l++) {
+
+    occupancy = at::empty({curr_cnt + 1}, face_vertices.options().dtype(at::kInt));
+    prefix_sum = at::empty({curr_cnt + 1}, face_vertices.options().dtype(at::kInt));
+
+    // Do the proposals hit?
+    decide_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>>(
+      curr_cnt, 
+      reinterpret_cast<float3*>(face_vertices.data_ptr<float>()), 
+      reinterpret_cast<uint64_t*>(morton_codes0.data_ptr<int64_t>()), 
+      reinterpret_cast<uint64_t*>(triangle_id0.data_ptr<int64_t>()), 
+      reinterpret_cast<uint*>(occupancy.data_ptr<int>()), l, target_level - l);
+
+    // set up memory for DeviceScan calls
+    temp_storage_bytes = get_cub_storage_bytes(NULL, reinterpret_cast<uint*>(occupancy.data_ptr<int>()), 
+      reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), curr_cnt+1);
+    temp_storage = at::empty({(int64_t)temp_storage_bytes}, face_vertices.options().dtype(at::kByte));
+
+    CubDebugExit(cub::DeviceScan::ExclusiveSum(
+      (void*)temp_storage.data_ptr<uint8_t>(), temp_storage_bytes, 
+      reinterpret_cast<uint*>(occupancy.data_ptr<int>()), 
+      reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), curr_cnt+1)); //start sum on second element
+    cudaMemcpy(&next_cnt, reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()) + curr_cnt, 
+               sizeof(uint), cudaMemcpyDeviceToHost);
+
+    if (next_cnt == 0) {
+      at::Tensor octree = at::empty({0}, face_vertices.options().dtype(at::kByte));
+      at::Tensor face_ids = at::empty({0}, face_vertices.options().dtype(at::kLong));
+      at::Tensor bary_coords = at::zeros({0, 3}, face_vertices.options().dtype(at::kFloat));
+      return { octree, face_ids, bary_coords };
+    }
+    else {
+      // allocate local GPU storage
+      morton_codes1 = at::empty({next_cnt}, face_vertices.options().dtype(at::kLong));
+      triangle_id1 = at::empty({next_cnt}, face_vertices.options().dtype(at::kLong));
+    }
+
+    // Subdivide if more levels remain, repeat
+    if (l < target_level) {
+      subdivide_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>>(
+        curr_cnt, 
+        reinterpret_cast<uint64_t*>(morton_codes0.data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(triangle_id0.data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(morton_codes1.data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(triangle_id1.data_ptr<int64_t>()), 
+        reinterpret_cast<uint*>(occupancy.data_ptr<int>()), 
+        reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()));
     } else {
-      // find coordinate with largest normal component
-      if (fabs(pln.x) > fabs(pln.y))
-        if (fabs(pln.x) > fabs(pln.z))
-          axis = 0; //x
-        else
-          axis = 2; //z
-      else
-        if (fabs(pln.y) > fabs(pln.z))
-          axis = 1; //y
-        else
-          axis = 2; //z
-
-      // project to 2d plane with largest normal component
-      float sign = 0.0f;
-
-      switch (axis)
-      {
-      case 0:
-        q0 = make_float3(p0.y, p0.z, 1.0f);
-        q1 = make_float3(p1.y, p1.z, 1.0f);
-        q2 = make_float3(p2.y, p2.z, 1.0f);
-
-        sign = pln.x > 0.0f ? 1.0f : -1.0f;
-        F = make_float3(pln.y, pln.z, pln.w);
-        F *= -1.0f/pln.x;
-        break;
-      case 1:
-        q0 = make_float3(p0.z, p0.x, 1.0f);
-        q1 = make_float3(p1.z, p1.x, 1.0f);
-        q2 = make_float3(p2.z, p2.x, 1.0f);
-
-        sign = pln.y > 0.0f ? 1.0f : -1.0f;
-        F = make_float3(pln.z, pln.x, pln.w);
-        F *= -1.0f/pln.y;
-        break;
-      case 2:
-        q0 = make_float3(p0.x, p0.y, 1.0f);
-        q1 = make_float3(p1.x, p1.y, 1.0f);
-        q2 = make_float3(p2.x, p2.y, 1.0f);
-
-        sign = pln.z > 0.0f ? 1.0f : -1.0f;
-        F = make_float3(pln.x, pln.y, pln.w);
-        F *= -1.0f/pln.z;
-        break;
-      }
-
-      // find bounding lines
-      l0 = sign*crs3(q1, q2);
-      l1 = sign*crs3(q2, q0);
-      l2 = sign*crs3(q0, q1);
+      compactify_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>>(
+        curr_cnt, 
+        reinterpret_cast<uint64_t*>(morton_codes0.data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(triangle_id0.data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(morton_codes1.data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(triangle_id1.data_ptr<int64_t>()), 
+        reinterpret_cast<uint*>(occupancy.data_ptr<int>()), 
+        reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()));
     }
 
-    // enlarge lines for conservative rasterization
-    l0.z += (l0.x>0.0f?-0.5f:0.5f)*l0.x + (l0.y>0.0f?-0.5f:0.5f)*l0.y;
-    l1.z += (l1.x>0.0f?-0.5f:0.5f)*l1.x + (l1.y>0.0f?-0.5f:0.5f)*l1.y;
-    l2.z += (l2.x>0.0f?-0.5f:0.5f)*l2.x + (l2.y>0.0f?-0.5f:0.5f)*l2.y;
-
-    // find bound rectangle
-    ushort2 pmin = make_ushort2(0xffff,0xffff);
-    ushort2 pmax = make_ushort2(0, 0);
-
-    if (q0.x < pmin.x) pmin.x = q0.x;
-    if (q0.y < pmin.y) pmin.y = q0.y;
-    if (q1.x < pmin.x) pmin.x = q1.x;
-    if (q1.y < pmin.y) pmin.y = q1.y;
-    if (q2.x < pmin.x) pmin.x = q2.x;
-    if (q2.y < pmin.y) pmin.y = q2.y;
-
-    if (q0.x > pmax.x) pmax.x = q0.x;
-    if (q0.y > pmax.y) pmax.y = q0.y;
-    if (q1.x > pmax.x) pmax.x = q1.x;
-    if (q1.y > pmax.y) pmax.y = q1.y;
-    if (q2.x > pmax.x) pmax.x = q2.x;
-    if (q2.y > pmax.y) pmax.y = q2.y;
-
-    ushort W = pmax.x - pmin.x + 1;
-    ushort H = pmax.y - pmin.y + 1;
-
-    dpmin[tidx] = pmin;
-
-    info[tidx] = W*H;
-    dW[tidx] = W;
-
-    daxis[tidx] = axis;
-    dl0[tidx] = l0;
-    dl1[tidx] = l1;
-    dl2[tidx] = l2;
-    dF[tidx] = F;
+    morton_codes0 = morton_codes1;
+    triangle_id0 = triangle_id1;
+    curr_cnt = next_cnt;
   }
+
+  // allocate local GPU storage
+  morton_codes1 = at::empty({curr_cnt}, face_vertices.options().dtype(at::kLong));
+  triangle_id1 = at::empty({curr_cnt}, face_vertices.options().dtype(at::kLong));
+
+  // set up memory for DeviceScan calls
+  temp_storage_bytes = get_cub_storage_bytes_sort_pairs(
+    NULL, 
+    reinterpret_cast<uint64_t*>(morton_codes0.data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(morton_codes1.data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(triangle_id0.data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(triangle_id1.data_ptr<int64_t>()), curr_cnt);
+  temp_storage = at::empty({(int64_t)temp_storage_bytes}, face_vertices.options().dtype(at::kByte));
+
+  CubDebugExit(cub::DeviceRadixSort::SortPairs(
+    (void*)temp_storage.data_ptr<uint8_t>(), 
+    temp_storage_bytes, 
+    reinterpret_cast<uint64_t*>(morton_codes0.data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(morton_codes1.data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(triangle_id0.data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(triangle_id1.data_ptr<int64_t>()), curr_cnt));
+
+  occupancy = at::empty({curr_cnt+1}, face_vertices.options().dtype(at::kInt));
+  prefix_sum = at::empty({curr_cnt+1}, face_vertices.options().dtype(at::kInt));
+
+  // set first element to zero
+  CubDebugExit(cudaMemcpy(reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), &buffer, sizeof(uint), cudaMemcpyHostToDevice));
+
+  // Mark boundaries of unique  
+  d_MarkDuplicates << <(curr_cnt + 63) / 64, 64 >> > (
+    curr_cnt, 
+    reinterpret_cast<uint64_t*>(morton_codes1.data_ptr<int64_t>()), 
+    reinterpret_cast<uint*>(occupancy.data_ptr<int>()));
+
+  // set up memory for DeviceScan calls
+  temp_storage_bytes = get_cub_storage_bytes(
+    NULL, 
+    reinterpret_cast<uint*>(occupancy.data_ptr<int>()), 
+    reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), curr_cnt+1);
+  temp_storage = at::empty({(int64_t)temp_storage_bytes}, face_vertices.options().dtype(at::kByte));
+
+  uint psize;
+  cub::DeviceScan::ExclusiveSum(
+    (void*)temp_storage.data_ptr<uint8_t>(), 
+    temp_storage_bytes, 
+    reinterpret_cast<uint*>(occupancy.data_ptr<int>()), 
+    reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), curr_cnt+1);
+  CubDebugExit(cudaMemcpy(&psize, reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()) + curr_cnt, sizeof(uint), cudaMemcpyDeviceToHost));
+
+  d_Compactify << <(curr_cnt + 63) / 64, 64 >> > (
+    curr_cnt, 
+    reinterpret_cast<uint64_t*>(morton_codes1.data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(morton_codes0.data_ptr<int64_t>()), 
+    reinterpret_cast<uint*>(occupancy.data_ptr<int>()), 
+    reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), 
+    reinterpret_cast<uint64_t*>(triangle_id1.data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(triangle_id0.data_ptr<int64_t>()));
+  at::Tensor bary_coords = at::zeros({psize, 2}, face_vertices.options().dtype(at::kFloat));
+
+  d_ComputeBaryCoords << <(psize + 63) / 64, 64 >> > (
+    psize,
+    reinterpret_cast<float3*>(face_vertices.data_ptr<float>()),
+    reinterpret_cast<uint64_t*>(morton_codes0.data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(triangle_id0.data_ptr<int64_t>()), 
+    reinterpret_cast<float2*>(bary_coords.data_ptr<float>()), target_level);
+
+  morton_codes1 = morton_codes0.index({Slice(None, psize)}).contiguous();   
+  triangle_id1 = triangle_id0.index({Slice(None, psize)}).contiguous();
+
+  at::Tensor octree = morton_to_octree(morton_codes1, target_level);
+
+  return { octree, triangle_id1, bary_coords };
 }
 
 
-__global__ void
-d_ProcessVoxels(uint nvxls, float3* l0, float3* l1, float3* l2, float3* F, uchar* axis, ushort* W, ushort2* pmin, uint* info, uint* psum, uint* PrefixSum, uint* Info, morton_code* M)
-{
-  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx < nvxls)
-  {
-    uint t = PrefixSum[tidx];
-    uint pid = tidx - (psum[t] - info[t]);
-
-    float x = pmin[t].x + (pid % W[t]);
-    float y = pmin[t].y + (pid / W[t]);
-    float3 p = make_float3(x, y, 1.0f);
-
-    bool t0 = dot(p, l0[t]) < 0.0f;
-    bool t1 = dot(p, l1[t]) < 0.0f;
-    bool t2 = dot(p, l2[t]) < 0.0f;
-
-    short z = (short)(dot(p, F[t]) + 0.5f);
-
-    point_data v;
-    if (t0 & t1 & t2)
-    {
-      switch (axis[t])
-      {
-      case 0:
-        v = make_point_data(z, x, y);
-        break;
-      case 1:
-        v = make_point_data(y, z, x);
-        break;
-      case 2:
-        v = make_point_data(x, y, z);
-        break;
-      }
-
-      M[tidx] = to_morton(v);
-      Info[tidx] = 1;
-    } else {
-      Info[tidx] = 0;
-    }
-  }
-}
-
-
-__global__ void
-d_prepTriTable(uint num, uint* prefix_sum, uint* info)
-{
-  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx < num)
-    atomicAdd(info + prefix_sum[tidx], 1);
-}
-
-
-__global__ void d_CommonParent(
-  const uint Psize,
-  const morton_code *d_Mdata,
-  uint *d_Info)
-{
-  int tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx < Psize)
-  {
-    if (tidx == 0)
-      d_Info[tidx] = 1;
-    else
-      d_Info[tidx] = (d_Mdata[tidx - 1] >> 3) == (d_Mdata[tidx] >> 3) ? 0 : 1;
-  }
-}
-
-
-__global__ void d_CompactifyNodes(
-  const uint Psize,
-  const uint *d_Info,
-  const uint *d_PrefixSum,
-  morton_code *d_Min,
-  morton_code *d_Mout,
-  uchar *O)
-{
-  int tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx < Psize)
-  {
-    if (d_Info[tidx] != 0)
-    {
-      uint IdxOut = d_PrefixSum[tidx]-1;
-      d_Mout[IdxOut] = d_Min[tidx] >> 3;
-
-      uint code = 0;
-      do
-      {
-        uint child_idx = static_cast<uint>(d_Min[tidx] & 0x7);
-        code |= 0x1 << child_idx;
-        tidx++;
-      } while (tidx != Psize && d_Info[tidx] != 1);
-
-      O[IdxOut] = code;
-    }
-  }
-}
-
-
-__global__ void MortonToPointa(
-  const uint     Psize,
-  morton_code*  Mdata,
-  point_data*    Pdata)
-{
-  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx < Psize)
-    Pdata[tidx] = to_point(Mdata[tidx]);
-}
-
-__global__ void PointToMorton(
-  const uint    Psize,
-  morton_code*  Mdata,
-  point_data*   Pdata)
-{
-  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx < Psize)
-    Mdata[tidx] = to_morton(Pdata[tidx]);
-}
-
-// Uses the morton buffer to construct an octree. It is the user's responsibility to allocate
-// space for these zero-init buffers, and for the morton buffer, to allocate the buffer from the back 
-// with the occupied positions.
-uint ConstructOctree(morton_code* d_morton_buffer, uint* d_info, uint* d_psum, 
-    void* d_temp_storage, uint64_t temp_storage_bytes, uchar* d_octree, int* h_pyramid, uint psize, uint level) {
-    
-
-    h_pyramid[level] = psize;
-    uint curr, prev = psize;
-    morton_code* mroot = d_morton_buffer+KAOLIN_SPC_MAX_POINTS-psize;
-    uchar* oroot = d_octree+KAOLIN_SPC_MAX_OCTREE;
-    
-    // Start from deepest layer
-    for (uint i=level; i>0; i--) {
-        // Mark boundaries of morton code octants
-        d_CommonParent << <(prev + 1023) / 1024, 1024 >> >(prev, mroot, d_info);
-        // Count number of allocated nodes in layer above
-        cub::DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_info, d_psum, prev);
-        cudaMemcpy(&curr, d_psum+prev-1, sizeof(uint), cudaMemcpyDeviceToHost);
-        h_pyramid[i-1] = curr;
-
-        // Move pointer back
-        oroot -= curr;
-        mroot -= curr;
-
-        // Populate octree & next level of morton codes
-        d_CompactifyNodes << <(prev + 1023) / 1024, 1024 >> >(prev, d_info, d_psum, mroot+curr, mroot, oroot);
-        prev = curr;
-    }
-
-    // Populate pyramid
-    int* h_pyramidsum = h_pyramid + level + 2;
-    h_pyramidsum[0] = 0;
-    for (uint i=0; i<=level; i++)
-    {
-        h_pyramidsum[i+1] = h_pyramidsum[i] + h_pyramid[i];
-    }
-    uint osize = h_pyramidsum[level];
-
-    return osize;
-}
-
-uint PointToOctree(point_data* d_points, morton_code* d_morton, uint* d_info, uint* d_psum, 
-    void* d_temp_storage, uint64_t temp_storage_bytes, uchar* d_octree, int* h_pyramid, 
-    uint psize, uint level) {
-    
-    // Populate from the back
-    morton_code* mroot = d_morton+KAOLIN_SPC_MAX_POINTS-psize;
-    PointToMorton<<<(psize+1023)/1024, 1024>>>(psize, mroot, d_points);
-
-    return ConstructOctree(d_morton, d_info, d_psum, d_temp_storage, temp_storage_bytes, 
-        d_octree, h_pyramid, psize, level);
-}
-
-uint VoxelizeGPU(uint npnts, float3* d_Pnts, uint ntris, tri_index* d_Tris, uint Level,
-    point_data* d_P, morton_code* d_M0, morton_code* d_M1, 
-    uint* d_Info, uint* d_PrefixSum, uint* d_info, uint* d_psum,
-    float3* d_l0, float3* d_l1, float3* d_l2, float3* d_F,
-    uchar* d_axis, ushort* d_W, ushort2* d_pmin,
-    void* d_temp_storageA, uint64_t temp_storage_bytesA, uchar* d_Odata, int* h_Pyramid) {
-
-    // Transform vertices to [0, 2^l]
-    float g = (0x1<<Level) - 1.0f;
-    float4x4 mM = make_float4x4(g, 0.0f, 0.0f, 0.0f,
-                     0.0f, g, 0.0f, 0.0f,
-                     0.0f, 0.0f, g, 0.0f,
-                     0.0f, 0.0f, 0.0f, 1.0f);
-    d_Transform2VNC<<<(npnts + 63) / 64, 64>>>(npnts, d_Pnts, mM);
-
-    // Rasterize triangles onto the 3D voxel grid
-    d_ProcessTriangles<<<(ntris + 63) / 64, 64>>>(npnts, d_Pnts, ntris, d_Tris,
-                                                  d_l0, d_l1, d_l2, d_F, d_axis,
-                                                  d_W, d_pmin, d_info);
-    
-    // Info contains triangle ID -> # rasterized voxels. 
-    // Count total # rasterized voxels and flush the buffer.
-    uint cnt;
-    cub::DeviceScan::InclusiveSum(d_temp_storageA, temp_storage_bytesA, d_info, d_psum, ntris);
-    cudaMemcpy(&cnt, d_psum + ntris - 1, sizeof(uint), cudaMemcpyDeviceToHost);
-    cudaMemset(d_Info, 0, cnt+1);
-
-    // Mark boundaries of packed voxels. Some boundaries will have duplciate triangles.
-    d_prepTriTable << <(ntris + 63) / 64, 64 >> > (ntris, d_psum, d_Info);
-    
-    // Create voxel->triangle ID correspondences.
-    cub::DeviceScan::InclusiveSum(d_temp_storageA, temp_storage_bytesA, d_Info, d_PrefixSum, cnt+1);
-
-    // Fill morton buffer with voxels
-    d_ProcessVoxels << <(cnt + 63) / 64, 64 >> > (cnt, d_l0, d_l1, d_l2, d_F, d_axis, d_W, d_pmin, d_info, d_psum, d_PrefixSum, d_Info, d_M0);
-    uint mcnt;
-
-    // Sort mortons, find unique, and fill the buffer (d_M1)
-    // d_M1 = d_M0[d_Info]
-    cub::DeviceScan::ExclusiveSum(d_temp_storageA, temp_storage_bytesA, d_Info, d_PrefixSum, cnt+1);
-    cudaMemcpy(&mcnt, d_PrefixSum + cnt, sizeof(uint), cudaMemcpyDeviceToHost);
-    d_Compactify << <(cnt + 63) / 64, 64 >> > (cnt, d_M0, d_M1, d_Info, d_PrefixSum);
-
-    // d_M0 = d_M1.sort()
-    CubDebugExit(cub::DeviceRadixSort::SortKeys(d_temp_storageA, temp_storage_bytesA, d_M1, d_M0, mcnt));
-
-    // Mark boundaries of unique  
-    d_RemoveDuplicates << <(mcnt + 63) / 64, 64 >> > (mcnt, d_M0, d_Info);
-
-    // d_M1[-psize:] = d_M0[d_Info]
-    uint psize;
-    cub::DeviceScan::ExclusiveSum(d_temp_storageA, temp_storage_bytesA, d_Info, d_PrefixSum, mcnt+1);
-    cudaMemcpy(&psize, d_PrefixSum + mcnt, sizeof(uint), cudaMemcpyDeviceToHost);
-    d_Compactify << <(mcnt + 63) / 64, 64 >> > (mcnt, d_M0, d_M1+KAOLIN_SPC_MAX_POINTS-psize, d_Info, d_PrefixSum);
-    // printf("cnt= %d, mcnt= %d, psize= %d\n", cnt, mcnt, psize);
-    
-    uint osize = ConstructOctree(d_M1, d_Info, d_PrefixSum, d_temp_storageA, temp_storage_bytesA, 
-                                 d_Odata, h_Pyramid, psize, Level);
-
-    // MortonToPointa << <(totalPoints + 1023) / 1024, 1024 >> >(totalPoints, M, d_P);
-    CubDebugExit(cudaGetLastError());
-
-    return osize;
-}
 
 }  // namespace kaolin
-
