@@ -1,6 +1,3 @@
-#ARG CUDA_VERSION=11.3.1
-#ARG CUDNN_VERSION=8
-#FROM nvidia/cuda:${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel-ubuntu18.04
 FROM ubuntu:18.04
 # used for cross-compilation in docker build
 #
@@ -9,7 +6,6 @@ ENV PYTHON_VERSION=${PYTHON_VERSION}
 ARG PYTORCH_VERSION=1.10.2
 ENV PYTORCH_VERSION=${PYTORCH_VERSION}
 
-#RUN sed -i -e 's|^deb http://[^.]*[.]ubuntu[.]com/ubuntu|deb  https://urm.nvidia.com/artifactory/ubuntu-remote|' /etc/apt/sources.list \
 RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-peer.conf \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated ca-certificates \

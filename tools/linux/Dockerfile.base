@@ -7,9 +7,6 @@ ENV PYTHON_VERSION=${PYTHON_VERSION}
 ARG PYTORCH_VERSION=1.13.1
 ENV PYTORCH_VERSION=${PYTORCH_VERSION}
 
-# Note: removing this line as it seems to cause a lot of problems.
-RUN sed -i -e 's|^deb http://[^.]*[.]ubuntu[.]com/ubuntu|deb  https://urm.nvidia.com/artifactory/ubuntu-remote|' /etc/apt/sources.list
-
 RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-peer.conf \
     && if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
         rm /etc/apt/sources.list.d/cuda.list; \

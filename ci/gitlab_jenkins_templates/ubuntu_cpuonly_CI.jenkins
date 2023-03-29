@@ -21,7 +21,7 @@ spec:
       - name: DOCKER_HOST
         value: tcp://localhost:2375
   - name: docker-daemon
-    image: docker:19.03.1-dind
+    image: docker:20.10.23-dind
     securityContext:
       privileged: true
     env:
