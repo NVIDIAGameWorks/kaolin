@@ -16,8 +16,6 @@ WORKDIR /kaolin
 
 COPY . .
 
-RUN sed -i -e 's|^deb http://[^.]*[.]ubuntu[.]com/ubuntu|deb  https://urm.nvidia.com/artifactory/ubuntu-remote|' /etc/apt/sources.list
-
 RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-peer.conf \
     && apt-get -y update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated ca-certificates \
