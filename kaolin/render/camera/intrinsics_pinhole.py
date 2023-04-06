@@ -671,4 +671,3 @@ class PinholeIntrinsics(CameraIntrinsics):
         fov_ratio = self.fov_x / self.fov_y
         self.fov_y -= amount
         self.fov_x = self.fov_y * fov_ratio  # Make sure the view is not distorted
-

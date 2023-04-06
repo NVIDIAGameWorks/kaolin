@@ -29,6 +29,7 @@ def run_apidoc(_):
             "setup.py",
             "**.so",
             "kaolin/version.py",
+            "kaolin/version.txt",
             "kaolin/ops/conversions/pointcloud.py",
             "kaolin/ops/conversions/sdf.py",
             "kaolin/ops/conversions/trianglemesh.py",
@@ -51,6 +52,7 @@ def run_apidoc(_):
             "kaolin/render/spc/raytrace.py",
             "kaolin/rep/spc.py",
             "kaolin/visualize/timelapse.py",
+            "kaolin/visualize/ipython.py",
             "kaolin/framework/*",
             "kaolin/render/camera/camera.py",
             "kaolin/render/camera/coordinates.py",
@@ -70,9 +72,8 @@ def run_apidoc(_):
         "-d", "2",
         "--templatedir",
         DOCS_MODULE_PATH,
-        "-o",
-        DOCS_MODULE_PATH,
-        KAOLIN_ROOT,
+        "-o", DOCS_MODULE_PATH,
+        os.path.join(KAOLIN_ROOT, "kaolin"),
         *EXCLUDE_PATHS
     ]
     apidoc.main(argv)

@@ -906,8 +906,11 @@ class TestCameraExtrinsicsRotate:
 class TestCameraExtrinsicsMoveCam:
 
     def test_move_right(self, device, dtype, backend, cam_pos_data):
-        cam_pos, cam_dir, view_matrix = cam_pos_data['cam_pos'], cam_pos_data['cam_dir'], cam_pos_data['view_matrix']
-        extrinsics = CameraExtrinsics.from_camera_pose(cam_pos, cam_dir, dtype=dtype, device=device, backend=backend)
+        cam_pos = cam_pos_data['cam_pos']
+        cam_dir = cam_pos_data['cam_dir']
+        view_matrix = cam_pos_data['view_matrix']
+        extrinsics = CameraExtrinsics.from_camera_pose(
+            cam_pos, cam_dir, dtype=dtype, device=device, backend=backend)
         amount = 1.0
         extrinsics.move_right(amount)
 
@@ -917,8 +920,11 @@ class TestCameraExtrinsicsMoveCam:
         assert_view_matrix(extrinsics.view_matrix(), expected_mat)
 
     def test_move_up(self, device, dtype, backend, cam_pos_data):
-        cam_pos, cam_dir, view_matrix = cam_pos_data['cam_pos'], cam_pos_data['cam_dir'], cam_pos_data['view_matrix']
-        extrinsics = CameraExtrinsics.from_camera_pose(cam_pos, cam_dir, dtype=dtype, device=device, backend=backend)
+        cam_pos = cam_pos_data['cam_pos']
+        cam_dir = cam_pos_data['cam_dir']
+        view_matrix = cam_pos_data['view_matrix']
+        extrinsics = CameraExtrinsics.from_camera_pose(
+            cam_pos, cam_dir, dtype=dtype, device=device, backend=backend)
         amount = 1.0
         extrinsics.move_up(amount)
 
@@ -928,8 +934,11 @@ class TestCameraExtrinsicsMoveCam:
         assert_view_matrix(extrinsics.view_matrix(), expected_mat)
 
     def test_move_forward(self, device, dtype, backend, cam_pos_data):
-        cam_pos, cam_dir, view_matrix = cam_pos_data['cam_pos'], cam_pos_data['cam_dir'], cam_pos_data['view_matrix']
-        extrinsics = CameraExtrinsics.from_camera_pose(cam_pos, cam_dir, dtype=dtype, device=device, backend=backend)
+        cam_pos = cam_pos_data['cam_pos']
+        cam_dir = cam_pos_data['cam_dir']
+        view_matrix = cam_pos_data['view_matrix']
+        extrinsics = CameraExtrinsics.from_camera_pose(
+            cam_pos, cam_dir, dtype=dtype, device=device, backend=backend)
         amount = 1.0
         extrinsics.move_forward(amount)
 
@@ -937,7 +946,6 @@ class TestCameraExtrinsicsMoveCam:
         axis_idx = 2
         expected_mat[..., axis_idx, 3] -= amount
         assert_view_matrix(extrinsics.view_matrix(), expected_mat)
-
 
 @pytest.mark.parametrize('backend', CameraExtrinsics.available_backends())
 @pytest.mark.parametrize('requires_grad', (True, False))
@@ -997,8 +1005,11 @@ class TestCameraExtrinsicsAllClose:
 class TestCameraExtrinsicsCamPosDir:
 
     def test_cam_pos(self, device, dtype, backend, cam_pos_data):
-        cam_pos, cam_dir, view_matrix = cam_pos_data['cam_pos'], cam_pos_data['cam_dir'], cam_pos_data['view_matrix']
-        extrinsics = CameraExtrinsics.from_camera_pose(cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
+        cam_pos = cam_pos_data['cam_pos']
+        cam_dir = cam_pos_data['cam_dir']
+        view_matrix = cam_pos_data['view_matrix']
+        extrinsics = CameraExtrinsics.from_camera_pose(
+            cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
         num_cams = view_matrix.shape[0]
         expected = torch.tensor(cam_pos, device=device, dtype=dtype)
         expected = expected.reshape(num_cams, 3, 1)
@@ -1007,8 +1018,11 @@ class TestCameraExtrinsicsCamPosDir:
         assert extrinsics_result.shape == (num_cams, 3, 1)
 
     def test_cam_right(self, device, dtype, backend, cam_pos_data):
-        cam_pos, cam_dir, view_matrix = cam_pos_data['cam_pos'], cam_pos_data['cam_dir'], cam_pos_data['view_matrix']
-        extrinsics = CameraExtrinsics.from_camera_pose(cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
+        cam_pos = cam_pos_data['cam_pos']
+        cam_dir = cam_pos_data['cam_dir']
+        view_matrix = cam_pos_data['view_matrix']
+        extrinsics = CameraExtrinsics.from_camera_pose(
+            cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
         num_cams = view_matrix.shape[0]
         cam_dir = torch.tensor(cam_dir, device=device, dtype=dtype)
         if cam_dir.ndim == 2:
@@ -1021,8 +1035,11 @@ class TestCameraExtrinsicsCamPosDir:
         assert extrinsics_result.shape == (num_cams, 3, 1)
 
     def test_cam_up(self, device, dtype, backend, cam_pos_data):
-        cam_pos, cam_dir, view_matrix = cam_pos_data['cam_pos'], cam_pos_data['cam_dir'], cam_pos_data['view_matrix']
-        extrinsics = CameraExtrinsics.from_camera_pose(cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
+        cam_pos = cam_pos_data['cam_pos']
+        cam_dir = cam_pos_data['cam_dir']
+        view_matrix = cam_pos_data['view_matrix']
+        extrinsics = CameraExtrinsics.from_camera_pose(
+            cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
         num_cams = view_matrix.shape[0]
         cam_dir = torch.tensor(cam_dir, device=device, dtype=dtype)
         if cam_dir.ndim == 2:
@@ -1034,8 +1051,11 @@ class TestCameraExtrinsicsCamPosDir:
         assert extrinsics_result.shape == (num_cams, 3, 1)
 
     def test_cam_forward(self, device, dtype, backend, cam_pos_data):
-        cam_pos, cam_dir, view_matrix = cam_pos_data['cam_pos'], cam_pos_data['cam_dir'], cam_pos_data['view_matrix']
-        extrinsics = CameraExtrinsics.from_camera_pose(cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
+        cam_pos = cam_pos_data['cam_pos']
+        cam_dir = cam_pos_data['cam_dir']
+        view_matrix = cam_pos_data['view_matrix']
+        extrinsics = CameraExtrinsics.from_camera_pose(
+            cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
         num_cams = view_matrix.shape[0]
         cam_dir = torch.tensor(cam_dir, device=device, dtype=dtype)
         if cam_dir.ndim == 2:
@@ -1045,3 +1065,4 @@ class TestCameraExtrinsicsCamPosDir:
         extrinsics_result = extrinsics.cam_forward()
         assert torch.allclose(extrinsics_result, expected, rtol=1e-3, atol=1e-3)
         assert extrinsics_result.shape == (num_cams, 3, 1)
+
