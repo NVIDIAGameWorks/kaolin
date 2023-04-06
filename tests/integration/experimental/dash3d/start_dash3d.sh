@@ -4,8 +4,11 @@ set -o nounset
 # Note: when run as a subprocess something is setting this
 # variable, which causes issues; printing for debug information
 # and unsetting
-echo "Unsetting MKL_THREADING_LAYER=$MKL_THREADING_LAYER"
-unset MKL_THREADING_LAYER
+if [[ -v MKL_THREADING_LAYER ]];
+then
+  echo "Unsetting MKL_THREADING_LAYER=$MKL_THREADING_LAYER"
+  unset MKL_THREADING_LAYER
+fi
 
 # Get the directory where current script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

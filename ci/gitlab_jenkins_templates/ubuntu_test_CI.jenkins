@@ -64,6 +64,16 @@ spec:
           echo e.toString()
         }
         try {
+          stage("Dash3D") {
+            sh '''
+            pytest -s --cov=/kaolin/kaolin /kaolin/tests/integration/
+            '''
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
           if (arch == "TITAN_RTX") {
             stage("Doc examples") {
               // using wheel you don't have /kaolin/kaolin
