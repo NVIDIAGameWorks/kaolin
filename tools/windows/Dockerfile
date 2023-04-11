@@ -82,14 +82,11 @@ RUN Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Us
     Remove-Item .\miniconda3.exe; \
     conda install -y python=$Env:PYTHON_VERSION
 
-# TODO: forcing torch LTS
-# RUN pip install torch==1.8.2 torchvision "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.5.2 cython==0.29.20 numpy==1.21.6 ninja --extra-index-url https://download.pytorch.org/whl/lts/1.8
-
 # NOTE: update the install list (2 lines here) if SSL_CERTIFICATE errors crop up to pip install the related dependency
 # conditional: bespoke logic for 1.8.2 LTS install, otherwise generic wheel lookup
 RUN $Env:TORCH_STR = ${Env:PYTORCH_VERSION} + '+cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
     $Env:TORCH_URL='https://download.pytorch.org/whl/cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
-    pip install --no-cache-dir torch==${Env:TORCH_STR} "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.7.3 cython==0.29.20 numpy==1.21.6 tornado==6.1 "tqdm>=4.51.0" ninja --extra-index-url ${Env:TORCH_URL};
+    pip install --no-cache-dir torch==${Env:TORCH_STR} usd-core==23.2 flask==2.0.3 pillow==8.1.2 scipy==1.7.3 cython==0.29.20 numpy==1.21.6 tornado==6.1 "tqdm>=4.51.0" ninja --extra-index-url ${Env:TORCH_URL};
 
 RUN pip install brotli
 
