@@ -6,6 +6,8 @@ currentBuild.displayName = targetImageTag.split(':')[2]
 // This will be the "MESSAGE" displayed on Blue Ocean
 currentBuild.description = sourceBranch + ": " + commitHash
 
+gitlabCommitStatus("build-${configName}") {
+
 podTemplate(
 cloud:'sc-ipp-blossom-prod',
 yaml:'''
@@ -40,38 +42,36 @@ spec:
   node(POD_LABEL) {
     container("docker") {
       try {
-        gitlabCommitStatus("build-${configName}") {
-          stage("Checkout") {
-            checkout([
-                $class: 'GitSCM',
-                branches: [[name: "${commitHash}"]],
-                // We need submodules
-                extensions: [[
-                    $class: 'SubmoduleOption',
-                    disableSubmodules: false,
-                    parentCredentials: false,
-                    recursiveSubmodules: true,
-                    reference: '',
-                    trackingSubmodules: false
-                ]],
-                userRemoteConfigs: [[
-                    credentialsId: 'gitlab-credentials',
-                    url: "${repoUrl}"
-                ]]
-            ])
+        stage("Checkout") {
+          checkout([
+              $class: 'GitSCM',
+              branches: [[name: "${commitHash}"]],
+              // We need submodules
+              extensions: [[
+                  $class: 'SubmoduleOption',
+                  disableSubmodules: false,
+                  parentCredentials: false,
+                  recursiveSubmodules: true,
+                  reference: '',
+                  trackingSubmodules: false
+              ]],
+              userRemoteConfigs: [[
+                  credentialsId: 'gitlab-credentials',
+                  url: "${repoUrl}"
+              ]]
+          ])
+        }
+        docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
+          stage("Build") {
+            targetImage = docker.build(
+                "${targetImageTag}",
+                """--no-cache --network host -f ./tools/linux/Dockerfile.install \
+                   --build-arg BASE_IMAGE=${baseImageTag} \
+                   .
+                """)
           }
-          docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
-            stage("Build") {
-              targetImage = docker.build(
-                  "${targetImageTag}",
-                  """--no-cache --network host -f ./tools/linux/Dockerfile.install \
-                     --build-arg BASE_IMAGE=${baseImageTag} \
-                     .
-                  """)
-            }
-            stage("Push") {
-              targetImage.push()
-            }
+          stage("Push") {
+            targetImage.push()
           }
         }
       } catch (e) {
@@ -91,6 +91,8 @@ spec:
     }
   }
 }
+
+}  // gitlabCommitStatus
 
 def prepareUbuntuTestJob(arch) {
   return {

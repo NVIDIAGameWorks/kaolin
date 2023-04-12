@@ -14,6 +14,8 @@ currentBuild.description = sourceBranch + ": " + commitHash
 //  kubectl patch kaolin-sa default -p '{"imagePullSecrets": [{"name": "myregistrykey"}]}'
 // 4) add to pod template
 
+gitlabCommitStatus("test-${configName}-${arch}") {
+
 podTemplate(cloud:'sc-ipp-blossom-prod', 
 slaveConnectTimeout: 4000,
 yaml: """
@@ -51,7 +53,6 @@ spec:
 {
   node(POD_LABEL) {
     container("windows") {
-      updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "running")
       if (testWheel.toBoolean()) {
         stage('Test') {
           powershell '''
@@ -285,16 +286,12 @@ spec:
           // update build result gitlab status
           //  catchError only updates the pipeline
           if (currentBuild.getCurrentResult() == "FAILURE") {
-            echo "failed"
-            echo "updating test-${configName}-${arch}"
-            updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "failed")
-          } else {
-            echo "success"
-            echo "updating test-${configName}-${arch}"
-            updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "success")
+            error "Build failed. See logs..."
           }
         }
       }
     }
   }
 }
+
+}  // gitlabCommitStatus

@@ -20,6 +20,8 @@ currentBuild.displayName = targetImageTag.split(':')[2]
 // This will be the "MESSAGE" displayed on Blue Ocean
 currentBuild.description = sourceBranch + ": " + commitHash
 
+gitlabCommitStatus("build-${configName}") {
+
 podTemplate(
 cloud:'sc-ipp-blossom-prod',
 envVars:[envVar(key:"JENKINS_URL", value:"${env.JENKINS_URL}")],
@@ -57,55 +59,53 @@ spec:
 {
   node(POD_LABEL) {
     try {
-      gitlabCommitStatus("build-${configName}") {
-        timeout(time: 300, unit: 'MINUTES') {
-          stage("Checkout") {
-            checkout([
-                $class: 'GitSCM',
-                branches: [[name: "${commitHash}"]],
-                // We need submodules
-                extensions: [[
-                    $class: 'SubmoduleOption',
-                    disableSubmodules: false,
-                    parentCredentials: false,
-                    recursiveSubmodules: true,
-                    reference: '',
-                    trackingSubmodules: false
-                ]],
-                userRemoteConfigs: [[
-                    credentialsId: 'gitlab-credentials',
-                    url: "${repoUrl}"
-                ]]
-            ])
+      timeout(time: 300, unit: 'MINUTES') {
+        stage("Checkout") {
+          checkout([
+              $class: 'GitSCM',
+              branches: [[name: "${commitHash}"]],
+              // We need submodules
+              extensions: [[
+                  $class: 'SubmoduleOption',
+                  disableSubmodules: false,
+                  parentCredentials: false,
+                  recursiveSubmodules: true,
+                  reference: '',
+                  trackingSubmodules: false
+              ]],
+              userRemoteConfigs: [[
+                  credentialsId: 'gitlab-credentials',
+                  url: "${repoUrl}"
+              ]]
+          ])
+        }
+        docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
+          stage("Build") {
+            cudaUrl = cuda_version_url[cudaVer]
+            targetImage = docker.build(
+                "${targetImageTag}",
+                """-m 32g --no-cache -f ./tools/windows/Dockerfile \
+                    --build-arg CUDA_VERSION=${cudaVer} \
+                    --build-arg CUDA_URL=${cudaUrl} \
+                    --build-arg PYTHON_VERSION=${pythonVer} \
+                    --build-arg PYTORCH_VERSION=${torchVer} \
+                    .
+                """)
           }
-          docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
-            stage("Build") {
-              cudaUrl = cuda_version_url[cudaVer]
+          if (buildWheel.toBoolean()) {
+            stage("With wheel") {
               targetImage = docker.build(
                   "${targetImageTag}",
-                  """-m 32g --no-cache -f ./tools/windows/Dockerfile \
-                      --build-arg CUDA_VERSION=${cudaVer} \
-                      --build-arg CUDA_URL=${cudaUrl} \
-                      --build-arg PYTHON_VERSION=${pythonVer} \
-                      --build-arg PYTORCH_VERSION=${torchVer} \
-                      .
-                  """)
+                  """-m 32g --no-cache -f ./tools/windows/Dockerfile.install_wheel \
+                     --build-arg BASE_IMAGE=${targetImageTag} \
+                     .
+                  """
+              )
             }
-            if (buildWheel.toBoolean()) {
-              stage("With wheel") {
-                targetImage = docker.build(
-                    "${targetImageTag}",
-                    """-m 32g --no-cache -f ./tools/windows/Dockerfile.install_wheel \
-                       --build-arg BASE_IMAGE=${targetImageTag} \
-                       .
-                    """
-                )
-              }
-            }
-            
-            stage("Push") {
-              targetImage.push()
-            }
+          }
+          
+          stage("Push") {
+            targetImage.push()
           }
         }
       }
@@ -133,6 +133,8 @@ spec:
     }
   }
 }
+
+}  // gitlabCommitStatus
 
 def prepareWindowsTestJob(arch) {
   return {

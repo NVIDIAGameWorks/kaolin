@@ -23,6 +23,7 @@
 #include <vector_functions.h>
 
 #ifndef __CUDACC__
+
 static inline __host__ __device__ double rsqrt(double a) {
   return 1. / sqrt(a);
 }
@@ -31,8 +32,6 @@ static inline __host__ __device__ float rsqrtf(float a) {
   return 1. / sqrtf(a);
 }
 #endif
-
-using namespace std;
 
 // limit induced by use of short for point coordinates
 #define KAOLIN_SPC_MAX_LEVELS           15

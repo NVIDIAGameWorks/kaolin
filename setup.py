@@ -14,9 +14,8 @@ import subprocess
 import warnings
 
 TORCH_MIN_VER = '1.6.0'
-TORCH_MAX_VER = '1.13.1'
+TORCH_MAX_VER = '2.0.0'
 CYTHON_MIN_VER = '0.29.20'
-INCLUDE_EXPERIMENTAL = os.getenv('KAOLIN_INSTALL_EXPERIMENTAL') is not None
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
 
 # Module required before installation
@@ -119,9 +118,10 @@ if not torch.cuda.is_available():
         logging.warning(
             "Torch did not find available GPUs on this system.\n"
             "If your intention is to cross-compile, this is not an error.\n"
-            "By default, Apex will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n"
+            "By default, Kaolin will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n"
             "Volta (compute capability 7.0), Turing (compute capability 7.5),\n"
-            "and, if the CUDA version is >= 11.0, Ampere (compute capability 8.0).\n"
+            "and, if the CUDA version is >= 11.0, Ampere (compute capability 8.0),\n"
+            "and, if the CUDA version is >= 11.8, Hopper (compute capability 9.0).\n"
             "If you wish to cross-compile for a single specific architecture,\n"
             'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n'
         )
@@ -130,20 +130,18 @@ if not torch.cuda.is_available():
             if int(bare_metal_major) == 11:
                 if int(bare_metal_minor) == 0:
                     os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0"
-                else:
+                elif int(bare_metal_minor) < 8:
                     os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6"
+                else:
+                    os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0"
             else:
                 os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5"
+        print(f'TORCH_CUDA_ARCH_LIST: {os.environ["TORCH_CUDA_ARCH_LIST"]}')
     else:
         logging.warning(
             "Torch did not find available GPUs on this system.\n"
             "Kaolin will install only with CPU support and will have very limited features.\n"
-            'If your wish to cross-compile for GPU `export FORCE_CUDA=1` before running setup.py\n'
-            "By default, Apex will cross-compile for Pascal (compute capabilities 6.0, 6.1, 6.2),\n"
-            "Volta (compute capability 7.0), Turing (compute capability 7.5),\n"
-            "and, if the CUDA version is >= 11.0, Ampere (compute capability 8.0).\n"
-            "If you wish to cross-compile for a single specific architecture,\n"
-            'export TORCH_CUDA_ARCH_LIST="compute capability" before running setup.py.\n'
+            "If your wish to cross-compile for GPU `export FORCE_CUDA=1` before running setup.py."
         )
 
 PACKAGE_NAME = 'kaolin'
@@ -178,30 +176,21 @@ write_version_file()
 
 def get_requirements():
     requirements = []
-    requirements.append('Pillow>=8.0.0')
-    requirements.append('tqdm>=4.51.0')
-    if sys.version_info < (3, 8):
-        requirements.append('scipy>=1.2.0,<=1.7.3')
-    else:
-        requirements.append('scipy>=1.2.0')
     if sys.version_info >= (3, 10):
         warnings.warn("usd-core is not compatible with python_version >= 3.10 "
                       "and won't be installed, please use supported python_version "
                       "to use USD related features")
-    requirements.append('usd-core<=23.5')
-    if INCLUDE_EXPERIMENTAL:
-        requirements.append('flask==2.0.3')
     with open(os.path.join(cwd, 'tools', 'viz_requirements.txt'), 'r') as f:
+        for line in f.readlines():
+            requirements.append(line.strip())
+    with open(os.path.join(cwd, 'tools', 'requirements.txt'), 'r') as f:
         for line in f.readlines():
             requirements.append(line.strip())
     return requirements
 
 
 def get_scripts():
-    if INCLUDE_EXPERIMENTAL:
-        logger.info('Including experimental features')
-        return ['kaolin/experimental/dash3d/kaolin-dash3d']
-    return []
+    return ['kaolin/experimental/dash3d/kaolin-dash3d']
 
 
 def get_extensions():

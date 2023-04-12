@@ -66,8 +66,10 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
         primvars = UsdGeom.PrimvarsAPI(mesh_prim)
         mesh_st = primvars.GetPrimvar('st')
         mesh_subsets = UsdGeom.Subset.GetAllGeomSubsets(UsdGeom.Imageable(mesh_prim))
-        mesh_material = UsdShade.MaterialBindingAPI(mesh_prim).ComputeBoundMaterial()[0]
-        transform = torch.from_numpy(np.array(UsdGeom.Xformable(mesh_prim).ComputeLocalToWorldTransform(time), dtype=np.float32))
+        mesh_material = UsdShade.MaterialBindingAPI.Apply(mesh_prim).ComputeBoundMaterial()[0]
+        transform = torch.from_numpy(np.array(
+            UsdGeom.Xformable(mesh_prim).ComputeLocalToWorldTransform(time), dtype=np.float32
+        ))
 
         # Parse mesh UVs
         if mesh_st:
@@ -134,7 +136,9 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
                         warnings.warn(e.args[0])
             if mesh_subsets:
                 for subset in mesh_subsets:
-                    subset_material, _ = UsdShade.MaterialBindingAPI(subset).ComputeBoundMaterial()
+                    subset_material, _ = UsdShade.MaterialBindingAPI.Apply(
+                        subset.GetPrim()
+                    ).ComputeBoundMaterial()
                     subset_material_metadata = subset_material.GetPrim().GetMetadata('references')
                     mat_ref_path = ""
                     if ref_path:

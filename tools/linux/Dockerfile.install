@@ -52,7 +52,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PATH /usr/local/cuda/bin:$PATH
 
 # for GLEW
-ENV LD_LIBRARY_PATH /usr/lib64:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH /usr/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib:${LD_LIBRARY_PATH}
 
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
@@ -66,9 +66,12 @@ RUN npm install -g npm@8.5.4
 RUN npm install 
 
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir setuptools==58.0.0 ninja cython==0.29.20 \
+    pip install --no-cache-dir setuptools==58.0.0 ninja \
         imageio imageio-ffmpeg && \
-    pip install --no-cache-dir -r tools/viz_requirements.txt
+    pip install --no-cache-dir \
+        -r tools/viz_requirements.txt \
+        -r tools/requirements.txt \
+        -r tools/build_requirements.txt
 
 RUN cd /tmp && \
     git clone https://github.com/NVlabs/nvdiffrast && \
@@ -76,6 +79,5 @@ RUN cd /tmp && \
     cp ./docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json && \
     pip install .
 
-ENV KAOLIN_INSTALL_EXPERIMENTAL "1"
 ENV IGNORE_TORCH_VER "1"
 RUN python setup.py develop

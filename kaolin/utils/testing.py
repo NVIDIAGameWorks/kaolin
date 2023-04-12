@@ -17,7 +17,6 @@ import functools
 import collections
 import numpy as np
 import torch
-from torch._six import string_classes
 
 import kaolin.ops.random as random
 from kaolin.ops.spc.uint8 import uint8_bits_sum
@@ -296,7 +295,7 @@ def contained_torch_equal(elem, other):
 
     if isinstance(elem, torch.Tensor):
         return torch.equal(elem, other)
-    elif isinstance(elem, string_classes):
+    elif isinstance(elem, str):
         return elem == other
     elif isinstance(elem, collections.abc.Mapping):
         if elem.keys() != other.keys():

@@ -15,7 +15,7 @@ Requirements
 * Linux, Windows, or macOS (CPU-only)
 * Python >= 3.7, <= 3.9
 * `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ >= 10.0 (with 'nvcc' installed) See `CUDA Toolkit Archive <https://developer.nvidia.com/cuda-toolkit-archive>`_ to install older version.
-* torch >= 1.8, <= 1.13.1
+* torch >= 1.8, <= 2.0.0
 
 Quick Start (Linux, Windows)
 ----------------------------
@@ -71,15 +71,6 @@ Installation from source
         $ conda create --name kaolin python=3.7
         $ conda activate kaolin
 
-Dependencies
-^^^^^^^^^^^^
-
-* torch >= 1.8, <= 1.13.1
-* cython == 0.29.20 (auto-installed)
-* scipy >= 1.2.0 (auto-installed)
-* Pillow >= 8.0.0 (auto-installed)
-* usd-core >= 20.11 (auto-installed; required for USD I/O and 3D checkpoints with :class:`~kaolin.visualize.Timelapse`)
-
 1. Clone Repository
 ^^^^^^^^^^^^^^^^^^^
 
@@ -90,6 +81,15 @@ Clone and optionally check out an `official release <https://github.com/NVIDIAGa
     $ git clone --recursive https://github.com/NVIDIAGameWorks/kaolin
     $ cd kaolin
     $ git checkout v0.13.0 # optional
+
+2. Install dependencies
+^^^^^^^^^^^^^^^^^^^^^^^
+
+You can install the dependencies running:
+
+.. code-block:: bash
+
+    $ pip install -r tools/build_requirements.txt -r tools/viz_requirements.txt -r tools/requirements.txt
 
 2. Test CUDA
 ^^^^^^^^^^^^
@@ -105,7 +105,7 @@ You can verify that CUDA is properly installed at the desired version with nvcc 
 ^^^^^^^^^^^^^^^^^^
 
 Follow `official instructions <https://pytorch.org>`_ to install PyTorch of a supported version.
-Kaolin may be able to work with other PyTorch versions, but we only explicitly test within the version range listed above.
+Kaolin may be able to work with other PyTorch versions, but we only explicitly test within the version range 1.10.0 to 2.0.0.
 See below for overriding PyTorch version check during install.
 
 Here is how to install the latest Pytorch version supported by Kaolin for cuda 11.3:
@@ -119,7 +119,6 @@ Here is how to install the latest Pytorch version supported by Kaolin for cuda 1
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * If trying Kaolin with an unsupported PyTorch version, set: ``export IGNORE_TORCH_VER=1``
-* To install experimental features (like :ref:`kaolin-dash3d <dash 3d>`), set: ``export KAOLIN_INSTALL_EXPERIMENTAL=1``
 * If using heterogeneous GPU setup, set the architectures for which to compile the CUDA code, e.g.: ``export TORCH_CUDA_ARCH_LIST="7.0 7.5"``
 * In some setups, there may be a conflict between cub available with cuda install > 11 and ``third_party/cub`` that kaolin includes as a submodule. If conflict occurs or cub is not found, set ``CUB_HOME`` to the cuda one, e.g. typically on Linux: ``export CUB_HOME=/usr/local/cuda-*/include/``
 

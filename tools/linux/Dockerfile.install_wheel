@@ -23,13 +23,21 @@ RUN apt-get -y update \
         libegl1-mesa-dev \
         git \
         pkg-config \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libasound2 \
+        libgtk2.0-0 \
+        libgtk-3-0 \
+        libnss3 \
         libglvnd0 \
         libgl1 \
         libglx0 \
         libegl1 \
         libgles2 \
         libglvnd-dev \
+        curl \
         cmake \
+        xvfb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -38,7 +46,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # for GLEW
-ENV LD_LIBRARY_PATH /usr/lib64:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH /usr/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib:${LD_LIBRARY_PATH}
 
 # nvidia-container-runtime
 #ENV NVIDIA_VISIBLE_DEVICES all
@@ -48,13 +56,19 @@ ENV NVIDIA_DRIVER_CAPABILITIES compute,utility,graphics
 ENV PYOPENGL_PLATFORM egl
 
 ## Install Dash3D Requirements ###
-RUN conda install -c conda-forge nodejs==16.13.0 \
-    && conda clean --all --force-pkgs-dirs
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x --insecure | bash - \
+    && apt-get install -y nodejs
+
 RUN npm install -g npm@8.5.4
-RUN npm install 
+RUN npm install
 
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir imageio imageio-ffmpeg
+    pip install --no-cache-dir setuptools==58.0.0 ninja \
+        imageio imageio-ffmpeg && \
+    pip install --no-cache-dir \
+        -r tools/viz_requirements.txt \
+        -r tools/requirements.txt \
+        -r tools/build_requirements.txt
 
 RUN cd /tmp && \
     git clone https://github.com/NVlabs/nvdiffrast && \
