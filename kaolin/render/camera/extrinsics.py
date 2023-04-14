@@ -414,7 +414,7 @@ class CameraExtrinsics():
                          dtype: torch.dtype = default_dtype,
                          device: Union[torch.device, str] = None,
                          requires_grad: bool = False,
-                         backend_name: str = None) -> CameraExtrinsics:
+                         backend: str = None) -> CameraExtrinsics:
         r"""Constructs the extrinsics from a given view matrix
         of shape :math:`(\text{num_cameras}, 4, 4)`.
 
@@ -457,8 +457,8 @@ class CameraExtrinsics():
                 If device is None, the default torch device will be used
             requires_grad (bool):
                 Sets the requires_grad field for the params tensor of the CameraExtrinsics
-            backend_name (str):
-                The backend's name used to manage the internal representation of the extrinsics, and how it is converted
+            backend (str):
+                The backend used to manage the internal representation of the extrinsics, and how it is converted
                 to a view matrix.
                 Different representations are tuned to varied use cases:
                 speed, differentiability w.r.t rigid transformations space, and so forth.
@@ -469,9 +469,9 @@ class CameraExtrinsics():
             (CameraExtrinsics): the camera extrinsics
         """
         view_matrix = cls._to_tensor_input(view_matrix, device=device, dtype=dtype)
-        backend = cls._make_backend(view_matrix, dtype, device, requires_grad, backend_name)
-        extrinsics = CameraExtrinsics(backend)
-        extrinsics._shared_fields['user_requested_backend'] = backend_name is not None
+        backend_obj = cls._make_backend(view_matrix, dtype, device, requires_grad, backend)
+        extrinsics = CameraExtrinsics(backend_obj)
+        extrinsics._shared_fields['user_requested_backend'] = backend is not None
         return extrinsics
 
     def change_coordinate_system(self, basis_change: Union[np.array, torch.Tensor]):
