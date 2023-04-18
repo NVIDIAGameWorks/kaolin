@@ -91,6 +91,7 @@ RUN $Env:TORCH_STR = ${Env:PYTORCH_VERSION} + '+cu' + ${Env:CUDA_VERSION}.Replac
     $Env:TORCH_URL='https://download.pytorch.org/whl/cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
     pip install --no-cache-dir torch==${Env:TORCH_STR} "usd-core<22.8" flask==2.0.3 pillow==8.1.2 scipy==1.7.3 cython==0.29.20 numpy==1.21.6 tornado==6.1 "tqdm>=4.51.0" ninja --extra-index-url ${Env:TORCH_URL};
 
+RUN pip install brotli
 
 # CUDA setup for running & testing on CI machine
 COPY tools/windows/SetupDriver.ps1 C:/data/
@@ -108,9 +109,9 @@ RUN conda list > conda_build.txt
 COPY . .
 
 # NOTE: pin setuptools to avoid directory copy bug
-RUN pip install --upgrade --no-cache-dir setuptools==58.0.0
-RUN pip install --upgrade --no-cache-dir certifi
-RUN pip install -r tools\ci_requirements.txt
+RUN pip install --upgrade --no-cache-dir setuptools==58.0.0 certifi
+RUN pip install --no-cache-dir -r tools\ci_requirements.txt
+RUN pip install --no-cache-dir -r tools\viz_requirements.txt
 
 ENV KAOLIN_INSTALL_EXPERIMENTAL "1"
 ENV IGNORE_TORCH_VER "1"
