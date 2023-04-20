@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
+from collections import namedtuple
 import logging
 import numpy as np
 import pytest
 import random
-import copy
-
 import torch
 
 from kaolin.ops.random import random_tensor
@@ -28,6 +28,8 @@ from kaolin.utils import testing
 
 
 logger = logging.getLogger(__name__)
+
+sample_tuple = namedtuple('sample_tuple', ['A', 'B', 'C'])
 
 
 class TestCheckTensor:
@@ -545,13 +547,57 @@ class TestContainedTorchEqual:
         other = copy.deepcopy(elem)
         assert testing.contained_torch_equal(elem, other)
 
+        # Also try on a tuple
+        elem = sample_tuple('hello', torch.rand(3, 3), (torch.rand(10, 3) * 10).to(torch.int32))
+        other = copy.deepcopy(elem)
+        assert testing.contained_torch_equal(elem, other)
+
     def test_false(self):
         elem = [1, 'a', {'b': torch.rand(3, 3), 'c': 0.1}]
         other = copy.deepcopy(elem)
         other[2]['b'][1, 1] += 1.
         assert not testing.contained_torch_equal(elem, other)
 
+        # Also try on a tuple
+        elem = sample_tuple('hello', torch.rand(3, 3), (torch.rand(10, 3) * 10).to(torch.int32))
+        other = copy.deepcopy(elem)
+        other.B[0, 0] +=  0.001
+        assert not testing.contained_torch_equal(elem, other)
 
+    def test_approximate(self):
+        elem = [1, 'a', {'b': torch.rand(3, 3), 'c': 0.1}]
+        other = copy.deepcopy(elem)
+        eps = 0.0001
+        other[2]['b'][1, 1] += eps
+        other[2]['c'] += eps
+        assert not testing.contained_torch_equal(elem, other)
+        assert testing.contained_torch_equal(elem, other, approximate=True, atol=eps*2)
 
+class TestCheckTensorAttributeShapes:
+    @pytest.mark.parametrize("throw", [True, False])
+    def test_checks_pass(self, throw):
+        container = {'cat': torch.rand((1, 5, 6)), 'dog': torch.rand((5, 5, 6)), 'colors': torch.rand((100, 3))}
+        assert testing.check_tensor_attribute_shapes(container, throw=throw, cat=(1, 5, 6), colors=(None, 3))
+
+        container = sample_tuple('Hello', torch.rand((3, 4, 5)), torch.rand((5, 1, 6)))
+        assert testing.check_tensor_attribute_shapes(container, throw=throw, B=(3, None, 5), C=[5, 1, 6])
+
+    def test_checks_fail(self):
+        container = {'cat': torch.rand((1, 5, 6)), 'dog': torch.rand((5, 5, 6)), 'colors': torch.rand((100, 3))}
+        with pytest.raises(ValueError):
+            assert testing.check_tensor_attribute_shapes(container, throw=True, cat=(1, 5, 6), colors=(59, 3))
+        assert not testing.check_tensor_attribute_shapes(container, throw=False, cat=(1, 50, 6), colors=(59, 3))
+
+class TestPrintDiagnostics:
+    def test_print_namedtuple_attributes(self, capsys):
+        sample1 = sample_tuple('My Name', [1, 2, 3], torch.zeros((5, 5, 5)))
+
+        testing.print_namedtuple_attributes(sample1)
+        out1, err = capsys.readouterr()
+        assert len(out1) > 10
+
+        testing.print_namedtuple_attributes(sample1, detailed=True)
+        out1_detailed, err = capsys.readouterr()
+        assert len(out1) < len(out1_detailed)
 
 

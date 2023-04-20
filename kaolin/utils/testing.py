@@ -13,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
+import copy
 import collections
+import functools
+import logging
 import numpy as np
 import torch
 
@@ -68,6 +70,10 @@ def check_tensor(tensor, shape=None, dtype=None, device=None, throw=True):
             if a dimension is set at ``None`` then it's not verified.
         dtype (torch.dtype, optional): the expected dtype.
         device (torch.device, optional): the expected device.
+        throw (bool): if true (default), will throw if checks fail
+
+    Return:
+        (bool) True if checks pass
     """
     if shape is not None:
         if len(shape) != tensor.ndim:
@@ -117,7 +123,7 @@ def check_packed_tensor(tensor, total_numel=None, last_dim=None, dtype=None, dev
         return False
     return True
 
-def check_padded_tensor(tensor, padding_value=None, shape_per_tensor=None, 
+def check_padded_tensor(tensor, padding_value=None, shape_per_tensor=None,
                         batch_size=None, max_shape=None, last_dim=None,
                         dtype=None, device=None, throw=True):
     """Check if :ref:`padded tensor<padded>` is valid given set of criteria.
@@ -135,7 +141,7 @@ def check_padded_tensor(tensor, padding_value=None, shape_per_tensor=None,
 
     Return:
         (bool): status of the check.
-    """ 
+    """
     if not check_tensor(tensor, dtype=dtype, device=device, throw=throw):
         return False
     if shape_per_tensor is not None:
@@ -274,18 +280,20 @@ def tensor_info(t, name='', print_stats=False, detailed=False):
              (_get_stats_str() if print_stats else ''),
              (_get_details_str() if detailed else '')))
 
-def contained_torch_equal(elem, other):
-    """Check for equality of two objects potentially containing tensors.
+def contained_torch_equal(elem, other, approximate=False, **allclose_args):
+    """Check for equality (or allclose if approximate) of two objects potentially containing tensors.
 
     :func:`torch.equal` do not support data structure like dictionary / arrays
     and `==` is ambiguous on :class:`torch.Tensor`.
     This class will try to apply recursion through :class:`collections.abc.Mapping`,
     :class:`collections.abc.Sequence`, :func:`torch.equal` if the objects are `torch.Tensor`,
     of else `==` operator.
-    
+
     Args:
-        elem (object): The first object
-        other (object): The other object to compare to ``elem``
+        elem (object, dict, list, tuple): The first object
+        other (object, dict, list, tuple): The other object to compare to ``elem``
+        approximate (bool): if requested will use allclose for comparison instead (default=False)
+        allclose_args: arguments to `torch.allclose` if approximate comparison requested
 
     Return (bool): the comparison result
     """
@@ -293,29 +301,91 @@ def contained_torch_equal(elem, other):
     if elem_type != type(other):
         return False
 
+    def _tensor_compare(a, b):
+        if not approximate:
+            return torch.equal(a, b)
+        else:
+            return torch.allclose(a, b, **allclose_args)
+
+    def _number_compare(a, b):
+        return _tensor_compare(torch.tensor([a]), torch.tensor([b]))
+
+    recursive_args = copy.copy(allclose_args)
+    recursive_args['approximate'] = approximate
+
     if isinstance(elem, torch.Tensor):
-        return torch.equal(elem, other)
+        return _tensor_compare(elem, other)
     elif isinstance(elem, str):
         return elem == other
+    elif isinstance(elem, float):
+        return _number_compare(elem, other)
     elif isinstance(elem, collections.abc.Mapping):
         if elem.keys() != other.keys():
             return False
-        return all(contained_torch_equal(elem[key], other[key]) for key in elem)
+        return all(contained_torch_equal(elem[key], other[key], **recursive_args) for key in elem)
     elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
-        if set(elem._fields()) != set(other._fields()):
+        if set(elem._fields) != set(other._fields):
             return False
         return all(contained_torch_equal(
-            getattr(elem, f), getattr(other, f)) for f in elem._fields()
+            getattr(elem, f), getattr(other, f), **recursive_args) for f in elem._fields
         )
     elif isinstance(elem, collections.abc.Sequence):
         if len(elem) != len(other):
             return False
-        return all(contained_torch_equal(a, b) for a, b in zip(elem, other))
+        return all(contained_torch_equal(a, b, **recursive_args) for a, b in zip(elem, other))
     else:
         return elem == other
 
 def check_allclose(tensor, other, rtol=1e-5, atol=1e-8, equal_nan=False):
-    if not torch.allclose(tensor, other, atol, rtol, equal_nan):
-        diff_idx = torch.where(~torch.isclose(tensor, other, atol, rtol, equal_nan))
+    if not torch.allclose(tensor, other, atol=atol, rtol=rtol, equal_nan=equal_nan):
+        diff_idx = torch.where(~torch.isclose(tensor, other, atol=atol, rtol=rtol, equal_nan=equal_nan))
         raise ValueError(f"Tensors are not close on indices {diff_idx}:",
                          f"Example values: {tensor[diff_idx][:10]} vs {other[diff_idx][:10]}.")
+
+def check_tensor_attribute_shapes(container, throw=True, **attribute_info):
+    """Checks shape on all specified attributes of the container.
+
+    Args:
+        container (dict, tuple, object): container with named attributes to be tested
+        throw (bool): if true (default), will throw error on first check that fails
+        attribute_info: named attribute=shape values, where shape can be list or tuple (see `check_tensor`)
+
+    Return:
+        (bool) True if checks pass
+    """
+    def _get_item(container, attr):
+        if isinstance(container, collections.abc.Mapping):
+            return container[attr]
+        else:
+            return getattr(container, attr)
+
+    success = True
+    for k, shape in attribute_info.items():
+        val = _get_item(container, k)
+        if not check_tensor(val, shape=shape, throw=False):
+            success = False
+            message = f'Attribute {k} has shape {val.shape} (expected {shape})'
+            if throw:
+                raise ValueError(message)
+            else:
+                logging.error(message)
+    return success
+
+
+def print_namedtuple_attributes(ntuple, name='', **tensor_info_args):
+    print_dict_attributes(ntuple._asdict(), name=name, **tensor_info_args)
+
+
+def print_dict_attributes(in_dict, name='', **tensor_info_args):
+    name_info = '' if len(name) == 0 else f' of {name}'
+    print(f'\nAttributes{name_info}:')
+    for k, v in in_dict.items():
+        if torch.is_tensor(v):
+            tinfo = tensor_info(v, **tensor_info_args)
+        elif isinstance(v, (str, int, float)):
+            tinfo = v
+        elif isinstance(v, collections.abc.Sequence):
+            tinfo = f'{type(v)} of length {len(v)}'
+        else:
+            tinfo = type(v)
+        print(f'   {k}: {tinfo}')
