@@ -4,6 +4,31 @@ docker_registry_server = ImageTag.split(':')[0..1].join(':')
 currentBuild.displayName = ImageTag.split(':')[2] + "-${arch}"
 currentBuild.description = sourceBranch + ": " + commitHash
 
+if (arch == "MULTI") {
+    gpu_list = """
+            - "A100_PCIE_40GB"
+            - "A100_PCIE_80GB"
+            - "A100_80GB_PCIE"
+            - "A100_PCIE_100GB"
+            - "A10"
+            - "A30"
+            - "A40"
+            - "GA100-E4720-HBM2"
+            - "GA100-E4720-DVT"
+            - "GA104-300-PG142-SKU10-TS3"
+            - "GeForce_RTX_4090"
+            - "H100_80GB_HBM3"
+            - "GH100_P1010_PCIE_CR"
+            - "Tesla_V100_PCIE_32GB"
+    """
+} else {
+    gpu_list = """
+            - "${arch}"
+    """
+}
+
+gitlabCommitStatus("test-${configName}-${arch}") {
+
 podTemplate(
 cloud:'sc-ipp-blossom-prod',
 yaml:"""
@@ -32,12 +57,18 @@ spec:
   - name: gitlabregcred
   nodeSelector:
     kubernetes.io/os: linux
-    nvidia.com/gpu_type: ${arch}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "nvidia.com/gpu_type"
+            operator: "In"
+            values:${gpu_list}
 """) {
   node(POD_LABEL) {
     container("docker") {
-      timeout(time: 30, unit: 'MINUTES') {
-        updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "running")
+      timeout(time: 40, unit: 'MINUTES') {
         stage("Install deps") {
           sh 'pip install -r /kaolin/tools/ci_requirements.txt'
           sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'
@@ -56,7 +87,7 @@ spec:
           stage("Pytest") {
             sh '''
             export KAOLIN_TEST_NVIDIFFRAST=1
-            pytest -s --cov=/kaolin/kaolin /kaolin/tests/python/kaolin/
+            pytest --import-mode=importlib -s --cov=/kaolin/kaolin /kaolin/tests/python/kaolin/
             '''
           }
         } catch(e) {
@@ -194,12 +225,13 @@ spec:
         }
         if (build_passed) {
           currentBuild.result = "SUCCESS"
-          updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "success")
         } else {
           currentBuild.result = "FAILURE"
-          updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "failed")
+          error "Build failed. See logs..."
         }
       }
     }
   }
 }
+
+}  // gitlabCommitStatus

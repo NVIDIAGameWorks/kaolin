@@ -130,7 +130,7 @@ Omniverse app requires local access to a GPU and to the saved checkpoints, which
 We are also developing a lightweight ``kaolin-dash3d`` visualizer,
 which allows visualizing local and remote checkpoints without specialized
 hardware or applications. This tool is bundled with the latest
-builds as a command-line utility (**Important**: set ``KAOLIN_INSTALL_EXPERIMENTAL=1`` to install; see :ref:`installation`).
+builds as a command-line utility
 
 To start Dash3D on the machine that stores the checkpoints, run::
 

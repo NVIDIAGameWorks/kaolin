@@ -86,7 +86,7 @@ RUN Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Us
 # conditional: bespoke logic for 1.8.2 LTS install, otherwise generic wheel lookup
 RUN $Env:TORCH_STR = ${Env:PYTORCH_VERSION} + '+cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
     $Env:TORCH_URL='https://download.pytorch.org/whl/cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
-    pip install --no-cache-dir torch==${Env:TORCH_STR} usd-core==23.2 flask==2.0.3 pillow==8.1.2 scipy==1.7.3 cython==0.29.20 numpy==1.21.6 tornado==6.1 "tqdm>=4.51.0" ninja --extra-index-url ${Env:TORCH_URL};
+    pip install --no-cache-dir torch==${Env:TORCH_STR} ninja --extra-index-url ${Env:TORCH_URL};
 
 RUN pip install brotli
 
@@ -107,14 +107,13 @@ COPY . .
 
 # NOTE: pin setuptools to avoid directory copy bug
 RUN pip install --upgrade --no-cache-dir setuptools==58.0.0 certifi
-RUN pip install --no-cache-dir -r tools\ci_requirements.txt
-RUN pip install --no-cache-dir -r tools\viz_requirements.txt
+RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org \
+    --trusted-host files.pythonhosted.org -r tools\ci_requirements.txt \
+    -r tools\viz_requirements.txt -r tools\requirements.txt -r tools/build_requirements.txt
 
-ENV KAOLIN_INSTALL_EXPERIMENTAL "1"
 ENV IGNORE_TORCH_VER "1"
 ENV TORCH_CUDA_ARCH_LIST "7.0 7.5+PTX"
 RUN python setup.py develop
-# RUN pip install --trusted-host pypi.python.org --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
 
 # fix for paging memory issue on CI machines
 #   see: https://gist.github.com/cobryan05/7d1fe28dd370e110a372c4d268dcb2e5

@@ -11,22 +11,39 @@ RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-p
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated ca-certificates \
     && rm /etc/apt/apt.conf.d/99verify-peer.conf \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-         build-essential curl git unzip gfortran libopenblas-dev liblapack-dev \
-         libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 \
-         libnss3 libxss1 libasound2 libxtst6 xauth xvfb \
+         build-essential \
+         curl \
+         git \
+         unzip \
+         gfortran \
+         libopenblas-dev \
+         liblapack-dev \
+         libgtk2.0-0 \
+         libgtk-3-0 \
+         libgbm-dev \
+         libnotify-dev \
+         libgconf-2-4 \
+         libnss3 \
+         libxss1 \
+         libasound2 \
+         libxtst6 \
+         xauth \
+         xvfb \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-
-RUN curl -o ~/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-RUN bash ~/miniconda.sh -b -p /opt/conda
-RUN rm ~/miniconda.sh
-RUN /opt/conda/bin/conda install -y python=${PYTHON_VERSION}
-RUN /opt/conda/bin/conda clean -ya
+RUN curl -o ~/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
+    bash ~/miniconda.sh -b -p /opt/conda && \
+    rm ~/miniconda.sh && \
+    /opt/conda/bin/conda install -y python=${PYTHON_VERSION} && \
+    /opt/conda/bin/conda clean -ya
 
 ENV PATH /opt/conda/bin:$PATH
 
-RUN pip install torch==${PYTORCH_VERSION}+cpu -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip install --no-cache-dir torch==${PYTORCH_VERSION}+cpu \
+    -f https://download.pytorch.org/whl/torch_stable.html
+
+WORKDIR /tmp
 
 RUN curl -fsSL https://deb.nodesource.com/setup_16.x --insecure | bash -
 RUN apt-get install -y nodejs
@@ -34,9 +51,6 @@ RUN apt-get install -y nodejs
 RUN conda list > conda_build.txt
 
 ### Install Dash3D Requirements ###
-WORKDIR /tmp
 RUN npm install -g npm@8.5.4
 COPY package.json package-lock.json ./
 RUN npm install
-
-RUN pip install ninja setuptools==46.4.0 numpy==1.18.0

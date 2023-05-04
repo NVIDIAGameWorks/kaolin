@@ -2,24 +2,21 @@
 
 import groovy.transform.Field
 
+if (gitlabActionType == "MERGE" || gitlabSourceBranch == "master") {
+gitlabCommitStatus("launch all builds") {
+
 // Configs for build from pytorch docker images
 // (See: https://hub.docker.com/r/pytorch/pytorch/tags)
 def ubuntu_from_pytorch_configs = [
     [
-        'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.10.0',
-        'archsToTest': 'TITAN_V'
-    ],
-    [
-        'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.11.0',
-        'archsToTest': 'A10'
-    ],
-    [
-        'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.12.0',
-        'archsToTest': 'A30'
-    ],
-    [
+        // python: 3.7
         'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.12.1',
-        'archsToTest': 'A100_PCIE_40GB'
+        'archsToTest': 'MULTI'
+    ],
+    [
+        // python: 3.10
+        'cudaVer': '11.6', 'cudnnVer': '8', 'torchVer': '1.13.1',
+        'archsToTest': 'MULTI'
     ]
 ]
 
@@ -28,7 +25,7 @@ def ubuntu_from_pytorch_configs = [
 def ubuntu_from_nvcr_configs = [
     [
         'baseImageTag': '22.10-py3',
-        'archsToTest': 'GA100-E4720-DVT'
+        'archsToTest': 'MULTI'
     ],
 ]
 
@@ -38,13 +35,13 @@ def ubuntu_from_nvcr_configs = [
 def ubuntu_from_cuda_configs = [
     [
         'cudaVer': '11.3.0', 'cudnnVer': '8',
-        'pythonVer': '3.7', 'torchVer': '1.10.2',
-        'archsToTest': 'Tesla_V100_PCIE_32GB;TITAN_RTX'
+        'pythonVer': '3.8', 'torchVer': '1.10.2',
+        'archsToTest': 'MULTI'
     ],
     [
-        'cudaVer': '11.6.1', 'cudnnVer': '8',
-        'pythonVer': '3.9', 'torchVer': '1.13.1',
-        'archsToTest': 'A100_PCIE_40GB'
+        'cudaVer': '11.8.0', 'cudnnVer': '8',
+        'pythonVer': '3.10', 'torchVer': '2.0.0',
+        'archsToTest': 'MULTI'
     ],
 ]
 
@@ -52,7 +49,7 @@ def ubuntu_from_cuda_configs = [
 // (Use docker image ubuntu:18.04 as a base)
 def ubuntu_cpuonly_configs = [
     [
-        'pythonVer': '3.7', 'torchVer': '1.10.0',
+        'pythonVer': '3.8', 'torchVer': '1.10.2',
     ],
     [
         'pythonVer': '3.9', 'torchVer': '1.13.1',
@@ -235,7 +232,7 @@ def windows_from_server_configs = [
     //      two machines exist, only the TITAN RTX will pass tests
     [
         'cudaVer': '11.3',
-        'pythonVer': '3.7', 'torchVer': '1.10.0',
+        'pythonVer': '3.8', 'torchVer': '1.10.2',
         'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
     ],
     [
@@ -258,138 +255,138 @@ node {
     // To enable master branch we have to accept all the push requests
     // and prune them here.
     sh "echo ${gitlabActionType}"
-    if (gitlabActionType == "MERGE" || gitlabSourceBranch == "master") {
-        gitlabCommitStatus("launch all builds") {
-            jobMap = [:]
-            // Jenkins doesn't parse the commit hash from the webhook.
-            // So we need to get the commit hash from the last commit in the branch,
-            // So we unsure that all the build and run are on the same commit
-            //
-            // Note:
-            //   If two commits on the same branch are pushed before the first
-            //   run this line then they will both run on the second commit
-            commitHash = sh(script: "git log -1 --pretty=format:%h",
-                            returnStdout: true).trim()
-            sh "echo ${commitHash}"
-            if (gitlabActionType == "MERGE" &&
-                gitlabMergeRequestTitle.contains("[for wheels]")) {
-                    for (config in ubuntu_for_wheels_configs) {
-                        for (pythonVer in ['3.7', '3.8', '3.9']) {
-                            def configName = "custom-wheels-torch${config['torchVer']}-" + \
-                                             "cuda${config['cudaVer']}-" +
-                                             "cudnn${config['cudnnVer']}-" +
-                                             "py${pythonVer}"
-                            jobMap["${configName}"] = prepareUbuntuFromCUDAJob(
-                                configName,
-                                config['cudaVer'],
-                                config['cudnnVer'],
-                                pythonVer,
-                                config['torchVer'],
-                                config['archsToTest'],
-                                true
-                            )
-                        }
-                    }
-                    for (config in windows_for_wheels_configs) {
-                        for (pythonVer in ['3.7', '3.8', '3.9']) {
-
-                            def cudaVerLabel = config['cudaVer'].split('\\.').join('')
-                            def torchVerLabel = config['torchVer'].split('\\.').join('')
-                            def pythonVerLabel = pythonVer.split('\\.').join('')
-                            def configName = "windows-wheels-cuda${cudaVerLabel}-py${pythonVerLabel}-torch${torchVerLabel}"
-                            jobMap["${configName}"] = prepareWindowsJob(
-                                configName,
-                                config['cudaVer'],
-                                pythonVer,
-                                config['torchVer'],
-                                config['archsToTest'],
-                                true
-                            )
-                        }
-                    }
-            } else {
-                // Check if the last commit message has a [with custom] tag
-                def hasNoCustomInMess = sh(script: "git log -1 | grep '.*\\[with custom\\].*'",
-                                           returnStatus: true)
-                if (gitlabActionType == "MERGE") {
-                    sh "echo ${gitlabMergeRequestTitle}"
-                }
-                // We try to build from cuda docker image if the commit has such tag
-                // or CI is applied on master
-                if (hasNoCustomInMess == 0 || gitlabSourceBranch == "master" ||
-                    gitlabMergeRequestTitle.contains("[with custom]")) {
-                    for (config in ubuntu_from_cuda_configs) {
-                        def configName = "custom-torch${config['torchVer']}-" + \
-                                         "cuda${config['cudaVer']}-" +
-                                         "cudnn${config['cudnnVer']}-" +
-                                         "py${config['pythonVer']}"
-                        jobMap["${configName}"] = prepareUbuntuFromCUDAJob(
-                            configName,
-                            config['cudaVer'],
-                            config['cudnnVer'],
-                            config['pythonVer'],
-                            config['torchVer'],
-                            config['archsToTest'],
-                            false
-                        )
-                    }
-                }
-
-                for (config in ubuntu_from_pytorch_configs) {
-                    def configName = "pytorch-torch${config['torchVer']}-" + \
-                                     "cuda${config['cudaVer']}-cudnn${config['cudnnVer']}"
-                    def baseImageTag = "pytorch/pytorch:${config['torchVer']}-" + \
-                                       "cuda${config['cudaVer']}-" + \
-                                       "cudnn${config['cudnnVer']}-devel"
-                    jobMap["${configName}"] = prepareUbuntuFromBaseImageJob(
+    jobMap = [:]
+    // Jenkins doesn't parse the commit hash from the webhook.
+    // So we need to get the commit hash from the last commit in the branch,
+    // So we unsure that all the build and run are on the same commit
+    //
+    // Note:
+    //   If two commits on the same branch are pushed before the first
+    //   run this line then they will both run on the second commit
+    commitHash = sh(script: "git log -1 --pretty=format:%h",
+                    returnStdout: true).trim()
+    sh "echo ${commitHash}"
+    if (gitlabActionType == "MERGE" &&
+        gitlabMergeRequestTitle.contains("[for wheels]")) {
+            for (config in ubuntu_for_wheels_configs) {
+                for (pythonVer in ['3.7', '3.8', '3.9']) {
+                    def configName = "custom-wheels-torch${config['torchVer']}-" + \
+                                     "cuda${config['cudaVer']}-" +
+                                     "cudnn${config['cudnnVer']}-" +
+                                     "py${pythonVer}"
+                    jobMap["${configName}"] = prepareUbuntuFromCUDAJob(
                         configName,
-                        baseImageTag,
-                        config['archsToTest']
+                        config['cudaVer'],
+                        config['cudnnVer'],
+                        pythonVer,
+                        config['torchVer'],
+                        config['archsToTest'],
+                        true
                     )
                 }
+            }
+            for (config in windows_for_wheels_configs) {
+                for (pythonVer in ['3.7', '3.8', '3.9']) {
 
-                for (config in ubuntu_from_nvcr_configs) {
-                    def configName = "nvcr-${config['baseImageTag']}"
-                    def baseImageTag = "nvcr.io/nvidia/pytorch:${config['baseImageTag']}"
-                    jobMap["${configName}"] = prepareUbuntuFromBaseImageJob(
-                        configName,
-                        baseImageTag,
-                        config['archsToTest']
-                    )
-                }
-
-                for (config in ubuntu_cpuonly_configs) {
-                    def torchVerLabel = config['torchVer'].split('\\.').join('')
-                    def pythonVerLabel = config['pythonVer'].split('\\.').join('')
-                    def configName = "cpuonly-py${config['pythonVer']}-torch${config['torchVer']}"
-                    jobMap["${configName}"] = prepareUbuntuCPUOnlyJob(
-                        configName,
-                        config['pythonVer'],
-                        config['torchVer']
-                    )
-                }
-
-                for (config in windows_from_server_configs) {
                     def cudaVerLabel = config['cudaVer'].split('\\.').join('')
                     def torchVerLabel = config['torchVer'].split('\\.').join('')
-                    def pythonVerLabel = config['pythonVer'].split('\\.').join('')
-                    def configName = "windows-cuda${cudaVerLabel}-py${pythonVerLabel}-torch${torchVerLabel}"
+                    def pythonVerLabel = pythonVer.split('\\.').join('')
+                    def configName = "windows-wheels-cuda${cudaVerLabel}-py${pythonVerLabel}-torch${torchVerLabel}"
                     jobMap["${configName}"] = prepareWindowsJob(
                         configName,
                         config['cudaVer'],
-                        config['pythonVer'],
+                        pythonVer,
                         config['torchVer'],
                         config['archsToTest'],
-                        false
+                        true
                     )
                 }
             }
-            stage('Launch builds') {
-                parallel jobMap
+    } else {
+        // Check if the last commit message has a [with custom] tag
+        def hasNoCustomInMess = sh(script: "git log -1 | grep '.*\\[with custom\\].*'",
+                                   returnStatus: true)
+        if (gitlabActionType == "MERGE") {
+            sh "echo ${gitlabMergeRequestTitle}"
+        }
+        // We try to build from cuda docker image if the commit has such tag
+        // or CI is applied on master
+        if (hasNoCustomInMess == 0 || gitlabSourceBranch == "master" ||
+            gitlabMergeRequestTitle.contains("[with custom]")) {
+            for (config in ubuntu_from_cuda_configs) {
+                def configName = "custom-torch${config['torchVer']}-" + \
+                                 "cuda${config['cudaVer']}-" +
+                                 "cudnn${config['cudnnVer']}-" +
+                                 "py${config['pythonVer']}"
+                jobMap["${configName}"] = prepareUbuntuFromCUDAJob(
+                    configName,
+                    config['cudaVer'],
+                    config['cudnnVer'],
+                    config['pythonVer'],
+                    config['torchVer'],
+                    config['archsToTest'],
+                    false
+                )
             }
         }
+
+        for (config in ubuntu_from_pytorch_configs) {
+            def configName = "pytorch-torch${config['torchVer']}-" + \
+                             "cuda${config['cudaVer']}-cudnn${config['cudnnVer']}"
+            def baseImageTag = "pytorch/pytorch:${config['torchVer']}-" + \
+                               "cuda${config['cudaVer']}-" + \
+                               "cudnn${config['cudnnVer']}-devel"
+            jobMap["${configName}"] = prepareUbuntuFromBaseImageJob(
+                configName,
+                baseImageTag,
+                config['archsToTest']
+            )
+        }
+
+        for (config in ubuntu_from_nvcr_configs) {
+            def configName = "nvcr-${config['baseImageTag']}"
+            def baseImageTag = "nvcr.io/nvidia/pytorch:${config['baseImageTag']}"
+            jobMap["${configName}"] = prepareUbuntuFromBaseImageJob(
+                configName,
+                baseImageTag,
+                config['archsToTest']
+            )
+        }
+
+        for (config in ubuntu_cpuonly_configs) {
+            def torchVerLabel = config['torchVer'].split('\\.').join('')
+            def pythonVerLabel = config['pythonVer'].split('\\.').join('')
+            def configName = "cpuonly-py${config['pythonVer']}-torch${config['torchVer']}"
+            jobMap["${configName}"] = prepareUbuntuCPUOnlyJob(
+                configName,
+                config['pythonVer'],
+                config['torchVer']
+            )
+        }
+
+        for (config in windows_from_server_configs) {
+            def cudaVerLabel = config['cudaVer'].split('\\.').join('')
+            def torchVerLabel = config['torchVer'].split('\\.').join('')
+            def pythonVerLabel = config['pythonVer'].split('\\.').join('')
+            def configName = "windows-cuda${cudaVerLabel}-py${pythonVerLabel}-torch${torchVerLabel}"
+            jobMap["${configName}"] = prepareWindowsJob(
+                configName,
+                config['cudaVer'],
+                config['pythonVer'],
+                config['torchVer'],
+                config['archsToTest'],
+                false
+            )
+        }
+    }
+    stage('Launch builds') {
+        parallel jobMap
     }
 }
+
+}  // gitlabCommitStatus
+}  // if (gitlabActionType == "MERGE" || gitlabSourceBranch == "master")
+
 
 def prepareUbuntuFromBaseImageJob(configName, baseImageTag, archsToTest) {
   return {
