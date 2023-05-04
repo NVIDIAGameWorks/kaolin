@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 # used for cross-compilation in docker build
 #
 ARG PYTHON_VERSION=3.9

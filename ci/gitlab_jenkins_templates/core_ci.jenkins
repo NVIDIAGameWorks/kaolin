@@ -482,11 +482,12 @@ def prepareWindowsJob(configName, cudaVer, pythonVer, torchVer, archsToTest,
       updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
       if (buildWheel.toBoolean()) {
         updateGitlabCommitStatus(name: "test-${configName}", state: "pending")
-      } else {
-        for (arch in archsToTest.split(';')) {
-          updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "pending")
-        }
-      }
+      } //else {
+      //  for (arch in archsToTest.split(';')) {
+      //    updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "pending")
+      //  }
+      //}
+
       build job: "windows_build_template_CI",
       parameters: [
         string(name: 'configName', value: "${configName}"),

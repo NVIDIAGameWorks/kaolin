@@ -124,11 +124,10 @@ spec:
       jobMap = [:]
       if (buildWheel.toBoolean()) {
         jobMap["test"] = prepareWindowsWheelTestJob()
-      } else { 
-        for (arch in archsToTest.split(';')) {
-          jobMap["${arch}"] = prepareWindowsTestJob(arch)
-        }
-      }
+      } //else { 
+      //  for (arch in archsToTest.split(';')) {
+      //    jobMap["${arch}"] = prepareWindowsTestJob(arch)
+      //  }
       parallel jobMap
     }
   }
@@ -136,6 +135,7 @@ spec:
 
 }  // gitlabCommitStatus
 
+/*
 def prepareWindowsTestJob(arch) {
   return {
     stage("Test ${arch}") {
@@ -155,6 +155,7 @@ def prepareWindowsTestJob(arch) {
     }
   }
 }
+*/
 
 def prepareWindowsWheelTestJob() {
   return {

@@ -24,7 +24,7 @@ from kaolin.io.dataset import KaolinDatasetItem
 from kaolin.io.off import return_type
 from kaolin.io.modelnet import ModelNet
 
-MODELNET_PATH = '/data/ModelNet'
+MODELNET_PATH = os.getenv('KAOLIN_TEST_MODELNET_PATH')
 MODELNET_TEST_CATEGORY_LABELS = ['bathtub']
 MODELNET_TEST_CATEGORY_LABELS_2 = ['desk']
 MODELNET_TEST_CATEGORY_LABELS_MULTI = ['bathtub', 'desk']
@@ -36,7 +36,8 @@ ALL_CATEGORIES = [
 ]
 
 # Skip test in a CI environment
-@pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
+@pytest.mark.skipif(MODELNET_PATH is None,
+                    reason="'KAOLIN_TEST_MODELNET_PATH' environment variable is not set.")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
 @pytest.mark.parametrize('split', ['train', 'test'])
 @pytest.mark.parametrize('index', [0, -1])

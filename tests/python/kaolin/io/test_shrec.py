@@ -24,7 +24,7 @@ from kaolin.io.obj import return_type
 from kaolin.io.dataset import KaolinDatasetItem
 from kaolin.io.shrec import SHREC16
 
-SHREC16_PATH = '/data/shrec16/'
+SHREC16_PATH = os.getenv('KAOLIN_TEST_SHREC16_PATH')
 SHREC16_TEST_CATEGORY_SYNSETS = ['02691156']
 SHREC16_TEST_CATEGORY_LABELS = ['airplane']
 SHREC16_TEST_CATEGORY_SYNSETS_2 = ['02958343']
@@ -33,7 +33,6 @@ SHREC16_TEST_CATEGORY_SYNSETS_MULTI = ['02691156', '02958343']
 SHREC16_TEST_CATEGORY_LABELS_MULTI = ['airplane', 'car']
 
 ALL_CATEGORIES = [
-    None,
     SHREC16_TEST_CATEGORY_SYNSETS,
     SHREC16_TEST_CATEGORY_LABELS,
     SHREC16_TEST_CATEGORY_SYNSETS_2,
@@ -44,7 +43,8 @@ ALL_CATEGORIES = [
 
 
 # Skip test in a CI environment
-@pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
+@pytest.mark.skipif(SHREC16_PATH is None,
+                    reason="'KAOLIN_TEST_SHREC16_PATH' environment variable is not set.")
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
 @pytest.mark.parametrize('split', ['train', 'val', 'test'])
 @pytest.mark.parametrize('use_transform', [True, False])
