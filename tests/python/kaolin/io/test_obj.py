@@ -19,9 +19,17 @@ import torch
 
 from kaolin.io import utils
 from kaolin.io import obj
+from kaolin.utils.testing import print_namedtuple_attributes, print_dict_attributes, \
+    check_tensor_attribute_shapes, contained_torch_equal, check_allclose
 
-ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../samples/')
+ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, os.pardir, 'samples')
 SIMPLE_DIR = os.path.join(ROOT_DIR, 'simple_obj/')
+
+
+def io_data_path(fname):
+    """ Return path relative to tests/samples/io"""
+    return os.path.join(ROOT_DIR, 'io', fname)
+
 
 # TODO(cfujitsang): Add sanity test over a dataset like ShapeNet
 
@@ -270,3 +278,22 @@ class TestLoadObj:
         else:
             assert outputs.vertex_normals is None
             assert outputs.face_normals is None
+
+
+class TestDiverseInputs:
+    @pytest.fixture(scope='class')
+    def expected_sizes(self):
+        # TODO: compare actual face UVs and normals once consistent between OBJ and USD
+        return {'ico_smooth': {'vertices': [42, 3], 'faces': [80, 3], 'vertex_normals': [42, 3]},
+                'ico_flat': {'vertices': [42, 3], 'faces': [80, 3], 'vertex_normals': [80, 3]},  # not actually vertex normals
+                'fox': {'vertices': [5002, 3], 'faces':  [10000, 3]}}
+
+    @pytest.mark.parametrize('bname', ['ico_smooth', 'ico_flat', 'fox'])
+    def test_read_write_read(self, bname, expected_sizes):
+        # TODO: also test materials
+        fname = io_data_path(f'{bname}.obj')
+        read_mesh = obj.import_mesh(fname, with_normals=True, with_materials=True)
+
+        # DEBUG INFORMATION (uncomment when debugging)
+        # print_namedtuple_attributes(read_mesh, f'Read OBJ mesh {bname}')
+        assert check_tensor_attribute_shapes(read_mesh, **expected_sizes[bname])

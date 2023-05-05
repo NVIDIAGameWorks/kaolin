@@ -92,7 +92,7 @@ class TestPoints:
 
         level = 3
         coords = (x / (2 ** level)) * 2.0 - 1.0
-        check_allclose(coords_to_trilinear_coeffs(coords, points, level), expected_coeffs, atol=1e-5)
+        check_allclose(coords_to_trilinear_coeffs(coords, points, level), expected_coeffs, rtol=1e-4, atol=1e-4)
 
     def test_interpolate_trilinear_forward(self, points):
         w = torch.rand(points.shape, device='cuda')

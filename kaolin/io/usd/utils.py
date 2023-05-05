@@ -56,8 +56,8 @@ def get_scene_paths(file_path_or_stage, scene_path_regex=None, prim_types=None,
             Path to usd file (\*.usd, \*.usda) or :class:`Usd.Stage`.
         scene_path_regex (str, optional):
             Optional regular expression used to select returned scene paths.
-        prim_types (list of str, optional):
-            Optional list of valid USD Prim types used to select scene paths.
+        prim_types (list of str, str, optional):
+            Optional list of valid USD Prim types used to select scene paths, or a single USD Prim type string.
         conditional (function path: Bool): Custom conditionals to check
 
     Returns:
@@ -78,6 +78,8 @@ def get_scene_paths(file_path_or_stage, scene_path_regex=None, prim_types=None,
     if scene_path_regex is None:
         scene_path_regex = '.*'
     if prim_types is not None:
+        if isinstance(prim_types, str):
+            prim_types = [prim_types]
         prim_types = [pt.lower() for pt in prim_types]
 
     scene_paths = []

@@ -12,39 +12,40 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 import os
-import shutil
-
 import pytest
+import shutil
+from pxr import Usd
 
 from kaolin.io import usd, obj
 from kaolin.ops.conversions import trianglemeshes_to_voxelgrids
 
 
+__test_dir = os.path.dirname(os.path.realpath(__file__))
+__samples_path = os.path.join(__test_dir, os.pardir, os.pardir, os.pardir, os.pardir, 'samples')
+
 @pytest.fixture(scope='class')
 def out_dir():
     # Create temporary output directory
-    out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '_out')
+    out_dir = os.path.join(__test_dir, '_out')
     os.makedirs(out_dir, exist_ok=True)
     yield out_dir
     shutil.rmtree(out_dir)
 
-
 @pytest.fixture(scope='module')
 def mesh():
-    cur_dir = os.path.dirname(os.path.realpath(__file__))
-    obj_mesh = obj.import_mesh(
-        os.path.join(cur_dir, os.pardir, os.pardir, os.pardir, os.pardir, 'samples/rocket.obj'),
+    obj_mesh = obj.import_mesh(os.path.join(__samples_path, 'rocket.obj'),
         with_normals=True, with_materials=True, error_handler=obj.skip_error_handler)
     return obj_mesh
 
 @pytest.fixture(scope='module')
+def mesh_path():
+    return os.path.join(__samples_path, 'golden', 'mesh.usda')   # rocket # TODO: rename file
+
+@pytest.fixture(scope='module')
 def pointcloud():
-    cur_dir = os.path.dirname(os.path.realpath(__file__))
     pointcloud, color, normals = usd.import_pointcloud(
-        os.path.join(cur_dir, os.pardir, os.pardir, os.pardir, os.pardir, 'samples/rocket_pointcloud_GeomPoints.usda'),
+        os.path.join(__samples_path, 'rocket_pointcloud_GeomPoints.usda'),
         '/World/pointcloud')
     return pointcloud
 
@@ -89,3 +90,18 @@ class TestMisc:
         assert times == [1.0, 20.0, 250.0]
 
         usd.export_pointcloud(out_path, pointcloud)
+
+    @pytest.mark.parametrize('input_stage', [False, True])
+    def test_get_scene_paths(self, mesh_path, input_stage):
+        paths = usd.get_scene_paths(mesh_path)
+        print(paths)
+        assert len(paths) == 2
+
+        paths = usd.get_scene_paths(mesh_path, prim_types="Mesh")
+        assert len(paths) == 1
+
+        paths = usd.get_scene_paths(mesh_path, prim_types=["Mesh"])
+        assert len(paths) == 1
+
+        paths = usd.get_scene_paths(mesh_path, scene_path_regex=".*World.*")
+        assert len(paths) == 2

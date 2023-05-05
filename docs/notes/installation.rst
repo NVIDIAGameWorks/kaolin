@@ -152,7 +152,7 @@ For an exhaustive check, install testing dependencies and run tests as follows:
     $ pip install -r tools/ci_requirements.txt
     $ export CI='true' # on Linux
     $ set CI='true' # on Windows
-    $ pytest tests/python/
+    $ pytest --import-mode=importlib -s tests/python/
 
 .. Note::
     These tests rely on CUDA operations and will fail if you installed on CPU only, where not all functionality is available.
