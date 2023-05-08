@@ -372,20 +372,36 @@ def check_tensor_attribute_shapes(container, throw=True, **attribute_info):
     return success
 
 
-def print_namedtuple_attributes(ntuple, name='', **tensor_info_args):
-    print_dict_attributes(ntuple._asdict(), name=name, **tensor_info_args)
+def print_namedtuple_attributes(ntuple, name='', prefix='', **tensor_info_kwargs):
+    r"""Same as :func:`print_dict_attributes`, but with named tuple input. """
+    print_dict_attributes(ntuple._asdict(), name=name, prefix=prefix, **tensor_info_kwargs)
 
 
-def print_dict_attributes(in_dict, name='', **tensor_info_args):
-    name_info = '' if len(name) == 0 else f' of {name}'
-    print(f'\nAttributes{name_info}:')
+def print_dict_attributes(in_dict, name='', prefix='', **tensor_info_kwargs):
+    r"""Convenience function to print all attributes of a dict with names. Extra info
+    will be provided for tensors.
+
+    Args:
+        in_dict (dict): input dictionary containing any values
+        name (str): name of the input dictionary (especially useful if printing nested dictionaries)
+        prefix (str): prefix to provide to every printed attributes (especially useful if printing nested dictionaries)
+        **tensor_info_kwargs: extra arguments to pass to :func:`tensor_info`
+    """
+    if len(name) > 0:
+        print(f'\nAttributes of {name}:')
     for k, v in in_dict.items():
+        recurse = False
         if torch.is_tensor(v):
-            tinfo = tensor_info(v, **tensor_info_args)
+            tinfo = tensor_info(v, **tensor_info_kwargs)
         elif isinstance(v, (str, int, float)):
             tinfo = v
         elif isinstance(v, collections.abc.Sequence):
             tinfo = f'{type(v)} of length {len(v)}'
+        elif isinstance(v, collections.abc.Mapping):
+            tinfo = f'{type(v)} of length {len(v)}'
+            recurse = True
         else:
             tinfo = type(v)
-        print(f'   {k}: {tinfo}')
+        print(f'   {prefix}{k}: {tinfo}')
+        if recurse:
+            print_dict_attributes(v, prefix=f'  ')

@@ -7,10 +7,12 @@
 #    https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.mesh.html#triangular-meshes
 # ==============================================================================================================
 
+import os
 import torch
 import kaolin
 
-mesh_path = "../../samples/sphere.obj"  # Path to some .obj file with textures
+FILE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
+mesh_path = os.path.join(FILE_DIR, os.pardir, os.pardir, "samples", "sphere.obj")   # Path to some .obj file with textures
 num_samples = 100000                    # Number of sample points
 
 # 1. Load a watertight mesh from obj file

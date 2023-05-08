@@ -72,7 +72,7 @@ def meshes():
     meshes = io.usd.import_meshes(os.path.join(cur_dir, os.pardir, os.pardir,
                                   os.pardir, 'samples/rocket_hetero.usd'),
                                   with_normals=True,
-                                  heterogeneous_mesh_handler=io.usd.heterogeneous_mesh_handler_naive_homogenize)
+                                  heterogeneous_mesh_handler=io.utils.mesh_handler_naive_triangulate)
     return meshes
 
 @pytest.fixture(scope='class')

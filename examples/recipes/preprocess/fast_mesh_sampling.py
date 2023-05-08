@@ -14,13 +14,13 @@
 # ==============================================================================================================
 
 import argparse
-import sys
+import os
 import torch
 
 import kaolin as kal
 
 parser = argparse.ArgumentParser(description='')
-parser.add_argument('--shapenet-dir', type=str,
+parser.add_argument('--shapenet-dir', type=str, default=os.getenv('KAOLIN_TEST_SHAPENETV2_PATH'),
                     help='Path to shapenet (v2)')
 parser.add_argument('--cache-dir', type=str, default='/tmp/dir',
                     help='Path where output of the dataset is cached')
@@ -52,22 +52,11 @@ def preprocessing_transform(inputs):
     uvs = torch.nn.functional.pad(mesh.uvs.unsqueeze(0) % 1, (0, 0, 0, 1)) * 2. - 1.
     uvs[:, :, 1] = -uvs[:, :, 1]
     face_uvs_idx = mesh.face_uvs_idx
-    materials_order = mesh.materials_order
+    face_material_idx = mesh.material_assignments
     materials = [m['map_Kd'].permute(2, 0, 1).unsqueeze(0).float() / 255. if 'map_Kd' in m else
                  m['Kd'].reshape(1, 3, 1, 1)
                  for m in mesh.materials]
-    
-    nb_faces = faces.shape[0]
-    num_consecutive_materials = \
-        torch.cat([
-            materials_order[1:, 1],
-            torch.LongTensor([nb_faces])
-        ], dim=0)- materials_order[:, 1]
-    
-    face_material_idx = kal.ops.batch.tile_to_packed(
-        materials_order[:, 0],
-        num_consecutive_materials
-    ).squeeze(-1)
+
     mask = face_uvs_idx == -1
     face_uvs_idx[mask] = 0
     face_uvs = kal.ops.mesh.index_vertices_by_faces(

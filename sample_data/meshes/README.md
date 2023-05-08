@@ -87,3 +87,24 @@ and are not meant to be high-quality 3D examples.
 * UVs
 
 <div style="clear:both"></div>
+
+## Quad Multi-Object Multi-Material Amsterdam
+
+**Filenames:** [amsterdam.obj](amsterdam.obj), [amsterdam.usda](amsterdam.usda).
+
+**Source:** this stylized city was authored in Blender, it contains simple materials and no textures.
+
+**Formats**: was exported as both `obj` and `usda` (ascii) from Blender.
+
+**Sanity checks**: displays correctly as `obj` imported into Blender3.1 and as `usda` imported into [NVIDIA Omniverse](https://www.nvidia.com/en-us/omniverse/). 
+
+<img width="30%" style="padding:0 20px 0 0; float: left" src="renders/amsterdam.jpg">
+
+**Attributes** of the 18 meshes in this file:
+* Vertices: 4, 98, 98, 98, 386, 386, 98, 8, 98, 98, 98, 4, 4, 4, 386, 98, 4, 4
+* Faces (all quads): 1, 96, 96, 96, 384, 384, 96, 6, 96, 96, 96, 1, 1, 1, 384, 96, 1, 1
+* Materials: 14 simple materials, with all faces of each mesh bound to a single material
+* Normals
+* UVs
+
+<div style="clear:both"></div>

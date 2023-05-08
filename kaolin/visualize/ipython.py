@@ -142,12 +142,12 @@ class BaseIpyVisualizer(object):
         if new_val is None:
             self.event.wait = 0
         else:
-            self.event.wait = int(1000. / max_fps)
+            self.event.wait = int(1000. / self._max_fps)
 
 @torch.jit.script
 def make_quaternion_rotation(angle: float, vec: torch.Tensor):
     r"""Represent a rotation around axis as a quaternion.
-    
+
     Args:
         angle (float): angle of rotation.
         vec (torch.Tensor):
@@ -163,7 +163,7 @@ def make_quaternion_rotation(angle: float, vec: torch.Tensor):
     return torch.stack([
         vec[:, 0] * sin_half_angle,
         vec[:, 1] * sin_half_angle,
-        vec[:, 2] * sin_half_angle, 
+        vec[:, 2] * sin_half_angle,
         torch.full((vec.shape[0],), cos_half_angle, dtype=vec.dtype, device=vec.device)
     ], dim=-1)
 
@@ -597,7 +597,7 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
                 if torch.dot(self.world_up.squeeze(), camera.cam_forward().squeeze()) >= 0:
                     self.elevation = -self.elevation
         self.azimuth = torch.zeros((1,), device=camera.device, dtype=camera.dtype)
-        
+
         self.zoom_sensitivity = zoom_sensitivity
         self.rotation_scale = rotation_sensitivity * math.pi
         self.translation_sensitivity = translation_sensitivity
@@ -666,7 +666,7 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
                         self._safe_zoom(event['deltaY'] * self.zoom_sensitivity)
                         self.render_update()
                     elif event['type'] == 'mousedown':
-                        self.position = (event['relativeX'], event['relativeY']) 
+                        self.position = (event['relativeX'], event['relativeY'])
                     elif event['type'] in ['mouseup', 'mouseleave', 'mouseenter']:
                         self.render_update()
                     elif event['type'] == 'mousemove':
