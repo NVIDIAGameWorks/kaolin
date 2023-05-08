@@ -15,10 +15,12 @@
 
 from abc import abstractmethod
 from collections.abc import Callable, Mapping
+import logging
 import inspect
 import os
 from pathlib import Path
 from PIL import Image
+import PIL
 import posixpath
 import torch
 import warnings
@@ -31,6 +33,7 @@ except ImportError:
 
 from .usd.utils import create_stage
 
+logging.getLogger("PIL.PngImagePlugin").propagate = False
 
 class MaterialError(Exception):
     pass
@@ -558,6 +561,7 @@ class PBRMaterial(Material):
         is_specular_workflow_input = shader.CreateInput('useSpecularWorkflow', Sdf.ValueTypeNames.Int)
         displacement_input = shader.CreateInput('displacement', Sdf.ValueTypeNames.Float)
 
+        # TODO(cfujitsang): This doesn't seems to be taking into account colorspace
         # Set constant values
         if self.diffuse_color is not None:
             diffuse_input.Set(tuple(self.diffuse_color), time=time)
@@ -783,8 +787,8 @@ class PBRMaterial(Material):
                     colorspace = 'auto'
                 try:
                     return cls._read_image(fp, colorspace=colorspace), False
-                except MaterialLoadError:
-                    warnings.warn(f'An error was encountered while processing the data {data["file"]}.')
+                except MaterialLoadError as e:
+                    warnings.warn(f'An error was encountered while processing the data {data["file"]}. "{e}"')
                     if 'fallback' in data:
                         return data['fallback']['value'], True
             return None, False
