@@ -14,17 +14,22 @@
 # limitations under the License.
 
 from abc import abstractmethod
+from io import BytesIO
 import math
+import traceback
+import warnings
 
+from PIL import Image as PILImage
 import torch
 
-from ipyevents import Event
-from ipywidgets import Output
-from ipywidgets import Image as ImageWidget
-from ipycanvas import Canvas
+try:
+    from ipyevents import Event
+    from ipywidgets import Output
+    from ipywidgets import Image as ImageWidget
+    from ipycanvas import Canvas
+except Exception as e:
+    warnings.warn('Error importing kaolin.visualize.ipython:\n' + traceback.format_exc())
 
-from io import BytesIO
-from PIL import Image as PILImage
 
 from ..render.camera import CameraExtrinsics
 
