@@ -79,6 +79,7 @@ def lookat_data(request):
 
     entry = data[data_idx]
     if is_batch_dim:  # Return a batch of 2 (same data twice)
+        # second_entry = data[(data_idx + 1) % len(_LOOK_AT_DATA_IDX)]
         entry = {k: (torch.stack((v, v), dim=0) if k != 'view_matrix' else torch.cat((v, v), dim=0))
                  for k, v in entry.items()}
     if is_row_dim:  # Shape ([B], 3, 1)

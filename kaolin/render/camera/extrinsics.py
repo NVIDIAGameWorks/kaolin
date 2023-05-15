@@ -948,8 +948,12 @@ class CameraExtrinsics():
         return self.R.transpose(2, 1) @ self._world_y()
 
     def cam_forward(self) -> torch.Tensor:
-        """Returns:
-            (torch.Tensor): the camera forward axis, in world coordinates"""
+        r""" Returns the camera forward axis -
+
+        See: https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/lookat-function/framing-lookat-function.html
+
+        Returns:
+            (torch.Tensor): the camera forward axis, in world coordinates."""
         return self.R.transpose(2, 1) @ self._world_z()
 
     def parameters(self) -> torch.Tensor:

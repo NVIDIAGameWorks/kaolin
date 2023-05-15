@@ -136,6 +136,96 @@ class CameraIntrinsics(ABC):
         raise NotImplementedError('This projection of this camera type is non-linear in homogeneous coordinates '
                                   'and therefore does not support a projection matrix. Use self.transform() instead.')
 
+    def viewport_matrix(self, vl=0, vr=None, vb=0, vt=None, min_depth=0.0, max_depth=1.0) -> torch.Tensor:
+        r"""Constructs a viewport matrix which transforms coordinates from NDC space to pixel space.
+        This is the general matrix form of glViewport, familiar from OpenGL.
+
+        NDC coordinates are expected to be in:
+        * [-1, 1] for the (x,y) coordinates.
+        * [ndc_min, ndc_max] for the (z) coordinate.
+
+        Pixel coordinates are in:
+        * [vl, vr] for the (x) coordinate.
+        * [vb, vt] for the (y) coordinate.
+        * [0, 1] for the (z) coordinate (yielding normalized depth).
+
+        When used in conjunction with a :func:`projection_matrix()`, a transformation from camera view space to
+        window space can be obtained.
+
+        Note that for the purpose of rendering with OpenGL shaders, this matrix is not required, as viewport
+        transformation is already applied by the hardware.
+
+        By default, this matrix assumes the NDC screen spaces have the y axis pointing up.
+        Under this assumption, and a [-1, 1] NDC space,
+        the default values of this method are compatible with OpenGL glViewport.
+
+        .. seealso::
+
+            glViewport() at https://registry.khronos.org/OpenGL-Refpages/gl4/html/glViewport.xhtml
+            and https://en.wikibooks.org/wiki/GLSL_Programming/Vertex_Transformations#Viewport_Transformation
+
+            projection_matrix() which converts coordinates from camera view space to NDC space.
+
+        .. note::
+
+            1. This matrix changes form depending on the NDC space used.
+            2. Returned values are floating points, rather than integers
+               (thus this method is compatible with antialising ops).
+
+        Args:
+            vl (int): Viewport left (pixel coordinates x) - where the viewport starts. Default is 0.
+            vr (int): Viewport right (pixel coordinates x) - where the viewport ends. Default is camera width.
+            vb (int): Viewport bottom (pixel coordinates y) - where the viewport starts. Default is 0.
+            vt (int): Viewport top (pixel coordinates y) - where the viewport ends. Default is camera height.
+            min_depth (float): Minimum of output depth range. Default is 0.0.
+            max (float): Maximum of output depth range. Default is 1.0.
+
+        Returns:
+            (torch.Tensor): the viewport matrix, of shape :math:`(1, 4, 4)`.
+        """
+        if vr is None:
+            vr = self.width
+        if vt is None:
+            vt = self.height
+        vl = float(vl)
+        vr = float(vr)
+        vb = float(vb)
+        vt = float(vt)
+
+        # From NDC space
+        ndc_min_x = -1.0
+        ndc_min_y = -1.0
+        ndc_min_z = self.ndc_min
+        ndc_max_x = 1.0
+        ndc_max_y = 1.0
+        ndc_max_z = self.ndc_max
+        ndc_width = ndc_max_x - ndc_min_x               # All ndc spaces assume x clip coordinates in [-1, 1]
+        ndc_height = ndc_max_y - ndc_min_y              # All ndc spaces assume y clip coordinates in [-1, 1]
+        ndc_depth = ndc_max_z - ndc_min_z               # NDC depth range, this is NDC space dependent
+
+        # To screen space
+        vw = vr - vl                                    # Viewport width
+        vh = vt - vb                                    # Viewport height
+        out_depth_range = max_depth - min_depth         # By default, normalized depth is assumed [0, 1]
+
+        # Recall that for OpenGL NDC space and full screen viewport, the following matrix is given,
+        # where vw, vh stand for screen width and height:
+        #              [vw/2,  0.0,  0.0,  vw/2]  @  [ x ]   = ..   perspective   =  [(x/w + 1) * (vw/2)]
+        #              [0.0,   vh/2, 0.0,  vh/2]     [ y ]          division         [(y/w + 1) * (vh/2)]
+        #              [0.0,   0.0,  1/2,  1/2]      [ z ]          ------------>    [(z/w + 1) / 2]
+        #              [0.0,   0.0,  0.0,  1.0]      [ w ]          (/w)             [  1.0  ]
+
+        # The matrix is non differentiable, as viewport coordinates are a fixed standard set by the graphics api
+        ndc_mat = self.params.new_tensor([
+            [vw / ndc_width, 0.0,             0.0,                          -(ndc_min_x / ndc_width) * vw + vl],
+            [0.0,            vh / ndc_height, 0.0,                          -(ndc_min_y / ndc_height) * vh + vb],
+            [0.0,            0.0,             out_depth_range / ndc_depth,  -(ndc_min_z / ndc_depth) * out_depth_range + min_depth],
+            [0.0,            0.0,             0.0,                          1.0]
+        ])
+
+        # Add batch dim, to allow broadcasting
+        return ndc_mat.unsqueeze(0)
+
     @abstractmethod
     def transform(self, vectors: torch.Tensor) -> torch.Tensor:
         r"""Projects the vectors from view space / camera space to NDC (normalized device coordinates) space.
