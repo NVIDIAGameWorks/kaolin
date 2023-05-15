@@ -75,18 +75,21 @@ def get_raw_mesh_prim_geometry(mesh_prim, time=None, with_normals=False, with_uv
         time (convertible to float, optional): positive integer indicating the time at which to retrieve parameters
 
     Returns:
-    dictionary of some or all values:
+
+    (dict):
         - **vertices** (torch.FloatTensor): vertex positions with any transforms already applied, of shape (N, 3)
         - **transform** (torch.FloatTensor): applied transform of shape (4, 4)
         - **faces** (torch.LongTensor): face vertex indices of original shape saved in the USD
         - **face_sizes** (torch.LongTensor): face vertex counts of original shape saved in the USD
-        if `with_normals=True`:
-        - **normals** (torch.FloatTensor): normal values of original shape saved in the USD
-        - **normals_interpolation** (string): normal interpolation type saved in the USD, such as "faceVarying"
-        if `with_uvs=True`:
-        - **uvs** (torch.FloatTensor): raw UV values saved in the USD
-        - **face_uvs_idx** (torch.LongTensor): raw indices into the UV for every vertex of every face
-        - **uv_interpolation** (string): UV interpolation type saved in the USD, such as "faceVarying"
+        - **normals** (torch.FloatTensor, optional):
+            if `with_normals=True`, normal values of original shape saved in the USD
+        - **normals_interpolation** (string, optional):
+            if `with_normals=True`, normal interpolation type saved in the USD, such as "faceVarying"
+        - **uvs** (torch.FloatTensor, optional): if ``with_uvs=True``, raw UV values saved in the USD
+        - **face_uvs_idx** (torch.LongTensor, optional):
+            if ``with_uvs=True``, raw indices into the UV for every vertex of every face
+        - **uv_interpolation** (string, optional):
+            if ``with_uvs=True``, UV interpolation type saved in the USD, such as "faceVarying"
     """
     if time is None:
         time = Usd.TimeCode.Default()

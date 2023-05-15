@@ -87,7 +87,11 @@ spec:
           stage("Pytest") {
             sh '''
             export KAOLIN_TEST_NVIDIFFRAST=1
-            pytest --import-mode=importlib -s --cov=/kaolin/kaolin /kaolin/tests/python/kaolin/
+            export KAOLIN_TEST_SHAPENETV1_PATH=/mnt/data/ci_shapenetv1
+            export KAOLIN_TEST_SHAPENETV2_PATH=/mnt/data/ci_shapenetv2
+            export KAOLIN_TEST_MODELNET_PATH=/mnt/data/ModelNet
+            export KAOLIN_TEST_SHREC16_PATH=/mnt/data/ci_shrec16
+            pytest --import-mode=importlib -rs --cov=/kaolin/kaolin /kaolin/tests/python/kaolin/
             '''
           }
         } catch(e) {
@@ -96,7 +100,7 @@ spec:
         }
         try {
           stage("Dash3D") {
-            sh '''
+            '''
             pytest -s --cov=/kaolin/kaolin /kaolin/tests/integration/
             '''
           }
@@ -162,6 +166,14 @@ spec:
         try {
           stage("Spherical Gaussian lighting Tutorial") {
             sh 'cd /kaolin/examples/tutorial && ipython sg_specular_lighting.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Interactive Visualizer") {
+            sh 'cd /kaolin/examples/tutorial && ipython interactive_visualizer.ipynb'
           }
         } catch(e) {
           build_passed = false

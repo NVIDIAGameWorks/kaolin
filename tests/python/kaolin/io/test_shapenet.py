@@ -24,22 +24,28 @@ from kaolin.io.obj import return_type
 from kaolin.io.dataset import KaolinDatasetItem
 from kaolin.io import shapenet
 
-SHAPENETV1_PATH = '/data/ShapeNetCore.v1'
-SHAPENETV2_PATH = '/data/ShapeNetCore.v2'
+SHAPENETV1_PATH = os.getenv('KAOLIN_TEST_SHAPENETV1_PATH')
+SHAPENETV2_PATH = os.getenv('KAOLIN_TEST_SHAPENETV2_PATH')
 SHAPENET_TEST_CATEGORY_SYNSETS = ['02933112']
 SHAPENET_TEST_CATEGORY_LABELS = ['dishwasher']
 SHAPENET_TEST_CATEGORY_MULTI = ['mailbox', '04379243']
 
 ALL_CATEGORIES = [
-    None,
     SHAPENET_TEST_CATEGORY_SYNSETS,
     SHAPENET_TEST_CATEGORY_LABELS,
     SHAPENET_TEST_CATEGORY_MULTI
 ]
 
-# Skip test in a CI environment
-@pytest.mark.skipif(os.getenv('CI') == 'true', reason="CI does not have dataset")
-@pytest.mark.parametrize('version', ['v1', 'v2'])
+@pytest.mark.parametrize('version', [
+    pytest.param('v1', marks=pytest.mark.skipif(
+        SHAPENETV1_PATH is None,
+        reason="'KAOLIN_TEST_SHAPENETV1_PATH' environment variable is not set."
+    )),
+    pytest.param('v2', marks=pytest.mark.skipif(
+        SHAPENETV2_PATH is None,
+        reason="'KAOLIN_TEST_SHAPENETV2_PATH' environment variable is not set."
+    ))
+])
 @pytest.mark.parametrize('categories', ALL_CATEGORIES)
 @pytest.mark.parametrize('with_materials', [True, False])
 @pytest.mark.parametrize('output_dict', [True, False])
