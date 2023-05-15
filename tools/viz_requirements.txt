@@ -6,3 +6,4 @@ jupyter_client<8
 pyzmq<25
 flask
 tornado
+comm>=0.1.3

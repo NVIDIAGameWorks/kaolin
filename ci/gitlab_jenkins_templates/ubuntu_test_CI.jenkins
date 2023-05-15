@@ -86,7 +86,7 @@ spec:
         try {
           stage("Pytest") {
             sh '''
-            export KAOLIN_TEST_NVIDIFFRAST=1
+            export KAOLIN_TEST_NVDIFFRAST=1
             export KAOLIN_TEST_SHAPENETV1_PATH=/mnt/data/ci_shapenetv1
             export KAOLIN_TEST_SHAPENETV2_PATH=/mnt/data/ci_shapenetv2
             export KAOLIN_TEST_MODELNET_PATH=/mnt/data/ModelNet
@@ -100,7 +100,7 @@ spec:
         }
         try {
           stage("Dash3D") {
-            '''
+            sh '''
             pytest -s --cov=/kaolin/kaolin /kaolin/tests/integration/
             '''
           }
