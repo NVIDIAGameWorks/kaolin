@@ -50,8 +50,8 @@ class TestRenderLighting:
         num_vertices = vertices.shape[1]
         face_vertices = kal.ops.mesh.index_vertices_by_faces(vertices, faces)
         # Face normals w.r.t to the world coordinate system
-        normals = obj.vertex_normals.cuda().unsqueeze(0)
-        face_normals_idx = obj.face_normals.cuda()
+        normals = obj.normals.cuda().unsqueeze(0)
+        face_normals_idx = obj.face_normals_idx.cuda()
         face_world_normals = kal.ops.mesh.index_vertices_by_faces(normals, face_normals_idx)
 
         face_uvs_idx = obj.face_uvs_idx.cuda()

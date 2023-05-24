@@ -94,7 +94,6 @@ class TestMisc:
     @pytest.mark.parametrize('input_stage', [False, True])
     def test_get_scene_paths(self, mesh_path, input_stage):
         paths = usd.get_scene_paths(mesh_path)
-        print(paths)
         assert len(paths) == 2
 
         paths = usd.get_scene_paths(mesh_path, prim_types="Mesh")

@@ -29,7 +29,7 @@ from kaolin.utils import testing
 
 logger = logging.getLogger(__name__)
 
-sample_tuple = namedtuple('sample_tuple', ['A', 'B', 'C'])
+sample_tuple = namedtuple('sample_tuple', ['A', 'B', 'C', 'D'])
 
 
 class TestCheckTensor:
@@ -548,7 +548,7 @@ class TestContainedTorchEqual:
         assert testing.contained_torch_equal(elem, other)
 
         # Also try on a tuple
-        elem = sample_tuple('hello', torch.rand(3, 3), (torch.rand(10, 3) * 10).to(torch.int32))
+        elem = sample_tuple('hello', torch.rand(3, 3), (torch.rand(10, 3) * 10).to(torch.int32), {'a': torch.rand(5)})
         other = copy.deepcopy(elem)
         assert testing.contained_torch_equal(elem, other)
 
@@ -559,9 +559,9 @@ class TestContainedTorchEqual:
         assert not testing.contained_torch_equal(elem, other)
 
         # Also try on a tuple
-        elem = sample_tuple('hello', torch.rand(3, 3), (torch.rand(10, 3) * 10).to(torch.int32))
+        elem = sample_tuple('hello', torch.rand(3, 3), (torch.rand(10, 3) * 10).to(torch.int32), {'a': torch.rand(5)})
         other = copy.deepcopy(elem)
-        other.B[0, 0] +=  0.001
+        other.B[0, 0] += 0.001
         assert not testing.contained_torch_equal(elem, other)
 
     def test_approximate(self):
@@ -579,7 +579,7 @@ class TestCheckTensorAttributeShapes:
         container = {'cat': torch.rand((1, 5, 6)), 'dog': torch.rand((5, 5, 6)), 'colors': torch.rand((100, 3))}
         assert testing.check_tensor_attribute_shapes(container, throw=throw, cat=(1, 5, 6), colors=(None, 3))
 
-        container = sample_tuple('Hello', torch.rand((3, 4, 5)), torch.rand((5, 1, 6)))
+        container = sample_tuple('Hello', torch.rand((3, 4, 5)), torch.rand((5, 1, 6)), {})
         assert testing.check_tensor_attribute_shapes(container, throw=throw, B=(3, None, 5), C=[5, 1, 6])
 
     def test_checks_fail(self):
@@ -590,7 +590,7 @@ class TestCheckTensorAttributeShapes:
 
 class TestPrintDiagnostics:
     def test_print_namedtuple_attributes(self, capsys):
-        sample1 = sample_tuple('My Name', [1, 2, 3], torch.zeros((5, 5, 5)))
+        sample1 = sample_tuple('My Name', [1, 2, 3], torch.zeros((5, 5, 5)), {'a': torch.rand(5)})
 
         testing.print_namedtuple_attributes(sample1)
         out1, err = capsys.readouterr()

@@ -23,6 +23,7 @@ import random
 from kaolin.io.obj import return_type
 from kaolin.io.dataset import KaolinDatasetItem
 from kaolin.io import shapenet
+from kaolin.utils.testing import contained_torch_equal
 
 SHAPENETV1_PATH = os.getenv('KAOLIN_TEST_SHAPENETV1_PATH')
 SHAPENETV2_PATH = os.getenv('KAOLIN_TEST_SHAPENETV2_PATH')
@@ -64,9 +65,9 @@ class TestShapeNet(object):
                         uvs=outputs['mesh'].uvs,
                         face_uvs_idx=outputs['mesh'].face_uvs_idx,
                         materials=outputs['mesh'].materials,
-                        materials_order=outputs['mesh'].materials_order,
-                        vertex_normals=outputs['mesh'].vertex_normals,
-                        face_normals=outputs['mesh'].face_normals
+                        material_assignments=outputs['mesh'].material_assignments,
+                        normals=outputs['mesh'].normals,
+                        face_normals_idx=outputs['mesh'].face_normals_idx
                     )
                     return outputs
                 return transform
@@ -79,9 +80,9 @@ class TestShapeNet(object):
                             uvs=inputs.data.uvs,
                             face_uvs_idx=inputs.data.face_uvs_idx,
                             materials=inputs.data.materials,
-                            materials_order=inputs.data.materials_order,
-                            vertex_normals=inputs.data.vertex_normals,
-                            face_normals=inputs.data.face_normals
+                            material_assignments=inputs.data.material_assignments,
+                            normals=inputs.data.normals,
+                            face_normals_idx=inputs.data.face_normals_idx
                         ),
                         attributes=inputs.attributes)
                     return outputs
@@ -146,16 +147,13 @@ class TestShapeNet(object):
             assert data.face_uvs_idx.shape == data.faces.shape
             assert isinstance(data.materials, list)
             assert len(data.materials) > 0
-            assert isinstance(data.materials_order, torch.LongTensor)
-            assert len(data.materials_order.shape) == 2
-            assert data.materials_order.shape[0] > 0
-            assert data.materials_order.shape[1] == 2
+            assert isinstance(data.material_assignments, torch.ShortTensor)
+            assert list(data.material_assignments.shape) == [data.faces.shape[0]]
         else:
             assert data.uvs is None
             assert data.face_uvs_idx is None
             assert data.materials is None
-            assert data.materials_order is None
-
+            assert data.material_assignments is None
 
         assert isinstance(attributes['name'], str)
         assert isinstance(attributes['path'], Path)
@@ -163,44 +161,23 @@ class TestShapeNet(object):
         assert isinstance(attributes['labels'], list)
 
     @pytest.mark.parametrize('index', [-1, -2])
-    def test_neg_index(self, shapenet_dataset, index, with_materials, output_dict):
+    def test_neg_index(self, shapenet_dataset, index, output_dict):
 
         assert len(shapenet_dataset) > 0
 
         gt_item = shapenet_dataset[len(shapenet_dataset) + index]
         if output_dict:
             gt_data = gt_item['mesh']
-            gt_attributes = gt_item
         else:
             gt_data = gt_item.data
-            gt_attributes = gt_item.attributes
 
         item = shapenet_dataset[index]
         if output_dict:
             data = item['mesh']
-            attributes = item
         else:
             data = item.data
-            attributes = item.attributes
 
-        assert torch.equal(data.vertices, gt_data.vertices)
-        assert torch.equal(data.faces, gt_data.faces)
-
-        if with_materials:
-            assert torch.equal(data.uvs, gt_data.uvs)
-            assert torch.equal(data.face_uvs_idx, gt_data.face_uvs_idx)
-            assert torch.equal(data.materials_order, gt_data.materials_order)
-            for m, gt_m in zip(data.materials, gt_data.materials):
-                assert m.keys() == gt_m.keys()
-                for k in m.keys():
-                    if k == 'name':
-                        assert m[k] == gt_m[k]
-                    else:
-                        assert torch.equal(m[k], gt_m[k])
-        assert attributes['name'] == gt_attributes['name']
-        assert attributes['path'] == gt_attributes['path']
-        assert attributes['synset'] == gt_attributes['synset']
-        assert attributes['labels'] == gt_attributes['labels']
+        contained_torch_equal(item, gt_item)
 
     def test_test_split(self, shapenet_dataset, with_materials, output_dict,
                         version, categories):

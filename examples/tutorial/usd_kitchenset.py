@@ -18,6 +18,7 @@ import os
 import argparse
 
 from kaolin.io import usd
+from kaolin.io.utils import mesh_handler_naive_triangulate
 
 
 def import_kitchen_set(kitchen_set_usd):
@@ -29,9 +30,9 @@ def import_kitchen_set(kitchen_set_usd):
     # for each polygon varies. To deal with those, we'll pass in a handler function that will 
     # homogenize those meshes to homogenous triangle meshes.
     usd_meshes = usd.import_meshes(
-        file_path=kitchen_set_usd,
+        kitchen_set_usd,
         scene_paths=scene_paths,
-        heterogeneous_mesh_handler=usd.heterogeneous_mesh_handler_naive_homogenize
+        heterogeneous_mesh_handler=mesh_handler_naive_triangulate
     )
     return usd_meshes
 

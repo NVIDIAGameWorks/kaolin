@@ -35,7 +35,7 @@ def _get_stage_from_maybe_file(file_path_or_stage):
 
     Args:
         file_path_or_stage (str or Usd.Stage):
-            Path to usd file (\*.usd, \*.usda) or :class:`Usd.Stage`.
+            Path to usd file (/*.usd, /*.usda) or :class:`Usd.Stage`.
 
     Returns:
         (Usd.Stage): The output stage.

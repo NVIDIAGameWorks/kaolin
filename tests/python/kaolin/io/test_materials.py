@@ -20,7 +20,9 @@ import shutil
 import torch
 import pytest
 
-from kaolin.io import materials, usd, obj
+from kaolin.io import materials as kal_materials
+from kaolin.io import usd, obj
+from kaolin.utils.testing import contained_torch_equal
 
 
 # Seed for texture sampling
@@ -45,7 +47,7 @@ def material_values():
         'specular_color': (1., 0., 0.),
         'is_specular_workflow': True,
     }
-    material = materials.PBRMaterial(**params)
+    material = kal_materials.PBRMaterial(**params)
     yield material
 
 
@@ -59,7 +61,7 @@ def material_textures():
         'specular_texture': torch.rand((3, 256, 256)),
         'is_specular_workflow': True,
     }
-    material = materials.PBRMaterial(**params)
+    material = kal_materials.PBRMaterial(**params)
     yield material
 
 
@@ -77,7 +79,7 @@ class TestPBRMaterial:
         file_path = os.path.join(out_dir, 'pbr_test.usda')
         material_values.write_to_usd(file_path, '/World/Looks/pbr', texture_dir='texture')
 
-        material_in = materials.PBRMaterial().read_from_usd(file_path, '/World/Looks/pbr', texture_path='texture')
+        material_in = kal_materials.PBRMaterial().read_from_usd(file_path, '/World/Looks/pbr', texture_path='texture')
 
         assert material_values.diffuse_color == pytest.approx(material_in.diffuse_color, 0.1)
         assert material_values.roughness_value == pytest.approx(material_in.roughness_value, 0.1)
@@ -89,7 +91,7 @@ class TestPBRMaterial:
         file_path = os.path.join(out_dir, 'pbr_test.usda')
         material_values.write_to_usd(file_path, '/World/Looks/pbr')
 
-        material_in = materials.PBRMaterial().read_from_usd(file_path, '/World/Looks/pbr')
+        material_in = kal_materials.PBRMaterial().read_from_usd(file_path, '/World/Looks/pbr')
 
         assert material_values.diffuse_color == pytest.approx(material_in.diffuse_color, 0.1)
         assert material_values.roughness_value == pytest.approx(material_in.roughness_value, 0.1)
@@ -102,7 +104,7 @@ class TestPBRMaterial:
         file_path = os.path.join(out_dir, 'pbr_tex_test.usda')
         material_textures.write_to_usd(file_path, '/World/Looks/pbr')
 
-        material_in = materials.PBRMaterial().read_from_usd(file_path, '/World/Looks/pbr')
+        material_in = kal_materials.PBRMaterial().read_from_usd(file_path, '/World/Looks/pbr')
         assert torch.allclose(material_textures.diffuse_texture, material_in.diffuse_texture, atol=1e-2)
         assert torch.allclose(material_textures.roughness_texture, material_in.roughness_texture, atol=1e-2)
         assert torch.allclose(material_textures.metallic_texture, material_in.metallic_texture, atol=1e-2)
@@ -129,7 +131,7 @@ class TestPBRMaterial:
         }
         for test_name, params in tests.items():
             prim = stage.DefinePrim(f'/World/{test_name}', 'Sphere')
-            mat = materials.PBRMaterial(**params)
+            mat = kal_materials.PBRMaterial(**params)
             mat.write_to_usd(out_path, f'/World/Looks/{test_name}', bound_prims=[prim])
         stage.Save()
 
@@ -170,11 +172,11 @@ class TestPBRMaterial:
         }
 
         for test_name, params in tests.items():
-            material_textures = materials.PBRMaterial(**params)
+            material_textures = kal_materials.PBRMaterial(**params)
             prim = usd.add_mesh(stage, f'/World/{test_name}', mesh.vertices, mesh.faces,
                                 uvs=mesh.uvs,
                                 face_uvs_idx=mesh.face_uvs_idx,
-                                face_normals=mesh.vertex_normals[mesh.face_normals].view(-1, 3))
+                                face_normals=mesh.normals[mesh.face_normals_idx].view(-1, 3))
             material_textures.write_to_usd(out_path, f'/World/Looks/{test_name}', bound_prims=[prim])
         stage.Save()
 
@@ -202,16 +204,65 @@ class TestPBRMaterial:
         texture = {'metallic_texture': single_channel_texture, 'metallic_colorspace': 'auto',
                    'roughness_texture': single_channel_texture, 'roughness_colorspace': 'raw',
                    'diffuse_texture': rgb_texture, 'diffuse_colorspace': 'sRGB'}
-        material = materials.PBRMaterial(**texture)
+        material = kal_materials.PBRMaterial(**texture)
 
         prim = usd.add_mesh(stage, '/World/colorspace_test', mesh.vertices, mesh.faces,
                             uvs=mesh.uvs,
                             face_uvs_idx=mesh.face_uvs_idx,
-                            face_normals=mesh.vertex_normals[mesh.face_normals].view(-1, 3))
+                            face_normals=mesh.normals[mesh.face_normals_idx].view(-1, 3))
         material.write_to_usd(out_path, '/World/Looks/colorspace_test', bound_prims=[prim])
 
-        material_in = materials.PBRMaterial().read_from_usd(out_path, '/World/Looks/colorspace_test')
+        material_in = kal_materials.PBRMaterial().read_from_usd(out_path, '/World/Looks/colorspace_test')
 
         assert material_in.diffuse_colorspace == 'sRGB'
         assert material_in.metallic_colorspace == 'auto'
         assert material_in.roughness_colorspace == 'raw'
+
+
+class TestUtilities:
+    @pytest.mark.parametrize('any_error_handler', [obj.skip_error_handler, obj.ignore_error_handler,
+                                                   obj.create_missing_materials_error_handler,
+                                                   obj.default_error_handler])
+    @pytest.mark.parametrize('material_assignments_shape', [1, 2])  # face indices, or start,end ranges
+    def test_process_materials_and_assignments(self, any_error_handler, material_assignments_shape):
+        materials_dict = {
+            'bricks': {'Ka': torch.rand((3,)), 'Kd': torch.rand((3,)), 'material_name': 'bricks'},
+            'grass': {'Ka': torch.rand((3,)), 'Kd': torch.rand((3,)), 'material_name': 'grass'}}
+        if material_assignments_shape == 2:
+            material_assignments_dict = {  # Using start,end ranges
+                'bricks': torch.LongTensor([[0, 10], [15, 20]]),
+                'grass': torch.LongTensor([[10, 15], [21, 22], [25, 30]])}
+        else:
+            material_assignments_dict = {  # Equivalent to above, but using full list of faces
+                'bricks': torch.LongTensor(list(range(0, 10)) + list(range(15, 20))),
+                'grass': torch.LongTensor(list(range(10, 15)) + list(range(21, 22)) + list(range(25, 30)))}
+        path = 'path'
+        num_faces = 30
+        expected_materials = [materials_dict['bricks'], materials_dict['grass']]
+        expected_assignments = torch.ShortTensor(
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, -1, 1, -1, -1, -1, 1, 1, 1, 1, 1])
+
+        # This should succeed with any error handler
+        materials, material_assignments = kal_materials.process_materials_and_assignments(
+            materials_dict, material_assignments_dict, any_error_handler, num_faces)
+        assert contained_torch_equal(materials, expected_materials)
+        assert torch.equal(material_assignments, expected_assignments)
+
+        # Now let's add assignment to a non-existent material
+        material_assignments_dict['kitties'] = torch.LongTensor([[22, 25]])
+        if any_error_handler == obj.default_error_handler:
+            with pytest.raises(obj.MaterialNotFoundError):
+                materials, material_assignments = kal_materials.process_materials_and_assignments(
+                    materials_dict, material_assignments_dict, any_error_handler, num_faces, error_context_str=path)
+        elif any_error_handler in [obj.skip_error_handler, obj.ignore_error_handler]:
+            # Ignore extra assignment
+            materials, material_assignments = kal_materials.process_materials_and_assignments(
+                materials_dict, material_assignments_dict, any_error_handler, num_faces, error_context_str=path)
+            assert contained_torch_equal(materials, expected_materials)
+            assert torch.equal(material_assignments, expected_assignments)
+        elif any_error_handler == obj.create_missing_materials_error_handler:
+            expected_assignments[22:25] = 2
+            materials, material_assignments = kal_materials.process_materials_and_assignments(
+                materials_dict, material_assignments_dict, any_error_handler, num_faces)
+            assert [m['material_name'] for m in materials] == ['bricks', 'grass', 'kitties']
+            assert contained_torch_equal(materials[:2], expected_materials)

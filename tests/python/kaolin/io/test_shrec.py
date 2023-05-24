@@ -63,9 +63,9 @@ class TestSHREC16(object):
                         uvs=outputs['mesh'].uvs,
                         face_uvs_idx=outputs['mesh'].face_uvs_idx,
                         materials=outputs['mesh'].materials,
-                        materials_order=outputs['mesh'].materials_order,
-                        vertex_normals=outputs['mesh'].vertex_normals,
-                        face_normals=outputs['mesh'].face_normals
+                        material_assignments=outputs['mesh'].material_assignments,
+                        normals=outputs['mesh'].normals,
+                        face_normals_idx=outputs['mesh'].face_normals_idx
                     )
                     return outputs
                 return transform
@@ -78,9 +78,9 @@ class TestSHREC16(object):
                             uvs=inputs.data.uvs,
                             face_uvs_idx=inputs.data.face_uvs_idx,
                             materials=inputs.data.materials,
-                            materials_order=inputs.data.materials_order,
-                            vertex_normals=inputs.data.vertex_normals,
-                            face_normals=inputs.data.face_normals
+                            material_assignments=inputs.data.material_assignments,
+                            normals=inputs.data.normals,
+                            face_normals_idx=inputs.data.face_normals_idx
                         ),
                         attributes=inputs.attributes)
                     return outputs

@@ -23,6 +23,7 @@ import torch
 from torch.types import _float, _bool
 
 __all__ = [
+    "CameraFOV",
     "CameraIntrinsics",
     "up_to_homogeneous",
     "down_from_homogeneous"
