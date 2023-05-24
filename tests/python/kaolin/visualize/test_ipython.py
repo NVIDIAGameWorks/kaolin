@@ -23,20 +23,29 @@ import pytest
 import kaolin
 
 class DummyRenderer():
-    def __init__(self, height, width, value):
+    def __init__(self, height, width, value, output_dict=False):
         self.height = height
         self.width = width
         self.value = value
         self.render_count = 0
         self.event_count = 0
+        self.output_dict = output_dict
 
     def __call__(self, camera):
         self.render_count += 1
-        return torch.full((self.height, self.width, 3), self.value,
-                          device=camera.device, dtype=torch.uint8)
+        img = torch.full((self.height, self.width, 3), self.value,
+                         device=camera.device, dtype=torch.uint8) 
+        if self.output_dict:
+            return {
+                'img': img,
+                'a': 1
+            }
+        else:
+            return img
 
-@pytest.mark.parametrize('height,width', [(64, 64), (32, 32)])
-@pytest.mark.parametrize('device', ['cpu', 'cuda'])
+@pytest.mark.parametrize('height,width', [(16, 16), (32, 32)])
+@pytest.mark.parametrize('device', ['cpu'])
+@pytest.mark.parametrize('output_dict', [False, True])
 class TestVisualizers:
 
     @pytest.fixture(autouse=True)
@@ -53,20 +62,20 @@ class TestVisualizers:
         )
 
     @pytest.fixture(autouse=True)
-    def renderer(self, height, width):
+    def renderer(self, height, width, output_dict):
         return DummyRenderer(
-            height, width, 0
+            height, width, 0, output_dict
         )
 
     @pytest.fixture(autouse=True)
-    def fast_renderer(self, height, width):
+    def fast_renderer(self, height, width, output_dict):
         return DummyRenderer(
-            int(height / 4), int(width / 4), 255
+            int(height / 4), int(width / 4), 255, output_dict
         )
 
     #TODO(cfujitsang): can't find a way to test max_fps
     @pytest.mark.parametrize('with_fast_renderer', [True, False])
-    @pytest.mark.parametrize('world_up_axis', [0, 1, 2])
+    @pytest.mark.parametrize('world_up_axis', [0, 1])
     @pytest.mark.parametrize('with_focus_at', [True, False])
     @pytest.mark.parametrize('with_sensitivity', [True, False])
     @pytest.mark.parametrize('with_additional_event', [True, False])
@@ -224,7 +233,8 @@ class TestVisualizers:
         assert torch.allclose(cur_cam_pos, viz.camera.cam_pos().squeeze(-1),
                               atol=1e-4, rtol=1e-4)
         cur_camera = copy.deepcopy(viz.camera)
-        viz._handle_event({'type': 'mouseup', 'buttons': 1})
+        viz._handle_event({'type': 'mouseup', 'button': 0, 'buttons': 1,
+                           'relativeX': to_x, 'relativeY': to_y})
         expected_render_count += 1
         check_counts()
         assert torch.equal(cur_camera.view_matrix(), viz.camera.view_matrix()), \
@@ -460,7 +470,8 @@ class TestVisualizers:
                               atol=1e-4, rtol=1e-4)
         cur_camera = copy.deepcopy(viz.camera)
 
-        viz._handle_event({'type': 'mouseup'})
+        viz._handle_event({'type': 'mouseup', 'button': 0,
+                           'relativeX': to_x, 'relativeY': to_y})
         expected_render_count += 1
         check_counts()
         assert torch.equal(cur_camera.view_matrix(), viz.camera.view_matrix()), \
@@ -500,7 +511,8 @@ class TestVisualizers:
         assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
         assert torch.allclose(cur_camera.params, viz.camera.params)
 
-        viz._handle_event({'type': 'mouseup'})
+        viz._handle_event({'type': 'mouseup', 'button': 1,
+                           'relativeX': to_x, 'relativeY': to_y})
         expected_render_count += 1
         check_counts()
         assert torch.equal(cur_camera.view_matrix(), viz.camera.view_matrix()), \

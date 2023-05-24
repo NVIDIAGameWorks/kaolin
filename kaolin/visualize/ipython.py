@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from abc import abstractmethod
+from collections.abc import Sequence
 from io import BytesIO
 import math
 import traceback
@@ -50,6 +51,21 @@ def update_canvas(canvas, image):
     image = ImageWidget(value=f.getvalue())
     canvas.draw_image(image, 0, 0, canvas.width, canvas.height)
 
+def _print_item_pixel_info(canvas, item, x, y):
+    """helper function to print info of items produced by render"""
+    if torch.is_tensor(item):
+        assert len(item.shape) in [2, 3], f"item is of shape {item.shape}"
+        item_height = item.shape[0]
+        item_width = item.shape[1]
+        if item_height == canvas.height and item_width == canvas.width:
+            print(f"{item[y, x]}")
+        else:
+            scaled_x = int(x * item_width / canvas.width)
+            scaled_y = int(y * item_height / canvas.height)
+            print(f"{item[scaled_y, scaled_x]} (coords scaled to {scaled_x, scaled_y})")
+    else:
+        print(f"{item}")
+
 class BaseIpyVisualizer(object):
     r"""Base class for ipython visualizer.
 
@@ -68,8 +84,9 @@ class BaseIpyVisualizer(object):
         camera (kal.render.camera.Camera): Camera used for the visualization.
         render (Callable):
             render function that take a :class:`kal.render.camera.Camera` as input.
-            Must return a torch.uint8 tensor as output,
-            of shape :math:`(\text{output_height}, \text{output_width})`,
+            Must return a torch.ByteTensor as output,
+            or a dictionary where the element 'img' is a torch.ByteTensor to be displayed,
+            of shape :math:`(\text{output_height}, \text{output_width}, 3)`,
             height and width don't have to match canvas dimension.
         fast_render (optional, Callable):
             A faster rendering function that may be used when doing high frequency manipulation
@@ -100,6 +117,7 @@ class BaseIpyVisualizer(object):
             self.fast_render = fast_render
 
         self._max_fps = max_fps
+        self.current_output = None
 
         wait = 0 if max_fps is None else int(1000. / max_fps)
 
@@ -115,17 +133,40 @@ class BaseIpyVisualizer(object):
     def render_update(self):
         """Update the Canvas with :func:`render`"""
         with torch.no_grad():
-            update_canvas(self.canvas, self.render(self.camera))
+            output = self.render(self.camera)
+            if isinstance(output, dict):
+                self.current_output = output
+            elif isinstance(output, torch.Tensor):
+                self.current_output = {'img': output}
+            else:
+                raise TypeError(f"render function output type ({type(output)}) unsupported")
+            update_canvas(self.canvas, self.current_output['img'])
 
     def fast_render_update(self):
         """Update the Canvas with :func:`fast_render`"""
         with torch.no_grad():
-            update_canvas(self.canvas, self.fast_render(self.camera))
+            output = self.fast_render(self.camera)
+            if isinstance(output, tuple):
+                output = output[0]
+            elif isinstance(output, dict):
+                output = output['img']
+            update_canvas(self.canvas, output)
 
     def show(self):
         """display the Canvas with interactive features"""
         self.render_update()
         display(self.canvas, self.out)
+
+    def _print_pixel_all_infos(self, event):
+        """print pixel all infos from event query"""
+        self.out.clear_output()
+        clamped_x = min(max(event["relativeX"], 0), self.canvas.width - 1)
+        clamped_y = min(max(event["relativeY"], 0), self.canvas.height - 1)
+        print(f'pixel coords: {clamped_x}, {clamped_y}')
+        for key, item in self.current_output.items():
+            print(key, end=': ')
+            _print_item_pixel_info(self.canvas, item, clamped_x, clamped_y)
+
 
     @abstractmethod
     def _handle_event(self, event):
@@ -254,7 +295,8 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
             and with respect to ``world_up``.
         render (Callable):
             render function that take a :class:`kal.render.camera.Camera` as input.
-            Must return a torch.uint8 tensor as output
+            Must return a torch.ByteTensor as output,
+            or a dictionary where the element 'img' is a torch.ByteTensor to be displayed,
             of shape :math:`(\text{output_height}, \text{output_width})`,
             height and width don't have to match canvas dimension.
         fast_render (optional, Callable):
@@ -455,6 +497,8 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
                         self.sign = torch.sign(self.camera.cam_up()[0, self.world_up_axis, 0])
                     elif event['type'] in ['mouseup', 'mouseleave', 'mouseenter']:
                         self.render_update()
+                        if event['type'] == 'mouseup' and event['button'] == 0:
+                            self._print_pixel_all_infos(event)
                     elif event['type'] == 'mousemove' and event['buttons'] == 1:
                             dx = (self.mouse_scale *
                                   (event['relativeX'] - self.position[0]) / self.canvas.width)
@@ -479,7 +523,8 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
             Camera used for the visualization.
         render (Callable):
             render function that take a :class:`kal.render.camera.Camera` as input.
-            Must return a torch.uint8 tensor as output,
+            Must return a torch.ByteTensor as output,
+            or a dictionary where the element 'img' is a torch.ByteTensor to be displayed,
             of shape :math:`(\text{output_height}, \text{output_width})`,
             height and width don't have to match canvas dimension.
         fast_render (optional, Callable):
@@ -669,6 +714,8 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
                         self.position = (event['relativeX'], event['relativeY'])
                     elif event['type'] in ['mouseup', 'mouseleave', 'mouseenter']:
                         self.render_update()
+                        if event['type'] == 'mouseup' and event['button'] == 0:
+                            self._print_pixel_all_infos(event)
                     elif event['type'] == 'mousemove':
                         if event['buttons'] == 1:
                             dx = (self.rotation_scale *
