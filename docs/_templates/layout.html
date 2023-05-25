@@ -4,6 +4,7 @@
   <style>
     :root {
       --nvidia-color: #76B900;
+      --dark-green: #008564;
     }
 
     a, a:visited, a:active {
@@ -27,13 +28,35 @@
         background: #b8d27c;
     }
 
+    html.writer-html4 .rst-content dl:not(.docutils) dl:not(.field-list)>dt, html.writer-html5 .rst-content dl[class]:not(.option-list):not(.field-list):not(.footnote):not(.glossary):not(.simple) dl:not(.field-list):not(.simple)>dt.sig {
+        background-color: #eaefe0;
+        border-left: 3px solid var(--nvidia-color);
+    }
+
+    html.writer-html4 .rst-content dl:not(.docutils)>dt, html.writer-html5 .rst-content dl[class]:not(.option-list):not(.field-list):not(.footnote):not(.glossary):not(.simple)>dt.sig {
+      background: #eaefe0;
+      border-top: 3px solid var(--nvidia-color);
+    }
+
+    html.writer-html4 .rst-content dl:not(.docutils)>dt, html.writer-html5 .rst-content dl[class]:not(.option-list):not(.field-list):not(.footnote):not(.glossary):not(.simple)>dt {
+        color: var(--dark-green);
+    }
+
     .icon, .version, a.icon.icon-home {
         color: white;
     }
 
     table.center-align-center-col td {
-    text-align: center
-}
+        text-align: center
+    }
+
+    .rubric, p.rubric {
+        margin-bottom: 15px;
+        font-weight: 700;
+        font-size: 120%;
+        color: var(--dark-green);
+        border-bottom: 1px solid var(--dark-green);
+    }
 
   </style>
 {% endblock %}

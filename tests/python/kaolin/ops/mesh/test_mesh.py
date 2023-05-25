@@ -866,3 +866,34 @@ class TestSubdivideTrianglemesh:
         assert torch.allclose(mesh.face_areas(new_vertices, new_faces).sum(),
                               torch.tensor([6.2005], dtype=new_vertices.dtype, device=new_faces.device), atol=1e-04)
         assert new_faces.shape[0] == faces_icosahedron.shape[0] * 4 ** 5
+
+
+@pytest.mark.parametrize('device,dtype', FLOAT_TYPES)
+class TestComputeVertexNormals:
+    def test_compute_vertex_normals(self, device, dtype):
+        # Faces are a fan around the 0th vertex
+        faces = torch.tensor([[0, 2, 1],
+                              [0, 3, 2],
+                              [0, 4, 3]],
+                             device=device, dtype=torch.long)
+        B = 3
+        F = faces.shape[0]
+        FSize = faces.shape[1]
+        V = 6  # one vertex not in faces
+        face_normals = torch.rand((B, F, FSize, 3), device=device, dtype=dtype)
+
+        expected = torch.zeros((B, V, 3), device=device, dtype=dtype)
+        for b in range(B):
+            expected[b, 0, :] = (face_normals[b, 0, 0, :] + face_normals[b, 1, 0, :] + face_normals[b, 2, 0, :]) / 3
+            expected[b, 1, :] = face_normals[b, 0, 2, :]
+            expected[b, 2, :] = (face_normals[b, 0, 1, :] + face_normals[b, 1, 2, :]) / 2
+            expected[b, 3, :] = (face_normals[b, 1, 1, :] + face_normals[b, 2, 2, :]) / 2
+            expected[b, 4, :] = face_normals[b, 2, 1, :]
+            expected[b, 5, :] = 0  # DNE in faces
+
+        vertex_normals = mesh.compute_vertex_normals(faces, face_normals, num_vertices=V)
+        assert torch.allclose(expected, vertex_normals)
+
+        # Now let's not pass in num_vertices; we will not get normals for the last vertex which is not in faces
+        vertex_normals = mesh.compute_vertex_normals(faces, face_normals)
+        assert torch.allclose(expected[:, :5, :], vertex_normals)

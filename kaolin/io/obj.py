@@ -23,6 +23,7 @@ from PIL import Image
 from kaolin.io.materials import MaterialLoadError, MaterialFileError, MaterialNotFoundError, \
     process_materials_and_assignments
 from kaolin.io import utils
+from kaolin.rep import SurfaceMesh
 
 __all__ = [
     'ignore_error_handler',
@@ -31,10 +32,6 @@ __all__ = [
     'default_error_handler',
     'import_mesh'
 ]
-
-return_type = namedtuple('return_type',
-                         ['vertices', 'faces', 'uvs', 'face_uvs_idx', 'materials',
-                          'material_assignments', 'normals', 'face_normals_idx'])
 
 
 def ignore_error_handler(error, **kwargs):
@@ -256,8 +253,9 @@ def import_mesh(path, with_materials=False, with_normals=False,
         normals = None
         face_normals_idx = None
 
-    return return_type(vertices, faces, uvs, face_uvs_idx, materials,
-                       material_assignments, normals, face_normals_idx)
+    return SurfaceMesh(vertices=vertices, faces=faces, uvs=uvs, face_uvs_idx=face_uvs_idx, materials=materials,
+                       material_assignments=material_assignments, normals=normals, face_normals_idx=face_normals_idx,
+                       unset_attributes_return_none=True)   # for greater backward compatibility
 
 
 def load_mtl(mtl_path, error_handler):

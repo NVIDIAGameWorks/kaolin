@@ -311,7 +311,7 @@ def packed_sample_points(vertices, first_idx_vertices,
 
 
 def face_normals(face_vertices, unit=False):
-    r"""Calculate normals of triangle meshes.
+    r"""Calculate normals of triangle meshes. Left-hand rule convention is used for picking normal direction.
 
         Args:
             face_vertices (torch.Tensor):

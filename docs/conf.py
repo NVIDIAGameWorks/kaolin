@@ -38,6 +38,8 @@ extensions = [
 
 todo_include_todos = True
 
+autodoc_typehints = "description"
+
 intersphinx_mapping = {
     'python': ("https://docs.python.org/3", None),
     'numpy': ('https://numpy.org/doc/stable/', None),
