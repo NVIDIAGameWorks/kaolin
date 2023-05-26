@@ -1,5 +1,12 @@
 # Contributing guidelines
 
+Contributions are welcome!
+You can send us pull requests to help improve Kaolin, if you are just getting started, Gitlab has a [how to](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html).
+
+Kaolin team members will be assigned to review your pull requests. Once your change passes the review and the continuous integration checks, a Kaolin member will approve and merge them to the repository.
+
+If you want to contribute, [Gitlab issues](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues) are a good starting point, especially the ones with the label [good first issue](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues?scope=all&utf8=%E2%9C%93&state=opened&label_name[]=good%20first%20issue). If you started working on a issue, leave a comment so other people know that you're working on it, you can also coordinate with others on the issue comment threads.
+
 ## Pull Request Checklist
 
 Before sending your pull requests, make sure you followed this list.
@@ -16,23 +23,38 @@ Before sending your pull requests, make sure you followed this list.
 
 6) Send your Pull Request to the `master` branch
 
-## How to become a contributor and submit your own code
+## Guidelines for Contributing Code
+
+### Running tests
+
+In order to verify that your change does not break anything, a number of checks must be 
+passed. For example, running unit tests, making sure that all example
+notebooks and recipes run without error, and docs build correctly. For unix-based
+system, we provide a script to execute all of these tests locally:
+
+```
+pip install -r tools/ci_requirements.txt
+pip install -r tools/doc_requirements.txt 
+
+bash tools/linux/run_tests.sh all 
+```
+
+If you also want to run integration tests, see [tests/integration/](tests/integration/), specifically
+[Dash3D tests](tests/integration/experimental/dash3d/README.md).
+
+### Documentation
+
+All new additions to the Kaolin API must be properly documented. Additional information
+on documentation is provided in [our guide](docs/README.md).
+
 
 ### Signing your commits
-Before we can take your patches we need to take care of legal concerns.
 
-Please sign each commits using ``git commit -s``.
-In case you forgot to sign previous commits you can amend previous commits using:
+All commits must be signed using ``git commit -s``.
+If you forgot to sign previous commits you can amend them as follows:
 * ``git commit -s --amend`` for the last commit.
 * ``git rebase --signoff`` for all the commits of your pull request.
 
-### Contributing code
-Contributions are welcome!
-You can send us pull requests to help improve Kaolin, if you are just getting started, Gitlab has a [how to](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html).
-
-Kaolin team members will be assigned to review your pull requests. Once they your change passes the review and the continuous integration checks, a Kaolin member will approve and merge them to the repository.
-
-If you want to contribute, [Gitlab issues](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues) are a good starting point, especially the ones with the label [good first issue](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues?scope=all&utf8=%E2%9C%93&state=opened&label_name[]=good%20first%20issue). If you started working on a issue, leave a comment so other people know that you're working on it, you can also coordinate with others on the issue comment threads.
 
 ### Standards and Coding Style
 #### General guidelines
@@ -40,8 +62,14 @@ If you want to contribute, [Gitlab issues](https://gitlab-master.nvidia.com/Toro
 * API changes should be minimal and backward compatible. Any changes that break backward compatibility should be carefully considered and tracked so that they can be included in the release notes.
 * New features may not accepted if the cost of maintenance is too high in comparison of its benefit, they may also be integrated to contrib subfolders for minimal support and maintenance before eventually being integrated to the core.
 
+#### Writing Tests
+All tests should use [pytest](https://docs.pytest.org/en/latest/) and [pytest-cov](https://pytest-cov.readthedocs.io/en/latest/) frameworks. The tests should be placed in [tests/python directory](tests/python/), which should follows the directory structure of [kaolin](kaolin/). For example,
+test for `kaolin/io/obj.py` should be placed into `tests/pyhon/kaolin/io/test_obj.py`. 
+
 #### License
 Include a license at the top of new files.
+
+
 
 ##### C/C++/CUDA
 ```cpp
@@ -241,14 +269,4 @@ On top of that we use prefixes (``packed\_``, ``padded\_``) to indicate that a m
 
 [tests/python/kaolin/](tests/python/kaolin) should follows the same directory structure of [kaolin/](kaolin/). E.g. each module kaolin/path/to/mymodule.py should have a corresponding tests/python/kaolin/path/to/test\_mymodule.py.
 
-#### Tests
-We are applying [pytest](https://docs.pytest.org/en/latest/) on [tests/python directory](tests/python/), with [pytest-cov](https://pytest-cov.readthedocs.io/en/latest/), which should follows the directory structure of [kaolin](kaolin/).
-To run these tests execute ``pytest --cov=kaolin/ tests/`` from the [root of kaolin](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat).
 
-Additional integration tests are located in [tests/integration](tests/integration).
-See that subdirectory for details.
-
-#### Documentation
-Contributors are encouraged to verify the generated documentation before each pull request.
-
-To build your own documentation, follow the [guide](docs/README.md).

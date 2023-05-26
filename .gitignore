@@ -10,6 +10,7 @@ _*/
 # generated folders
 kaolin/version.py
 build/
+build_docs/
 kaolin.egg-info
 *.so
 *.egg
@@ -31,4 +32,9 @@ node_modules/
 .vscode/settings.json
 .vscode/tasks.json
 *.sw*
+*.ipynb_checkpoints
 
+# tests
+.test_logs/
+.test_coverage/
+.coverage
