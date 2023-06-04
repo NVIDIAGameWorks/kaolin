@@ -6,7 +6,8 @@
 import torch
 import numpy as np
 from typing import Tuple
-from kaolin.render.camera import Camera, CameraFOV
+from kaolin.render.camera import Camera
+from kaolin.render.camera.intrinsics import CameraFOV
 
 def generate_pixel_grid(res_x=None, res_y=None, device='cuda'):
     h_coords = torch.arange(res_x, device=device)
@@ -45,20 +46,21 @@ def generate_perspective_rays(camera: Camera, pixel_grid: Tuple[torch.Tensor, to
 
     return ray_orig, ray_dir, camera.near, camera.far
 
-
+img_width = 200
+img_height =200
 camera = Camera.from_args(
     eye=torch.tensor([4.0, 4.0, 4.0]),
     at=torch.tensor([0.0, 0.0, 0.0]),
     up=torch.tensor([0.0, 1.0, 0.0]),
     fov=30 * np.pi / 180,  # In radians
     x0=0.0, y0=0.0,
-    width=800, height=800,
+    width=img_width, height=img_height,
     near=1e-2, far=1e2,
     dtype=torch.float64,
     device='cuda'
 )
 
-pixel_grid = generate_pixel_grid(200, 200)
+pixel_grid = generate_pixel_grid(img_width, img_height)
 ray_orig, ray_dir, near, far = generate_perspective_rays(camera, pixel_grid)
 
 print('Ray origins:')
