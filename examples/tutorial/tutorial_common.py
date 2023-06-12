@@ -16,7 +16,6 @@
 import math
 import os
 import torch
-import torchvision
 
 try:
     import matplotlib.pyplot as plt

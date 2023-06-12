@@ -5,17 +5,18 @@ import groovy.transform.Field
 if (gitlabActionType == "MERGE" || gitlabSourceBranch == "master") {
 gitlabCommitStatus("launch all builds") {
 
+
 // Configs for build from pytorch docker images
 // (See: https://hub.docker.com/r/pytorch/pytorch/tags)
 def ubuntu_from_pytorch_configs = [
     [
         // python: 3.7
-        'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.12.1',
+        'cudaVer': '11.6', 'cudnnVer': '8', 'torchVer': '1.13.1',
         'archsToTest': 'MULTI'
     ],
     [
         // python: 3.10
-        'cudaVer': '11.6', 'cudnnVer': '8', 'torchVer': '1.13.1',
+        'cudaVer': '11.7', 'cudnnVer': '8', 'torchVer': '2.0.1',
         'archsToTest': 'MULTI'
     ]
 ]
@@ -34,13 +35,13 @@ def ubuntu_from_nvcr_configs = [
 // (See: https://hub.docker.com/r/nvidia/cuda/tags)
 def ubuntu_from_cuda_configs = [
     [
-        'cudaVer': '11.3.0', 'cudnnVer': '8',
-        'pythonVer': '3.8', 'torchVer': '1.10.2',
+        'cudaVer': '11.3.1', 'cudnnVer': '8',
+        'pythonVer': '3.8', 'torchVer': '1.11.0',
         'archsToTest': 'MULTI'
     ],
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'pythonVer': '3.10', 'torchVer': '2.0.0',
+        'pythonVer': '3.10', 'torchVer': '2.0.1',
         'archsToTest': 'MULTI'
     ],
 ]
@@ -49,10 +50,10 @@ def ubuntu_from_cuda_configs = [
 // (Use docker image ubuntu:18.04 as a base)
 def ubuntu_cpuonly_configs = [
     [
-        'pythonVer': '3.8', 'torchVer': '1.10.2',
+        'pythonVer': '3.8', 'torchVer': '1.11.0',
     ],
     [
-        'pythonVer': '3.9', 'torchVer': '1.13.1',
+        'pythonVer': '3.10', 'torchVer': '2.0.1',
     ]
 ]
 
@@ -232,12 +233,12 @@ def windows_from_server_configs = [
     //      two machines exist, only the TITAN RTX will pass tests
     [
         'cudaVer': '11.3',
-        'pythonVer': '3.8', 'torchVer': '1.10.2',
+        'pythonVer': '3.8', 'torchVer': '1.11.0',
         'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
     ],
     [
-        'cudaVer': '11.6',
-        'pythonVer': '3.9', 'torchVer': '1.13.1',
+        'cudaVer': '11.8',
+        'pythonVer': '3.10', 'torchVer': '2.0.1',
         'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
     ]
 ]
