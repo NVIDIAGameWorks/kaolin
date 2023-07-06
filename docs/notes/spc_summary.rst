@@ -202,7 +202,7 @@ Transposed convolutions are defined by the transposed neighbor function
   n^T(i,k) = \text{ID}\left(P_i-\overrightarrow{K}_k\right)
 
 
-The value **jump** is used to indicate the difference in levels between the iput features
+The value **jump** is used to indicate the difference in levels between the input features
 and the output features. For convolutions, this is the number of levels to downsample; while
 for transposed convolutions, **jump** is the number of levels to upsample. The value of **jump** must
 be positive, and may not go beyond the highest level of the octree.
