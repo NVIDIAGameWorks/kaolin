@@ -1,7 +1,7 @@
 version: 2
 
 python:
-   version: 3.8
+   version: 3.9
    system_packages: true
    install:
       - requirements: docs/readthedocs_requirements.txt
