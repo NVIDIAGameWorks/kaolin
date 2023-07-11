@@ -274,6 +274,6 @@ Functions useful for working with SPCs are available in the following modules:
 
 * :ref:`kaolin.ops.spc<kaolin.ops.spc>` - general explanation and operations
 * :ref:`kaolin.render.spc<kaolin.render.spc>` - rendering utilities
-* :class:`kaolin.rep.Spc` - high-level wrapper.. _kaolin.ops.spc:
+* :class:`kaolin.rep.Spc` - high-level wrapper
 
 

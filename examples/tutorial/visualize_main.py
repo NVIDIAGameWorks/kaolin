@@ -30,9 +30,7 @@ def __normalize_vertices(vertices):
     Normalizes vertices to fit an [-1...1] bounding box,
     common during training, but not necessary for visualization.
     """
-    result = vertices - torch.mean(vertices, dim=0).unsqueeze(0)
-    span = torch.max(result, dim=0).values - torch.min(result, dim=0).values
-    return result / torch.max(span)
+    return kaolin.ops.pointcloud.center_points(res.vertices.unsqueeze(0), normalize=True).squeeze(0) * 2
 
 
 if __name__ == "__main__":
@@ -70,7 +68,7 @@ if __name__ == "__main__":
     # TODO: add textured example
     for f in obj_files:
         res = kaolin.io.obj.import_mesh(f)
-        vertices = res.vertices if args.skip_normalization else __normalize_vertices(res.vertices)
+        vertices = res.vertices if args.skip_normalization else __normalize_vertices(vertices)
         num_samples = random.randint(1000, 1500)  # Vary to ensure robustness
         pts = kaolin.ops.mesh.sample_points(
             vertices.unsqueeze(0), res.faces, num_samples)[0].squeeze(0)
@@ -131,14 +129,9 @@ if __name__ == "__main__":
                 voxelgrid_list=out_voxels)
 
     logger.info('Emulated training complete!\n'
-                'You can now view created USD files found here: {}\n\n'
-                'You will soon be able to visualize these in the Kaolin Omniverse App '
-                'and our web visualizer. Stay tuned!'.format(args.output_dir))
-
-    # TODO(mshugrina): update command line once finalized
-    # 'Now try visualizing the results by running:\n'
-    # '  kaolin/dash3d/run.py --logdir={}\n'
-    # 'And then navigating to localhost:8080\n'.format(args.output_dir))
+                'You can now view created USD files by running:\n\n'
+                f'kaolin-dash3d --logdir={args.output_dir}\n\n'
+                'And then navigating to localhost:8080\n')
 
     # TODO(mshugrina): once dash3d is also integrated, write an integration test
     # to ensure timelapse output is properly parsed by the visualizer

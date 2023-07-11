@@ -256,31 +256,35 @@ def tensor_info(t, name='', print_stats=False, detailed=False):
 
     def _get_details_str():
         if torch.is_tensor(t):
-            return ' - req_grad={}, is_leaf={}, device={}, layout={}'.format(
-                t.requires_grad, t.is_leaf, t.device, t.layout)
+            return ' - req_grad={}, is_leaf={}, layout={}'.format(
+                t.requires_grad, t.is_leaf, t.layout)
 
     if t is None:
         return '%s: None' % name
 
     shape_str = ''
     if hasattr(t, 'shape'):
-        shape_str = '%s ' % str(t.shape)
+        shape_str = '%s ' % str(list(t.shape))
 
     if hasattr(t, 'dtype'):
         type_str = '%s' % str(t.dtype)
     else:
         type_str = '{}'.format(type(t))
 
+    device_str = ''
+    if hasattr(t, 'device'):
+        device_str = '[{}]'.format(t.device)
+
     name_str = ''
     if name is not None and len(name) > 0:
         name_str = '%s: ' % name
 
-    return ('%s%s(%s) %s %s' %
-            (name_str, shape_str, type_str,
+    return ('%s%s(%s)%s %s %s' %
+            (name_str, shape_str, type_str, device_str,
              (_get_stats_str() if print_stats else ''),
              (_get_details_str() if detailed else '')))
 
-def contained_torch_equal(elem, other, approximate=False, **allclose_args):
+def contained_torch_equal(elem, other, approximate=False, print_error_context=None, **allclose_args):
     """Check for equality (or allclose if approximate) of two objects potentially containing tensors.
 
     :func:`torch.equal` do not support data structure like dictionary / arrays
@@ -293,13 +297,19 @@ def contained_torch_equal(elem, other, approximate=False, **allclose_args):
         elem (object, dict, list, tuple): The first object
         other (object, dict, list, tuple): The other object to compare to ``elem``
         approximate (bool): if requested will use allclose for comparison instead (default=False)
+        print_error_context (str): set to any string value to print the context for the first nested failed match
         allclose_args: arguments to `torch.allclose` if approximate comparison requested
 
     Return (bool): the comparison result
     """
+    def _maybe_print(val, extra_context='', prefix_string='Failed match for '):
+        if not val and print_error_context is not None:  # match failed
+            print(f'{prefix_string}{print_error_context}{extra_context}')
+        return val
+
     elem_type = type(elem)
     if elem_type != type(other):
-        return False
+        return _maybe_print(False)
 
     def _tensor_compare(a, b):
         if not approximate:
@@ -310,31 +320,46 @@ def contained_torch_equal(elem, other, approximate=False, **allclose_args):
     def _number_compare(a, b):
         return _tensor_compare(torch.tensor([a]), torch.tensor([b]))
 
+    def _attrs_to_dict(a, attrs):
+        return {k : getattr(a, k) for k in attrs if hasattr(a, k)}
+
+    def _recursive_error_context(append_context):
+        if print_error_context is None:
+            return None
+        return f'{print_error_context}{append_context}'
+
     recursive_args = copy.copy(allclose_args)
     recursive_args['approximate'] = approximate
 
     if isinstance(elem, torch.Tensor):
-        return _tensor_compare(elem, other)
+        return _maybe_print(_tensor_compare(elem, other))
     elif isinstance(elem, str):
-        return elem == other
+        return _maybe_print(elem == other, extra_context=f': {elem} vs {other}')
     elif isinstance(elem, float):
-        return _number_compare(elem, other)
+        return _maybe_print(_number_compare(elem, other), extra_context=f': {elem} vs {other}')
     elif isinstance(elem, collections.abc.Mapping):
         if elem.keys() != other.keys():
-            return False
-        return all(contained_torch_equal(elem[key], other[key], **recursive_args) for key in elem)
+            return _maybe_print(False, f': {elem.keys()} vs {other.keys()}', 'Different keys for ')
+        return all(contained_torch_equal(
+            elem[key], other[key],
+            print_error_context=_recursive_error_context(f'[{key}]'), **recursive_args) for key in elem)
     elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
         if set(elem._fields) != set(other._fields):
-            return False
+            return _maybe_print(False, f': {elem._fields} vs {other._fields}', 'Different fields for ')
         return all(contained_torch_equal(
-            getattr(elem, f), getattr(other, f), **recursive_args) for f in elem._fields
-        )
+            getattr(elem, f), getattr(other, f),
+            print_error_context=_recursive_error_context(f'.{f}'), **recursive_args) for f in elem._fields)
     elif isinstance(elem, collections.abc.Sequence):
         if len(elem) != len(other):
-            return False
-        return all(contained_torch_equal(a, b, **recursive_args) for a, b in zip(elem, other))
+            return _maybe_print(False, ': {len(elem)} vs {len(other)}', 'Different length for ')
+        return all(contained_torch_equal(
+            a, b, print_error_context=_recursive_error_context(f'[{i}]'), **recursive_args)
+                   for i, (a, b) in enumerate(zip(elem, other)))
+    elif hasattr(elem, '__slots__'):
+        return contained_torch_equal(_attrs_to_dict(elem, elem.__slots__), _attrs_to_dict(other, other.__slots__),
+                                     print_error_context=print_error_context, **recursive_args)
     else:
-        return elem == other
+        return _maybe_print(elem == other)
 
 def check_allclose(tensor, other, rtol=1e-5, atol=1e-8, equal_nan=False):
     if not torch.allclose(tensor, other, atol=atol, rtol=rtol, equal_nan=equal_nan):

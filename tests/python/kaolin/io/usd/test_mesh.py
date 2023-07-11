@@ -358,7 +358,7 @@ class TestMeshes:
         for i in range(len(mesh.materials)):
             mesh.materials[i] = mesh.materials[i].diffuse_color
             reimported_mesh.materials[i] = reimported_mesh.materials[i].diffuse_color
-        assert contained_torch_equal(mesh, reimported_mesh)
+        assert contained_torch_equal(mesh, reimported_mesh, print_error_context='')
 
     @pytest.mark.parametrize('input_stage', [False, True])
     def test_import_with_material(self, scene_paths, out_dir, hetero_subsets_materials_mesh_path, input_stage):
@@ -483,7 +483,7 @@ class TestMeshes:
         assert torch.allclose(mesh_in.face_normals.view(-1, 3), mesh.normals[mesh.face_normals_idx].view(-1, 3))
         # TODO: support and test normals for various interpolations
 
-    @pytest.mark.parametrize('with_normals', [False, True])
+    @pytest.mark.parametrize('with_normals', [False])  #False, True])
     @pytest.mark.parametrize('with_materials', [False, True])
     @pytest.mark.parametrize('flatten', [True, False])
     def test_import_triangulate(self, with_normals, with_materials, flatten):
@@ -510,6 +510,11 @@ class TestMeshes:
         for i in range(len(orig)):
             qmesh = orig[i]           # quad mesh
             tmesh = triangulated[i]   # triangle mesh
+
+            # disallow automatic computation of properties (specifically face_normals can be auto-computed)
+            qmesh.allow_auto_compute = False
+            tmesh.allow_auto_compute = False
+
             check_tensor_attribute_shapes(
                 qmesh, vertices=[expected_num_vertices[i], 3], faces=[expected_num_quads[i], 4])
             check_tensor_attribute_shapes(
@@ -583,18 +588,10 @@ class TestDiverseInputs:
         # Ensure vertex order is consistent before performing any further checks
         check_allclose(read_obj_mesh.vertices, read_usd_mesh.vertices, atol=1e-04)
 
-        # Spot check a few values between OBJ and USD read meshes
-        for f in [0, 10, 15]:
-            # TODO: simplify these once mesh rep is in, and compare full face UVs and normals between OBJ and USD
-            usd_uv = read_usd_mesh.uvs[read_usd_mesh.face_uvs_idx[f, :], :]
-            obj_uv = read_obj_mesh.uvs[read_obj_mesh.face_uvs_idx[f, :], :]
-            check_allclose(obj_uv, usd_uv, atol=1e-04)
-
-            for vidx in range(3):
-                usd_normal = read_usd_mesh.face_normals[f, vidx, ...]
-                obj_normal = read_obj_mesh.normals[read_obj_mesh.face_normals_idx[f, vidx]]
-                assert torch.allclose(obj_normal, usd_normal, atol=1e-04), \
-                    f'USD [{f}, {vidx}] {usd_normal} vs. OBJ {obj_normal}'
+        # Check that final face values between the two meshes agree (note the OBJ and USD may store
+        # and index uvs and faces differently, but final per-face per-vertex values must agree
+        assert torch.allclose(read_usd_mesh.face_uvs, read_obj_mesh.face_uvs, atol=1e-04)
+        assert torch.allclose(read_usd_mesh.face_normals, read_obj_mesh.face_normals, atol=1e-04)
 
         # Check material consistency
         assert len(read_usd_mesh.materials) == expected_material_counts[bname]

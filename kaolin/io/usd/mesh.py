@@ -28,13 +28,11 @@ except ImportError:
 
 from kaolin.io import materials as usd_materials
 from kaolin.io import utils
+from kaolin.rep import SurfaceMesh
 
 from .utils import _get_stage_from_maybe_file, get_scene_paths, create_stage
 
 
-mesh_return_type = namedtuple('mesh_return_type', ['vertices', 'faces',
-                                                   'uvs', 'face_uvs_idx', 'face_normals', 'material_assignments',
-                                                   'materials'])
 __all__ = [
     'import_mesh',
     'import_meshes',
@@ -445,7 +443,7 @@ def import_mesh(file_path_or_stage, scene_path=None, with_materials=False, with_
                                 heterogeneous_mesh_handler=heterogeneous_mesh_handler,
                                 with_materials=with_materials,
                                 with_normals=with_normals, times=[time], triangulate=triangulate)
-    return mesh_return_type(*meshes_list[0])
+    return meshes_list[0]
 
 
 def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, with_normals=False,
@@ -561,20 +559,18 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
             faces = faces.view(-1 if len(faces) > 0 else 0, facesize)  # Nfaces x facesize
             nfaces = faces.shape[0]
 
-            # TODO: note - this means if there is no face information normals/uvs are actually not processed;
-            # this will come up as a problem later.
-            if nfaces > 0:
-                if face_uvs_idx is not None and face_uvs_idx.size(0) > 0:
-                    uvs = uvs.reshape(-1, 2)
-                    face_uvs_idx = face_uvs_idx.reshape(-1, facesize)
-                else:
-                    uvs = None
-                    face_uvs_idx = None
+        # Process face-related attributes, correctly handling absence of face information
+        if face_uvs_idx is not None and face_uvs_idx.size(0) > 0:
+            uvs = uvs.reshape(-1, 2)
+            face_uvs_idx = face_uvs_idx.reshape(-1, max(1, facesize))
+        else:
+            uvs = None
+            face_uvs_idx = None
 
-                if face_normals is not None and face_normals.size(0) > 0:
-                    face_normals = face_normals.reshape(nfaces, -1, 3)
-                else:
-                    face_normals = None
+        if face_normals is not None and face_normals.size(0) > 0:
+            face_normals = face_normals.reshape((nfaces, -1, 3) if nfaces > 0 else (-1, 1, 3))
+        else:
+            face_normals = None
 
         materials = None
         material_assignments = None
@@ -586,9 +582,10 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
                 materials_dict, material_assignments_dict, _default_error_handler, nfaces,
                 error_context_str=scene_path)
 
-        # TODO(mshugrina): Replace tuple output with mesh class
-        results.append(mesh_return_type(vertices, faces, uvs, face_uvs_idx, face_normals,
-                                        material_assignments, materials))
+        results.append(SurfaceMesh(
+            vertices=vertices, faces=faces, uvs=uvs, face_uvs_idx=face_uvs_idx, face_normals=face_normals,
+            material_assignments=material_assignments, materials=materials,
+            unset_attributes_return_none=True))  # for greater backward compatibility
 
     return results
 

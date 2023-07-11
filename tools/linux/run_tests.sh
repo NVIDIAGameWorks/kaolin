@@ -128,7 +128,7 @@ if [ $RUN_RECIPES -eq "1" ]; then
     NPASS=0
 
     cd $KAOLIN_ROOT/examples/recipes
-    for F in $(find . -name "*.py"); do
+    for F in $(find . -name "*.py" | grep -v "ipynb_checkpoints"); do
 
         echo "Executing python $F" >> $RECIPES_LOG
         python $F >> $RECIPES_LOG 2>&1

@@ -20,7 +20,7 @@ import copy
 import pytest
 import torch
 
-from kaolin.io.obj import return_type
+from kaolin.rep import SurfaceMesh
 from kaolin.io.dataset import KaolinDatasetItem
 from kaolin.io.shrec import SHREC16
 
@@ -57,7 +57,7 @@ class TestSHREC16(object):
             if output_dict:
                 def transform(inputs):
                     outputs = copy.copy(inputs)
-                    outputs['mesh'] = return_type(
+                    outputs['mesh'] = SurfaceMesh(
                         vertices=outputs['mesh'].vertices + 1.,
                         faces=outputs['mesh'].faces,
                         uvs=outputs['mesh'].uvs,
@@ -72,7 +72,7 @@ class TestSHREC16(object):
             else:
                 def transform(inputs):
                     outputs = KaolinDatasetItem(
-                        data=return_type(
+                        data=SurfaceMesh(
                             vertices=inputs.data.vertices + 1.,
                             faces=inputs.data.faces,
                             uvs=inputs.data.uvs,
@@ -110,7 +110,7 @@ class TestSHREC16(object):
         else:
             data = item.data
             attributes = item.attributes
-        assert isinstance(data, return_type)
+        assert isinstance(data, SurfaceMesh)
         assert isinstance(attributes, dict)
 
         assert isinstance(data.vertices, torch.Tensor)

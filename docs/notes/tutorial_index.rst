@@ -10,6 +10,28 @@ point to master.
 Detailed Tutorials
 ------------------
 
+* `Camera and Rasterization <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/camera_and_rasterization.ipynb>`_: Rasterize ShapeNet mesh with nvdiffrast and camera:
+    * Load ShapeNet mesh
+    * Preprocess mesh and materials
+    * Create a camera with ``from_args()`` general constructor
+    * Render a mesh with multiple materials with nvdiffrast
+    * Move camera and see the resulting rendering
+* `Optimizing Diffuse Lighting <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/diffuse_lighting.ipynb>`_: Optimize lighting parameters with spherical gaussians and spherical harmonics:
+    * Load an obj mesh with normals and materials
+    * Rasterize the diffuse and specular albedo
+    * Render and optimize diffuse lighting:
+      * Spherical harmonics
+      * Spherical gaussian with inner product implementation
+      * Spherical gaussian with fitted approximation
+* `Optimize Diffuse and Specular Lighting with Spherical Gaussians <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/sg_specular_lighting.ipynb>`_:
+    * Load an obj mesh with normals and materials
+    * Generate view rays from camera
+    * Rasterize the diffuse and specular albedo
+    * Render and optimize diffuse and specular lighting with spherical gaussians
+* `Working with Surface Meshes <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/working_with_meshes.ipynb>`_:
+    * loading and constructing :class:`kaolin.rep.SurfaceMesh` objects
+    * batching of meshes
+    * auto-computing common attributes (like ``face_normals``)
 * `Deep Marching Tetrahedra <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/dmtet_tutorial.ipynb>`_: reconstructs a tetrahedral mesh from point clouds with `DMTet <https://nv-tlabs.github.io/DMTet/>`_, covering:
     * generating data with Omniverse Kaolin App
     * loading point clouds from a ``.usd`` file
@@ -51,24 +73,7 @@ Detailed Tutorials
     * applying marching tetrahedra
     * using Timelapse API for 3D checkpoints
     * visualizing 3D checkpoints using ``kaolin-dash3d``
-* `Camera and Rasterization <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/camera_and_rasterization.ipynb>`_: Rasterize ShapeNet mesh with nvdiffrast and camera:
-    * Load ShapeNet mesh
-    * Preprocess mesh and materials
-    * Create a camera with ``from_args()`` general constructor
-    * Render a mesh with multiple materials with nvdiffrast
-    * Move camera and see the resulting rendering
-* `Optimizing Diffuse Lighting <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/diffuse_lighting.ipynb>`_: Optimize lighting parameters with spherical gaussians and spherical harmonics:
-    * Load an obj mesh with normals and materials
-    * Rasterize the diffuse and specular albedo
-    * Render and optimize diffuse lighting:
-      * Spherical harmonics
-      * Spherical gaussian with inner product implementation
-      * Spherical gaussian with fitted approximation
-* `Optimize Diffuse and Specular Lighting with Spherical Gaussians <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/sg_specular_lighting.ipynb>`_:
-    * Load an obj mesh with normals and materials
-    * Generate view rays from camera
-    * Rasterize the diffuse and specular albedo
-    * Render and optimize diffuse and specular lighting with spherical gaussians
+
 
 Simple Recipes
 --------------

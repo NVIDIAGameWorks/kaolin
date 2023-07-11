@@ -20,7 +20,7 @@ import pytest
 import torch
 import random
 
-from kaolin.io.obj import return_type
+from kaolin.rep import SurfaceMesh
 from kaolin.io.dataset import KaolinDatasetItem
 from kaolin.io import shapenet
 from kaolin.utils.testing import contained_torch_equal
@@ -59,7 +59,7 @@ class TestShapeNet(object):
             if output_dict:
                 def transform(inputs):
                     outputs = copy.copy(inputs)
-                    outputs['mesh'] = return_type(
+                    outputs['mesh'] = SurfaceMesh(
                         vertices=outputs['mesh'].vertices + 1.,
                         faces=outputs['mesh'].faces,
                         uvs=outputs['mesh'].uvs,
@@ -74,7 +74,7 @@ class TestShapeNet(object):
             else:
                 def transform(inputs):
                     outputs = KaolinDatasetItem(
-                        data=return_type(
+                        data=SurfaceMesh(
                             vertices=inputs.data.vertices + 1.,
                             faces=inputs.data.faces,
                             uvs=inputs.data.uvs,
@@ -125,7 +125,7 @@ class TestShapeNet(object):
         else:
             data = item.data
             attributes = item.attributes
-        assert isinstance(data, return_type)
+        assert isinstance(data, SurfaceMesh)
         assert isinstance(attributes, dict)
 
         assert isinstance(data.vertices, torch.Tensor)

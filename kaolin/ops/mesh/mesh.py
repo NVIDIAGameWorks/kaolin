@@ -18,6 +18,7 @@ import torch
 __all__ = [
     'index_vertices_by_faces',
     'adjacency_matrix',
+    'compute_vertex_normals',
     'uniform_laplacian',
 ]
 
@@ -119,3 +120,42 @@ def uniform_laplacian(num_vertices, faces):
     L[torch.isnan(L)] = 0
 
     return L
+
+
+def compute_vertex_normals(faces, face_normals, num_vertices=None):
+    r"""Computes normals for every vertex by averaging face normals
+    assigned to that vertex for every face that has this vertex.
+
+    Args:
+       faces (torch.LongTensor): vertex indices of faces of a fixed-topology mesh batch with
+            shape :math:`(\text{num_faces}, \text{face_size})`.
+       face_normals (torch.FloatTensor): pre-normalized xyz normal values
+            for every vertex of every face with shape
+            :math:`(\text{batch_size}, \text{num_faces}, \text{face_size}, 3)`.
+       num_vertices (int, optional): number of vertices V (set to max index in faces, if not set)
+
+    Return:
+        (torch.FloatTensor): of shape (B, V, 3)
+    """
+    if num_vertices is None:
+        num_vertices = int(faces.max()) + 1
+
+    B = face_normals.shape[0]
+    V = num_vertices
+    F = faces.shape[0]
+    FSz = faces.shape[1]
+    vertex_normals = torch.zeros((B, V, 3), dtype=face_normals.dtype, device=face_normals.device)
+    counts = torch.zeros((B, V), dtype=face_normals.dtype, device=face_normals.device)
+
+    faces = faces.unsqueeze(0).repeat(B, 1, 1)
+    fake_counts = torch.ones((B, F), dtype=face_normals.dtype, device=face_normals.device)
+    #              B x F          B x F x 3
+    # self[index[i][j][k]][j][k] += src[i][j][k]  # if dim == 0
+    # self[i][index[i][j][k]][k] += src[i][j][k]  # if dim == 1
+    for i in range(FSz):
+        vertex_normals.scatter_add_(1, faces[..., i:i + 1].repeat(1, 1, 3), face_normals[..., i, :])
+        counts.scatter_add_(1, faces[..., i], fake_counts)
+
+    counts = counts.clip(min=1).unsqueeze(-1)
+    vertex_normals = vertex_normals / counts
+    return vertex_normals

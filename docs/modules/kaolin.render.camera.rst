@@ -3,6 +3,8 @@
 kaolin.render.camera
 ====================
 
+Kaolin provides extensive camera API. For an overview, see the :ref:`Camera class docs <kaolin.render.camera.Camera>`.
+
 API
 ---
 
