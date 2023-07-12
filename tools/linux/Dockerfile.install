@@ -79,5 +79,4 @@ RUN cd /tmp && \
     cp ./docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json && \
     pip install .
 
-ENV IGNORE_TORCH_VER "1"
 RUN python setup.py develop

@@ -1,4 +1,4 @@
-usd-core<=23.5
+usd-core<=23.5 ; python_version < "3.11"
 numpy
 pybind11
 Pillow>=8.0.0

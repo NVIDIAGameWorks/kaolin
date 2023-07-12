@@ -111,7 +111,6 @@ RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.pytho
     --trusted-host files.pythonhosted.org -r tools\ci_requirements.txt \
     -r tools\viz_requirements.txt -r tools\requirements.txt -r tools/build_requirements.txt
 
-ENV IGNORE_TORCH_VER "1"
 ENV TORCH_CUDA_ARCH_LIST "7.0 7.5+PTX"
 RUN python setup.py develop
 
