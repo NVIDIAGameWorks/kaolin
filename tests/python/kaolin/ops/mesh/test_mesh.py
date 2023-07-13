@@ -99,7 +99,7 @@ class TestSamplePoints:
               [[1., 3.], [1., 4.], [1., 5.]]],
              [[[2., 6.], [2., 7.], [2., 8.]],
               [[3., 9.], [3., 10.], [3., 11.]]]],
-            device=device, dtype=torch.long)
+            device=device, dtype=dtype)
 
     ######## FIXED ########
     @pytest.mark.parametrize('use_features', [False, True])

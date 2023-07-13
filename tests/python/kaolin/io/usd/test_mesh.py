@@ -483,7 +483,7 @@ class TestMeshes:
         assert torch.allclose(mesh_in.face_normals.view(-1, 3), mesh.normals[mesh.face_normals_idx].view(-1, 3))
         # TODO: support and test normals for various interpolations
 
-    @pytest.mark.parametrize('with_normals', [False])  #False, True])
+    @pytest.mark.parametrize('with_normals', [False, True])
     @pytest.mark.parametrize('with_materials', [False, True])
     @pytest.mark.parametrize('flatten', [True, False])
     def test_import_triangulate(self, with_normals, with_materials, flatten):

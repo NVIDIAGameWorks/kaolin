@@ -14,6 +14,7 @@ ARG WHEEL_NAME
 
 COPY ./package.json ./package-lock.json ./${WHEEL_NAME} ./
 COPY ./examples ./examples
+COPY ./sample_data ./sample_data
 COPY ./tests ./tests
 COPY ./tools ./tools
 RUN apt-get -y update \

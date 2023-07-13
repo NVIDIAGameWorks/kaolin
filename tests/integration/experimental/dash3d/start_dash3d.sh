@@ -14,7 +14,7 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 KAOLIN_ROOT=$SCRIPT_DIR/../../../..
 
-DASH3D=$KAOLIN_ROOT/kaolin/experimental/dash3d/kaolin-dash3d
+DASH3D=kaolin-dash3d
 
 USAGE="$0 [log_directory] (optional: port)
 

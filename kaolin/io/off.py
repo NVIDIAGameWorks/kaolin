@@ -87,7 +87,7 @@ def import_mesh(path, with_face_colors=False):
         faces.append([int(d) for d in data[1:face_size + 1]])
         if with_face_colors:
             face_colors.append([
-                float(d) for d in data[face_size + 1:face_size + 4]
+                int(d) for d in data[face_size + 1:face_size + 4]
             ])
         if len(faces) == num_faces:
             break
