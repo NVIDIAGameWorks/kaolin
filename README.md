@@ -5,9 +5,9 @@
 </p>
 
 ## Overview
-NVIDIA Kaolin library provides a PyTorch API for working with a variety of 3D representations and includes a growing collection of GPU-optimized operations such as modular differentiable rendering, fast conversions between representations, data loading, 3D checkpoints and more. 
+NVIDIA Kaolin library provides a PyTorch API for working with a variety of 3D representations and includes a growing collection of GPU-optimized operations such as modular differentiable rendering, fast conversions between representations, data loading, 3D checkpoints, differentiable camera API, differentiable lighting with spherical harmonics and spherical gaussians, powerful quadtree acceleration structure called Structured Point Clouds, interactive 3D visualizer for jupyter notebooks, convenient batched mesh container and more. Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest/) to get started!
 
-Kaolin library is part of a larger suite of tools for 3D deep learning research. For example, the [Omniverse Kaolin App](https://docs.omniverse.nvidia.com/app_kaolin/app_kaolin/overview.html) allows interactive visualization of 3D checkpoints. To find out more about the Kaolin ecosystem, visit the [NVIDIA Kaolin Dev Zone page](https://developer.nvidia.com/kaolin).
+Note that Kaolin library is part of the larger [NVIDIA Kaolin effort](https://developer.nvidia.com/kaolin) for 3D deep learning.
 
 ## Installation and Getting Started
 
@@ -21,31 +21,27 @@ For example, to install kaolin 0.13.0 over torch 1.12.1 and cuda 11.3:
 pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
 ```
 
-We now support version 0.12.0 to 0.13.0
+We now support versions 0.12.0 to 0.14.0.
 
-Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest/) to get started!
+## About the Latest Release (0.14.0)
 
-## About the Latest Release (0.13.0)
-
-With the version 0.13.0 we have added new [lighting features](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html), most notably spherical gaussian [diffuse](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_diffuse_fitted) and [specular](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html#kaolin.render.lighting.sg_warp_specular_term) reflectance, we also improved the spherical harmonics API and coefficients.
-
-See tutorials below.
-
-[![Diffuse lighting tutorial](./assets/diffuse.png)](./examples/tutorial/diffuse_lighting.ipynb) [![Specular lighting tutorial](./assets/specular.png)](./examples/tutorial/sg_specular_lighting.ipynb)
+In this version we added a [conversion Op for mesh to SPC](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.conversions.html#kaolin.ops.conversions.unbatched_mesh_to_spc),
+which allows turning meshes into Structured Point Cloud, our octree based representation.
+In addition, [interactive 3D visualizers](https://kaolin.readthedocs.io/en/latest/modules/kaolin.visualize.html) for Jupyter notebooks
+and a [SurfaceMesh class](https://kaolin.readthedocs.io/en/latest/modules/kaolin.rep.surface_mesh.html#kaolin-rep-surfacemesh) (see tutorials below).
 
 
-We also:
-  * Reformated the data preprocessing with a new [CachedDataset](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.dataset.html#kaolin.io.dataset.CachedDataset) replacing [ProcessedDataset](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.dataset.html#kaolin.io.dataset.ProcessedDataset)
-  * Fixed bug and improved speed on SPC raytracing, and added gradient on trilinear interpolation
-  * Improved memory consumption on [uniform_laplacian](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.mesh.html#kaolin.ops.mesh.uniform_laplacian)
+Check our new tutorials:
 
-Check out our new [tutorials](https://kaolin.readthedocs.io/en/latest/notes/tutorial_index.html):
-  * Recipe for fast mesh sampling preprocessing in [examples/recipes/preprocess/fast_mesh_sampling.py](./examples/recipes/preprocess/fast_mesh_sampling.py)
-  * Recipe for SPC 3d convolution in [examples/recipes/spc/spc_conv3d_example.py](./examples/recipes/spc/spc_conv3d_example.py)
-  * Tutorial for diffuse lighting in [examples/tutorial/diffuse_lighting.ipynb](./examples/tutorial/diffuse_lighting.ipynb)
-  * Tutorial for spherical gaussian specular lighting [examples/tutorial/sg_specular_lighting.ipynb](./examples/tutorial/sg_specular_lighting.ipynb)
+[**Bring any custom renderer** into a Jupyter notebook for debugging. Use Kaolin Camera to navigate:](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/interactive_visualizer.ipynb)
 
-See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.13.0) for details.
+<a href="https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/interactive_visualizer.ipynb"><img src="./assets/visualizer.gif" alt="visualizer" height="300" /></a>
+
+[Read and manage **batched mesh attributes** with convenience using SurfaceMesh:](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/working_with_meshes.ipynb)
+
+<a href="https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/working_with_meshes.ipynb"><img src="./assets/working_with_meshes.png" alt="working_with_meshes" height="250" /></a>
+
+See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.14.0) for details.
 
 ## Contributing
 
