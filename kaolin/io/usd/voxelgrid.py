@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import torch
+import numpy as np
 
 try:
     from pxr import Usd, UsdGeom, Sdf
@@ -109,7 +110,7 @@ def import_voxelgrids(file_path_or_stage, scene_paths=None, times=None):
         instancer = UsdGeom.PointInstancer(prim)
         assert instancer   # Currently only support pointclouds from point instancers
 
-        voxel_indices = torch.tensor(instancer.GetPositionsAttr().Get(time=time), dtype=torch.long)
+        voxel_indices = torch.from_numpy(np.array(instancer.GetPositionsAttr().Get(time=time), dtype=np.int64))
         bounds = voxel_indices.max(dim=0)[0]
         max_bound = bounds.max()
         grid_size = prim.GetAttribute('primvars:grid_size').Get(time=time)

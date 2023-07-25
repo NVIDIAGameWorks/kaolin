@@ -61,126 +61,66 @@ def ubuntu_cpuonly_configs = [
 def ubuntu_for_wheels_configs = [
 /*
     [
-        'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.10.0', 'archsToTest': 'TITAN_V'
+        'cudaVer': '11.3.1', 'cudnnVer': '8',
+        'torchVer': '1.11.0', 'archsToTest': 'MULTI'
     ],
     [
-        'cudaVer': '11.1.1', 'cudnnVer': '8',
-        'torchVer': '1.10.0', 'archsToTest': 'TITAN_V'
-    ],
-    [
-        'cudaVer': '11.1.1', 'cudnnVer': '8',
-        'torchVer': '1.10.1', 'archsToTest': 'TITAN_V'
-    ],
-    [
-        'cudaVer': '11.1.1', 'cudnnVer': '8',
-        'torchVer': '1.10.2', 'archsToTest': 'TITAN_V'
+        'cudaVer': '11.5.2', 'cudnnVer': '8',
+        'torchVer': '1.11.0', 'archsToTest': 'MULTI'
     ],
     [
         'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.10.0', 'archsToTest': 'A100_PCIE_40GB'
+        'torchVer': '1.12.0', 'archsToTest': 'MULTI'
     ],
     [
-        'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.10.1', 'archsToTest': 'TITAN_V'
-    ],
-    [
-        'cudaVer': '11.1.1', 'cudnnVer': '8',
-        'torchVer': '1.10.1', 'archsToTest': 'Tesla_T4'
+        'cudaVer': '11.6.2', 'cudnnVer': '8',
+        'torchVer': '1.12.0', 'archsToTest': 'MULTI'
     ],
     [
         'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.10.1', 'archsToTest': 'A100_PCIE_40GB'
+        'torchVer': '1.12.1', 'archsToTest': 'MULTI'
     ],
     [
-        'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.10.2', 'archsToTest': 'TITAN_V'
+        'cudaVer': '11.6.2', 'cudnnVer': '8',
+        'torchVer': '1.12.1', 'archsToTest': 'MULTI'
     ],
     [
-        'cudaVer': '11.1.1', 'cudnnVer': '8',
-        'torchVer': '1.10.2', 'archsToTest': 'Tesla_T4'
-    ],
-    [
-        'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.10.2', 'archsToTest': 'A100_PCIE_40GB'
-    ],
-    [
-        'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.11.0', 'archsToTest': 'TITAN_V'
-    ],
-    [
-        'cudaVer': '11.5.1', 'cudnnVer': '8',
-        'torchVer': '1.11.0', 'archsToTest': 'A100_PCIE_40GB'
-    ],
-    [
-        'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.12.0', 'archsToTest': 'TITAN_V'
-    ],
-    [
-        'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.12.0', 'archsToTest': 'A10'
-    ],
-    [
-        'cudaVer': '11.6.1', 'cudnnVer': '8',
-        'torchVer': '1.12.0', 'archsToTest': 'A30'
-    ],
-    [
-        'cudaVer': '10.2', 'cudnnVer': '7',
-        'torchVer': '1.12.1', 'archsToTest': 'TITAN_V'
-    ],
-    [
-        'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.12.1', 'archsToTest': 'A30'
-    ],
-    [
-        'cudaVer': '11.6.1', 'cudnnVer': '8',
-        'torchVer': '1.12.1', 'archsToTest': 'GA100-E4720-DVT'
-    ],
-    [
-        'cudaVer': '11.6.1', 'cudnnVer': '8',
-        'torchVer': '1.13.0', 'archsToTest': 'GA100-E4720-DVT'
+        'cudaVer': '11.6.2', 'cudnnVer': '8',
+        'torchVer': '1.13.0', 'archsToTest': 'MULTI'
     ],
     [
         'cudaVer': '11.7.1', 'cudnnVer': '8',
-        'torchVer': '1.13.0', 'archsToTest': 'A100_PCIE_40GB'
+        'torchVer': '1.13.0', 'archsToTest': 'MULTI'
     ],
     [
-        'cudaVer': '11.6.1', 'cudnnVer': '8',
-        'torchVer': '1.13.1', 'archsToTest': 'A10'
+        'cudaVer': '11.6.2', 'cudnnVer': '8',
+        'torchVer': '1.13.1', 'archsToTest': 'MULTI'
     ],
     [
         'cudaVer': '11.7.1', 'cudnnVer': '8',
-        'torchVer': '1.13.1', 'archsToTest': 'A30'
+        'torchVer': '1.13.1', 'archsToTest': 'MULTI'
     ],
-*/
+    [
+        'cudaVer': '11.7.1', 'cudnnVer': '8',
+        'torchVer': '2.0.0', 'archsToTest': 'MULTI'
+    ],
+    [
+        'cudaVer': '11.8.0', 'cudnnVer': '8',
+        'torchVer': '2.0.0', 'archsToTest': 'MULTI'
+    ],
+    [
+        'cudaVer': '11.7.1', 'cudnnVer': '8',
+        'torchVer': '2.0.1', 'archsToTest': 'MULTI'
+    ],
+    [
+        'cudaVer': '11.8.0', 'cudnnVer': '8',
+        'torchVer': '2.0.1', 'archsToTest': 'MULTI'
+    ]
+*/  
 ]
 
 def windows_for_wheels_configs = [
 /*
-    [
-        'cudaVer': '11.1', 'cudnnVer': '8',
-        'torchVer': '1.10.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.3', 'cudnnVer': '8',
-        'torchVer': '1.10.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.1', 'cudnnVer': '8',
-        'torchVer': '1.10.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.3', 'cudnnVer': '8',
-        'torchVer': '1.10.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.1', 'cudnnVer': '8',
-        'torchVer': '1.10.2', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.3', 'cudnnVer': '8',
-        'torchVer': '1.10.2', 'archsToTest': ''
-    ],
     [
         'cudaVer': '11.3', 'cudnnVer': '8',
         'torchVer': '1.11.0', 'archsToTest': ''
@@ -221,6 +161,22 @@ def windows_for_wheels_configs = [
         'cudaVer': '11.7', 'cudnnVer': '8',
         'torchVer': '1.13.1', 'archsToTest': ''
     ],
+    [
+        'cudaVer': '11.7', 'cudnnVer': '8',
+        'torchVer': '2.0.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.0.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.7', 'cudnnVer': '8',
+        'torchVer': '2.0.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.0.1', 'archsToTest': ''
+    ]
 */
 ]
 
@@ -270,7 +226,7 @@ node {
     if (gitlabActionType == "MERGE" &&
         gitlabMergeRequestTitle.contains("[for wheels]")) {
             for (config in ubuntu_for_wheels_configs) {
-                for (pythonVer in ['3.7', '3.8', '3.9']) {
+                for (pythonVer in ['3.8', '3.9', '3.10']) {
                     def configName = "custom-wheels-torch${config['torchVer']}-" + \
                                      "cuda${config['cudaVer']}-" +
                                      "cudnn${config['cudnnVer']}-" +
@@ -287,7 +243,7 @@ node {
                 }
             }
             for (config in windows_for_wheels_configs) {
-                for (pythonVer in ['3.7', '3.8', '3.9']) {
+                for (pythonVer in ['3.8', '3.9', '3.10']) {
 
                     def cudaVerLabel = config['cudaVer'].split('\\.').join('')
                     def torchVerLabel = config['torchVer'].split('\\.').join('')

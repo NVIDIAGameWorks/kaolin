@@ -115,7 +115,7 @@ spec:
               }
               stage("Push wheel to volume") {
                 sh """
-                mkdir -p /mount_binaries/torch-${torchVer}_cu${cudaTag}
+                mkdir -p /mount_binaries/whl/torch-${torchVer}_cu${cudaTag}
                 mv ./${wheelName} /mount_binaries/whl/torch-${torchVer}_cu${cudaTag}/${wheelName}
                 """
               }

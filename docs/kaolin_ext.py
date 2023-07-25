@@ -29,6 +29,7 @@ def run_apidoc(_):
             "setup.py",
             "**.so",
             "kaolin/version.py",
+            "kaolin/experimental/",
             "kaolin/version.txt",
             "kaolin/io/usd/utils.py",
             "kaolin/io/usd/mesh.py",
