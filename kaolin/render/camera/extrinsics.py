@@ -733,8 +733,8 @@ class CameraExtrinsics():
         return self._backend.convert_to_mat()
 
     def inv_view_matrix(self) -> torch.Tensor:
-        r"""Returns the inverse of the view matrix used to convert vectors from camera to world coordinates
-        (a.k.a: cam2world matrix). This matrix is column major:
+        r"""Returns the inverse of the view matrix.
+        This matrix is column major:
 
         .. math::
 
@@ -757,6 +757,10 @@ class CameraExtrinsics():
 
         if you're using a different coordinate system, the axes may be permuted.
 
+        .. note::
+
+        This matrix is different from cam2world matrix. That is, `xyz_in_world != self.inv_view_matrix() @ xyz_in_cam`.
+        
         .. seealso::
 
             :func:`change_coordinate_system()`
