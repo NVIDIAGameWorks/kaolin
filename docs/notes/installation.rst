@@ -13,9 +13,9 @@ Requirements
 ------------
 
 * Linux, Windows, or macOS (CPU-only)
-* Python >= 3.7, <= 3.9
+* Python >= 3.7, <= 3.10
 * `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ >= 10.0 (with 'nvcc' installed) See `CUDA Toolkit Archive <https://developer.nvidia.com/cuda-toolkit-archive>`_ to install older version.
-* torch >= 1.8, <= 2.0.0
+* torch >= 1.8, <= 2.0.1
 
 Quick Start (Linux, Windows)
 ----------------------------
@@ -24,7 +24,7 @@ Quick Start (Linux, Windows)
 
 .. code-block:: bash
 
-    $ pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VER}_cu{CUDA_VER}.html
+    $ pip install kaolin==0.14.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VER}_cu{CUDA_VER}.html
 
 .. Note::
     Replace *TORCH_VER* and *CUDA_VER* with any of the compatible options below.
@@ -33,23 +33,21 @@ Quick Start (Linux, Windows)
 .. rst-class:: center-align-center-col
 
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch / CUDA** | **cu102** | **cu111** | **cu113** | **cu116** | **cu117** |
+    | **torch / CUDA** | **cu113** | **cu115** | **cu116** | **cu117** | **cu118** |
     +==================+===========+===========+===========+===========+===========+
-    | **torch-1.13.1** |           |           |           |     ✓     |     ✓     |
+    | **torch-2.0.0**  |           |           |           |     ✓     |     ✓     |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.13.0** |           |           |           |     ✓     |     ✓     |
+    | **torch-2.0.1**  |           |           |           |     ✓     |     ✓     |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.12.1** |     ✓     |           |     ✓     |     ✓     |           |
+    | **torch-1.13.1** |           |           |     ✓     |     ✓     |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.12.0** |     ✓     |           |     ✓     |     ✓     |           |
+    | **torch-1.13.0** |           |           |     ✓     |     ✓     |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.11.0** |     ✓     |           |     ✓     |           |           |
+    | **torch-1.12.1** |     ✓     |           |     ✓     |           |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.10.2** |     ✓     |     ✓     |     ✓     |           |           |
+    | **torch-1.12.0** |     ✓     |           |     ✓     |           |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.10.1** |     ✓     |     ✓     |     ✓     |           |           |
-    +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.10.0** |     ✓     |     ✓     |     ✓     |           |           |
+    | **torch-1.11.0** |     ✓     |     ✓     |           |           |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
 
 For example, to install kaolin for torch 1.12.1 and CUDA 11.3:
@@ -108,11 +106,11 @@ Follow `official instructions <https://pytorch.org>`_ to install PyTorch of a su
 Kaolin may be able to work with other PyTorch versions, but we only explicitly test within the version range 1.10.0 to 2.0.0.
 See below for overriding PyTorch version check during install.
 
-Here is how to install the latest Pytorch version supported by Kaolin for cuda 11.3:
+Here is how to install the latest Pytorch version supported by Kaolin for cuda 11.8:
 
 .. code-block:: bash
 
-    $ pip install torch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+    $ pip install torch==2.0.1 --extra-index-url https://download.pytorch.org/whl/cu118
 
 
 4. Optional Environment Variables
