@@ -3,10 +3,10 @@ Welcome to Kaolin Library Documentation
 
 .. image:: ../assets/kaolin.png
 
-NVIDIA Kaolin library provides a PyTorch API for working with a variety of 3D representations and includes a growing collection of GPU-optimized operations such as modular differentiable rendering, fast conversions between representations, data loading, 3D checkpoints and more.
+`NVIDIA Kaolin library <https://github.com/NVIDIAGameWorks/kaolin>`_ provides a PyTorch API for working with a variety of 3D representations and includes a growing collection of GPU-optimized operations such as modular differentiable rendering, fast conversions between representations, data loading, 3D checkpoints, differentiable camera API, differentiable lighting with spherical harmonics and spherical gaussians, powerful quadtree acceleration structure called Structured Point Clouds, interactive 3D visualizer for jupyter notebooks, convenient batched mesh container and more.
 See :ref:`Installation <installation>`, :ref:`API Overview <overview>` and :ref:`Tutorials <tutorial_index>` to get started!
 
-Kaolin library is part of a larger suite of tools for 3D deep learning research. For example, `Omniverse Kaolin app <https://docs.omniverse.nvidia.com/app_kaolin/app_kaolin/overview.html>`_ allows interactive visualization of 3D checkpoints. To find out more about the Kaolin ecosystem, visit the `NVIDIA Kaolin Dev Zone page <https://developer.nvidia.com/kaolin>`_.
+Note that Kaolin library is part of the larger `NVIDIA Kaolin effort <https://developer.nvidia.com/kaolin>`_ for 3D deep learning.
 
 
 .. toctree::
