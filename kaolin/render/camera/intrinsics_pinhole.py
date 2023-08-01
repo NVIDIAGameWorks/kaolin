@@ -388,7 +388,7 @@ class PinholeIntrinsics(CameraIntrinsics):
         ty = -(top + bottom) / (top - bottom)
         # tz = -(far + near) / (far - near)    # Not used explicitly here, but makes easier to follow derivations
 
-        # Some examples of U,V choices to control the NDC space obtained:
+        # Some examples of U,V choices to control the depth of the NDC space obtained:
         # ------------------------------------------------------------------------------------------------------
         # | NDC in [-1, 1]  |   U = -2.0 * near * far / (far - near)    | i.e. OpenGL NDC space
         # |                 |   V = -(far + near) / (far - near)        |
@@ -451,7 +451,7 @@ class PinholeIntrinsics(CameraIntrinsics):
             [0.0,                   2.0 / (top - bottom),  0.0,            -ty ],
             [0.0,                   0.0,                   U,               V  ],
             [0.0,                   0.0,                   0.0,            -1.0]
-        ])
+        ], dtype=self.dtype)
 
         # Add batch dim, to allow broadcasting
         return ndc_mat.unsqueeze(0)
@@ -483,9 +483,50 @@ class PinholeIntrinsics(CameraIntrinsics):
         proj = ndc @ persp_matrix
         return proj
 
+    def project(self, vectors: torch.Tensor) -> torch.Tensor:
+        r"""
+        Applies perspective projection to obtain Clip Coordinates
+        (this function does not perform perspective division the actual Normalized Device Coordinates).
+
+        Assumptions:
+
+        * Camera is looking down the negative "z" axis
+          (that is: camera forward axis points outwards from screen, OpenGL compatible).
+        * Practitioners are advised to keep near-far gap as narrow as possible,
+          to avoid inherent depth precision errors.
+
+        Args:
+            vectors (torch.Tensor):
+                the vectors to be transformed,
+                can homogeneous of shape :math:`(\text{num_vectors}, 4)`
+                or :math:`(\text{num_cameras}, \text{num_vectors}, 4)`
+                or non-homogeneous of shape :math:`(\text{num_vectors}, 3)`
+                or :math:`(\text{num_cameras}, \text{num_vectors}, 3)`
+
+        Returns:
+            (torch.Tensor): the transformed vectors, of same shape as ``vectors`` but, with homogeneous coordinates,
+                where the last dim is 4
+        """
+        proj = self.projection_matrix()
+
+        # Expand input vectors to 4D homogeneous coordinates if needed
+        homogeneous_vecs = up_to_homogeneous(vectors)
+
+        num_cameras = len(self)  # C - number of cameras
+        batch_size = vectors.shape[-2]  # B - number of vectors
+
+        v = homogeneous_vecs.expand(num_cameras, batch_size, 4)[..., None]  # Expand as (C, B, 4, 1)
+        proj = proj[:, None].expand(num_cameras, batch_size, 4, 4)  # Expand as (C, B, 4, 4)
+
+        transformed_v = proj @ v
+        transformed_v = transformed_v.squeeze(-1)  # Reshape:  (C, B, 4)
+
+        return transformed_v  # Return shape:  (C, B, 4)
+
     def transform(self, vectors: torch.Tensor) -> torch.Tensor:
         r"""
-        Applies perspective projection to actual NDC coordinates (this function also performs perspective division).
+        Applies perspective projection to obtain Normalized Device Coordinates
+        (this function also performs perspective division).
 
         Assumptions:
 
@@ -502,23 +543,11 @@ class PinholeIntrinsics(CameraIntrinsics):
                 or :math:`(\text{num_cameras}, \text{num_vectors}, 3)`
 
         Returns:
-            (torch.Tensor): the transformed vectors, of same shape than ``vectors`` but last dim 3
+            (torch.Tensor): the transformed vectors, of same shape as ``vectors`` but with non-homogeneous coords,
+            e.g. the last dim 3
         """
-        proj = self.projection_matrix()
-
-        # Expand input vectors to 4D homogeneous coordinates if needed
-        homogeneous_vecs = up_to_homogeneous(vectors)
-
-        num_cameras = len(self)         # C - number of cameras
-        batch_size = vectors.shape[-2]  # B - number of vectors
-
-        v = homogeneous_vecs.expand(num_cameras, batch_size, 4)[..., None]  # Expand as (C, B, 4, 1)
-        proj = proj[:, None].expand(num_cameras, batch_size, 4, 4)          # Expand as (C, B, 4, 4)
-
-        transformed_v = proj @ v
-        transformed_v = transformed_v.squeeze(-1)  # Reshape:  (C, B, 4)
-        normalized_v = down_from_homogeneous(transformed_v)
-
+        transformed_v = self.project(vectors)   # Project with homogeneous coords to shape (C, B, 4)
+        normalized_v = down_from_homogeneous(transformed_v)  # Perspective divide to shape:  (C, B, 3)
         return normalized_v  # Return shape:  (C, B, 3)
 
     def normalize_depth(self, depth: torch.Tensor) -> torch.Tensor:
@@ -549,6 +578,26 @@ class PinholeIntrinsics(CameraIntrinsics):
         normalized_depth = torch.clamp(normalized_depth, min=0.0, max=1.0)
         return normalized_depth
 
+    @CameraIntrinsics.width.setter
+    def width(self, value: int) -> None:
+        """ Updates the width of the image plane.
+        The fov will remain invariant, and the focal length may change instead.
+        """
+        # Keep the fov invariant and change focal length instead
+        fov = self.fov_x
+        self._shared_fields['width'] = value
+        self.fov_x = fov
+
+    @CameraIntrinsics.height.setter
+    def height(self, value: int) -> None:
+        """ Updates the hieght of the image plane.
+        The fov will remain invariant, and the focal length may change instead.
+        """
+        # Keep the fov invariant and change focal length instead
+        fov = self.fov_y
+        self._shared_fields['height'] = value
+        self.fov_y = fov
+
     @property
     def x0(self) -> torch.FloatTensor:
         """The horizontal offset from the NDC origin in image space
@@ -570,6 +619,22 @@ class PinholeIntrinsics(CameraIntrinsics):
     @y0.setter
     def y0(self, val: Union[float, torch.Tensor]) -> None:
         self._set_param(val, PinholeParamsDefEnum.y0)
+
+    @property
+    def cx(self) -> torch.FloatTensor:
+        """The principal point X coordinate.
+        Note: By default, the principal point is canvas center (kaolin defines the NDC origin at the canvas center).
+        """
+        # Assumes the NDC x origin is at the center of the canvas
+        return self.width / 2.0 + self.params[:, PinholeParamsDefEnum.x0]
+
+    @property
+    def cy(self) -> torch.FloatTensor:
+        """The principal point Y coordinate.
+        Note: By default, the principal point is canvas center (kaolin defines the NDC origin at the canvas center).
+        """
+        # Assumes the NDC y origin is at the center of the canvas
+        return self.height / 2.0 + self.params[:, PinholeParamsDefEnum.y0]
 
     @property
     def focal_x(self) -> torch.FloatTensor:

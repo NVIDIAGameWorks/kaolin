@@ -442,10 +442,20 @@ class Camera:
         """Camera image plane width (pixel resolution)"""
         return self.intrinsics.width
 
+    @width.setter
+    def width(self, value: int) -> None:
+        """Camera image plane width (pixel resolution)"""
+        self.intrinsics.width = value
+
     @property
     def height(self) -> int:
         """Camera image plane height (pixel resolution)"""
         return self.intrinsics.height
+
+    @height.setter
+    def height(self, value: int) -> None:
+        """Camera image plane height (pixel resolution)"""
+        self.intrinsics.height = value
 
     @property
     def lens_type(self) -> str:
