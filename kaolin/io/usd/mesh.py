@@ -390,7 +390,8 @@ def import_mesh(file_path_or_stage, scene_path=None, with_materials=False, with_
     Supports homogeneous meshes (meshes with consistent numbers of vertices per face).
     All sub-meshes found under the `scene_path` are flattened to a single mesh. The following
     interpolation types are supported for UV coordinates: `vertex`, `varying` and `faceVarying`.
-    Returns an unbatched representation.
+    Returns an unbatched attributes as CPU torch tensors in an easy-to-manage
+    :class:`kaolin.rep.SurfaceMesh` container.
 
     Args:
         file_path_or_stage (str, Usd.Stage):
@@ -409,31 +410,74 @@ def import_mesh(file_path_or_stage, scene_path=None, with_materials=False, with_
         time (convertible to float, optional): Positive integer indicating the time at which to retrieve parameters.
         triangulate: if True, will triangulate all non-triangular meshes using same logic as
             :func:`mesh_handler_naive_triangulate <kaolin.io.utils.mesh_handler_naive_triangulate>`.
+
     Returns:
+        (SurfaceMesh):
+            an unbatched instance of :class:`kaolin.rep.SurfaceMesh`, where:
 
-    namedtuple of:
-        - **vertices** (torch.FloatTensor): of shape (num_vertices, 3)
-        - **faces** (torch.LongTensor): of shape (num_faces, face_size)
-        - **uvs** (torch.FloatTensor): of shape (num_uvs, 2)
-        - **face_uvs_idx** (torch.LongTensor): of shape (num_faces, face_size)
-        - **face_normals** (torch.FloatTensor): of shape (num_faces, face_size, 3)
-        - **materials** (dict of kaolin.io.materials.Material): Material properties keyed by material names
-        - **materials** (list of Material): list of material objects, sorted alphabetically by their name
-        - **material_assignments** (torch.ShortTensor): of shape (num_faces,) containing index of the
-            material (in the above list) assigned to the corresponding face, or `-1` if no material was assigned
+            * **normals** and **face_normals_idx** will only be filled if `with_normals=True`
+            * **materials** will be a list
+              of :class:`kaolin.io.materials.Material` sorted by their `material_name`;
+              filled only if `with_materials=True`.
+            * **material_assignments** will be a tensor
+              of shape ``(num_faces,)`` containing the index
+              of the material (in the `materials` list) assigned to the corresponding face,
+              or `-1` if no material was assigned; filled only if `with_materials=True`.
 
-    Example:
-        >>> # Create a stage with some meshes
-        >>> stage = export_mesh('./new_stage.usd', vertices=torch.rand(3, 3), faces=torch.tensor([[0, 1, 2]]),
-        ... scene_path='/World/mesh1')
-        >>> # Import meshes
-        >>> mesh = import_mesh('./new_stage.usd', scene_path='/World/mesh1')
-        >>> mesh.vertices.shape
-        torch.Size([3, 3])
-        >>> mesh.faces
-        tensor([[0, 1, 2]])
+    .. rubric:: Examples
+
+    To load a mesh without loading normals or materials::
+
+        >>> from kaolin.io.usd.mesh import import_mesh
+        >>> mesh = import_mesh("sample_data/meshes/pizza.usda")
+        >>> print(mesh)
+        SurfaceMesh object with batching strategy NONE
+                    vertices: [482, 3] (torch.float32)[cpu]
+                         uvs: [2880, 2] (torch.float32)[cpu]
+                       faces: [960, 3] (torch.int64)[cpu]
+                face_uvs_idx: [960, 3] (torch.int64)[cpu]
+               face_vertices: if possible, computed on access from: (faces, vertices)
+                face_normals: if possible, computed on access from: (normals, face_normals_idx) or (vertices, faces)
+              vertex_normals: if possible, computed on access from: (faces, face_normals)
+                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
+
+        >>> mesh.face_normals  # Causes face_normals and any attributes required to compute it to be auto-computed
+        >>> mesh.to_batched()  # Apply fixed topology batching, unsqueezing most attributes
+        >>> mesh = mesh.cuda(attributes=["vertices"])  # Moves just vertices to GPU
+        >>> print(mesh)
+        SurfaceMesh object with batching strategy FIXED
+                    vertices: [1, 482, 3] (torch.float32)[cuda:0]
+               face_vertices: [1, 960, 3, 3] (torch.float32)[cpu]
+                face_normals: [1, 960, 3, 3] (torch.float32)[cpu]
+                         uvs: [1, 2880, 2] (torch.float32)[cpu]
+                       faces: [960, 3] (torch.int64)[cpu]
+                face_uvs_idx: [1, 960, 3] (torch.int64)[cpu]
+              vertex_normals: if possible, computed on access from: (faces, face_normals)
+                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
+
+
+    To load a mesh with normals and materials, while triangulating and homogenizing if needed::
+
+        >>> from kaolin.io.usd.mesh import import_mesh
+        >>> from kaolin.io.utils import mesh_handler_naive_triangulate
+        >>> mesh = import_mesh("sample_data/meshes/pizza.usda",
+                              with_normals=True, with_materials=True,
+                              heterogeneous_mesh_handler=mesh_handler_naive_triangulate,
+                              triangulate=True)
+        >>> print(mesh)
+        SurfaceMesh object with batching strategy NONE
+                    vertices: [482, 3] (torch.float32)[cpu]
+                face_normals: [960, 3, 3] (torch.float32)[cpu]
+                         uvs: [2880, 2] (torch.float32)[cpu]
+                       faces: [960, 3] (torch.int64)[cpu]
+                face_uvs_idx: [960, 3] (torch.int64)[cpu]
+        material_assignments: [960] (torch.int16)[cpu]
+                   materials: list of length 2
+               face_vertices: if possible, computed on access from: (faces, vertices)
+              vertex_normals: if possible, computed on access from: (faces, face_normals)
+                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
     """
-    # TODO  add arguments to selectively import UVs and normals
+    # TODO  add arguments to selectively import UVs
     stage = _get_stage_from_maybe_file(file_path_or_stage)
     if scene_path is None:
         scene_path = stage.GetPseudoRoot().GetPath()
@@ -454,7 +498,8 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
     heterogeneous meshes can be achieved by passing a function through the ``heterogeneous_mesh_handler`` argument.
     The following interpolation types are supported for UV coordinates: `vertex`, `varying` and `faceVarying`.
     For each scene path specified in `scene_paths`, sub-meshes (if any) are flattened to a single mesh.
-    Returns unbatched meshes list representation. Prims with no meshes or with heterogenous faces are skipped.
+    Prims with no meshes or with heterogenous faces are skipped. Returns an unbatched attributes as CPU torch
+    tensors in a list of easy-to-manage :class:`kaolin.rep.SurfaceMesh` containers.
 
     Args:
         file_path_or_stage (str or Usd.Stage):
@@ -473,19 +518,24 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
         times (list of int): Positive integers indicating the time at which to retrieve parameters.
         triangulate: if True, will triangulate all non-triangular meshes using same logic as
             :func:`mesh_handler_naive_triangulate <kaolin.io.utils.mesh_handler_naive_triangulate>`.
+
     Returns:
+        (a list of SurfaceMesh):
+            a list of unbatched instances of :class:`kaolin.rep.SurfaceMesh`, where:
 
-    list of namedtuple of:
-        - **vertices** (list of torch.FloatTensor): of shape (num_vertices, 3)
-        - **faces** (list of torch.LongTensor): of shape (num_faces, face_size)
-        - **uvs** (list of torch.FloatTensor): of shape (num_uvs, 2)
-        - **face_uvs_idx** (list of torch.LongTensor): of shape (num_faces, face_size)
-        - **face_normals** (list of torch.FloatTensor): of shape (num_faces, face_size, 3)
-        - **materials** (list of Material): list of materials, sorted alphabetically by their name
-        - **material_assignments** (torch.ShortTensor): of shape (num_faces,) containing index of the
-            material (in the above list) assigned to the corresponding face, or `-1` if no material was assigned
+            * **normals** and **face_normals_idx** will only be filled if `with_normals=True`
+            * **materials** will be a list
+              of :class:`kaolin.io.materials.Material` sorted by their `material_name`;
+              filled only if `with_materials=True`.
+            * **material_assignments** will be a tensor
+              of shape ``(num_faces,)`` containing the index
+              of the material (in the `materials` list) assigned to the corresponding face,
+              or `-1` if no material was assigned; filled only if `with_materials=True`.
 
-    Example:
+    .. rubric:: Examples
+
+    To export and then import USD meshes::
+
         >>> # Create a stage with some meshes
         >>> vertices_list = [torch.rand(3, 3) for _ in range(3)]
         >>> faces_list = [torch.tensor([[0, 1, 2]]) for _ in range(3)]
@@ -498,6 +548,43 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
         torch.Size([3, 3])
         >>> [m.faces for m in meshes]
         [tensor([[0, 1, 2]]), tensor([[0, 1, 2]]), tensor([[0, 1, 2]])]
+
+    To load multiple meshes from file, including materials and normals, while homongenizing and triangulating::
+
+        >>> from kaolin.io.usd.mesh import import_meshes
+        >>> from kaolin.io.utils import mesh_handler_naive_triangulate
+        >>> meshes = import_meshes('sample_data/meshes/amsterdam.usda',
+                                   with_normals=True, with_materials=True,
+                                   heterogeneous_mesh_handler=mesh_handler_naive_triangulate,
+                                   triangulate=True)
+        >>> len(meshes)
+        18
+        >>> print(meshes[0])
+        SurfaceMesh object with batching strategy NONE
+                    vertices: [4, 3] (torch.float32)[cpu]
+                face_normals: [2, 3, 3] (torch.float32)[cpu]
+                         uvs: [4, 2] (torch.float32)[cpu]
+                       faces: [2, 3] (torch.int64)[cpu]
+                face_uvs_idx: [2, 3] (torch.int64)[cpu]
+        material_assignments: [2] (torch.int16)[cpu]
+                   materials: list of length 1
+               face_vertices: if possible, computed on access from: (faces, vertices)
+              vertex_normals: if possible, computed on access from: (faces, face_normals)
+                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
+        >>> # If needed, concatenate meshes into a batch
+        >>> from kaolin.rep import SurfaceMesh
+        >>> mesh = SurfaceMesh.cat(meshes, fixed_topology=False)
+        >>> print(mesh)
+        SurfaceMesh object with batching strategy LIST
+            vertices: [
+                      0: [4, 3] (torch.float32)[cpu]
+                      1: [98, 3] (torch.float32)[cpu]
+                      ...
+                     17: [4, 3] (torch.float32)[cpu]
+                      ]
+        face_normals: [
+                      0: [2, 3, 3] (torch.float32)[cpu]
+                      ...
     """
     triangulate_handler = None if not triangulate else utils.mesh_handler_naive_triangulate
 
