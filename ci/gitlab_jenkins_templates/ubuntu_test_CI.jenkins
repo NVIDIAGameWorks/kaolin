@@ -27,6 +27,10 @@ if (arch == "MULTI") {
     """
 }
 
+node_blacklist = """
+            - "a4u8g-0031.ipp1u1.colossus"
+"""
+
 gitlabCommitStatus("test-${configName}-${arch}") {
 
 podTemplate(
@@ -54,7 +58,7 @@ spec:
       - mountPath: /mnt
         name: pvc-mount
   imagePullSecrets:
-  - name: gitlabregcred
+  - name: gitlabcred
   nodeSelector:
     kubernetes.io/os: linux
   affinity:
@@ -65,6 +69,9 @@ spec:
           - key: "nvidia.com/gpu_type"
             operator: "In"
             values:${gpu_list}
+          - key: "kubernetes.io/hostname"
+            operator: "NotIn"
+            values:${node_blacklist}
 """) {
   node(POD_LABEL) {
     container("docker") {
@@ -78,6 +85,8 @@ spec:
           stage('Disp info') {
             sh 'nvidia-smi'
             sh 'python --version'
+            sh 'lscpu'
+            sh 'free -h --si'
           }
         } catch(e) {
           build_passed = false
@@ -91,7 +100,11 @@ spec:
             export KAOLIN_TEST_SHAPENETV2_PATH=/mnt/data/ci_shapenetv2
             export KAOLIN_TEST_MODELNET_PATH=/mnt/data/ModelNet
             export KAOLIN_TEST_SHREC16_PATH=/mnt/data/ci_shrec16
-            pytest --import-mode=importlib -rs --cov=/kaolin/kaolin /kaolin/tests/python/kaolin/
+            pytest --durations=50 --import-mode=importlib -rs --cov=/kaolin/kaolin \
+                --log-disable=PIL.PngImagePlugin \
+                --log-disable=PIL.TiffImagePlugin \
+                --log-disable=kaolin.rep.surface_mesh \
+                /kaolin/tests/python/kaolin
             '''
           }
         } catch(e) {
@@ -123,25 +136,10 @@ spec:
           build_passed = false
           echo e.toString()
         }
+        // TUTORIALS
         try {
-          stage("DIB-R Tutorial") {
-            sh 'cd /kaolin/examples/tutorial && ipython dibr_tutorial.ipynb'
-          }
-        } catch(e) {
-          build_passed = false
-          echo e.toString()
-        }
-        try {
-          stage("DMTet Tutorial") {
-            sh 'cd /kaolin/examples/tutorial && ipython dmtet_tutorial.ipynb'
-          }
-        } catch(e) {
-          build_passed = false
-          echo e.toString()
-        }
-        try {
-          stage("Understanding SPCs Tutorial") {
-            sh 'cd /kaolin/examples/tutorial && ipython understanding_spcs_tutorial.ipynb'
+          stage("BBox Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython bbox_tutorial.ipynb'
           }
         } catch(e) {
           build_passed = false
@@ -156,8 +154,40 @@ spec:
           echo e.toString()
         }
         try {
+          stage("DIB-R Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython dibr_tutorial.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
           stage("Diffuse lighting Tutorial") {
             sh 'cd /kaolin/examples/tutorial && ipython diffuse_lighting.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("DMTet Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython dmtet_tutorial.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("GLTF Visualizer") {
+            sh 'cd /kaolin/examples/tutorial && ipython gltf_viz.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Interactive Visualizer") {
+            sh 'cd /kaolin/examples/tutorial && ipython interactive_visualizer.ipynb'
           }
         } catch(e) {
           build_passed = false
@@ -172,13 +202,23 @@ spec:
           echo e.toString()
         }
         try {
-          stage("Interactive Visualizer") {
-            sh 'cd /kaolin/examples/tutorial && ipython interactive_visualizer.ipynb'
+          stage("Understanding SPCs Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython understanding_spcs_tutorial.ipynb'
           }
         } catch(e) {
           build_passed = false
           echo e.toString()
         }
+        try {
+          stage("Working with meshes Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython working_with_meshes.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+
+        // RECIPES
         try {
           stage("SPC from Pointcloud Recipe") {
             sh 'cd /kaolin/examples/recipes/dataload/ && python spc_from_pointcloud.py'

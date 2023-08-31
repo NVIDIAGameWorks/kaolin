@@ -39,6 +39,8 @@ spec:
 ''') {
   node(POD_LABEL) {
     container("docker") {
+      // This is to let the time for the docker-daemon to get initialized.
+      sleep 10
       try {
         stage("Checkout") {
           checkout([
@@ -53,7 +55,7 @@ spec:
                   trackingSubmodules: false
               ]],
               userRemoteConfigs: [[
-                  credentialsId: 'gitlab-credentials',
+                  credentialsId: 'kaolin-gitlab-access-token-as-password',
                   url: "${repoUrl}"
               ]]
           ])

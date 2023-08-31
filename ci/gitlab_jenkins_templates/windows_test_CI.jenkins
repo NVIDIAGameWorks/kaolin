@@ -44,7 +44,7 @@ spec:
       - mountPath: c:/mnt
         name: pvc-mount
   imagePullSecrets:
-  - name: gitlabregcred
+  - name: gitlabcred
   nodeSelector:
     kubernetes.io/os: windows
     nvidia.com/node_type: ${arch}

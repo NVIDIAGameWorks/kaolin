@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:18.04
 # used for cross-compilation in docker build
 #
 ARG PYTHON_VERSION=3.9
@@ -53,4 +53,5 @@ RUN conda list > conda_build.txt
 ### Install Dash3D Requirements ###
 RUN npm install -g npm@8.5.4
 COPY package.json package-lock.json ./
+RUN chown -R root package.json package-lock.json
 RUN npm install

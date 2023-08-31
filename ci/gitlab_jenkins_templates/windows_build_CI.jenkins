@@ -24,7 +24,7 @@ currentBuild.description = sourceBranch + ": " + commitHash
 gitlabCommitStatus("build-${configName}") {
 
 podTemplate(
-cloud:'sc-ipp-blossom-prod',
+cloud:'sc-ipp-blossom-116',
 envVars:[envVar(key:"JENKINS_URL", value:"${env.JENKINS_URL}")],
 yaml:'''
 apiVersion: v1
@@ -53,7 +53,7 @@ spec:
         limits:
           memory: 32Gi
   imagePullSecrets:
-  - name: gitlabregcred
+  - name: gitlabcred
   nodeSelector:
     kubernetes.io/os: windows
 ''') 
@@ -75,12 +75,12 @@ spec:
                   trackingSubmodules: false
               ]],
               userRemoteConfigs: [[
-                  credentialsId: 'gitlab-credentials',
+                  credentialsId: 'kaolin-gitlab-access-token-as-password',
                   url: "${repoUrl}"
               ]]
           ])
         }
-        docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
+        docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
           stage("Build") {
             cudaUrl = cuda_version_url[cudaVer]
             targetImage = docker.build(
