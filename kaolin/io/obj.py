@@ -30,7 +30,8 @@ __all__ = [
     'skip_error_handler',
     'create_missing_materials_error_handler',
     'default_error_handler',
-    'import_mesh'
+    'import_mesh',
+    'load_mtl'
 ]
 
 
@@ -77,15 +78,17 @@ def flatten_feature(feature):
 def import_mesh(path, with_materials=False, with_normals=False,
                 error_handler=None, heterogeneous_mesh_handler=None,
                 triangulate=False):
-    r"""Load data from an obj file as a single mesh.
+    r"""Load data from an obj file as a single mesh, and return data as CPU pytorch tensors in an easy-to-manage
+    :class:`kaolin.rep.SurfaceMesh` container.
 
-    With limited materials support to Kd, Ka, Ks, map_Kd, map_Ka and map_Ks.
-    Followed format described in: http://paulbourke.net/dataformats/obj/
+    .. note::
+        Currently has limited materials support for Kd, Ka, Ks, map_Kd, map_Ka and map_Ks,
+        following the format described in: http://paulbourke.net/dataformats/obj/
 
     Args:
         path (str): path to the obj file (with extension).
         with_materials (bool): if True, load materials. Default: False.
-        with_normals (bool): if True, load vertex normals. Default: False.
+        with_normals (bool): if True, load normals. Default: False.
         error_handler (Callable, optional):
             function that handles errors that can be raised (see raised errors, except `NonHomogeneousMeshError`
             handled separately), with the signature ``error_handler(error: Exception, **kwargs)``.
@@ -105,23 +108,17 @@ def import_mesh(path, with_materials=False, with_normals=False,
             :func:`mesh_handler_naive_triangulate <kaolin.io.utils.mesh_handler_naive_triangulate>`.
 
     Returns:
-        (obj.return_type):
-            namedtuple of:
+        (SurfaceMesh):
+            an unbatched instance of :class:`kaolin.rep.SurfaceMesh`, where:
 
-            - **vertices** (torch.Tensor): vertex locations of shape :math:`(\text{num_vertices}, 3)`.
-            - **faces** (torch.LongTensor): indices into vertex array
-              of shape :math:`(\text{num_faces}, \text{face_size})`.
-            - **uvs** (torch.Tensor): UV map coordinates of shape :math:`(\text{num_uvs}, 2)`.
-            - **face_uvs_idx** (torch.LongTensor): indices into UVmap for every vertex of every face
-              of shape :math:`(\text{num_faces}, \text{face_size})`.
-            - **materials** (list of dict):
-              a list of materials (see return values of :func:`load_mtl`) sorted by their `material_name`.
-            - **material_assignments** (dict of torch.LongTensor): (torch.ShortTensor): of shape `(\text{num_faces},)`
-                containing index of the material (in the `materials` list) assigned to the corresponding face,
-                or `-1` if no material was assigned.
-            - **normals** (torch.Tensor): normal values of shape :math:`(\text{num_normals}, 3)`.
-            - **face_normals_idx** (torch.LongTensor): indices into the normal array for every vertex
-              of every face, of shape :math:`(\text{num_faces}, \text{face_size})`.
+            * **normals** and **face_normals_idx** will only be filled if `with_normals=True`
+            * **materials** will be a list
+              of materials (see return values of :func:`load_mtl`) sorted by their `material_name`;
+              filled only if `with_materials=True`.
+            * **material_assignments** will be a tensor
+              of shape ``(num_faces,)`` containing the index
+              of the material (in the `materials` list) assigned to the corresponding face,
+              or `-1` if no material was assigned; filled only if `with_materials=True`.
 
     Raises:
         MaterialNotFoundError:
@@ -133,6 +130,59 @@ def import_mesh(path, with_materials=False, with_normals=False,
             map_Kd/map_Ka/map_ks being invalid (set `error_handler` to skip).
         NonHomogeneousMeshError:
             The number of vertices were not equal for all faces (set `heterogeneous_mesh_handler` to handle).
+
+
+    .. rubric:: Examples
+
+    To load a mesh without loading normals, materials or UVs::
+
+        >>> from kaolin.io.obj import import_mesh
+        >>> mesh = import_mesh("sample_data/meshes/pizza.obj")
+        >>> print(mesh)
+        SurfaceMesh object with batching strategy NONE
+                    vertices: [482, 3] (torch.float32)[cpu]
+                       faces: [960, 3] (torch.int64)[cpu]
+               face_vertices: if possible, computed on access from: (faces, vertices)
+                face_normals: if possible, computed on access from: (normals, face_normals_idx) or (vertices, faces)
+              vertex_normals: if possible, computed on access from: (faces, face_normals)
+                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
+
+
+        >>> mesh.face_normals  # Causes face_normals and any attributes required to compute it to be auto-computed
+        >>> mesh.to_batched()  # Apply fixed topology batching, unsqueezing most attributes
+        >>> mesh = mesh.cuda(attributes=["vertices"])  # Moves just vertices to GPU
+        >>> print(mesh)
+        SurfaceMesh object with batching strategy FIXED
+                    vertices: [1, 482, 3] (torch.float32)[cuda:0]
+               face_vertices: [1, 960, 3, 3] (torch.float32)[cpu]
+                face_normals: [1, 960, 3, 3] (torch.float32)[cpu]
+                       faces: [960, 3] (torch.int64)[cpu]
+              vertex_normals: if possible, computed on access from: (faces, face_normals)
+                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
+
+
+    To load a mesh with normals, materials and UVs, while triangulating and homogenizing if needed::
+
+        >>> from kaolin.io.obj import import_mesh
+        >>> from kaolin.io.utils import mesh_handler_naive_triangulate
+        >>> mesh = import_mesh("sample_data/meshes/pizza.obj",
+                              with_normals=True, with_materials=True,
+                              heterogeneous_mesh_handler=mesh_handler_naive_triangulate,
+                              triangulate=True)
+        >>> print(mesh)
+        SurfaceMesh object with batching strategy NONE
+                    vertices: [482, 3] (torch.float32)[cpu]
+                     normals: [482, 3] (torch.float32)[cpu]
+                         uvs: [514, 2] (torch.float32)[cpu]
+                       faces: [960, 3] (torch.int64)[cpu]
+            face_normals_idx: [960, 3] (torch.int64)[cpu]
+                face_uvs_idx: [960, 3] (torch.int64)[cpu]
+        material_assignments: [960] (torch.int16)[cpu]
+                   materials: list of length 2
+               face_vertices: if possible, computed on access from: (faces, vertices)
+                face_normals: if possible, computed on access from: (normals, face_normals_idx) or (vertices, faces)
+              vertex_normals: if possible, computed on access from: (faces, face_normals)
+                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
     """
     triangulate_handler = None if not triangulate else utils.mesh_handler_naive_triangulate
 
