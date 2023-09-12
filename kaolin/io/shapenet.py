@@ -104,7 +104,7 @@ class ShapeNetV1(Dataset):
 
         * if output_dict=True: a dictionary with the following key-value pairs:
 
-            * 'mesh': containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * 'mesh': containing a :class:`kaolin.rep.SurfaceMesh` returned by :func:`kaolin.io.obj.import_mesh`.
             * 'name': the model name (i.e the subfolder name)
             * 'path': the full path to the .off
             * 'synset': the synset associated to the category
@@ -112,7 +112,7 @@ class ShapeNetV1(Dataset):
 
         * if output_dict=False (deprecated): a :class:`KaolinDatasetItem` with the fields:
 
-            * ``data``: containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * ``data``: containing a :class:`kaolin.rep.SurfaceMesh` returned by :func:`kaolin.io.obj.import_mesh`.
             * ``attributes``: containing a dictionary with the following key-value pairs:
 
                 * 'name': the model name (i.e the subfolder name)
@@ -292,7 +292,7 @@ class ShapeNetV2(Dataset):
 
         * if output_dict=True: a dictionary with the following key-value pairs:
 
-            * 'mesh': containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * 'mesh': containing a :class:`kaolin.rep.SurfaceMesh` returned by :func:`kaolin.io.obj.import_mesh`.
             * 'name': the model name (i.e the subfolder name)
             * 'path': the full path to the .off
             * 'synset': the synset associated to the category
@@ -300,7 +300,7 @@ class ShapeNetV2(Dataset):
 
         * if output_dict=False (deprecated): a :class:`KaolinDatasetItem` with the fields:
 
-            * ``data``: containing a namedtuple returned by :func:`kaolin.io.off.import_mesh`.
+            * ``data``: containing a :class:`kaolin.rep.SurfaceMesh` returned by :func:`kaolin.io.obj.import_mesh`.
             * ``attributes``: containing a dictionary with the following key-value pairs:
 
                 * 'name': the model name (i.e the subfolder name)
