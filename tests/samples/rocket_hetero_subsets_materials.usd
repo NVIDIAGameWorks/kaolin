@@ -92,7 +92,7 @@ def Xform "Root" (
             {
                 reorder properties = ["inputs:diffuseColor", "inputs:emissiveColor", "inputs:useSpecularWorkflow", "inputs:specularColor", "inputs:metallic", "inputs:roughness", "inputs:clearcoat", "inputs:clearcoatRoughness", "inputs:opacity", "inputs:opacityThreshold", "inputs:ior", "inputs:normal", "inputs:displacement", "inputs:occlusion", "outputs:surface", "outputs:displacement"]
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
+                float inputs:clearcoat
                 float inputs:clearcoatRoughness = 0.01
                 color3f inputs:diffuseColor = (1, 0, 0)
                 float inputs:displacement = 0
@@ -133,9 +133,9 @@ def Xform "Root" (
             {
                 reorder properties = ["inputs:diffuseColor", "inputs:emissiveColor", "inputs:useSpecularWorkflow", "inputs:specularColor", "inputs:metallic", "inputs:roughness", "inputs:clearcoat", "inputs:clearcoatRoughness", "inputs:opacity", "inputs:opacityThreshold", "inputs:ior", "inputs:normal", "inputs:displacement", "inputs:occlusion", "outputs:surface", "outputs:displacement"]
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
+                float inputs:clearcoat
                 float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.60759497, 0.16920365, 0)
+                color3f inputs:diffuseColor = (0.6074219, 0.16918945, 0)
                 float inputs:displacement = 0
                 color3f inputs:emissiveColor = (0.93181777, 1, 0)
                 float inputs:ior = 1.5
@@ -173,7 +173,6 @@ def Xform "Root" (
             def Shader "PreviewSurfaceTexture"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
                 float inputs:clearcoatRoughness = 0
                 color3f inputs:diffuseColor.connect = </Root/Looks/PreviewSurfaceTexture/diffuseColorTex.outputs:rgb>
                 float inputs:displacement = 0

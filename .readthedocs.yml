@@ -1,13 +1,17 @@
 version: 2
 
 python:
-   version: 3.8
-   install:
-      - requirements: docs/readthedocs_requirements.txt
-      - requirements: tools/doc_requirements.txt
-      - method: setuptools
-        path: '.'
+ install:
+  - requirements: docs/readthedocs_requirements.txt
+  - requirements: tools/doc_requirements.txt
+  - method: setuptools
+    path: '.'
+
+build:
+  os: "ubuntu-22.04"
+  tools:
+    python: "3.8"
 
 sphinx:
-   configuration: docs/conf.py
-   fail_on_warning: true
+ configuration: docs/conf.py
+ fail_on_warning: true

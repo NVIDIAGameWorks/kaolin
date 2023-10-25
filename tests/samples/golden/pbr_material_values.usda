@@ -21,17 +21,17 @@ def Xform "World"
             def Shader "Shader"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
-                float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
-                float inputs:displacement = 0
-                float inputs:ior = 1.5
-                float inputs:metallic = 0
+                float inputs:clearcoat
+                float inputs:clearcoatRoughness
+                color3f inputs:diffuseColor
+                float inputs:displacement
+                float inputs:ior
+                float inputs:metallic
                 normal3f inputs:normal
-                float inputs:opacity = 1
-                float inputs:opacityThreshold = 0
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (0, 0, 0)
+                float inputs:opacity
+                float inputs:opacityThreshold
+                float inputs:roughness
+                color3f inputs:specularColor
                 int inputs:useSpecularWorkflow = 0
                 token outputs:displacement
                 token outputs:surface
@@ -46,43 +46,43 @@ def Xform "World"
             def Shader "Shader"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
-                float inputs:clearcoatRoughness = 0.01
+                float inputs:clearcoat
+                float inputs:clearcoatRoughness
                 color3f inputs:diffuseColor = (0, 1, 0)
-                float inputs:displacement = 0
-                float inputs:ior = 1.5
-                float inputs:metallic = 0
+                float inputs:displacement
+                float inputs:ior
+                float inputs:metallic
                 normal3f inputs:normal
-                float inputs:opacity = 1
-                float inputs:opacityThreshold = 0
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (0, 0, 0)
+                float inputs:opacity
+                float inputs:opacityThreshold
+                float inputs:roughness
+                color3f inputs:specularColor
                 int inputs:useSpecularWorkflow = 0
                 token outputs:displacement
                 token outputs:surface
             }
         }
 
-        def Material "Roughness"
+        def Material "SpecularRoughness"
         {
-            token outputs:displacement.connect = </World/Looks/Roughness/Shader.outputs:displacement>
-            token outputs:surface.connect = </World/Looks/Roughness/Shader.outputs:surface>
+            token outputs:displacement.connect = </World/Looks/SpecularRoughness/Shader.outputs:displacement>
+            token outputs:surface.connect = </World/Looks/SpecularRoughness/Shader.outputs:surface>
 
             def Shader "Shader"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
-                float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
-                float inputs:displacement = 0
-                float inputs:ior = 1.5
-                float inputs:metallic = 0
+                float inputs:clearcoat
+                float inputs:clearcoatRoughness
+                color3f inputs:diffuseColor = (1, 0, 0)
+                float inputs:displacement
+                float inputs:ior
+                float inputs:metallic
                 normal3f inputs:normal
-                float inputs:opacity = 1
-                float inputs:opacityThreshold = 0
+                float inputs:opacity
+                float inputs:opacityThreshold
                 float inputs:roughness = 0.1
-                color3f inputs:specularColor = (0, 0, 0)
-                int inputs:useSpecularWorkflow = 0
+                color3f inputs:specularColor = (0, 0, 1)
+                int inputs:useSpecularWorkflow = 1
                 token outputs:displacement
                 token outputs:surface
             }
@@ -96,17 +96,17 @@ def Xform "World"
             def Shader "Shader"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
-                float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
-                float inputs:displacement = 0
-                float inputs:ior = 1.5
+                float inputs:clearcoat
+                float inputs:clearcoatRoughness
+                color3f inputs:diffuseColor = (0, 1, 0)
+                float inputs:displacement
+                float inputs:ior
                 float inputs:metallic = 1
                 normal3f inputs:normal
-                float inputs:opacity = 1
-                float inputs:opacityThreshold = 0
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (0, 0, 0)
+                float inputs:opacity
+                float inputs:opacityThreshold
+                float inputs:roughness
+                color3f inputs:specularColor
                 int inputs:useSpecularWorkflow = 0
                 token outputs:displacement
                 token outputs:surface
@@ -122,16 +122,16 @@ def Xform "World"
             {
                 uniform token info:id = "UsdPreviewSurface"
                 float inputs:clearcoat = 1
-                float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
-                float inputs:displacement = 0
-                float inputs:ior = 1.5
-                float inputs:metallic = 0
+                float inputs:clearcoatRoughness
+                color3f inputs:diffuseColor
+                float inputs:displacement
+                float inputs:ior
+                float inputs:metallic
                 normal3f inputs:normal
-                float inputs:opacity = 1
-                float inputs:opacityThreshold = 0
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (0, 0, 0)
+                float inputs:opacity
+                float inputs:opacityThreshold
+                float inputs:roughness
+                color3f inputs:specularColor
                 int inputs:useSpecularWorkflow = 0
                 token outputs:displacement
                 token outputs:surface
@@ -146,17 +146,17 @@ def Xform "World"
             def Shader "Shader"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
+                float inputs:clearcoat
                 float inputs:clearcoatRoughness = 1
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
-                float inputs:displacement = 0
-                float inputs:ior = 1.5
-                float inputs:metallic = 0
+                color3f inputs:diffuseColor
+                float inputs:displacement
+                float inputs:ior
+                float inputs:metallic
                 normal3f inputs:normal
-                float inputs:opacity = 1
-                float inputs:opacityThreshold = 0
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (0, 0, 0)
+                float inputs:opacity
+                float inputs:opacityThreshold
+                float inputs:roughness
+                color3f inputs:specularColor
                 int inputs:useSpecularWorkflow = 0
                 token outputs:displacement
                 token outputs:surface
@@ -171,17 +171,17 @@ def Xform "World"
             def Shader "Shader"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
-                float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
-                float inputs:displacement = 0
-                float inputs:ior = 1.5
-                float inputs:metallic = 0
+                float inputs:clearcoat
+                float inputs:clearcoatRoughness
+                color3f inputs:diffuseColor
+                float inputs:displacement
+                float inputs:ior
+                float inputs:metallic
                 normal3f inputs:normal
                 float inputs:opacity = 0.5
-                float inputs:opacityThreshold = 0
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (0, 0, 0)
+                float inputs:opacityThreshold
+                float inputs:roughness
+                color3f inputs:specularColor
                 int inputs:useSpecularWorkflow = 0
                 token outputs:displacement
                 token outputs:surface
@@ -196,17 +196,17 @@ def Xform "World"
             def Shader "Shader"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
-                float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
-                float inputs:displacement = 0
-                float inputs:ior = 1.5
-                float inputs:metallic = 0
+                float inputs:clearcoat
+                float inputs:clearcoatRoughness
+                color3f inputs:diffuseColor
+                float inputs:displacement
+                float inputs:ior
+                float inputs:metallic
                 normal3f inputs:normal
-                float inputs:opacity = 1
+                float inputs:opacity
                 float inputs:opacityThreshold = 0.5
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (0, 0, 0)
+                float inputs:roughness
+                color3f inputs:specularColor
                 int inputs:useSpecularWorkflow = 0
                 token outputs:displacement
                 token outputs:surface
@@ -221,43 +221,18 @@ def Xform "World"
             def Shader "Shader"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
-                float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
-                float inputs:displacement = 0
+                float inputs:clearcoat
+                float inputs:clearcoatRoughness
+                color3f inputs:diffuseColor
+                float inputs:displacement
                 float inputs:ior = 1
-                float inputs:metallic = 0
+                float inputs:metallic
                 normal3f inputs:normal
-                float inputs:opacity = 1
-                float inputs:opacityThreshold = 0
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (0, 0, 0)
+                float inputs:opacity
+                float inputs:opacityThreshold
+                float inputs:roughness
+                color3f inputs:specularColor
                 int inputs:useSpecularWorkflow = 0
-                token outputs:displacement
-                token outputs:surface
-            }
-        }
-
-        def Material "Specular"
-        {
-            token outputs:displacement.connect = </World/Looks/Specular/Shader.outputs:displacement>
-            token outputs:surface.connect = </World/Looks/Specular/Shader.outputs:surface>
-
-            def Shader "Shader"
-            {
-                uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
-                float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
-                float inputs:displacement = 0
-                float inputs:ior = 1.5
-                float inputs:metallic = 0
-                normal3f inputs:normal
-                float inputs:opacity = 1
-                float inputs:opacityThreshold = 0
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (1, 0, 0)
-                int inputs:useSpecularWorkflow = 1
                 token outputs:displacement
                 token outputs:surface
             }
@@ -271,17 +246,17 @@ def Xform "World"
             def Shader "Shader"
             {
                 uniform token info:id = "UsdPreviewSurface"
-                float inputs:clearcoat = 0
-                float inputs:clearcoatRoughness = 0.01
-                color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+                float inputs:clearcoat
+                float inputs:clearcoatRoughness
+                color3f inputs:diffuseColor
                 float inputs:displacement = 0.1
-                float inputs:ior = 1.5
-                float inputs:metallic = 0
+                float inputs:ior
+                float inputs:metallic
                 normal3f inputs:normal
-                float inputs:opacity = 1
-                float inputs:opacityThreshold = 0
-                float inputs:roughness = 0.5
-                color3f inputs:specularColor = (0, 0, 0)
+                float inputs:opacity
+                float inputs:opacityThreshold
+                float inputs:roughness
+                color3f inputs:specularColor
                 int inputs:useSpecularWorkflow = 0
                 token outputs:displacement
                 token outputs:surface
@@ -294,9 +269,9 @@ def Xform "World"
         rel material:binding = </World/Looks/Diffuse>
     }
 
-    def Sphere "Roughness"
+    def Sphere "SpecularRoughness"
     {
-        rel material:binding = </World/Looks/Roughness>
+        rel material:binding = </World/Looks/SpecularRoughness>
     }
 
     def Sphere "Metallic"
@@ -327,11 +302,6 @@ def Xform "World"
     def Sphere "Ior"
     {
         rel material:binding = </World/Looks/Ior>
-    }
-
-    def Sphere "Specular"
-    {
-        rel material:binding = </World/Looks/Specular>
     }
 
     def Sphere "Displacement"
