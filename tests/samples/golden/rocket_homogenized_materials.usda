@@ -29,19 +29,15 @@ def Xform "World"
                 def Shader "Shader"
                 {
                     uniform token info:id = "UsdPreviewSurface"
-                    float inputs:clearcoat = 0
-                    float inputs:clearcoatRoughness = 0.01
-                    color3f inputs:diffuseColor = (0.5, 0.5, 0.5)
+                    float inputs:clearcoat
+                    float inputs:clearcoatRoughness = 0
                     color3f inputs:diffuseColor.connect = </World/Rocket/Looks/material_0/diffuse_texture.outputs:rgb>
                     float inputs:displacement = 0
-                    float inputs:displacement.connect = </World/Rocket/Looks/material_0/displacement_texture.outputs:r>
                     float inputs:ior = 1.5
-                    float inputs:metallic = 0
                     float inputs:metallic.connect = </World/Rocket/Looks/material_0/metallic_texture.outputs:r>
                     normal3f inputs:normal
                     float inputs:opacity = 1
                     float inputs:opacityThreshold = 0
-                    float inputs:roughness = 0.5
                     float inputs:roughness.connect = </World/Rocket/Looks/material_0/roughness_texture.outputs:r>
                     color3f inputs:specularColor = (0, 0, 0)
                     int inputs:useSpecularWorkflow = 0
@@ -75,14 +71,6 @@ def Xform "World"
                     asset inputs:file = @material_0/metallic.png@
                     float outputs:r
                 }
-
-                def Shader "displacement_texture"
-                {
-                    uniform token info:id = "UsdUVTexture"
-                    token inputs:colorspace = "auto"
-                    asset inputs:file = @material_0/displacement.png@
-                    float outputs:r
-                }
             }
 
             def Material "material_1"
@@ -93,10 +81,10 @@ def Xform "World"
                 def Shader "Shader"
                 {
                     uniform token info:id = "UsdPreviewSurface"
-                    float inputs:clearcoat = 0.01
+                    float inputs:clearcoat
                     float inputs:clearcoatRoughness = 0.01
                     color3f inputs:diffuseColor = (1, 0, 0)
-                    float inputs:displacement = 1
+                    float inputs:displacement = 0
                     float inputs:ior = 1.5
                     float inputs:metallic = 0
                     normal3f inputs:normal
@@ -118,10 +106,10 @@ def Xform "World"
                 def Shader "Shader"
                 {
                     uniform token info:id = "UsdPreviewSurface"
-                    float inputs:clearcoat = 0.01
+                    float inputs:clearcoat
                     float inputs:clearcoatRoughness = 0.01
-                    color3f inputs:diffuseColor = (0.60759497, 0.16920365, 0)
-                    float inputs:displacement = 1
+                    color3f inputs:diffuseColor = (0.6074219, 0.16918945, 0)
+                    float inputs:displacement = 0
                     float inputs:ior = 1.5
                     float inputs:metallic = 1
                     normal3f inputs:normal

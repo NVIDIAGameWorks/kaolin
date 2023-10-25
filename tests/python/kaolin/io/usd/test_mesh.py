@@ -1,4 +1,4 @@
-# Copyright (c) 2019, 20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019-2023 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -297,6 +297,9 @@ class TestMeshes:
         mesh = usd.import_mesh(path_or_stage, scene_path='/Root',
                                heterogeneous_mesh_handler=utils.mesh_handler_naive_triangulate,
                                with_normals=True, with_materials=True)
+        # avoid any automatic computation of normals
+        mesh.unset_attributes_return_none = True
+
         # Confirm we now have a triangulated mesh
         assert mesh.faces.size(1) == 3
 
@@ -311,6 +314,7 @@ class TestMeshes:
         golden_mesh = usd.import_mesh(golden_path,
                                       heterogeneous_mesh_handler=utils.mesh_handler_naive_triangulate,
                                       with_normals=True, with_materials=True)
+        golden_mesh.unset_attributes_return_none = True
 
         # Spot check against raw USD attributes
         raw_attributes = read_raw_usd_attributes(path_or_stage)[0]
@@ -334,9 +338,8 @@ class TestMeshes:
             assert torch.allclose(golden_mesh.vertices[mesh.faces[tri_idx, :], :], expected_vertices)
             assert torch.allclose(golden_mesh.face_normals[tri_idx, ...], expected_normals)
             assert torch.allclose(golden_mesh.uvs[mesh.face_uvs_idx[tri_idx, :], :], expected_uvs)
-
         # Write the homogenized mesh to file
-        out_path = os.path.join(out_dir, 'homogenized_materials.usda')
+        out_path = os.path.join(out_dir, 'rocket_homogenized_materials.usda')
         if function_variant == 'export_mesh':
             usd.export_mesh(out_path, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces,
                             face_uvs_idx=mesh.face_uvs_idx, face_normals=mesh.face_normals, uvs=mesh.uvs,
@@ -352,12 +355,10 @@ class TestMeshes:
 
         # Confirm we read identical mesh after writing
         reimported_mesh = usd.import_mesh(out_path, scene_path='/World/Rocket', with_materials=True, with_normals=True)
+        reimported_mesh.unset_attributes_return_none = True
 
         # Since comparison of materials is not implemented, we override materials with diffuse colors first
         assert len(mesh.materials) == len(reimported_mesh.materials)
-        for i in range(len(mesh.materials)):
-            mesh.materials[i] = mesh.materials[i].diffuse_color
-            reimported_mesh.materials[i] = reimported_mesh.materials[i].diffuse_color
         assert contained_torch_equal(mesh, reimported_mesh, print_error_context='')
 
     @pytest.mark.parametrize('input_stage', [False, True])

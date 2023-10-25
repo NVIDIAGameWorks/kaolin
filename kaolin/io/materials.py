@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019-2023 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -246,6 +246,13 @@ class Material:
     def read_from_obj(self, file_path):
         pass
 
+def _to_1d_tensor(data):
+    if isinstance(data, torch.Tensor):
+        return data.reshape(-1)
+    elif data is None:
+        return None
+    else:
+        return torch.tensor(data).reshape(-1)
 
 class PBRMaterial(Material):
     """Define a PBR material
@@ -256,31 +263,31 @@ class PBRMaterial(Material):
         diffuse_color (tuple of floats):
             RGB values for `Diffuse` parameter (typically referred to as `Albedo`
             in a metallic workflow) in the range of `(0.0, 0.0, 0.0)` to `(1.0, 1.0, 1.0)`.
-            Default value is grey `(0.5, 0.5, 0.5)`.
+            Default value is None.
         roughness_value (float):
-            Roughness value of specular lobe in range `0.0` to `1.0`. Default value is `0.5`.
+            Roughness value of specular lobe in range `0.0` to `1.0`. Default value is None.
         metallic_value (float):
             Metallic value, typically set to `0.0` for non-metallic and `1.0` for metallic materials. 
-            Ignored if `is_specular_workflow` is `True`. Default value is `0.0`.
+            Ignored if `is_specular_workflow` is `True`. Default value is None.
         clearcoat_value (float):
-            Second specular lobe amount. Color is hardcoded to white. Default value is `0.0`.
+            Second specular lobe amount. Color is hardcoded to white. Default value is None.
         clearcoat_roughness_value (float):
             Roughness for the clearcoat specular lobe in the range `0.0` to `1.0`.
-            The default value is `0.01`.
+            The default value is None.
         opacity_value (float):
             Opacity, with `1.0` fully opaque and `0.0` as transparent with values within this range
-            defining a translucent surface. Default value is `1.0`.
+            defining a translucent surface. Default value is None.
         opacity_treshold (float):
             Used to create cutouts based on the `opacity_value`. Surfaces with an opacity
-            smaller than the `opacity_threshold` will be fully transparent. Default value is `0.0`.
+            smaller than the `opacity_threshold` will be fully transparent. Default value is None.
         ior_value (float):
             Index of Refraction used with translucent objects and objects with specular components.
-            Default value is `1.5`.
+            Default value is None.
         specular_color (tuple of floats):
             RGB values for `Specular` lobe. Ignored if `is_specular_workflow` is `False`.
-            Default value is white `(0.0, 0.0, 0.0)`.
+            Default value is None.
         displacement_value (float):
-            Displacement in the direction of the normal. Default is `0.0`
+            Displacement in the direction of the normal. Default is None
         diffuse_texture (torch.FloatTensor):
             Texture for diffuse parameter, of shape `(3, height, width)`.
         roughness_texture (torch.FloatTensor):
@@ -343,18 +350,64 @@ class PBRMaterial(Material):
             Dictionary mapping a shader name to a reader and writer function.
             (Currently cannot be set).
     """
+
+    __value_attributes = [
+        'diffuse_color',
+        'roughness_value',
+        'metallic_value',
+        'clearcoat_value',
+        'clearcoat_roughness_value',
+        'opacity_value',
+        'opacity_threshold',
+        'ior_value',
+        'specular_color',
+        'displacement_value'
+    ]
+
+    __texture_attributes = [
+        'diffuse_texture',
+        'roughness_texture',
+        'metallic_texture',
+        'clearcoat_texture',
+        'clearcoat_roughness_texture',
+        'opacity_texture',
+        'ior_texture',
+        'specular_texture',
+        'normals_texture',
+        'displacement_texture'
+    ]
+
+    __colorspace_attributes = [
+        'diffuse_colorspace',
+        'roughness_colorspace',
+        'metallic_colorspace',
+        'clearcoat_colorspace',
+        'clearcoat_roughness_colorspace',
+        'opacity_colorspace',
+        'ior_colorspace',
+        'specular_colorspace',
+        'normals_colorspace',
+        'displacement_colorspace'
+    ]
+
+    __misc_attributes = [
+        'is_specular_workflow'
+    ]
+
+    __slots__ = __value_attributes + __texture_attributes + __colorspace_attributes
+
     def __init__(
         self,
-        diffuse_color=(0.5, 0.5, 0.5),
-        roughness_value=0.5,
-        metallic_value=0.,
-        clearcoat_value=0.,
-        clearcoat_roughness_value=0.01,
-        opacity_value=1.0,
-        opacity_threshold=0.0,
-        ior_value=1.5,
-        specular_color=(0.0, 0.0, 0.0),
-        displacement_value=0.,
+        diffuse_color=None,
+        roughness_value=None,
+        metallic_value=None,
+        clearcoat_value=None,
+        clearcoat_roughness_value=None,
+        opacity_value=None,
+        opacity_threshold=None,
+        ior_value=None,
+        specular_color=None,
+        displacement_value=None,
         diffuse_texture=None,
         roughness_texture=None,
         metallic_texture=None,
@@ -379,34 +432,67 @@ class PBRMaterial(Material):
         name=''
     ):
         super().__init__(name)
-        self.diffuse_color = diffuse_color
-        self.roughness_value = roughness_value
-        self.metallic_value = metallic_value
-        self.clearcoat_value = clearcoat_value
-        self.clearcoat_roughness_value = clearcoat_roughness_value
-        self.opacity_value = opacity_value
-        self.opacity_threshold = opacity_threshold
-        self.ior_value = ior_value
-        self.specular_color = specular_color
-        self.displacement_value = displacement_value
+        self.diffuse_color = _to_1d_tensor(diffuse_color)
+        assert self.diffuse_color is None or self.diffuse_color.shape == (3,)
+        self.roughness_value = _to_1d_tensor(roughness_value)
+        assert self.roughness_value is None or self.roughness_value.shape == (1,)
+        self.metallic_value = _to_1d_tensor(metallic_value)
+        assert self.metallic_value is None or self.metallic_value.shape == (1,)
+        self.clearcoat_value = _to_1d_tensor(clearcoat_value)
+        assert self.clearcoat_value is None or self.clearcoat_value.shape == (1,)
+        self.clearcoat_roughness_value = _to_1d_tensor(clearcoat_roughness_value)
+        assert self.clearcoat_roughness_value is None or self.clearcoat_roughness_value.shape == (1,)
+        self.opacity_value = _to_1d_tensor(opacity_value)
+        assert self.opacity_value is None or self.opacity_value.shape == (1,)
+        self.opacity_threshold = _to_1d_tensor(opacity_threshold)
+        assert self.opacity_threshold is None or self.opacity_threshold.shape == (1,)
+        self.ior_value = _to_1d_tensor(ior_value)
+        assert self.ior_value is None or self.ior_value.shape == (1,)
+        self.specular_color = _to_1d_tensor(specular_color)
+        if self.specular_color is not None:
+            if self.specular_color.shape == (1,):
+                self.specular_color = self.specular_color.repeat(3)
+            else:
+                assert self.specular_color.shape == (3,)
+        self.displacement_value = _to_1d_tensor(displacement_value)
+        assert self.displacement_value is None or self.displacement_value.shape == (1,)
+        assert diffuse_texture is None or diffuse_texture.dim() == 3
         self.diffuse_texture = diffuse_texture
+        assert roughness_texture is None or roughness_texture.dim() == 3
         self.roughness_texture = roughness_texture
+        assert metallic_texture is None or metallic_texture.dim() == 3
         self.metallic_texture = metallic_texture
+        assert clearcoat_texture is None or clearcoat_texture.dim() == 3
         self.clearcoat_texture = clearcoat_texture
+        assert clearcoat_roughness_texture is None or clearcoat_roughness_texture.dim() == 3
         self.clearcoat_roughness_texture = clearcoat_roughness_texture
+        assert opacity_texture is None or opacity_texture.dim() == 3
         self.opacity_texture = opacity_texture
+        assert ior_texture is None or ior_texture.dim() == 3
         self.ior_texture = ior_texture
+        assert specular_texture is None or specular_texture.dim() == 3
         self.specular_texture = specular_texture
+        assert normals_texture is None or normals_texture.dim() == 3
         self.normals_texture = normals_texture
+        assert displacement_texture is None or displacement_texture.dim() == 3
         self.displacement_texture = displacement_texture
+        assert diffuse_colorspace in ['auto', 'raw', 'sRGB']
         self.diffuse_colorspace = diffuse_colorspace
+        assert roughness_colorspace in ['auto', 'raw']
         self.roughness_colorspace = roughness_colorspace
+        assert metallic_colorspace in ['auto', 'raw']
         self.metallic_colorspace = metallic_colorspace
+        assert clearcoat_colorspace in ['auto', 'raw']
         self.clearcoat_colorspace = clearcoat_colorspace
+        assert clearcoat_roughness_colorspace in ['auto', 'raw']
         self.clearcoat_roughness_colorspace = clearcoat_roughness_colorspace
+        assert opacity_colorspace in ['auto', 'raw']
         self.opacity_colorspace = opacity_colorspace
+        assert ior_colorspace in ['auto', 'raw']
         self.ior_colorspace = ior_colorspace
+        assert specular_colorspace in ['auto', 'raw', 'sRGB']
         self.specular_colorspace = specular_colorspace
+        assert normals_colorspace in ['auto', 'raw', 'sRGB']
         self.normals_colorspace = normals_colorspace
         self.displacement_colorspace = displacement_colorspace
         self.is_specular_workflow = is_specular_workflow
@@ -476,24 +562,24 @@ class PBRMaterial(Material):
         if self.diffuse_color is not None:
             diffuse_input.Set(tuple(self.diffuse_color), time=time)
         if self.roughness_value is not None:
-            roughness_input.Set(self.roughness_value, time=time)
+            roughness_input.Set(self.roughness_value.item(), time=time)
         if self.specular_color is not None:
             specular_input.Set(tuple(self.specular_color), time=time)
         if self.metallic_value is not None:
-            metallic_input.Set(self.metallic_value, time=time)
+            metallic_input.Set(self.metallic_value.item(), time=time)
         if self.clearcoat_value is not None:
-            clearcoat_input.Set(self.clearcoat_value, time=time)
+            clearcoat_input.Set(self.clearcoat_value.item(), time=time)
         if self.clearcoat_roughness_value is not None:
-            clearcoat_roughness_input.Set(self.clearcoat_roughness_value, time=time)
+            clearcoat_roughness_input.Set(self.clearcoat_roughness_value.item(), time=time)
         if self.opacity_value is not None:
-            opacity_input.Set(self.opacity_value, time=time)
+            opacity_input.Set(self.opacity_value.item(), time=time)
         if self.opacity_threshold is not None:
-            opacity_threshold_input.Set(self.opacity_threshold, time=time)
+            opacity_threshold_input.Set(self.opacity_threshold.item(), time=time)
         if self.ior_value is not None:
-            ior_input.Set(self.ior_value, time=time)
+            ior_input.Set(self.ior_value.item(), time=time)
         is_specular_workflow_input.Set(int(self.is_specular_workflow), time=time)
         if self.displacement_value is not None:
-            displacement_input.Set(self.displacement_value, time=time)
+            displacement_input.Set(self.displacement_value.item(), time=time)
 
         # Export textures and connect textures to shader
         usd_dir = os.path.dirname(usd_file_path)
@@ -719,16 +805,16 @@ class PBRMaterial(Material):
                 params[f'metallic_{["texture", "value"][is_value]}'] = output
                 if 'colorspace' in data:
                     params['metallic_colorspace'] = data['colorspace']['value']
+            elif 'clearcoatroughness' in name.lower():
+                output, is_value = _read_data(data)
+                params[f'clearcoat_roughness_{["texture", "value"][is_value]}'] = output
+                if 'colorspace' in data:
+                    params['clearcoat_roughness_colorspace'] = data['colorspace']['value']
             elif 'clearcoat' in name.lower():
                 output, is_value = _read_data(data)
                 params[f'clearcoat_{["texture", "value"][is_value]}'] = output
                 if 'colorspace' in data:
                     params['clearcoat_colorspace'] = data['colorspace']['value']
-            elif 'clearcoat_roughness' in name.lower():
-                output, is_value = _read_data(data)
-                params[f'clearcoat_roughness_{["texture", "value"][is_value]}'] = output
-                if 'colorspace' in data:
-                    params['clearcoat_roughness_colorspace'] = data['colorspace']['value']
             elif 'opacitythreshold' in name.lower():
                 output, _ = _read_data(data)
                 params['opacity_threshold'] = output
@@ -756,12 +842,124 @@ class PBRMaterial(Material):
                     params['normals_texture'] = output * 2. - 1.
                     if 'colorspace' in data:
                         params['normals_colorspace'] = data['colorspace']['value']
-            if 'displacement':
+            elif 'displacement' in name.lower():
                 output, is_value = _read_data(data)
                 params[f'displacement_{["texture", "value"][is_value]}'] = output
                 if 'colorspace' in data:
                     params['displacement_colorspace'] = data['colorspace']['value']
         return cls(**params)
+
+    def cuda(self, device=None, non_blocking=False, memory_format=torch.preserve_format):
+        """Returns a copy where all the attributes are on CUDA memory.
+
+        Arguments:
+            device (torch.device): The destination GPU device. Defaults to the current CUDA device.
+            non_blocking (bool): If True and the source is in pinned memory,
+                                 the copy will be asynchronous with respect to the host.
+            memory_format (torch.memory_format, optional): the desired memory format of returned Tensor.
+                                                           Default: torch.preserve_format.
+
+        Returns:
+            (PBRMaterial): The new material.
+        """
+        params = {}
+        for param_name in PBRMaterial.__colorspace_attributes + PBRMaterial.__misc_attributes:
+            params[param_name] = getattr(self, param_name)
+        for param_name in PBRMaterial.__value_attributes + PBRMaterial.__texture_attributes:
+            val = getattr(self, param_name)
+            if val is not None:
+                params[param_name] = val.cuda(
+                    device=device, non_blocking=non_blocking, memory_format=memory_format)
+        return PBRMaterial(**params)
+
+    def cpu(self, memory_format=torch.preserve_format):
+        """Returns a copy where all the attributes are on CPU memory.
+
+        Arguments:
+            memory_format (torch.memory_format, optional): the desired memory format of returned Tensor.
+                                                           Default: torch.preserve_format.
+
+        Returns:
+            (PBRMaterial): The new material.
+        """
+        params = {}
+        for param_name in PBRMaterial.__colorspace_attributes + PBRMaterial.__misc_attributes:
+            params[param_name] = getattr(self, param_name)
+        for param_name in PBRMaterial.__value_attributes + PBRMaterial.__texture_attributes:
+            val = getattr(self, param_name)
+            if val is not None:
+                params[param_name] = val.cpu(
+                    memory_format=memory_format)
+        return PBRMaterial(**params)
+
+    def contiguous(self, memory_format=torch.contiguous_format):
+        """Returns a copy where all the attributes are contiguous in memory.
+
+        Arguments:
+            memory_format (torch.memory_format, optional): the desired memory format of returned Tensor.
+                                                           Default: torch.contiguous_format.
+
+        Returns:
+            (PBRMaterial): The new material.
+        """
+        params = {}
+        for param_name in PBRMaterial.__colorspace_attributes + PBRMaterial.__misc_attributes:
+            params[param_name] = getattr(self, param_name)
+        for param_name in PBRMaterial.__value_attributes + PBRMaterial.__texture_attributes:
+            val = getattr(self, param_name)
+            if val is not None:
+                params[param_name] = val.contiguous(memory_format=memory_format)
+        return PBRMaterial(**params)
+
+    def hwc(self):
+        """Returns a copy where all the image attributes are in HWC layout.
+
+        Returns:
+            (PBRMaterial): The new material.
+        """
+        params = {}
+        for param_name in PBRMaterial.__value_attributes + PBRMaterial.__colorspace_attributes + PBRMaterial.__misc_attributes:
+            params[param_name] = getattr(self, param_name)
+
+        for param_name in PBRMaterial.__texture_attributes:
+            val = getattr(self, param_name)
+            if val is not None:
+                if val.shape[0] in [1, 3]:
+                    params[param_name] = val.permute(1, 2, 0)
+                else:
+                    params[param_name] = val
+        return PBRMaterial(**params)
+
+    def chw(self):
+        """Returns a copy where all the image attributes are in CHW layout.
+
+        Returns:
+            (PBRMaterial): The new material.
+        """
+        params = {}
+        for param_name in PBRMaterial.__value_attributes + PBRMaterial.__colorspace_attributes + PBRMaterial.__misc_attributes:
+            params[param_name] = getattr(self, param_name)
+
+        for param_name in PBRMaterial.__texture_attributes:
+            val = getattr(self, param_name)
+            if val is not None:
+                if val.shape[2] in [1, 3]:
+                    params[param_name] = val.permute(2, 0, 1)
+                else:
+                    params[param_name] = val
+        return PBRMaterial(**params)
+
+    def __str__(self):
+        output = ""
+        for param_name in PBRMaterial.__value_attributes + PBRMaterial.__colorspace_attributes + PBRMaterial.__misc_attributes:
+            attr = getattr(self, param_name)
+            if attr is not None:
+                output = output + f"{param_name}: {attr}\n"
+        for param_name in PBRMaterial.__texture_attributes:
+            attr = getattr(self, param_name)
+            if attr is not None:
+                output = output + f"{param_name}: {attr.shape}\n"
+        return output
 
 
 def process_materials_and_assignments(materials_dict, material_assignments_dict, error_handler, num_faces,
