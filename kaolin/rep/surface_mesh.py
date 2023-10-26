@@ -66,8 +66,8 @@ class SurfaceMesh(object):
                        faces: [80, 3] (torch.int64)[cpu]
                face_vertices: if possible, computed on access from: (faces, vertices)
                 face_normals: if possible, computed on access from: (normals, face_normals_idx) or (vertices, faces)
-              vertex_normals: if possible, computed on access from: (faces, face_normals)
                     face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
+              vertex_normals: if possible, computed on access from: (faces, face_normals)
 
         >>> mesh.face_normals  # Causes attribute to be computed
         >>> print(mesh.describe_attribute("face_normals"))
@@ -79,17 +79,18 @@ class SurfaceMesh(object):
 
         >>> print(SurfaceMesh.attribute_info_string(SurfaceMesh.Batching.FIXED))
         Expected SurfaceMesh contents for batching strategy FIXED
-                       faces: (torch.IntTensor)   of shape ['F', 'FSz']
-            face_normals_idx: (torch.IntTensor)   of shape ['B', 'F', 'FSz']
-                face_uvs_idx: (torch.IntTensor)   of shape ['B', 'F', 'FSz']
-        material_assignments: (torch.IntTensor)   of shape ['B', 'F']
                     vertices: (torch.FloatTensor) of shape ['B', 'V', 3]
+                       faces: (torch.IntTensor)   of shape ['F', 'FSz']
                face_vertices: (torch.FloatTensor) of shape ['B', 'F', 'FSz', 3]
                      normals: (torch.FloatTensor) of shape ['B', 'VN', 3]
+            face_normals_idx: (torch.IntTensor)   of shape ['B', 'F', 'FSz']
                 face_normals: (torch.FloatTensor) of shape ['B', 'F', 'FSz', 3]
-              vertex_normals: (torch.FloatTensor) of shape ['B', 'V', 3]
                          uvs: (torch.FloatTensor) of shape ['B', 'U', 2]
+                face_uvs_idx: (torch.IntTensor)   of shape ['B', 'F', 'FSz']
                     face_uvs: (torch.FloatTensor) of shape ['B', 'F', 'FSz', 2]
+              vertex_normals: (torch.FloatTensor) of shape ['B', 'V', 3]
+             vertex_tangents: (torch.FloatTensor) of shape ['B', 'V', 3]
+        material_assignments: (torch.IntTensor)   of shape ['B', 'F']
                    materials: non-tensor attribute
 
     .. note::
@@ -112,23 +113,25 @@ class SurfaceMesh(object):
     +------------------------------+------------------+--------------------+--------------------+-------------+
     | vertices                     | V x 3            | B x V x 3          | [V_i x 3]          | N           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
+    | faces                        | F x FSz          | F x FSz            | [F_i x FSize]      | N           |
+    +------------------------------+------------------+--------------------+--------------------+-------------+
     | face_vertices                | F x FSz x 3      | B x F x FSz x 3    | [F_i x FSz_i x 3]  | Y           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
     | normals                      | VN x 3           | B x VN x 3         | [VN_i x 3]         | N           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
-    | face_normals                 | F x FSz x 3      | B x F x FSz x 3    | [F_i x FSz_i x 3]  | Y           |
+    | face_normals_idx             | F x FSz          | B x F x FSz        | [F_i x FSz]        | N           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
-    | vertex_normals               | V x 3            | B x V x 3          | [V_i x 3]          | Y           |
+    | face_normals                 | F x FSz x 3      | B x F x FSz x 3    | [F_i x FSz_i x 3]  | Y           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
     | uvs                          | U x 2            | B x U x 2          | [U_i x 2]          | N           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
+    | face_uvs_idx                 | F x FSz          | B x F x FSz        | [F_i x FSz]        | N           |
+    +------------------------------+------------------+--------------------+--------------------+-------------+
     | face_uvs                     | F x FSz x 2      | B x F x FSz x 2    | [F_i x FSz_i x 2]  | Y           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
-    | faces                        | F x FSz          | F x FSz            | [F_i x FSize]      | N           |
+    | vertex_normals               | V x 3            | B x V x 3          | [V_i x 3]          | Y           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
-    | face_normals_idx             | F x FSz          | B x F x FSz        | [F_i x FSz]        | N           |
-    +------------------------------+------------------+--------------------+--------------------+-------------+
-    | face_uvs_idx                 | F x FSz          | B x F x FSz        | [F_i x FSz]        | N           |
+    | vertex_tangents              | V x 3            | B x V x 3          | [V_i x 3]          | Y           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
     | material_assignments         | F                | B x F              | [F_i]              | N           |
     +------------------------------+------------------+--------------------+--------------------+-------------+
@@ -158,18 +161,21 @@ class SurfaceMesh(object):
         face_vertices: xyz locations for each vertex of each face; can be set directly
            or is **auto-computable** by indexing ``vertices`` with ``faces``.
         normals: xyz normal values, indexed by ``face_normals_idx``.
+        face_normals_idx: indices into ``normals`` for each vertex in each face.
         face_normals: xyz normal values for each face; can be set directly
            or is **auto-computable** by 1) indexing ``normals`` with ``face_normals_idx``,
            or (if either is missing and mesh is triangular) by 2) using
            vertex locations.
+        uvs: uv texture coordinates, indexed by ``face_uvs_idx``.
+        face_uvs_idx: indices into ``uvs`` for each vertex of each face.
+        face_uvs: uv coordinate values for each vertex of each face; can be set directly
+           or is **auto-computable** by indexing ``uvs`` with ``face_uvs_idx``.
         vertex_normals: xyz normal values, corresponding to vertices; can be set directly
            or is **auto-computable** by averaging ``face_normals`` of faces incident
            to a vertex.
-        uvs: uv texture coordinates, indexed by ``face_uvs_idx``.
-        face_uvs: uv coordinate values for each vertex of each face; can be set directly
-           or is **auto-computable** by indexing ``uvs`` with ``face_uvs_idx``.
-        face_normals_idx: indices into ``normals`` for each vertex in each face.
-        face_uvs_idx: indices into ``uvs`` for each vertex of each face.
+        vertex_tangents: tangents values used to compute the orientation of normal perturbation,
+           corresponding to vertices; can be set directly
+           of is **auto-computable**, from ``vertices`` and ``face_uvs``.
         material_assignments: indices into ``materials`` list for each face.
         materials: raw materials as output by the io reader.
         strict_checks: if ``True``, will raise exception if any tensors passed to
@@ -202,6 +208,7 @@ class SurfaceMesh(object):
         'vertex_normals',
         'uvs',
         'face_uvs',
+        'vertex_tangents'
     ]
     __int_tensor_attributes = [
         'faces',
@@ -210,6 +217,25 @@ class SurfaceMesh(object):
         'material_assignments'
     ]
     __tensor_attributes = __float_tensor_attributes + __int_tensor_attributes
+
+    # This list is ordered as in the ctor arguments
+    # To be used for print related features
+    __ordered_tensor_attributes = [
+        'vertices',
+        'faces',
+        'face_vertices',
+        'normals',
+        'face_normals_idx',
+        'face_normals',
+        'uvs',
+        'face_uvs_idx',
+        'face_uvs',
+        'vertex_normals',
+        'vertex_tangents',
+        'material_assignments'
+    ]
+    assert set(__ordered_tensor_attributes) == set(__tensor_attributes), \
+        "attributes in __ordered_tensor_attributes don't match those in __tensor_attributes"
 
     # Keeping as separate list as things can diverge
     __fixed_topology_attributes = [
@@ -224,7 +250,8 @@ class SurfaceMesh(object):
         if attr not in SurfaceMesh.__slots__:
             raise AttributeError(f'SurfaceMesh does not support attribute named "{attr}"')
 
-    def __init__(self, vertices: Union[torch.FloatTensor, list],
+    def __init__(self,
+                 vertices: Union[torch.FloatTensor, list],
                  faces: Union[torch.LongTensor, list],
                  normals: Optional[Union[torch.FloatTensor, list]] = None,
                  uvs: Optional[Union[torch.FloatTensor, list]] = None,
@@ -233,6 +260,7 @@ class SurfaceMesh(object):
                  material_assignments: Optional[Union[torch.Tensor, list]] = None,
                  materials: Optional[list] = None,
                  vertex_normals: Optional[Union[torch.FloatTensor, list]] = None,
+                 vertex_tangents: Optional[Union[torch.FloatTensor, list]] = None,
                  face_normals: Optional[Union[torch.FloatTensor, list]] = None,
                  face_uvs: Optional[Union[torch.FloatTensor, list]] = None,
                  face_vertices: Optional[Union[torch.FloatTensor, list]] = None,
@@ -270,6 +298,7 @@ class SurfaceMesh(object):
         self.material_assignments = material_assignments
         self.materials = materials
         self.vertex_normals = vertex_normals
+        self.vertex_tangents = vertex_tangents
         self.face_normals = face_normals
         self.face_uvs = face_uvs
         self.face_vertices = face_vertices
@@ -335,10 +364,11 @@ class SurfaceMesh(object):
 
         shape_str = 'shapes' if batching == SurfaceMesh.Batching.LIST else 'shape'
         res = [f'Expected SurfaceMesh contents for batching strategy {batching}']
-        for attr in cls.__int_tensor_attributes:
-            res.append(f'{attr : >20}: {_format_type("torch.IntTensor")}   of {shape_str} {_get_shape(attr)}')
-        for attr in cls.__float_tensor_attributes:
-            res.append(f'{attr : >20}: {_format_type("torch.FloatTensor")} of {shape_str} {_get_shape(attr)}')
+        for attr in cls.__ordered_tensor_attributes:
+            if attr in cls.__int_tensor_attributes:
+                res.append(f'{attr : >20}: {_format_type("torch.IntTensor")}   of {shape_str} {_get_shape(attr)}')
+            if attr in cls.__float_tensor_attributes:
+                res.append(f'{attr : >20}: {_format_type("torch.FloatTensor")} of {shape_str} {_get_shape(attr)}')
         for attr in sorted(cls.__material_attributes):
             res.append(f'{attr : >20}: non-tensor attribute')
         return '\n'.join(res)
@@ -367,7 +397,7 @@ class SurfaceMesh(object):
 
         val = super().__getattribute__(attr)
         res = ''
-        if attr in SurfaceMesh.__tensor_attributes:
+        if attr in SurfaceMesh.__ordered_tensor_attributes:
             if self.batching == SurfaceMesh.Batching.LIST or type(val) is list:
                 res = '\n'.join([f'{attr : >20}: ['] +
                               [kaolin.utils.testing.tensor_info(
@@ -436,7 +466,7 @@ class SurfaceMesh(object):
            (list): list of string names
         """
         res = []
-        options = SurfaceMesh.__tensor_attributes if only_tensors else SurfaceMesh.__slots__
+        options = SurfaceMesh.__ordered_tensor_attributes if only_tensors else SurfaceMesh.__slots__
         for attr in options:
             if self.has_attribute(attr):
                 res.append(attr)
@@ -522,6 +552,7 @@ class SurfaceMesh(object):
                   'normals':                       [VN, 3],
                   'uvs':                           [U, 2],
                   'vertex_normals':                [V, 3],
+                  'vertex_tangents':               [V, 3],
                   'face_normals':                  [F, FSz, 3],
                   'face_uvs':                      [F, FSz, 2],
                   'face_vertices':                 [F, FSz, 3],
@@ -912,7 +943,18 @@ class SurfaceMesh(object):
         return res, can_cache
 
     def _compute_face_uvs(self):
-        return self._index_value_by_faces(self.uvs, self.face_uvs_idx)
+        if self.batching in [SurfaceMesh.Batching.NONE, SurfaceMesh.Batching.FIXED]:
+            face_uvs_idx = torch.clone(self.face_uvs_idx)
+            face_uvs_idx[face_uvs_idx == -1] = 0
+        elif self.batching == SurfaceMesh.Batching.LIST:
+            face_uvs_idx = []
+            for t in self.face_uvs_idx:
+                t = torch.clone(t)
+                t[t == -1] = 0
+                face_uvs_idx.append(t)
+        else:
+            raise NotImplementedError(f'Unsupported batching {self.batching}')
+        return self._index_value_by_faces(self.uvs, face_uvs_idx)
 
     def _compute_face_vertices(self):
         return self._index_value_by_faces(self.vertices, self.faces)
@@ -945,9 +987,30 @@ class SurfaceMesh(object):
             raise NotImplementedError(f'Unsupported batching {self.batching}')
         return res, can_cache
 
+    def _compute_vertex_tangents(self, should_cache=None):
+
+        can_cache = (
+            not self._requires_grad(self.vertex_normals) and
+            not self._requires_grad(self.vertices)
+        )
+
+        if self.batching == SurfaceMesh.Batching.LIST:
+            res = [kaolin.ops.mesh.vertex_tangents(
+                       self.faces[i], self.face_vertices[i], self.face_uvs[i],
+                       self.vertex_normals[i])
+                   for i in range(self)]
+        elif self.batching in [SurfaceMesh.Batching.FIXED, SurfaceMesh.Batching.NONE]:
+            res = kaolin.ops.mesh.vertex_tangents(
+                self.faces, self.face_vertices, self.face_uvs, self.vertex_normals)
+        else:
+            raise NotImplementedError(f'Unsupported batching {self.batching}')
+        return res, can_cache
+
     def _compute_computable_attribute(self, attr, should_cache=None):
         if attr == 'vertex_normals':
             return self._compute_vertex_normals(should_cache=should_cache)
+        elif attr == 'vertex_tangents':
+            return self._compute_vertex_tangents(should_cache=should_cache)
         elif attr == 'face_normals':
             return self._compute_face_normals(should_cache=should_cache)
         elif attr == 'face_uvs':
@@ -1111,10 +1174,12 @@ class SurfaceMesh(object):
         r"""Returns attributes that are currently not set but could be computed using existing attributes."""
         exist = self.get_attributes(only_tensors=True)
         computable = {}
-        for attr in SurfaceMesh.__tensor_attributes:
+        for attr in SurfaceMesh.__ordered_tensor_attributes:
             if attr not in exist:
                 if attr == 'vertex_normals':
                     computable[attr] = [['faces', 'face_normals']]
+                elif attr == 'vertex_tangents':
+                    computable[attr] = [['faces', 'vertices', 'face_uvs']]
                 elif attr == 'face_normals':
                     # There are two ways to compute face normals
                     computable[attr] = [['normals', 'face_normals_idx'], ['vertices', 'faces']]

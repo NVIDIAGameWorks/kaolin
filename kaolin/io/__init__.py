@@ -1,5 +1,6 @@
 from . import dataset
 from . import materials
+from . import gltf
 from . import obj
 from . import off
 from . import render

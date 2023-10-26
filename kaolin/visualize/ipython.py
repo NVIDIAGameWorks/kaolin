@@ -160,8 +160,11 @@ class BaseIpyVisualizer(object):
     def _print_pixel_all_infos(self, event):
         """print pixel all infos from event query"""
         self.out.clear_output()
-        clamped_x = min(max(event["relativeX"], 0), self.canvas.width - 1)
-        clamped_y = min(max(event["relativeY"], 0), self.canvas.height - 1)
+        scaled_x = int(event["relativeX"] * self.canvas.width / event["boundingRectWidth"])
+        scaled_y = int(event["relativeY"] * self.canvas.height / event["boundingRectHeight"])
+
+        clamped_x = min(max(scaled_x, 0), self.canvas.width - 1)
+        clamped_y = min(max(scaled_y, 0), self.canvas.height - 1)
         print(f'pixel coords: {clamped_x}, {clamped_y}')
         for key, item in self.current_output.items():
             print(key, end=': ')

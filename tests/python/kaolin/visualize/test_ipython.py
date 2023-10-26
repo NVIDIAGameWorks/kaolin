@@ -234,7 +234,8 @@ class TestVisualizers:
                               atol=1e-4, rtol=1e-4)
         cur_camera = copy.deepcopy(viz.camera)
         viz._handle_event({'type': 'mouseup', 'button': 0, 'buttons': 1,
-                           'relativeX': to_x, 'relativeY': to_y})
+                           'relativeX': to_x, 'relativeY': to_y,
+                           'boundingRectWidth': width, 'boundingRectHeight': height})
         expected_render_count += 1
         check_counts()
         assert torch.equal(cur_camera.view_matrix(), viz.camera.view_matrix()), \
@@ -471,7 +472,8 @@ class TestVisualizers:
         cur_camera = copy.deepcopy(viz.camera)
 
         viz._handle_event({'type': 'mouseup', 'button': 0,
-                           'relativeX': to_x, 'relativeY': to_y})
+                           'relativeX': to_x, 'relativeY': to_y,
+                           'boundingRectWidth': width, 'boundingRectHeight': height})
         expected_render_count += 1
         check_counts()
         assert torch.equal(cur_camera.view_matrix(), viz.camera.view_matrix()), \
@@ -512,7 +514,8 @@ class TestVisualizers:
         assert torch.allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'mouseup', 'button': 1,
-                           'relativeX': to_x, 'relativeY': to_y})
+                           'relativeX': to_x, 'relativeY': to_y,
+                           'boundingRectWidth': width, 'boundingRectHeight': height})
         expected_render_count += 1
         check_counts()
         assert torch.equal(cur_camera.view_matrix(), viz.camera.view_matrix()), \

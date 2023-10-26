@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21-22 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21-22-23 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +23,7 @@ __all__ = [
     'packed_sample_points',
     'face_normals',
     'subdivide_trianglemesh',
+    'vertex_tangents'
 ]
 
 
@@ -609,3 +610,62 @@ def subdivide_trianglemesh(vertices, faces, iterations, alpha=None):
         faces = torch.cat([faces, edges_fx3], 1)
         faces = faces[:, [[1, 4, 3], [0, 3, 5], [2, 5, 4], [5, 3, 4]]].reshape(-1, 3)
     return vertices, faces
+
+def vertex_tangents(faces, face_vertices, face_uvs, vertex_normals):
+    r"""Compute vertex tangents.
+
+    The vertex tangents are useful to apply normal maps during rendering.
+
+    .. seealso::
+
+        https://en.wikipedia.org/wiki/Normal_mapping#Calculating_tangent_space
+
+    Args:
+       faces (torch.LongTensor): unbatched triangle mesh faces, of shape
+                                 :math:`(\text{num_faces}, 3)`.
+       face_vertices (torch.Tensor): unbatched triangle face vertices, of shape
+                                     :math:`(\text{num_faces}, 3, 3)`.
+       face_uvs (torch.Tensor): unbatched triangle UVs, of shape
+                                :math:`(\text{num_faces}, 3, 2)`.
+       vertex_normals (torch.Tensor): unbatched vertex normals, of shape
+                                      :math:`(\text{num_vertices}, 3)`.
+
+    Returns:
+       (torch.Tensor): The vertex tangents, of shape :math:`(\text{num_vertices, 3})`
+    """
+    # This function is strongly inspired by
+    # https://github.com/NVlabs/nvdiffrec/blob/main/render/mesh.py#L203
+    tangents = torch.zeros_like(vertex_normals)
+
+    face_uvs0, face_uvs1, face_uvs2 = torch.split(face_uvs, 1, dim=-2)
+    fv0, fv1, fv2 = torch.split(face_vertices, 1, dim=-2)
+    uve1 = face_uvs1 - face_uvs0
+    uve2 = face_uvs2 - face_uvs0
+    pe1 = (fv1 - fv0).squeeze(-2)
+    pe2 = (fv2 - fv0).squeeze(-2)
+
+    nom = pe1 * uve2[..., 1] - pe2 * uve1[..., 1]
+    denom = uve1[..., 0] * uve2[..., 1] - uve1[..., 1] * uve2[..., 0]
+    # Avoid division by zero for degenerated texture coordinates
+    tang = nom / torch.where(
+        denom > 0.0, torch.clamp(denom, min=1e-6), torch.clamp(denom, max=-1e-6)
+    )
+    vn_idx = torch.split(faces, 1, dim=-1)
+    indexing_dim = 0 if face_vertices.ndim == 3 else 1
+    # TODO(cfujitsang): optimizable?
+    for i in range(3):
+        idx = vn_idx[i].repeat(1, 3)
+        tangents.scatter_add_(indexing_dim, idx, tang)
+    # Normalize and make sure tangent is perpendicular to normal
+    tangents = torch.nn.functional.normalize(tangents, dim=1)
+    tangents = torch.nn.functional.normalize(
+        tangents -
+        torch.sum(tangents * vertex_normals, dim=-1, keepdim=True) *
+        vertex_normals
+    )
+
+    if torch.is_anomaly_enabled():
+        assert torch.all(torch.isfinite(tangents))
+
+    return tangents
+
