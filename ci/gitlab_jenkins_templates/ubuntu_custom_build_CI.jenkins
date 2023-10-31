@@ -65,12 +65,12 @@ spec:
                     trackingSubmodules: false
                 ]],
                 userRemoteConfigs: [[
-                    credentialsId: 'gitlab-credentials',
+                    credentialsId: 'kaolin-gitlab-access-token-as-password',
                     url: "${repoUrl}"
                 ]]
             ])
           }
-          docker.withRegistry("https://${docker_registry_server}", 'gitlab-credentials') {
+          docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
             stage("Build") {
               baseImage = docker.build(
                   "${targetImageTag}-base",

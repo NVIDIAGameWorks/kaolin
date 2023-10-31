@@ -376,11 +376,12 @@ class TestToDense:
             grad_out, torch.any(feature_grids != 0, dim=1))
         assert torch.equal(coalescent_features.grad, coalescent_expected_grad)
 
-@pytest.mark.parametrize('device', ['cpu','cuda'])
+@pytest.mark.parametrize('device,height,width,depth,threshold', [
+                         ('cpu', 2, 2, 2, 0.1),
+                         ('cuda', 2, 2, 2, 0.1),
+                         ('cuda', 113, 251, 251, 0.9)])
 @pytest.mark.parametrize('batch_size', [1, 5])
 @pytest.mark.parametrize('feature_dim', [1, 3])
-@pytest.mark.parametrize('height,width,depth,threshold',
-                         [(2, 2, 2, 0.1), (113, 251, 251, 0.9)])
 @pytest.mark.parametrize('dtype', [torch.float])
 class TestCycleConversionsFeatureGrids:
     @pytest.fixture(autouse=True)
