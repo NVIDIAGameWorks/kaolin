@@ -277,7 +277,7 @@ class TestPBRMaterial:
                 assert cuda_val is None
             else:
                 assert torch.equal(cuda_val, val.cuda())
-                assert val.is_cpu
+                assert not val.is_cuda
 
         for param_name in _misc_attributes:
             assert getattr(mat, param_name) == getattr(cuda_mat, param_name)

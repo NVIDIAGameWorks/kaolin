@@ -11,12 +11,22 @@ gitlabCommitStatus("launch all builds") {
 def ubuntu_from_pytorch_configs = [
     [
         // python: 3.7
+        'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.12.1',
+        'archsToTest': 'MULTI'
+    ],
+    [
+        // python: 3.7
         'cudaVer': '11.6', 'cudnnVer': '8', 'torchVer': '1.13.1',
         'archsToTest': 'MULTI'
     ],
     [
+        // python: 3.7
+        'cudaVer': '12.1', 'cudnnVer': '8', 'torchVer': '2.1.0',
+        'archsToTest': 'MULTI'
+    ],
+    [
         // python: 3.10
-        'cudaVer': '11.7', 'cudnnVer': '8', 'torchVer': '2.0.1',
+        'cudaVer': '11.8', 'cudnnVer': '8', 'torchVer': '2.1.0',
         'archsToTest': 'MULTI'
     ]
 ]
@@ -25,7 +35,7 @@ def ubuntu_from_pytorch_configs = [
 // (See: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch/tags)
 def ubuntu_from_nvcr_configs = [
     [
-        'baseImageTag': '22.10-py3',
+        'baseImageTag': '23.10-py3',
         'archsToTest': 'MULTI'
     ],
 ]
@@ -40,8 +50,8 @@ def ubuntu_from_cuda_configs = [
         'archsToTest': 'MULTI'
     ],
     [
-        'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'pythonVer': '3.10', 'torchVer': '2.0.1',
+        'cudaVer': '12.1.0', 'cudnnVer': '8',
+        'pythonVer': '3.10', 'torchVer': '2.1.0',
         'archsToTest': 'MULTI'
     ],
 ]

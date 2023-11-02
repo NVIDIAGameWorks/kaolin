@@ -16,7 +16,7 @@ kind: Pod
 spec:
   containers:
   - name: docker
-    image: docker:19.03.1
+    image: docker:20.10.23
     command:
     - sleep
     args:
@@ -25,7 +25,7 @@ spec:
       - name: DOCKER_HOST
         value: tcp://localhost:2375
   - name: docker-daemon
-    image: docker:19.03.1-dind
+    image: docker:20.10.23-dind
     securityContext:
       privileged: true
     env:
@@ -41,6 +41,8 @@ spec:
 ''') {
   node(POD_LABEL) {
     container("docker") {
+      // This is to let the time for the docker-daemon to get initialized.
+      sleep 10
       try {
         stage("Checkout") {
           checkout([

@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2023 NVIDIA CORPORATION. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,51 +11,61 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#define CUB_NS_PREFIX namespace kaolin {
-#define CUB_NS_POSTFIX }
-#define CUB_NS_QUALIFIER ::kaolin::cub
-
-#include <stdio.h>
-#include <string.h>
 
 #include "tables.h"
 #include "helper_math.h"
 
 #include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAGuard.h>
 
 #include <cub/cub.cuh>
 
 namespace kaolin {
 
 // textures containing look-up tables
-texture<uint, 1, cudaReadModeElementType> triTex;
-texture<uint, 1, cudaReadModeElementType> numUniqueVertsTex;
-texture<uint, 1, cudaReadModeElementType> numTrianglesTex;
-texture<uint, 1, cudaReadModeElementType> numPartialVertsTex;
-texture<uint, 1, cudaReadModeElementType> vertsOrderTex;
+cudaTextureObject_t triTex;
+cudaTextureObject_t numUniqueVertsTex;
+cudaTextureObject_t numTrianglesTex;
+cudaTextureObject_t numPartialVertsTex;
+cudaTextureObject_t vertsOrderTex;
 
-void allocateTextures(at::Tensor d_triTable, at::Tensor d_numUniqueVertsTable, 
-                      at::Tensor d_numTrianglesTable, at::Tensor d_numPartialVertsTable,
-                      at::Tensor d_vertsOrderTable)
-{
-  // TODO: rename allocateTextures
-  // TODO: check if texture is already binded.
-  cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindUnsigned);
+void initTextures(cudaStream_t stream) {
+    cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(
+        32, 0, 0, 0, cudaChannelFormatKindUnsigned);
+    auto _init_tex = [&](cudaTextureObject_t& tex, void* hostPtr, int input_size){
+        unsigned int *devPtr = (unsigned int*) c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(
+            input_size * sizeof(unsigned int), stream);
+        AT_CUDA_CHECK(cudaMemcpyAsync((void*) devPtr, hostPtr,
+                                   input_size * sizeof(unsigned int),
+                                   cudaMemcpyHostToDevice, stream));
 
-  cudaMemcpy((void *) d_triTable.data_ptr<int>(), (void *)triTable, 256*16*sizeof(int), cudaMemcpyHostToDevice);
-  cudaBindTexture(0, triTex, d_triTable.data_ptr<int>(), channelDesc);
+        cudaResourceDesc resDesc = {};
+        resDesc.resType = cudaResourceTypeLinear;
+        resDesc.res.linear.devPtr = devPtr;
+        resDesc.res.linear.sizeInBytes = input_size * sizeof(unsigned int);
+        resDesc.res.linear.desc = channelDesc;
 
-  cudaMemcpy((void *) d_numUniqueVertsTable.data_ptr<int>(), (void *)numUniqueVertsTable, 256*sizeof(int), cudaMemcpyHostToDevice);
-  cudaBindTexture(0, numUniqueVertsTex, d_numUniqueVertsTable.data_ptr<int>(), channelDesc);
+        cudaTextureDesc texDesc = {};
+        texDesc.normalizedCoords = false;
+        texDesc.filterMode = cudaFilterModePoint;
+        texDesc.addressMode[0] = cudaAddressModeClamp;
+        texDesc.readMode = cudaReadModeElementType;
+        AT_CUDA_CHECK(cudaCreateTextureObject(&tex, &resDesc, &texDesc, NULL));
+    };
+    _init_tex(triTex, (void*) triTable, 256 * 16);
+    _init_tex(numUniqueVertsTex, (void*) numUniqueVertsTable, 256);
+    _init_tex(numTrianglesTex, (void*) numTrianglesTable, 256);
+    _init_tex(numPartialVertsTex, (void*) numPartialVertsTable, 256);
+    _init_tex(vertsOrderTex, (void*) vertsOrderTable, 256 * 3);
+}
 
-  cudaMemcpy((void *) d_numTrianglesTable.data_ptr<int>(), (void *)numTrianglesTable, 256*sizeof(int), cudaMemcpyHostToDevice);
-  cudaBindTexture(0, numTrianglesTex, d_numTrianglesTable.data_ptr<int>(), channelDesc);
-
-  cudaMemcpy((void *) d_numPartialVertsTable.data_ptr<int>(), (void *)numPartialVertsTable, 256*sizeof(int), cudaMemcpyHostToDevice);
-  cudaBindTexture(0, numPartialVertsTex, d_numPartialVertsTable.data_ptr<int>(), channelDesc);
-
-  cudaMemcpy((void *) d_vertsOrderTable.data_ptr<int>(), (void *)vertsOrderTable, 256*3*sizeof(int), cudaMemcpyHostToDevice);
-  cudaBindTexture(0, vertsOrderTex, d_vertsOrderTable.data_ptr<int>(), channelDesc);
+void freeTextures() {
+    AT_CUDA_CHECK(cudaDestroyTextureObject(triTex));
+    AT_CUDA_CHECK(cudaDestroyTextureObject(numUniqueVertsTex));
+    AT_CUDA_CHECK(cudaDestroyTextureObject(numTrianglesTex));
+    AT_CUDA_CHECK(cudaDestroyTextureObject(numPartialVertsTex));
+    AT_CUDA_CHECK(cudaDestroyTextureObject(vertsOrderTex));
 }
 
 // sample volume data set at a point
@@ -85,7 +95,11 @@ __global__ void
 classifyVoxel(int *voxelOccupied, int *voxelTriangles, int *voxelPartialVerts,
               int *voxelVertsOrder,
               float* volume, int3 gridSize, int numVoxels,
-              float3 voxelSize, float isoValue)
+              float3 voxelSize, float isoValue,
+              cudaTextureObject_t numUniqueVertsTex,
+              cudaTextureObject_t numPartialVertsTex,
+              cudaTextureObject_t numTrianglesTex,
+              cudaTextureObject_t vertsOrderTex)
 {
   int blockId = __mul24(blockIdx.y, gridDim.x) + blockIdx.x;
   int i = __mul24(blockId, blockDim.x) + threadIdx.x;
@@ -115,13 +129,13 @@ classifyVoxel(int *voxelOccupied, int *voxelTriangles, int *voxelPartialVerts,
   cubeindex += int(field[7] < isoValue)*128;
 
   // read number of vertices from texture for half cube
-  int numVerts = tex1Dfetch(numUniqueVertsTex, cubeindex);
-  int numPartialVerts = tex1Dfetch(numPartialVertsTex, cubeindex);
-  int numTriangles = tex1Dfetch(numTrianglesTex, cubeindex);
+  int numVerts = tex1Dfetch<unsigned int>(numUniqueVertsTex, cubeindex);
+  int numPartialVerts = tex1Dfetch<unsigned int>(numPartialVertsTex, cubeindex);
+  int numTriangles = tex1Dfetch<unsigned int>(numTrianglesTex, cubeindex);
 
-  int vertsOrder1 = tex1Dfetch(vertsOrderTex, cubeindex*3);
-  int vertsOrder2 = tex1Dfetch(vertsOrderTex, cubeindex*3 + 1);
-  int vertsOrder3 = tex1Dfetch(vertsOrderTex, cubeindex*3 + 2);
+  int vertsOrder1 = tex1Dfetch<unsigned int>(vertsOrderTex, cubeindex*3);
+  int vertsOrder2 = tex1Dfetch<unsigned int>(vertsOrderTex, cubeindex*3 + 1);
+  int vertsOrder3 = tex1Dfetch<unsigned int>(vertsOrderTex, cubeindex*3 + 2);
 
   if (i < numVoxels)
   {
@@ -159,10 +173,13 @@ void launch_classifyVoxel(at::Tensor voxelOccupied, at::Tensor voxelTriangles, a
   }
   // calculate number of vertices need per voxel
   classifyVoxel<<<grid, threads>>>(voxelOccupied.data_ptr<int>(), 
-                                   voxelTriangles.data_ptr<int>(), voxelPartialVerts.data_ptr<int>(),
+                                   voxelTriangles.data_ptr<int>(),
+                                   voxelPartialVerts.data_ptr<int>(),
                                    voxelVertsOrder.data_ptr<int>(),
-                                   voxelgrid.data_ptr<float>(), gridSize,
-                                   numVoxels, voxelSize, isoValue);
+                                   voxelgrid.data_ptr<float>(),
+                                   gridSize, numVoxels, voxelSize, isoValue,
+                                   numUniqueVertsTex, numPartialVertsTex,
+                                   numTrianglesTex, vertsOrderTex);
 }
 
 // compact voxel array
@@ -361,7 +378,8 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
                    int *numTrianglesScanned, int *numPartialVertsScanned, int *numPartialVerts,
                    int *voxelVertsOrder,
                    float* volume, int3 gridSize,
-                   float3 voxelSize, float isoValue, int activeVoxels, int maxVerts)
+                   float3 voxelSize, float isoValue, int activeVoxels, int maxVerts,
+                   cudaTextureObject_t triTex, cudaTextureObject_t vertsOrderTex)
 {
   int blockId = __mul24(blockIdx.y, gridDim.x) + blockIdx.x;
   int grid_index = __mul24(blockId, blockDim.x) + threadIdx.x;
@@ -419,17 +437,17 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
   __shared__ float3 vertlist[12*NTHREADS];
 
   vertlist[threadIdx.x] = vertexInterp(isoValue, v[0], v[1], field[0], field[1]);
-  vertlist[NTHREADS+threadIdx.x] = vertexInterp(isoValue, v[1], v[2], field[1], field[2]);
-  vertlist[(NTHREADS*2)+threadIdx.x] = vertexInterp(isoValue, v[2], v[3], field[2], field[3]);
-  vertlist[(NTHREADS*3)+threadIdx.x] = vertexInterp(isoValue, v[3], v[0], field[3], field[0]);
-  vertlist[(NTHREADS*4)+threadIdx.x] = vertexInterp(isoValue, v[4], v[5], field[4], field[5]);
-  vertlist[(NTHREADS*5)+threadIdx.x] = vertexInterp(isoValue, v[5], v[6], field[5], field[6]);
-  vertlist[(NTHREADS*6)+threadIdx.x] = vertexInterp(isoValue, v[6], v[7], field[6], field[7]);
-  vertlist[(NTHREADS*7)+threadIdx.x] = vertexInterp(isoValue, v[7], v[4], field[7], field[4]);
-  vertlist[(NTHREADS*8)+threadIdx.x] = vertexInterp(isoValue, v[0], v[4], field[0], field[4]);
-  vertlist[(NTHREADS*9)+threadIdx.x] = vertexInterp(isoValue, v[1], v[5], field[1], field[5]);
-  vertlist[(NTHREADS*10)+threadIdx.x] = vertexInterp(isoValue, v[2], v[6], field[2], field[6]);
-  vertlist[(NTHREADS*11)+threadIdx.x] = vertexInterp(isoValue, v[3], v[7], field[3], field[7]);
+  vertlist[NTHREADS + threadIdx.x] = vertexInterp(isoValue, v[1], v[2], field[1], field[2]);
+  vertlist[(NTHREADS * 2) + threadIdx.x] = vertexInterp(isoValue, v[2], v[3], field[2], field[3]);
+  vertlist[(NTHREADS * 3) + threadIdx.x] = vertexInterp(isoValue, v[3], v[0], field[3], field[0]);
+  vertlist[(NTHREADS * 4) + threadIdx.x] = vertexInterp(isoValue, v[4], v[5], field[4], field[5]);
+  vertlist[(NTHREADS * 5) + threadIdx.x] = vertexInterp(isoValue, v[5], v[6], field[5], field[6]);
+  vertlist[(NTHREADS * 6) + threadIdx.x] = vertexInterp(isoValue, v[6], v[7], field[6], field[7]);
+  vertlist[(NTHREADS * 7) + threadIdx.x] = vertexInterp(isoValue, v[7], v[4], field[7], field[4]);
+  vertlist[(NTHREADS * 8) + threadIdx.x] = vertexInterp(isoValue, v[0], v[4], field[0], field[4]);
+  vertlist[(NTHREADS * 9) + threadIdx.x] = vertexInterp(isoValue, v[1], v[5], field[1], field[5]);
+  vertlist[(NTHREADS * 10) + threadIdx.x] = vertexInterp(isoValue, v[2], v[6], field[2], field[6]);
+  vertlist[(NTHREADS * 11) + threadIdx.x] = vertexInterp(isoValue, v[3], v[7], field[3], field[7]);
 
   __syncthreads();
 
@@ -438,7 +456,7 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
 
     float3 *v[1];
 
-    uint edge = tex1Dfetch(vertsOrderTex, (cubeindex*3) + i);
+    uint edge = tex1Dfetch<unsigned int>(vertsOrderTex, (cubeindex*3) + i);
 
     if (edge == 255) {
         break;
@@ -461,14 +479,14 @@ generateTriangles2(float *pos, int *faces, int *compactedVoxelArray,
 
     // Add triangles
   for (int j=0; j<16; j+=3) {
-    uint face_idx1 = tex1Dfetch(triTex, cubeindex*16 + j);
+    uint face_idx1 = tex1Dfetch<unsigned int>(triTex, cubeindex*16 + j);
 
     if (face_idx1 == 255) {
       break;
     }
 
-    uint face_idx2 = tex1Dfetch(triTex, cubeindex*16 + j + 1);
-    uint face_idx3 = tex1Dfetch(triTex, cubeindex*16 + j + 2);
+    uint face_idx2 = tex1Dfetch<unsigned int>(triTex, cubeindex*16 + j + 1);
+    uint face_idx3 = tex1Dfetch<unsigned int>(triTex, cubeindex*16 + j + 2);
 
     int num_prev_verts;
     int num_prev_triangles;
@@ -511,17 +529,20 @@ void launch_generateTriangles2(at::Tensor pos, at::Tensor faces, at::Tensor comp
   dim3 grid2((int) ceil(activeVoxels/ (float) NTHREADS), 1, 1);
 
   while (grid2.x > 65535) {
-    grid2.x/=2;
-    grid2.y*=2;
+    grid2.x /= 2;
+    grid2.y *= 2;
   }
 
-  generateTriangles2<<<grid2, NTHREADS>>>(pos.data_ptr<float>(), faces.data_ptr<int>(),
-                                          compactedVoxelArray.data_ptr<int>(), numTrianglesScanned.data_ptr<int>(),
-                                          numPartialVertsScanned.data_ptr<int>(), numPartialVerts.data_ptr<int>(),
+  generateTriangles2<<<grid2, NTHREADS>>>(pos.data_ptr<float>(),
+                                          faces.data_ptr<int>(),
+                                          compactedVoxelArray.data_ptr<int>(),
+                                          numTrianglesScanned.data_ptr<int>(),
+                                          numPartialVertsScanned.data_ptr<int>(),
+                                          numPartialVerts.data_ptr<int>(),
                                           voxelVertsOrder.data_ptr<int>(),
-                                          voxelgrid.data_ptr<float>(), gridSize,
-                                          voxelSize, isoValue, activeVoxels,
-                                          maxVerts);
+                                          voxelgrid.data_ptr<float>(),
+                                          gridSize, voxelSize, isoValue, activeVoxels, maxVerts,
+                                          triTex, vertsOrderTex);
 }
 
 void CubScanWrapper(at::Tensor output, at::Tensor input, int numElements) {
@@ -540,23 +561,19 @@ void CubScanWrapper(at::Tensor output, at::Tensor input, int numElements) {
   // Run exclusive prefix sum
   cub::DeviceScan::ExclusiveSum(d_temp_storage, temp_storage_bytes, d_in, d_out, numElements);
 }
-// at::Tensor used to store tables
-at::Tensor d_triTable;
-at::Tensor d_numUniqueVertsTable;
-at::Tensor d_numTrianglesTable;
-at::Tensor d_numPartialVertsTable;
-at::Tensor d_vertsOrderTable;
 
-void
-computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
-                  int *activeVoxels, int *totalVerts, int *totalTriangles, int *totalPartialVerts,
-                  int numVoxels, float3 voxelSize, int maxVerts, int maxFaces,
-                  at::Tensor voxelgrid, at::Tensor d_pos, at::Tensor d_faces,
-                  at::Tensor d_voxelPartialVerts,
-                  at::Tensor d_voxelTriangles,
-                  at::Tensor d_voxelOccupied,
-                  at::Tensor d_compVoxelArray,
-                  at::Tensor d_voxelVertsOrder) {
+// at::Tensor used to store tables
+void computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
+                       int *activeVoxels, int *totalVerts, int *totalTriangles,
+                       int *totalPartialVerts,
+                       int numVoxels, float3 voxelSize, int maxVerts, int maxFaces,
+                       at::Tensor voxelgrid, at::Tensor d_pos, at::Tensor d_faces,
+                       at::Tensor d_voxelPartialVerts,
+                       at::Tensor d_voxelTriangles,
+                       at::Tensor d_voxelOccupied,
+                       at::Tensor d_compVoxelArray,
+                       at::Tensor d_voxelVertsOrder
+) {
   // calculate number of vertices and triangles need per voxel
   launch_classifyVoxel(d_voxelOccupied,
                        d_voxelTriangles, d_voxelPartialVerts,
@@ -582,8 +599,7 @@ computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
     *activeVoxels = lastElement + lastScanElement;
   }
 
-  if (activeVoxels==0)
-  {
+  if (activeVoxels==0) {
     // return if there are no full voxels
     *totalVerts = 0;
     return;
@@ -636,7 +652,12 @@ computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
                             maxVerts);
 }
 
-std::vector<at::Tensor> unbatched_mcube_forward_cuda_kernel_launcher(const at::Tensor voxelgrid, float iso_value) {
+std::vector<at::Tensor> unbatched_mcube_forward_cuda_kernel_launcher(
+    const at::Tensor voxelgrid, float iso_value) {
+  const at::cuda::OptionalCUDAGuard device_guard(at::device_of(voxelgrid));
+  auto stream = at::cuda::getCurrentCUDAStream();
+
+
   int3 gridSizeLog2;
   int3 gridSize;  // height, width, depth of voxelgrid
 
@@ -682,24 +703,14 @@ std::vector<at::Tensor> unbatched_mcube_forward_cuda_kernel_launcher(const at::T
   at::Tensor d_voxelVertsOrder = at::zeros({numVoxels, 3}, int_options); // tensor to store the order of added verts for each voxel
 
   // initialize static pointers
-  if (!d_triTable.defined()) {
-    d_triTable = at::zeros({256, 16}, int_options);
-    d_numUniqueVertsTable = at::zeros({256}, int_options);
-    d_numTrianglesTable = at::zeros({256}, int_options);
-    d_numPartialVertsTable = at::zeros({256}, int_options);
-    d_vertsOrderTable = at::zeros({256, 3}, int_options);
-
-    // allocate table textures after we initialize everything.
-    allocateTextures(d_triTable, d_numUniqueVertsTable, d_numTrianglesTable, d_numPartialVertsTable, d_vertsOrderTable);
-  }
+  // TODO(cfujitsang): keep the memoization
+  initTextures(stream);
 
   computeIsosurface(gridSize, gridSizeLog2, isoValue,
                     &activeVoxels, &totalVerts, &totalTriangles, &totalPartialVerts,
                     numVoxels, voxelSize, maxVerts, maxFaces,
-                    voxelgrid, d_pos, d_faces,
-                    d_voxelPartialVerts,
-                    d_voxelTriangles,
-                    d_voxelOccupied, d_compVoxelArray, d_voxelVertsOrder);
+                    voxelgrid, d_pos, d_faces, d_voxelPartialVerts,
+                    d_voxelTriangles, d_voxelOccupied, d_compVoxelArray, d_voxelVertsOrder);
 
   std::vector<at::Tensor> result;
 
@@ -712,7 +723,7 @@ std::vector<at::Tensor> unbatched_mcube_forward_cuda_kernel_launcher(const at::T
   if (err != cudaSuccess) {
     printf("CUDA Error: %s\n", cudaGetErrorString(err));
   }
-
+  freeTextures();
   return result;
 }
 
