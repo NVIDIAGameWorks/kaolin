@@ -219,7 +219,7 @@ def import_mesh(path, with_materials=False, with_normals=False,
             if len(data) == 0:
                 continue
             if data[0] == 'v':
-                vertices.append(data[1:])
+                vertices.append(data[1:4])
             elif with_materials and data[0] == 'vt':
                 uvs.append(data[1:3])
             elif with_normals and data[0] == 'vn':
