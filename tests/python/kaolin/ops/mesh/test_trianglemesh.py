@@ -58,7 +58,7 @@ class TestFaceAreas:
         output = kaolin.ops.mesh.packed_face_areas(vertices, first_idx_vertices,
                                         faces, num_faces_per_mesh)
         expected_output = torch.tensor([0.5, 1., math.sqrt(2.)], device=device, dtype=dtype)
-        assert torch.allclose(output, expected_output)
+        check_allclose(output, expected_output)
 
 @pytest.mark.parametrize("device,dtype", FLOAT_TYPES)
 class TestSamplePoints:
@@ -130,10 +130,10 @@ class TestSamplePoints:
 
         v0_p = points - face_vertices_choices[:, :, 0]  # batch_size x num_points x 3
         len_v0_p = torch.sqrt(torch.sum(v0_p ** 2, dim=-1))
-        cos_a = torch.matmul(v0_p.reshape(-1, 1, 3),
-                             face_normals.reshape(-1, 3, 1)).reshape(
-            batch_size, num_samples) / len_v0_p
-        point_to_face_dist = len_v0_p * cos_a
+        point_to_face_dist = torch.matmul(
+            v0_p.reshape(-1, 1, 3),
+            face_normals.reshape(-1, 3, 1)
+        ).reshape(batch_size, num_samples)
 
         if dtype == torch.half:
             atol = 1e-2
@@ -143,10 +143,9 @@ class TestSamplePoints:
             rtol = 1e-5
 
         # check that the point is close to the plan
-        assert torch.allclose(point_to_face_dist,
-                              torch.zeros((batch_size, num_samples),
-                                          device=device, dtype=dtype),
-                              atol=atol, rtol=rtol)
+        check_allclose(point_to_face_dist,
+                       torch.zeros((batch_size, num_samples), device=device, dtype=dtype),
+                       atol=atol, rtol=rtol)
 
         # check that the point lie in the triangle
         edges0 = face_vertices_choices[:, :, 1] - face_vertices_choices[:, :, 0]
@@ -201,15 +200,15 @@ class TestSamplePoints:
 
             gt_points = torch.sum(
                 face_vertices_choices * weights.unsqueeze(-1), dim=-2)
-            assert torch.allclose(points, gt_points, atol=atol, rtol=rtol)
+            check_allclose(points, gt_points, atol=atol, rtol=rtol)
 
             _face_choices = face_choices[..., None, None].repeat(1, 1, 3, feat_dim)
             face_features_choices = torch.gather(face_features, 1, _face_choices)
 
             gt_interpolated_features = torch.sum(
                 face_features_choices * weights.unsqueeze(-1), dim=-2)
-            assert torch.allclose(interpolated_features, gt_interpolated_features,
-                                  atol=atol, rtol=rtol)
+            check_allclose(interpolated_features, gt_interpolated_features,
+                           atol=atol, rtol=rtol)
 
     def test_sample_points_with_areas(self, vertices, faces, dtype, device):
         num_samples = 1000
@@ -218,7 +217,7 @@ class TestSamplePoints:
             kaolin.ops.mesh.sample_points)(vertices, faces, num_samples, face_areas)
         points2, face_choices2 = with_seed(1234)(
             kaolin.ops.mesh.sample_points)(vertices, faces, num_samples)
-        assert torch.allclose(points1, points2)
+        check_allclose(points1, points2)
         assert torch.equal(face_choices1, face_choices2)
 
     def test_sample_points_with_areas_with_features(self, vertices, faces,
@@ -231,9 +230,9 @@ class TestSamplePoints:
         points2, face_choices2, interpolated_features2 = with_seed(1234)(
             kaolin.ops.mesh.sample_points)(vertices, faces, num_samples,
                                 face_features=face_features)
-        assert torch.allclose(points1, points2)
+        check_allclose(points1, points2)
         assert torch.equal(face_choices1, face_choices2)
-        assert torch.allclose(interpolated_features1, interpolated_features2)
+        check_allclose(interpolated_features1, interpolated_features2)
 
     def test_diff_sample_points(self, vertices, faces, device, dtype):
         num_samples = 1000
@@ -308,10 +307,10 @@ class TestSamplePoints:
         face_normals = kaolin.ops.mesh.face_normals(face_vertices_choices, unit=True)
         v0_p = points - face_vertices_choices[:, :, 0]  # batch_size x num_points x 3
         len_v0_p = torch.sqrt(torch.sum(v0_p ** 2, dim=-1))
-        cos_a = torch.matmul(v0_p.reshape(-1, 1, 3),
-                             face_normals.reshape(-1, 3, 1)).reshape(
-            batch_size, num_samples) / len_v0_p
-        point_to_face_dist = len_v0_p * cos_a
+        point_to_face_dist = torch.matmul(
+            v0_p.reshape(-1, 1, 3),
+            face_normals.reshape(-1, 3, 1)
+        ).reshape(batch_size, num_samples)
 
         if dtype == torch.half:
             atol = 1e-2
@@ -321,10 +320,9 @@ class TestSamplePoints:
             rtol = 1e-5
 
         # check that the point is close to the plan
-        assert torch.allclose(point_to_face_dist,
-                              torch.zeros((batch_size, num_samples),
-                                          device=device, dtype=dtype),
-                              atol=atol, rtol=rtol)
+        check_allclose(point_to_face_dist,
+                       torch.zeros((batch_size, num_samples), device=device, dtype=dtype),
+                       atol=atol, rtol=rtol)
 
         # check that the point lie in the triangle
         edges0 = face_vertices_choices[:, :, 1] - face_vertices_choices[:, :, 0]
@@ -363,7 +361,7 @@ class TestSamplePoints:
         points2, face_choices2 = with_seed(1234)(kaolin.ops.mesh.packed_sample_points)(
             vertices, first_idx_vertices, faces, num_faces_per_mesh, num_samples)
 
-        assert torch.allclose(points1, points2)
+        check_allclose(points1, points2)
         assert torch.equal(face_choices1, face_choices2)
 
     def test_diff_packed_sample_points(self, packed_vertices_info, packed_faces_info,
@@ -811,21 +809,21 @@ class TestSubdivideTrianglemesh:
     def test_subdivide_trianglemesh_1_iter_default_alpha(self, vertices_icosahedron, faces_icosahedron, expected_vertices_default_alpha, expected_faces_icosahedron_1_iter):
         new_vertices, new_faces = kaolin.ops.mesh.subdivide_trianglemesh(
             vertices_icosahedron, faces_icosahedron, 1)
-        assert torch.allclose(new_vertices, expected_vertices_default_alpha, atol=1e-04)
+        check_allclose(new_vertices, expected_vertices_default_alpha, atol=1e-04)
         assert torch.equal(new_faces, expected_faces_icosahedron_1_iter)
 
     def test_subdivide_trianglemesh_1_iter_zero_alpha(self, vertices_icosahedron, faces_icosahedron, expected_vertices_zero_alpha, expected_faces_icosahedron_1_iter):
         alpha = torch.zeros_like(vertices_icosahedron[..., 0])
         new_vertices, new_faces = kaolin.ops.mesh.subdivide_trianglemesh(
             vertices_icosahedron, faces_icosahedron, 1, alpha)
-        assert torch.allclose(new_vertices, expected_vertices_zero_alpha, atol=1e-04)
+        check_allclose(new_vertices, expected_vertices_zero_alpha, atol=1e-04)
         assert torch.equal(new_faces, expected_faces_icosahedron_1_iter)
 
     def test_subdivide_trianglemesh_5_iter(self, vertices_icosahedron, faces_icosahedron):
         new_vertices, new_faces = kaolin.ops.mesh.subdivide_trianglemesh(
             vertices_icosahedron, faces_icosahedron, 5)
         # check total area of all faces
-        assert torch.allclose(
+        check_allclose(
             kaolin.ops.mesh.face_areas(new_vertices, new_faces).sum(),
             torch.tensor([6.2005], dtype=new_vertices.dtype, device=new_faces.device),
             atol=1e-4)

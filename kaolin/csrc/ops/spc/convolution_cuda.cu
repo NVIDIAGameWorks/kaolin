@@ -17,10 +17,6 @@
 #include "../../utils.h"
 #include "convolution.cuh"
 
-#define CUB_NS_PREFIX namespace kaolin {
-#define CUB_NS_POSTFIX }
-#define CUB_NS_QUALIFIER ::kaolin::cub
-
 #include <ATen/cuda/CUDAContext.h>
 #include <cub/device/device_scan.cuh>
 

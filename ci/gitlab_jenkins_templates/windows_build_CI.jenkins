@@ -36,7 +36,7 @@ spec:
       claimName: 'kaolin-pvc'
   containers:
   - name: jnlp
-    image: jenkins/jnlp-agent:latest-windows
+    image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/jnlp-agent:jdk11-windows
     env: 
     - name: JENKINS_AGENT_WORKDIR
       value: C:/Jenkins/agent
