@@ -16,7 +16,7 @@ currentBuild.description = sourceBranch + ": " + commitHash
 
 gitlabCommitStatus("test-${configName}") {
 
-podTemplate(cloud:'sc-ipp-blossom-prod', 
+podTemplate(cloud:'sc-ipp-blossom-116',
 slaveConnectTimeout: 4000,
 yaml: """
 apiVersion: v1
@@ -28,7 +28,7 @@ spec:
       claimName: 'kaolin-pvc'
   containers:
   - name: jnlp
-    image: jenkins/jnlp-agent:latest-windows
+    image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/jnlp-agent:jdk11-windows
     env:
     - name: JENKINS_AGENT_WORKDIR
       value: C:/Jenkins/agent
@@ -41,7 +41,7 @@ spec:
       - mountPath: c:/mnt
         name: pvc-mount
   imagePullSecrets:
-  - name: gitlabregcred
+  - name: gitlabcred
   nodeSelector:
     kubernetes.io/os: windows
 """
@@ -68,6 +68,14 @@ spec:
               cp /tmp/kaolin-*.whl /mnt/whl/torch-"$env:torchVer"_cu"$env:cudaTag"/
               '''
             }
+          }
+        }
+        stage("Push wheels on artifacts") {
+          catchError(stageResults: "failure") {
+            powershell '''
+            cp /tmp/kaolin-*.whl .
+            '''
+            archiveArtifacts artifacts: "kaolin-*.whl"
           }
         }
       }

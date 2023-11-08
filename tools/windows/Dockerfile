@@ -3,8 +3,6 @@
 
 FROM mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2019
 
-SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
-
 # set up conda and python environment
 ARG CUDA_VERSION=11.1
 ENV CUDA_VERSION=${CUDA_VERSION}
