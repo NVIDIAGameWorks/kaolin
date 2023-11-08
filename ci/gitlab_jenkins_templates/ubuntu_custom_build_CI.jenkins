@@ -91,7 +91,7 @@ spec:
             if (buildWheel.toBoolean()) {
               stage("Build wheel") {
                 cudaTag = cudaVer.split('\\.')[0..<2].join('')
-                targetImage.inside("-v /mount_binaries:/mount_binaries") {
+                targetImage.inside() {
                   sh """
                   ls .
                   python setup.py bdist_wheel --dist-dir .
