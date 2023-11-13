@@ -33,6 +33,7 @@ except Exception as e:
 
 
 from ..render.camera import CameraExtrinsics
+from ..ops.coords import spherical2cartesian, cartesian2spherical
 
 __all__ = [
     'update_canvas',
@@ -314,8 +315,10 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
             Sensitivity of the wheel on zoom. Default: 1e-3.
         forward_sensitivity (float):
             Sensitivity of the wheel on forward. Default: 1e-3.
-        mouse_sensitivity (float):
-            Sensitivity of the mouse on movements. Default: 1.5.
+        rotation_sensitivity (float):
+            Sensitivity of the mouse on left click movements. Default: 1.5.
+        translation_sensitivity (float):
+            Sensitivity of the mouse on right click movements. Default: 1.
         max_fps (optional, float):
             maximum framerate for handling consecutive events,
             this is useful when the rendering is slow to avoid freezes.
@@ -348,7 +351,7 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
         focus_at (torch.Tensor)
         world_up_axis (int)
         zoom_sensitivity (float)
-        forward_sensitivity (float)
+        rotation_sensitivity (float)
         mouse_sensitivity (float)
         max_fps (int)
         update_only_on_release (bool)
@@ -370,7 +373,8 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
                  world_up_axis=1,
                  zoom_sensitivity=0.001,
                  forward_sensitivity=0.001,
-                 mouse_sensitivity=1.5,
+                 rotation_sensitivity=1.5,
+                 translation_sensitivity=1.,
                  max_fps=24.,
                  update_only_on_release=False,
                  additional_watched_events=None,
@@ -381,9 +385,18 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
                 self.focus_at = torch.zeros((3,), device=camera.device)
             else:
                 self.focus_at = focus_at
+            vec = self.focus_at - camera.cam_pos().squeeze()
+            if world_up_axis == 0:
+                z, x, y = torch.split(vec, 1)
+            elif world_up_axis == 1:
+                y, z, x = torch.split(vec, 1)
+            else:
+                x, y, z = torch.split(vec, 1)
+            self.azimuth, self.elevation, self.distance = cartesian2spherical(x, y, z)
 
             up = torch.zeros((3,), device=camera.device)
-            up[world_up_axis] = float(camera.cam_up().squeeze()[world_up_axis] >= 0) * 2. - 1.
+            self.up_sign = float(camera.cam_up().squeeze()[world_up_axis] >= 0) * 2. - 1.
+            up[world_up_axis] = self.up_sign
             camera.extrinsics = CameraExtrinsics.from_lookat(
                 eye=camera.cam_pos().squeeze(),
                 at=self.focus_at,
@@ -397,10 +410,12 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
             self.world_up_axis = world_up_axis
             self.zoom_sensitivity = zoom_sensitivity
             self.forward_sensitivity = forward_sensitivity
-            self.mouse_scale = mouse_sensitivity * math.pi
+            self.rotation_scale = rotation_sensitivity * math.pi
+            self.translation_sensitivity = translation_sensitivity
             self.update_only_on_release = update_only_on_release
 
-            watched_events = ['wheel', 'mousedown', 'mouseup', 'mousemove', 'mouseleave', 'mouseenter']
+            watched_events = ['wheel', 'mousedown', 'mouseup', 'mousemove', 'mouseleave', 'mouseenter',
+                              'contextmenu']
             if additional_watched_events is not None:
                 watched_events += additional_watched_events
             self.additional_event_handler = additional_event_handler
@@ -408,6 +423,39 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
             super().__init__(height, width, camera, render, fast_render,
                              watched_events, max_fps)
 
+    def _make_camera(self):
+        if self.world_up_axis == 0:
+            y, z, x = spherical2cartesian(self.azimuth, self.elevation, self.distance)
+        elif self.world_up_axis == 1:
+            z, x, y = spherical2cartesian(self.azimuth, self.elevation, self.distance)
+        else:
+            x, y, z = spherical2cartesian(self.azimuth, self.elevation, self.distance)
+        eye = self.focus_at - torch.cat([x, y, z])
+        up = torch.zeros((3,), device=self.camera.device)
+        up[self.world_up_axis] = self.up_sign
+
+        self.camera.extrinsics = CameraExtrinsics.from_lookat(
+            eye=eye,
+            at=self.focus_at,
+            up=up,
+            dtype=self.camera.dtype,
+            device=self.camera.device
+        )
+
+    def _move_translation(self, amount_up, amount_left):
+        """Move the camera up and left with the focus point.
+
+        Args:
+            amount_up (float): Amount to move up.
+            amount_left (float): Amount to move left.
+        """
+        old_cam_pos = self.camera.cam_pos()
+        self.camera.move_up(amount_up)
+        self.camera.move_right(-amount_left)
+        #cam_move = self.camera.R.transpose(2, 1) @ torch.tensor(
+        #    [[amount_right], [amount_up], [0.]], device='cuda')
+        self.focus_at += (self.camera.cam_pos() - old_cam_pos).squeeze()
+        
     def _move_turntable(self, amount_elevation, amount_azimuth):
         """Move the camera around a focus point as turntable
 
@@ -417,36 +465,17 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
             amount_azimuth (float):
                 Amount of azimuth rotation, measure in radians.
         """
-        radius = (self.camera.cam_pos().squeeze() - self.focus_at).norm(dim=-1, keepdim=True)
-        # Rotates camera in normal direction to plane (world space)
-        in_plane_amount = -amount_azimuth
-        # Rotates camera in up-forward direction (camera space)
-        pitch = -amount_elevation
-        self.camera.t = torch.zeros(3, device=self.camera.device, dtype=self.camera.dtype)
-        self.camera.rotate(pitch=pitch)
-        translate = torch.eye(4, device=self.camera.device, dtype=self.camera.dtype)
-        translate[:3, 3] = -self.focus_at
-        rot_mat = torch.eye(4, device=self.camera.device, dtype=self.camera.dtype)
-        if self.world_up_axis == 1:
-            rot_mat[0, 0] = math.cos(in_plane_amount)
-            rot_mat[0, 2] = -math.sin(in_plane_amount)
-            rot_mat[2, 0] = math.sin(in_plane_amount)
-            rot_mat[2, 2] = math.cos(in_plane_amount)
-        elif self.world_up_axis == 2:
-            rot_mat[0, 0] = math.cos(in_plane_amount)
-            rot_mat[0, 1] = math.sin(in_plane_amount)
-            rot_mat[1, 0] = -math.sin(in_plane_amount)
-            rot_mat[1, 1] = math.cos(in_plane_amount)
-        elif self.world_up_axis == 0:
-            rot_mat[1, 1] = math.cos(in_plane_amount)
-            rot_mat[1, 2] = math.sin(in_plane_amount)
-            rot_mat[2, 1] = -math.sin(in_plane_amount)
-            rot_mat[2, 2] = math.cos(in_plane_amount)
-        view_matrix = self.camera.view_matrix().squeeze(0) @ rot_mat @ translate
-        self.camera._backend.update(view_matrix)
-        cam_forward = self.camera.cam_forward().squeeze()
-        backward_dir = cam_forward / cam_forward.norm(dim=-1, keepdim=True)
-        self.camera.translate(radius * backward_dir)
+        self.elevation -= amount_elevation * self.up_sign
+        self.azimuth -= amount_azimuth * self.up_sign
+        if self.elevation > math.pi / 2.:
+            self.elevation = math.pi - self.elevation
+            self.up_sign = -self.up_sign
+            self.azimuth = self.azimuth + math.pi
+        if self.elevation < -math.pi / 2.:
+            self.elevation = -math.pi - self.elevation
+            self.up_sign = -self.up_sign
+            self.azimuth = self.azimuth + math.pi
+        self._make_camera()
 
     def _safe_zoom(self, amount):
         r"""Applies a zoom on the camera by adjusting the lens.
@@ -476,10 +505,8 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
         Args:
             amount (float): Amout of adjustment (positive amount => move forward)
         """
-        radius = (self.camera.cam_pos().squeeze() - self.focus_at).norm(dim=-1, keepdim=True)
-        log_radius = torch.log(radius)
-        new_radius = torch.exp(log_radius + amount)
-        self.camera.move_forward(new_radius - radius)
+        self.distance = torch.exp(torch.log(self.distance) + amount)
+        self._make_camera()
 
     def _handle_event(self, event):
         with torch.no_grad():
@@ -496,18 +523,26 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
                         self.render_update()
                     elif event['type'] == 'mousedown':
                         self.position = (event['relativeX'], event['relativeY'])
-                        # If the camera is upside down w.r.t to world we need to invert azimuth movement
-                        self.sign = torch.sign(self.camera.cam_up()[0, self.world_up_axis, 0])
                     elif event['type'] in ['mouseup', 'mouseleave', 'mouseenter']:
                         self.render_update()
                         if event['type'] == 'mouseup' and event['button'] == 0:
                             self._print_pixel_all_infos(event)
-                    elif event['type'] == 'mousemove' and event['buttons'] == 1:
-                            dx = (self.mouse_scale *
+                    elif event['type'] == 'mousemove':
+                        if event['buttons'] == 1:
+                            dx = (self.rotation_scale *
                                   (event['relativeX'] - self.position[0]) / self.canvas.width)
-                            dy = (self.mouse_scale *
+                            dy = (self.rotation_scale *
                                   (event['relativeY'] - self.position[1]) / self.canvas.height)
-                            self._move_turntable(dy, self.sign * dx)
+                            self._move_turntable(dy, dx)
+                            self.position = (event['relativeX'], event['relativeY'])
+                            if not self.update_only_on_release:
+                                self.fast_render_update()
+                        elif event['buttons'] == 2:
+                            dx = (self.translation_sensitivity *
+                                  (event['relativeX'] - self.position[0]) / self.canvas.width)
+                            dy = (self.translation_sensitivity *
+                                  (event['relativeY'] - self.position[1]) / self.canvas.height)
+                            self._move_translation(dy, dx)
                             self.position = (event['relativeX'], event['relativeY'])
                             if not self.update_only_on_release:
                                 self.fast_render_update()
