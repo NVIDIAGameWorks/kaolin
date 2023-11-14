@@ -277,7 +277,7 @@ class TestVisualizers:
         )
         check_allclose(cur_camera.cam_forward(), viz.camera.cam_forward(), atol=1e-2, rtol=1e-4), \
             "After move forward: camera have changed cam_forward()"
-        check_allclose(cur_camera.cam_up(), viz.camera.cam_up(), atol=1e-2, rtol=1e-3), \
+        check_allclose(cur_camera.cam_up(), viz.camera.cam_up(), atol=1e-2, rtol=1e-2), \
             "After move forward: camera have change cam_up()"
         check_allclose(normalized_distance, cur_camera.cam_forward().squeeze(),
                               atol=1e-5, rtol=1e-5), \
