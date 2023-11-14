@@ -452,8 +452,6 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
         old_cam_pos = self.camera.cam_pos()
         self.camera.move_up(amount_up)
         self.camera.move_right(-amount_left)
-        #cam_move = self.camera.R.transpose(2, 1) @ torch.tensor(
-        #    [[amount_right], [amount_up], [0.]], device='cuda')
         self.focus_at += (self.camera.cam_pos() - old_cam_pos).squeeze()
         
     def _move_turntable(self, amount_elevation, amount_azimuth):
@@ -505,8 +503,9 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
         Args:
             amount (float): Amout of adjustment (positive amount => move forward)
         """
-        self.distance = torch.exp(torch.log(self.distance) + amount)
-        self._make_camera()
+        new_distance = torch.exp(torch.log(self.distance) + amount)
+        self.camera.move_forward(new_distance - self.distance)
+        self.distance = new_distance
 
     def _handle_event(self, event):
         with torch.no_grad():
