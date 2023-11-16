@@ -8,6 +8,7 @@ API
 
 .. automodule:: kaolin.visualize
    :members:
+   :inherited-members:
    :undoc-members:
    :show-inheritance:
 

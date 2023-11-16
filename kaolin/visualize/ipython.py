@@ -27,7 +27,7 @@ try:
     from ipyevents import Event
     from ipywidgets import Output
     from ipywidgets import Image as ImageWidget
-    from ipycanvas import Canvas
+    from ipycanvas import Canvas, hold_canvas
 except Exception as e:
     warnings.warn('Error importing kaolin.visualize.ipython:\n' + traceback.format_exc())
 
@@ -50,7 +50,9 @@ def update_canvas(canvas, image):
     PILImage.fromarray(image.cpu().numpy()).save(
         f, "PNG", quality=100)
     image = ImageWidget(value=f.getvalue())
-    canvas.draw_image(image, 0, 0, canvas.width, canvas.height)
+    with hold_canvas(canvas):
+        canvas.clear_rect(0, 0, canvas.width, canvas.height)
+        canvas.draw_image(image, 0, 0, canvas.width, canvas.height)
 
 def _print_item_pixel_info(canvas, item, x, y):
     """helper function to print info of items produced by render"""
@@ -80,9 +82,9 @@ class BaseIpyVisualizer(object):
     (make sure to reuse the base class one so that ipycanvas and ipyevents are properly used)
 
     Args:
-        height (int): height of the canvas.
-        width (int): width of the canvas.
-        camera (kal.render.camera.Camera): Camera used for the visualization.
+        height (int): Height of the canvas.
+        width (int): Width of the canvas.
+        camera (kaolin.render.camera.Camera): Camera used for the visualization.
         render (Callable):
             render function that take a :class:`kal.render.camera.Camera` as input.
             Must return a torch.ByteTensor as output,
@@ -95,35 +97,70 @@ class BaseIpyVisualizer(object):
         watched_events (list of str):
             Events to be watched by the visualizer
             (see `ipyevents main documentation`_).
-        max_fps (float):
+        max_fps (optional, float):
             maximum framerate for handling consecutive events,
             this is useful when the rendering is slow to avoid freezes.
             Typically 24 fps is great when working on a local machine
             with :func:`render` close to real-time,
             and lower to 10 fps with slower rendering or network latency.
+        canvas (optional, ipycanvas.Canvas):
+             If you don't want the visualizer to create a canvas automatically, pass the canvas object
+             to be drawn on to this function. By default, this canvas will also be used for processing events.
+             Note that in case of ipycanvas.MultiCanvas, only the parent MultiCanvas object can process
+             events, so if you are drawing of a sub-canvas of a MultiCanvas, pass the MultiCanvas object
+             as `event_canvas=`. Dimensions must be matching `height` and `width`.
+        event_canvas (optional, ipywidgets.DOMWidget):
+             If you want visualizer to receive events from a different canvas object from the one that the
+             rendering shows on, pass this object here. Note that in case of ipycanvas.MultiCanvas,
+             only the parent MultiCanvas object can process events. By default, the same canvas is used for
+             events and drawing.
 
     .. _ipyevents main documentation: https://github.com/mwcraig/ipyevents/blob/main/docs/events.ipynb
     """
 
     def __init__(self, height, width, camera, render, fast_render=None,
-                 watched_events=None, max_fps=None):
-        self.canvas = Canvas(height=height, width=width)
+                 watched_events=None, max_fps=None,
+                 canvas=None, event_canvas=None):
+        #: (ipywidgets.Output): An output where error and prints are displayed.
         self.out = Output()
         assert len(camera) == 1, "only single camera supported for visualizer"
+        #: (kaolin.render.camera.Camera): The camera used for rendering.
         self.camera = camera
-        self.render = render
-        if fast_render is None:
-            self.fast_render = render
+        #: render (Callable): The rendering function.
+        self.render = render 
+        #: (int): The Canvas height.
+        self.height = height
+        #: (int): The Canvas width.
+        self.width = width
+        if canvas is None:
+            canvas = Canvas(height=self.height, width=self.width)
         else:
-            self.fast_render = fast_render
+            assert canvas.height == self.height, \
+                "specified height is different than provided canvas"
+            assert canvas.width == self.width, \
+                "specified width is different than provided canvas"
 
+        if canvas is None:
+            canvas = Canvas(height=self.height, width=self.width)
+        #: (ipycanvas.Canvas): The canvas on which the rendering is displayed.
+        self.canvas = canvas
+        if event_canvas is None:
+            event_canvas = canvas
+        #: (ipywidgets.DOMWidget): The widget used to handle the events.
+        self.event_canvas = event_canvas
+
+        #: (Callable): The fast rendering function.
+        self.fast_render = render if fast_render is None else fast_render
         self._max_fps = max_fps
+
+        #: (torch.Tensor): The current output of the rendering function.
         self.current_output = None
 
         wait = 0 if max_fps is None else int(1000. / max_fps)
 
+        #: (ipyevents.Event): the event handler.
         self.event = Event(
-            source=self.canvas,
+            source=self.event_canvas,
             watched_events=watched_events,
             prevent_default_action=True,
             wait=wait,
@@ -291,8 +328,8 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
     get closer to the center with the wheel + control key.
 
     Args:
-        height (int): height of the canvas.
-        width (int): width of the canvas.
+        height (int): Height of the canvas.
+        width (int): Width of the canvas.
         camera (kal.render.camera.Camera):
             Camera used for the visualization.
             Note: The camera will be reoriented to look at ``focus_at``
@@ -341,25 +378,25 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
             enabling / disabling a feature on a key press.
             The Callable must take as input a tuple of (this visualizer object, the event).
             (see `ipyevents main documentation`_).
+        canvas (optional, ipycanvas.Canvas):
+             If you don't want the visualizer to create a canvas automatically, pass the canvas object
+             to be drawn on to this function. By default, this canvas will also be used for processing events.
+             Note that in case of ipycanvas.MultiCanvas, only the parent MultiCanvas object can process
+             events, so if you are drawing of a sub-canvas of a MultiCanvas, pass the MultiCanvas object
+             as `event_canvas=`. Dimensions must be matching `height` and `width`.
+        event_canvas (optional, ipywidgets.DOMWidget):
+             If you want visualizer to receive events from a different canvas object from the one that the
+             rendering shows on, pass this object here. Note that in case of ipycanvas.MultiCanvas,
+             only the parent MultiCanvas object can process events. By default, the same canvas is used for
+             events and drawing.
 
     Attributes:
-        camera (kal.render.camera.Camera): The camera used for rendering.
-        canvas (ipycanvas.Canvas): The canvas on which the rendering is copied to.
-        out (ipywidgets.Output): An output where error and prints are displayed.
-        render (Callable): The rendering function.
-        fast_render (Callable)
         focus_at (torch.Tensor)
         world_up_axis (int)
         zoom_sensitivity (float)
         rotation_sensitivity (float)
         mouse_sensitivity (float)
-        max_fps (int)
         update_only_on_release (bool)
-
-    Methods:
-        show: display the Canvas with interactive features.
-        render_update: Update the Canvas with :func:`render()`.
-        fast_render_update: Update the Canvas with :func:`fast_render()`.
 
     .. _ipyevents main documentation: https://github.com/mwcraig/ipyevents/blob/main/docs/events.ipynb
     """
@@ -378,8 +415,10 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
                  max_fps=24.,
                  update_only_on_release=False,
                  additional_watched_events=None,
-                 additional_event_handler=None):
-
+                 additional_event_handler=None,
+                 canvas=None,
+                 event_canvas=None
+                 ):
         with torch.no_grad():
             if focus_at is None:
                 self.focus_at = torch.zeros((3,), device=camera.device)
@@ -420,8 +459,8 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
                 watched_events += additional_watched_events
             self.additional_event_handler = additional_event_handler
 
-            super().__init__(height, width, camera, render, fast_render,
-                             watched_events, max_fps)
+            super().__init__(height, width, camera, render, fast_render, watched_events, max_fps,
+                             canvas=canvas, event_canvas=event_canvas)
 
     def _make_camera(self):
         if self.world_up_axis == 0:
@@ -554,8 +593,8 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
     and zoom with the wheel.
 
     Args:
-        height (int): height of the canvas.
-        width (int): width of the canvas.
+        height (int): Height of the canvas.
+        width (int): Width of the canvas.
         camera (kal.render.camera.Camera):
             Camera used for the visualization.
         render (Callable):
@@ -606,25 +645,28 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
             enabling / disabling a feature on a key press.
             The Callable must take as input a tuple of (this visualizer object, the event).
             (see `ipyevents main documentation`_).
+        res (optional, tuple of ints):
+            height and width of the canvas, if not defined will get inferred from `canvas` if defined,
+            otherwise from the output of `render`.
+        canvas (optional, ipycanvas.Canvas):
+             If you don't want the visualizer to create a canvas automatically, pass the canvas object
+             to be drawn on to this function. By default, this canvas will also be used for processing events.
+             Note that in case of ipycanvas.MultiCanvas, only the parent MultiCanvas object can process
+             events, so if you are drawing of a sub-canvas of a MultiCanvas, pass the MultiCanvas object
+             as `event_canvas=`. Dimensions must be matching `height` and `width`.
+        event_canvas (optional, ipywidgets.DOMWidget):
+             If you want visualizer to receive events from a different canvas object from the one that the
+             rendering shows on, pass this object here. Note that in case of ipycanvas.MultiCanvas,
+             only the parent MultiCanvas object can process events. By default, the same canvas is used for
+             events and drawing.
 
     Attributes:
-        camera (kal.render.camera.Camera): The camera used for rendering.
-        canvas (ipycanvas.Canvas): The canvas on which the rendering is copied to.
-        out (ipywidgets.Output): An output where error and prints are displayed.
-        render (Callable): The rendering function.
-        fast_render (Callable)
         world_up (torch.Tensor)
         zoom_sensitivity (float)
         rotation_sensitivity (float)
         translation_sensitivity (float)
         key_move_sensitivity (float)
-        max_fps (int)
         update_only_on_release (bool)
-
-    Methods:
-        show: display the Canvas with interactive features.
-        render_update: Update the Canvas with :func:`render()`.
-        fast_render_update: Update the Canvas with :func:`fast_render()`.
 
     .. _ipyevents main documentation: https://github.com/mwcraig/ipyevents/blob/main/docs/events.ipynb
     """
@@ -649,8 +691,10 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
                  backward_key='u',
                  update_only_on_release=False,
                  additional_watched_events=None,
-                 additional_event_handler=None):
-
+                 additional_event_handler=None,
+                 canvas=None,
+                 event_canvas=None
+                 ):
         self.position = None
 
         with torch.no_grad():
@@ -700,8 +744,8 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
             watched_events += additional_watched_events
         self.additional_event_handler = additional_event_handler
 
-        super().__init__(height, width, camera, render, fast_render,
-                         watched_events, max_fps)
+        super().__init__(height, width, camera, render, fast_render, watched_events, max_fps,
+                         canvas=canvas, event_canvas=event_canvas)
 
     def _safe_zoom(self, amount):
         r"""Applies a zoom on the camera by adjusting the lens.
