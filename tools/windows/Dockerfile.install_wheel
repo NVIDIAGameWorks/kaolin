@@ -4,8 +4,6 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
-SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
-
 RUN python setup.py bdist_wheel --dist-dir /tmp
 
 WORKDIR /tmp

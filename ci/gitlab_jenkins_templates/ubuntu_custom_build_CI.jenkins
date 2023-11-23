@@ -98,8 +98,8 @@ spec:
                   """
                 }
                 pythonVerTag = pythonVer.split('\\.').join('')
-                Integer pythonVerTagVal = pythonVerTag
-                pythonVerAbiTag = (pythonVerTagVal < 38) ? pythonVerTag + 'm' : pythonVerTag
+                Integer MinorVal = pythonVer.split('\\.')[1].toInteger()
+                pythonVerAbiTag = (MinorVal < 8) ? pythonVerTag + 'm' : pythonVerTag
                 kaolinVer = sh(script: "cat ./version.txt", returnStdout: true).trim()
                 baseWheelName = "kaolin-${kaolinVer}-cp${pythonVerTag}-cp${pythonVerAbiTag}"
                 wheelName = "${baseWheelName}-linux_x86_64.whl"
@@ -116,8 +116,11 @@ spec:
               stage("Push wheel to volume") {
                 sh """
                 mkdir -p /mount_binaries/whl/torch-${torchVer}_cu${cudaTag}
-                mv ./${wheelName} /mount_binaries/whl/torch-${torchVer}_cu${cudaTag}/${wheelName}
+                cp ./${wheelName} /mount_binaries/whl/torch-${torchVer}_cu${cudaTag}/${wheelName}
                 """
+              }
+              stage("Push wheel to artifact") {
+                archiveArtifacts artifacts: "${wheelName}"
               }
             }
             stage("Push") {
