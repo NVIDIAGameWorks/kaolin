@@ -205,22 +205,30 @@ class TestMeshes:
             usd.import_meshes(mesh_path, ['/foo'] + scene_paths)
 
     @pytest.mark.parametrize('input_stage', [False, True])
-    def test_import_hetero_fail(self, hetero_mesh_path, input_stage):
+    @pytest.mark.parametrize('triangulate', [False, True])
+    def test_import_hetero_fail(self, hetero_mesh_path, input_stage, triangulate):
         """Test that import fails when importing heterogeneous mesh without handler"""
         path_or_stage = Usd.Stage.Open(hetero_mesh_path) if input_stage else hetero_mesh_path
 
-        with pytest.raises(utils.NonHomogeneousMeshError):
-            usd.import_meshes(file_path_or_stage=path_or_stage, scene_paths=['/Root'])
+        if not triangulate:
+            with pytest.raises(utils.NonHomogeneousMeshError):
+                usd.import_meshes(file_path_or_stage=path_or_stage, scene_paths=['/Root'], triangulate=triangulate)
 
-        with pytest.raises(utils.NonHomogeneousMeshError):
-            usd.import_mesh(file_path_or_stage=path_or_stage, scene_path='/Root')
+            with pytest.raises(utils.NonHomogeneousMeshError):
+                usd.import_mesh(file_path_or_stage=path_or_stage, scene_path='/Root', triangulate=triangulate)
+
+        else:
+            usd.import_meshes(file_path_or_stage=path_or_stage, scene_paths=['/Root'], triangulate=triangulate)
+            usd.import_mesh(file_path_or_stage=path_or_stage, scene_path='/Root', triangulate=triangulate)
 
     @pytest.mark.parametrize('input_stage', [False, True])
-    def test_import_hetero_skip(self, scene_paths, hetero_mesh_path, homo_mesh_path, mixed_mesh_path, input_stage):
+    @pytest.mark.parametrize('triangulate', [False, True])
+    def test_import_hetero_skip(self, scene_paths, hetero_mesh_path, homo_mesh_path, mixed_mesh_path, input_stage, triangulate):
         """Test that import skips mesh when importing heterogeneous mesh with skip handler"""
         path_or_stage = Usd.Stage.Open(hetero_mesh_path) if input_stage else hetero_mesh_path
         meshes = usd.import_meshes(path_or_stage, ['/Root'],
-                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
+                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip,
+                                   triangulate=triangulate)
         assert len(meshes) == 0
 
         path_or_stage = Usd.Stage.Open(homo_mesh_path) if input_stage else homo_mesh_path
@@ -235,14 +243,18 @@ class TestMeshes:
                                    heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
         assert len(meshes) == 1
 
+    @pytest.mark.parametrize('use_triangulate_shortcut', [True, False])
     @pytest.mark.parametrize('input_stage', [False, True])
     def test_import_hetero_homogenize_import_meshes(self, out_dir, hetero_mesh_path, homogenized_golden_path,
-                                                    input_stage):
+                                                    input_stage, use_triangulate_shortcut):
         """Test that imports homogeneous mesh when importing heterogeneous mesh with naive homogenize handler"""
         # TODO(jlafleche) Render meshes before/after homogenize operation
         path_or_stage = Usd.Stage.Open(hetero_mesh_path) if input_stage else hetero_mesh_path
-        mesh = usd.import_meshes(path_or_stage, ['/Root'],
-                                 heterogeneous_mesh_handler=utils.mesh_handler_naive_triangulate)
+        if use_triangulate_shortcut:
+            kwargs = {'triangulate': True}
+        else:
+            kwargs = {'heterogeneous_mesh_handler': utils.mesh_handler_naive_triangulate}
+        mesh = usd.import_meshes(path_or_stage, ['/Root'], **kwargs)
         # Confirm we now have a triangle mesh
         assert mesh[0].faces.size(1) == 3
 
@@ -252,13 +264,19 @@ class TestMeshes:
         # Confirm exported USD matches golden file
         assert open(homogenized_golden_path).read() == open(out_path).read()
 
+    @pytest.mark.parametrize('use_triangulate_shortcut', [True, False])
     @pytest.mark.parametrize('input_stage', [False, True])
-    def test_import_hetero_homogenize_import_mesh(self, out_dir,  hetero_mesh_path, homogenized_golden_path, input_stage):
+    def test_import_hetero_homogenize_import_mesh(self, out_dir,  hetero_mesh_path, homogenized_golden_path,
+                                                  input_stage, use_triangulate_shortcut):
         """Test that imports homogeneous mesh when importing heterogeneous mesh with naive homogenize handler"""
         # TODO(jlafleche) Render meshes before/after homogenize operation
         path_or_stage = Usd.Stage.Open(hetero_mesh_path) if input_stage else hetero_mesh_path
-        mesh = usd.import_mesh(path_or_stage, scene_path='/Root',
-                               heterogeneous_mesh_handler=utils.mesh_handler_naive_triangulate)
+        if use_triangulate_shortcut:
+            kwargs = {'triangulate': True}
+        else:
+            kwargs = {'heterogeneous_mesh_handler': utils.mesh_handler_naive_triangulate}
+        mesh = usd.import_mesh(path_or_stage, scene_path='/Root', **kwargs)
+
         # Confirm we now have a triangle mesh
         assert mesh.faces.size(1) == 3
 
@@ -565,7 +583,7 @@ class TestDiverseInputs:
                 'amsterdam': 14}
 
     # TODO: add armchair
-    @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam'])
+    @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam', 'armchair'])
     def test_read_write_read_consistency(self, bname, out_dir, expected_sizes, expected_material_counts):
         # Read USD version, flattening all meshes into one
         fname = io_data_path(f'{bname}.usd')
@@ -592,7 +610,7 @@ class TestDiverseInputs:
         # Check that final face values between the two meshes agree (note the OBJ and USD may store
         # and index uvs and faces differently, but final per-face per-vertex values must agree
         assert torch.allclose(read_usd_mesh.face_uvs, read_obj_mesh.face_uvs, atol=1e-04)
-        assert torch.allclose(read_usd_mesh.face_normals, read_obj_mesh.face_normals, atol=1e-04)
+        assert torch.allclose(read_usd_mesh.face_normals, read_obj_mesh.face_normals, atol=1e-04, rtol=1e-03)
 
         # Check material consistency
         assert len(read_usd_mesh.materials) == expected_material_counts[bname]

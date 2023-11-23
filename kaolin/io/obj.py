@@ -106,6 +106,9 @@ def import_mesh(path, with_materials=False, with_normals=False,
             Default: will raise a NonHomogeneousMeshError.
         triangulate: if True, will triangulate all non-triangular meshes using same logic as
             :func:`mesh_handler_naive_triangulate <kaolin.io.utils.mesh_handler_naive_triangulate>`.
+            If `heterogeneous_mesh_handler` is not set, this flag will cause non-homogeneous meshes to
+            be triangulated and loaded without error; otherwise triangulation executes after `heterogeneous_mesh_handler`,
+            which may skip or throw an error.
 
     Returns:
         (SurfaceMesh):
@@ -185,6 +188,8 @@ def import_mesh(path, with_materials=False, with_normals=False,
                     face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
     """
     triangulate_handler = None if not triangulate else utils.mesh_handler_naive_triangulate
+    if heterogeneous_mesh_handler is None:
+        heterogeneous_mesh_handler = triangulate_handler
 
     if error_handler is None:
         error_handler = default_error_handler

@@ -410,6 +410,9 @@ def import_mesh(file_path_or_stage, scene_path=None, with_materials=False, with_
         time (convertible to float, optional): Positive integer indicating the time at which to retrieve parameters.
         triangulate: if True, will triangulate all non-triangular meshes using same logic as
             :func:`mesh_handler_naive_triangulate <kaolin.io.utils.mesh_handler_naive_triangulate>`.
+            If `heterogeneous_mesh_handler` is not set, this flag will cause non-homogeneous meshes to
+            be triangulated and loaded without error; otherwise triangulation executes after `heterogeneous_mesh_handler`,
+            which may skip or throw an error.
 
     Returns:
         (SurfaceMesh):
@@ -518,6 +521,9 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
         times (list of int): Positive integers indicating the time at which to retrieve parameters.
         triangulate: if True, will triangulate all non-triangular meshes using same logic as
             :func:`mesh_handler_naive_triangulate <kaolin.io.utils.mesh_handler_naive_triangulate>`.
+            If `heterogeneous_mesh_handler` is not set, this flag will cause non-homogeneous meshes to
+            be triangulated and loaded without error; otherwise triangulation executes after `heterogeneous_mesh_handler`,
+            which may skip or throw an error.
 
     Returns:
         (a list of SurfaceMesh):
@@ -587,6 +593,8 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
                       ...
     """
     triangulate_handler = None if not triangulate else utils.mesh_handler_naive_triangulate
+    if heterogeneous_mesh_handler is None:
+        heterogeneous_mesh_handler = triangulate_handler
 
     # TODO  add arguments to selectively import UVs and normals
     stage = _get_stage_from_maybe_file(file_path_or_stage)
