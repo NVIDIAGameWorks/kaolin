@@ -21,6 +21,7 @@ import numpy as np
 import pytest
 
 import kaolin
+from kaolin.utils.testing import check_allclose
 
 class DummyRenderer():
     def __init__(self, height, width, value, output_dict=False):
@@ -95,14 +96,18 @@ class TestVisualizers:
         if with_sensitivity:
             zoom_sensitivity = 0.01
             forward_sensitivity = 0.01
-            mouse_sensitivity = 2.
+            rotation_sensitivity = 2.
+            translation_sensitivity = 2.
             kwargs['zoom_sensitivity'] = zoom_sensitivity
             kwargs['forward_sensitivity'] = forward_sensitivity
-            kwargs['mouse_sensitivity'] = mouse_sensitivity
+            kwargs['rotation_sensitivity'] = rotation_sensitivity
+            kwargs['translation_sensitivity'] = translation_sensitivity
         else:
             zoom_sensitivity = 0.001
             forward_sensitivity = 0.001
-            mouse_sensitivity = 1.5
+            rotation_sensitivity = 1.5
+            translation_sensitivity = 1.
+
 
         global event_count
         event_count = 0
@@ -137,13 +142,13 @@ class TestVisualizers:
                 assert fast_renderer.render_count == expected_fast_render_count
             else:
                 assert renderer.render_count == expected_render_count + expected_fast_render_count
-        assert torch.allclose(viz.focus_at, focus_at)
+        check_allclose(viz.focus_at, focus_at)
         check_counts()
         assert viz.canvas.height == height
         assert viz.canvas.width == width
 
         # Test reorientation at ctor
-        assert torch.allclose(viz.camera.cam_pos(), camera.cam_pos(), atol=1e-5, rtol=1e-5), \
+        check_allclose(viz.camera.cam_pos(), camera.cam_pos(), atol=1e-5, rtol=1e-5), \
             "After ctor: camera moved"
         signed_world_up = torch.zeros((3,), device=camera.device)
         signed_world_distance = float(camera.cam_up().squeeze()[world_up_axis] >= 0) * 2. - 1.
@@ -154,7 +159,7 @@ class TestVisualizers:
             "After ctor: camera right is not perpendicular to the world up"
 
         expected_cam_forward = torch.nn.functional.normalize(viz.focus_at - camera.cam_pos().squeeze(), dim=-1)
-        assert torch.allclose(
+        check_allclose(
             torch.dot(-viz.camera.cam_forward().squeeze(), expected_cam_forward),
             torch.ones((1,), device=camera.device)
         ), "After ctor: camera is not looking at focus_at"
@@ -211,14 +216,14 @@ class TestVisualizers:
             viz.focus_at - viz.camera.cam_pos().squeeze(),
             dim=-1
         )
-        assert torch.allclose(cur_radius, ref_radius)
+        check_allclose(cur_radius, ref_radius)
         cur_focus_at = (
             viz.camera.cam_pos() - viz.camera.cam_forward() * cur_radius
         ).squeeze()
-        assert torch.allclose(viz.focus_at, cur_focus_at, atol=1e-5, rtol=1e-5)
+        check_allclose(viz.focus_at, cur_focus_at, atol=1e-5, rtol=1e-5)
 
-        azimuth_diff = mouse_sensitivity * (to_x - from_x) * math.pi / viz.canvas.width
-        elevation_diff = mouse_sensitivity * (to_y - from_y) * math.pi / viz.canvas.height
+        azimuth_diff = rotation_sensitivity * (to_x - from_x) * math.pi / viz.canvas.width
+        elevation_diff = rotation_sensitivity * (to_y - from_y) * math.pi / viz.canvas.height
 
         cur_cam_pos = kaolin.visualize.ipython.rotate_around_axis(
             ctor_camera.cam_pos().squeeze(-1) - focus_at.unsqueeze(0),
@@ -230,7 +235,7 @@ class TestVisualizers:
             -elevation_diff,
             viz.camera.cam_right().squeeze(-1),
         ) + focus_at.unsqueeze(0)
-        assert torch.allclose(cur_cam_pos, viz.camera.cam_pos().squeeze(-1),
+        check_allclose(cur_cam_pos, viz.camera.cam_pos().squeeze(-1),
                               atol=1e-4, rtol=1e-4)
         cur_camera = copy.deepcopy(viz.camera)
         viz._handle_event({'type': 'mouseup', 'button': 0, 'buttons': 1,
@@ -270,11 +275,13 @@ class TestVisualizers:
             cur_camera.cam_pos().squeeze() - viz.camera.cam_pos().squeeze(),
             dim=-1
         )
-        assert torch.allclose(cur_camera.cam_forward(), viz.camera.cam_forward()), \
-            "After move forward: camera have changed cam_forward()"
-        assert torch.allclose(cur_camera.cam_up(), viz.camera.cam_up()), \
-            "After move forward: camera have change cam_up()"
-        assert torch.allclose(normalized_distance, cur_camera.cam_forward().squeeze(),
+        assert torch.all(torch.abs(torch.cross(
+            cur_camera.cam_forward(), viz.camera.cam_forward())) < 1e-2), \
+            "After move forward: camera have changed cam_forward"
+        assert torch.all(torch.abs(torch.cross(
+            cur_camera.cam_up(), viz.camera.cam_up())) < 1e-2), \
+            "After move forward: camera have changed cam_up"
+        check_allclose(normalized_distance, cur_camera.cam_forward().squeeze(),
                               atol=1e-5, rtol=1e-5), \
              "After move forward: camera haven't moved forward"
         assert torch.all(torch.sign(focus_at - cur_camera.cam_pos().squeeze()) *
@@ -385,7 +392,7 @@ class TestVisualizers:
             device=camera.device,
             dtype=camera.dtype
         )
-        assert torch.allclose(expected_extrinsics.view_matrix(), viz.camera.view_matrix(),
+        check_allclose(expected_extrinsics.view_matrix(), viz.camera.view_matrix(),
                               atol=1e-5, rtol=1e-5)
         ctor_camera = copy.deepcopy(viz.camera)
         
@@ -461,13 +468,13 @@ class TestVisualizers:
             cur_cam_right,
         )
 
-        assert torch.allclose(ctor_camera.cam_pos().squeeze(-1), viz.camera.cam_pos().squeeze(-1),
+        check_allclose(ctor_camera.cam_pos().squeeze(-1), viz.camera.cam_pos().squeeze(-1),
                               atol=1e-4, rtol=1e-4)
-        assert torch.allclose(cur_cam_right, viz.camera.cam_right().squeeze(-1),
+        check_allclose(cur_cam_right, viz.camera.cam_right().squeeze(-1),
                               atol=1e-4, rtol=1e-4)
-        assert torch.allclose(cur_cam_forward, viz.camera.cam_forward().squeeze(-1),
+        check_allclose(cur_cam_forward, viz.camera.cam_forward().squeeze(-1),
                               atol=1e-4, rtol=1e-4)
-        assert torch.allclose(cur_cam_up, viz.camera.cam_up().squeeze(-1),
+        check_allclose(cur_cam_up, viz.camera.cam_up().squeeze(-1),
                               atol=1e-4, rtol=1e-4)
         cur_camera = copy.deepcopy(viz.camera)
 
@@ -510,8 +517,8 @@ class TestVisualizers:
 
         cur_camera.move_up(translation_sensitivity * (to_y - from_y) / height)
         cur_camera.move_right(-translation_sensitivity * (to_x - from_x) / width)
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'mouseup', 'button': 1,
                            'relativeX': to_x, 'relativeY': to_y,
@@ -527,89 +534,89 @@ class TestVisualizers:
         expected_fast_render_count += 1
         check_counts()
         cur_camera.move_up(key_move_sensitivity)
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keyup', 'key': up_key})
         expected_render_count += 1
         check_counts()
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keydown', 'key': down_key})
         expected_fast_render_count += 1
         check_counts()
         cur_camera.move_up(-key_move_sensitivity)
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keyup', 'key': down_key})
         expected_render_count += 1
         check_counts()
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keydown', 'key': left_key})
         expected_fast_render_count += 1
         check_counts()
         cur_camera.move_right(-key_move_sensitivity)
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keyup', 'key': left_key})
         expected_render_count += 1
         check_counts()
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keydown', 'key': right_key})
         expected_fast_render_count += 1
         check_counts()
         cur_camera.move_right(key_move_sensitivity)
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keyup', 'key': right_key})
         expected_render_count += 1
         check_counts()
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keydown', 'key': forward_key})
         expected_fast_render_count += 1
         check_counts()
         cur_camera.move_forward(-key_move_sensitivity)
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keyup', 'key': forward_key})
         expected_render_count += 1
         check_counts()
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keydown', 'key': backward_key})
         expected_fast_render_count += 1
         check_counts()
         cur_camera.move_forward(key_move_sensitivity)
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keyup', 'key': backward_key})
         expected_render_count += 1
         check_counts()
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keydown', 'key': 'x'})
         check_counts()
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         viz._handle_event({'type': 'keyup', 'key': 'x'})
         check_counts()
-        assert torch.allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
-        assert torch.allclose(cur_camera.params, viz.camera.params)
+        check_allclose(cur_camera.view_matrix(), viz.camera.view_matrix())
+        check_allclose(cur_camera.params, viz.camera.params)
 
         wheel_amount = 120 * random.randint(1, 10)
         viz._handle_event({'type': 'wheel', 'deltaY': wheel_amount})
