@@ -16,7 +16,7 @@
 import pytest
 
 import torch
-from kaolin.non_commercial.flexicubes.flexicubes import FlexiCubes  # Please adjust this according to your project structure.
+from kaolin.non_commercial import FlexiCubes
 
 
 def cube_sdf(x_nx3):
@@ -25,7 +25,7 @@ def cube_sdf(x_nx3):
     sdf_values = sdf_values[:, 0] * sdf_values[:, 1] * sdf_values[:, 2]
     sdf_values = -1.0 * sdf_values
 
-    return sdf_values.view(-1, 1)
+    return sdf_values.view(-1)
 
 
 def cube_sdf_gradient(x_nx3):
@@ -307,7 +307,58 @@ class TestFlexiCubes:
                                          [15, 25, 16]],
                                         dtype=torch.long,
                                         device=device)
-        return expected_vertices, expected_faces_1, expected_faces_2
+        expected_faces_3 = torch.tensor([[ 3,  4,  0],
+                                         [ 0,  4,  1],
+                                         [ 4,  5,  1],
+                                         [ 1,  5,  2],
+                                         [ 6,  7,  3],
+                                         [ 3,  7,  4],
+                                         [ 7,  8,  5],
+                                         [ 7,  5,  4],
+                                         [ 9, 12,  0],
+                                         [ 0, 12,  3],
+                                         [ 9, 10,  0],
+                                         [ 0, 10,  1],
+                                         [10, 11,  1],
+                                         [ 1, 11,  2],
+                                         [11, 13,  2],
+                                         [ 2, 13,  5],
+                                         [12, 14,  6],
+                                         [12,  6,  3],
+                                         [13, 16,  8],
+                                         [13,  8,  5],
+                                         [14, 15,  6],
+                                         [ 6, 15,  7],
+                                         [15, 16,  7],
+                                         [ 7, 16,  8],
+                                         [17, 20, 12],
+                                         [17, 12,  9],
+                                         [17, 18, 10],
+                                         [17, 10,  9],
+                                         [20, 21, 18],
+                                         [20, 18, 17],
+                                         [18, 19, 10],
+                                         [10, 19, 11],
+                                         [19, 22, 13],
+                                         [19, 13, 11],
+                                         [21, 22, 18],
+                                         [18, 22, 19],
+                                         [20, 23, 12],
+                                         [12, 23, 14],
+                                         [23, 24, 20],
+                                         [20, 24, 21],
+                                         [22, 25, 13],
+                                         [13, 25, 16],
+                                         [24, 25, 22],
+                                         [24, 22, 21],
+                                         [23, 24, 15],
+                                         [23, 15, 14],
+                                         [24, 25, 15],
+                                         [15, 25, 16]],
+                                        dtype=torch.long,
+                                        device=device)
+
+        return expected_vertices, expected_faces_1, expected_faces_2, expected_faces_3
 
     def test_grid_construction(self, expected_grid, device):
         fc = FlexiCubes(device)
@@ -339,4 +390,4 @@ class TestFlexiCubes:
 
         assert torch.allclose(output[0], expected_qef_output[0], atol=1e-4)
         # in this example, both triangulations are correct
-        assert torch.equal(output[1], expected_qef_output[1]) or torch.equal(output[1], expected_qef_output[2])
+        assert torch.equal(output[1], expected_qef_output[1]) or torch.equal(output[1], expected_qef_output[2]) or torch.equal(output[1], expected_qef_output[3])
