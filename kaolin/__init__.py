@@ -6,6 +6,8 @@ from . import rep
 from . import utils
 from . import visualize
 
+from . import non_commercial
+
 try:
     from .version import __version__  # noqa: F401
 except ImportError:

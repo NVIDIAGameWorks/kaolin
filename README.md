@@ -62,6 +62,20 @@ Please review our [contribution guidelines](CONTRIBUTING.md).
 * [Text2Mesh](https://github.com/threedle/text2mesh):
     * Use [Kaolin's rendering functions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.mesh.html#), [camera functions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.camera.html), and [obj](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.obj.html#kaolin.io.obj.import_mesh) and [off](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.off.html#kaolin.io.off.import_mesh) importers.
 
+## Licenses
+
+Most of Kaolin's repository is under [Apache v2.0 license](LICENSE), except under [kaolin/non_commercial](kaolin/non_commercial/) which is under [NSCL license](LICENSE.NSCL) restricted to non commercial usage for research and evaluation purposes. For example, FlexiCubes method is included under [non_commercial](kaolin/non_commercial/flexicubes/flexicubes.py).
+
+Default `kaolin` import includes Apache-licensed components:
+```
+import kaolin
+```
+
+The non-commercial components need to be explicitly imported as:
+```
+import kaolin.non_commercial
+```
+
 ## Citation
 
 If you are using Kaolin library for your research, please cite:
@@ -74,17 +88,15 @@ If you are using Kaolin library for your research, please cite:
       howpublished={\url{https://github.com/NVIDIAGameWorks/kaolin}}
 }
 ```
+
 ## Contributors
 
 Current Team:
 
 - Technical Lead: Clement Fuji Tsang
 - Manager: Maria (Masha) Shugrina
-- Jean-Francois Lafleche
 - Charles Loop
 - Or Perel
-- Towaki Takikawa
-- Jiehan Wang
 - Alexander Zook
 
 Other Majors Contributors:
@@ -93,6 +105,7 @@ Other Majors Contributors:
 - Sanja Fidler
 - Jun Gao
 - Jason Gorski
+- Jean-Francois Lafleche
 - Rev Lebaredian
 - Jianing Li
 - Michael Li
@@ -101,4 +114,6 @@ Other Majors Contributors:
 - Tianchang (Frank) Shen
 - Edward Smith
 - Gavriel State
+- Towaki Takikawa
+- Jiehan Wang
 - Tommy Xiang

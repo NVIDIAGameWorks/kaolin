@@ -69,3 +69,30 @@ Utilities:
    :maxdepth: 2
 
    ../modules/kaolin.utils
+
+Non Commercial
+^^^^^^^^^^^^^^
+
+:ref:`kaolin/non_commercial<kaolin.non_commercial>` contains features under `NSCL license <https://github.com/NVIDIAGameWorks/kaolin/blob/master/LICENSE.NSCL>`_ restricted to non commercial usage for research and evaluation purposes.
+
+.. toctree::
+   :maxdepth: 2
+
+   ../modules/kaolin.non_commercial
+
+Licenses
+========
+
+Most of Kaolin's repository is under `Apache v2.0 license <https://github.com/NVIDIAGameWorks/kaolin/blob/master/LICENSE>`_, except under :ref:`kaolin/non_commercial<kaolin.non_commercial>` which is under `NSCL license <https://github.com/NVIDIAGameWorks/kaolin/blob/master/LICENSE.NSCL>`_ restricted to non commercial usage for research and evaluation purposes. For example, FlexiCubes method is included under :ref:`non_commercial<kaolin.non_commercial>`.
+
+Default `kaolin` import includes Apache-licensed components:
+
+.. code-block:: python
+
+   import kaolin
+
+The non-commercial components need to be explicitly imported as:
+
+.. code-block:: python
+
+   import kaolin.non_commercial

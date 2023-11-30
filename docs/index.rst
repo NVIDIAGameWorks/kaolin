@@ -32,3 +32,4 @@ Note that Kaolin library is part of the larger `NVIDIA Kaolin effort <https://de
    modules/kaolin.rep
    modules/kaolin.utils
    modules/kaolin.visualize
+   modules/kaolin.non_commercial
