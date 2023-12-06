@@ -4,14 +4,23 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+#### Kaolin ####
+
 WORKDIR /kaolin
+
+RUN conda list > conda_build.txt
 
 COPY . .
 
 # NOTE: pin setuptools to avoid directory copy bug
 RUN pip install --upgrade --no-cache-dir setuptools==58.0.0 certifi
 RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org \
-    --trusted-host files.pythonhosted.org -r tools/build_requirements.txt
+    --trusted-host files.pythonhosted.org -r tools\ci_requirements.txt \
+    -r tools\viz_requirements.txt -r tools\requirements.txt -r tools/build_requirements.txt
 
-RUN python setup.py bdist_wheel --dist-dir .
-RUN Get-ChildItem "./" -Filter "*.whl" | Foreach-Object {$filepath=$_.FullName; pip install $filepath}
+RUN python setup.py develop
+
+# fix for paging memory issue on CI machines
+#   see: https://gist.github.com/cobryan05/7d1fe28dd370e110a372c4d268dcb2e5
+RUN pip install pefile
+COPY tools/fixNvPe.py c:/data/

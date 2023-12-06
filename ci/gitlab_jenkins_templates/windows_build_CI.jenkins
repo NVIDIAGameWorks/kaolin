@@ -81,11 +81,11 @@ spec:
           ])
         }
         docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
-          stage("Build") {
+          stage("Build base") {
             cudaUrl = cuda_version_url[cudaVer]
-            targetImage = docker.build(
-                "${targetImageTag}",
-                """-m 32g --no-cache -f ./tools/windows/Dockerfile \
+            baseImage = docker.build(
+                "${targetImageTag}-base",
+                """-m 32g --no-cache -f ./tools/windows/Dockerfile.base \
                     --build-arg CUDA_VERSION=${cudaVer} \
                     --build-arg CUDA_URL=${cudaUrl} \
                     --build-arg PYTHON_VERSION=${pythonVer} \
@@ -93,15 +93,25 @@ spec:
                     .
                 """)
           }
+
           if (buildWheel.toBoolean()) {
-            stage("With wheel") {
+            stage("Build with wheel") {
               targetImage = docker.build(
                   "${targetImageTag}",
                   """-m 32g --no-cache -f ./tools/windows/Dockerfile.install_wheel \
-                     --build-arg BASE_IMAGE=${targetImageTag} \
+                     --build-arg BASE_IMAGE=${targetImageTag}-base \
                      .
                   """
               )
+            }
+          } else {
+            stage("Build") {
+              targetImage = docker.build(
+                  "${targetImageTag}",
+                  """-m 32g --no-cache -f ./tools/windows/Dockerfile.install \
+                      --build-arg BASE_IMAGE=${targetImageTag}-base \
+                      .
+                  """)
             }
           }
           

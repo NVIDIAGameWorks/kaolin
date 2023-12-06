@@ -63,13 +63,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_16.x --insecure | bash - \
 RUN npm install -g npm@8.5.4
 RUN npm install
 
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir setuptools==58.0.0 ninja \
-        imageio imageio-ffmpeg && \
-    pip install --no-cache-dir \
-        -r tools/viz_requirements.txt \
-        -r tools/requirements.txt \
-        -r tools/build_requirements.txt
+RUN pip install --upgrade pip && pip install ninja
 
 RUN cd /tmp && \
     git clone https://github.com/NVlabs/nvdiffrast && \
