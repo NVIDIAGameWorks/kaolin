@@ -253,16 +253,21 @@ class TestLoadObj:
                                       with_materials=True, with_normals=with_normals,
                                       error_handler=obj.skip_error_handler)
 
+    @pytest.mark.parametrize('use_triangulate_shortcut', [True, False])
     @pytest.mark.parametrize('with_normals', [False, True])
     @pytest.mark.parametrize('with_materials', [False, True])
     def test_import_mesh_heterogeneous(self, with_normals, with_materials, expected_vertices,
                                        expected_faces_heterogeneous, expected_face_uvs_idx_heterogeneous,
                                        expected_uvs, expected_materials, expected_material_assignments_heterogeneous,
-                                       expected_normals, expected_face_normals_idx_heterogeneous):
+                                       expected_normals, expected_face_normals_idx_heterogeneous,
+                                       use_triangulate_shortcut):
+        if use_triangulate_shortcut:
+            kwargs = {'triangulate': True}
+        else:
+            kwargs = {'heterogeneous_mesh_handler': utils.mesh_handler_naive_triangulate}
         outputs = obj.import_mesh(os.path.join(SIMPLE_DIR, 'model_heterogeneous.obj'),
                                   with_materials=with_materials, with_normals=with_normals,
-                                  error_handler=obj.skip_error_handler,
-                                  heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_naive_homogenize)
+                                  error_handler=obj.skip_error_handler, **kwargs)
         assert torch.equal(outputs.vertices, expected_vertices)
         assert torch.equal(outputs.faces, expected_faces_heterogeneous)
 
@@ -282,12 +287,29 @@ class TestLoadObj:
             assert outputs.normals is None
             assert outputs.face_normals_idx is None
 
-    def test_import_mesh_heterogeneous_skip(self):
+    @pytest.mark.parametrize('triangulate', [False, True])
+    def test_import_mesh_heterogeneous_skip(self, triangulate):
         outputs = obj.import_mesh(os.path.join(SIMPLE_DIR, 'model_heterogeneous.obj'),
                                   with_materials=True, with_normals=True,
                                   error_handler=obj.skip_error_handler,
+                                  triangulate=triangulate,
                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
         assert outputs is None
+
+    @pytest.mark.parametrize('triangulate', [False, True])
+    def test_import_mesh_heterogeneous_fail(self, triangulate):
+        """Test that import fails when importing heterogeneous mesh without handler"""
+        if not triangulate:
+            with pytest.raises(utils.NonHomogeneousMeshError):
+                obj.import_mesh(os.path.join(SIMPLE_DIR, 'model_heterogeneous.obj'),
+                                with_materials=True, with_normals=True,
+                                error_handler=obj.skip_error_handler,
+                                triangulate=triangulate)
+        else:
+            obj.import_mesh(os.path.join(SIMPLE_DIR, 'model_heterogeneous.obj'),
+                            with_materials=True, with_normals=True,
+                            error_handler=obj.skip_error_handler,
+                            triangulate=triangulate)
 
     @pytest.fixture(autouse=True)
     def expected_large_values(self):

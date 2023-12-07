@@ -88,6 +88,31 @@ and are not meant to be high-quality 3D examples.
 
 <div style="clear:both"></div>
 
+## Armchair Quad Meshes
+
+**Filenames:** [armchair.obj](armchair.obj), [armchair.usdc](armchair.usdc).
+
+**License:** this model is released under [Creative Commons — Attribution 4.0 International — CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) License. 
+
+**Formats**: was exported as both `obj` and `usdc` (binary) from Blender; usd format contains a transform. 
+
+**Sanity checks**: displays correctly as `obj` imported into Blender3.1 and as `usdc` imported into [NVIDIA Omniverse](https://www.nvidia.com/en-us/omniverse/). 
+
+<img width="30%" style="padding:0 20px 0 0; float: left" src="renders/armchair.jpg">
+
+**Attributes** of the three mesh objects:
+1. Mesh 0: Back_LP
+   * Vertices: 4146, Faces: 4144 quads, normals, UVs
+   * Materials: one textured material (yellow)
+2. Mesh 1: Sides_LP
+    * Vertices: 912, Faces: 912 quads, normals, UVs
+    * Materials: one textured material (white)
+3. Mesh 3: Seat_LP
+    * Vertices: 4146, Faces: 4144 quads, normals, UVs
+    * Materials: same material as for Mesh 0
+
+<div style="clear:both"></div>
+
 ## Quad Multi-Object Multi-Material Amsterdam
 
 **Filenames:** [amsterdam.obj](amsterdam.obj), [amsterdam.usda](amsterdam.usda).
