@@ -14,34 +14,33 @@ Note that Kaolin library is part of the larger [NVIDIA Kaolin effort](https://de
 Starting with v0.12.0, Kaolin supports installation with wheels:
 ```
 # Replace TORCH_VERSION and CUDA_VERSION with your torch / cuda versions
-pip install kaolin==0.12.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
+pip install kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
 ```
-For example, to install kaolin 0.13.0 over torch 1.12.1 and cuda 11.3:
+For example, to install kaolin 0.15.0 over torch 1.12.1 and cuda 11.3:
 ```
-pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
+pip install kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
 ```
 
-We now support versions 0.12.0 to 0.14.0.
+## About the Latest Release (0.15.0)
 
-## About the Latest Release (0.14.0)
+In this version we added a [non commercial section](https://kaolin.readthedocs.io/en/latest/modules/kaolin.non_commercial.html) under [NSCL license](LICENSE.NSCL). See [The license section for more info](#Licenses) for more details.
 
-In this version we added a [conversion Op for mesh to SPC](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.conversions.html#kaolin.ops.conversions.unbatched_mesh_to_spc),
-which allows turning meshes into Structured Point Cloud, our octree based representation.
-In addition, [interactive 3D visualizers](https://kaolin.readthedocs.io/en/latest/modules/kaolin.visualize.html) for Jupyter notebooks
-and a [SurfaceMesh class](https://kaolin.readthedocs.io/en/latest/modules/kaolin.rep.surface_mesh.html#kaolin-rep-surfacemesh) (see tutorials below).
+In this new section we implemented [features for Flexicubes](https://kaolin.readthedocs.io/en/latest/modules/kaolin.non_commercial.html#kaolin.non_commercial.FlexiCubes) a method to extract meshes from scalar fields. See more information in [the official repository](https://github.com/nv-tlabs/FlexiCubes) which is now using Kaolin's implementation.
+
+<a href="https://kaolin.readthedocs.io/en/latest/modules/kaolin.non_commercial.html#kaolin.non_commercial.FlexiCubes"><img src="./assets/flexicubes.png" alt="flexicubes" height="250" /></a>
+
+In addition we implemented a [GLTF mesh loader](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.gltf.html) that can be used to load models from [Objaverse](https://objaverse.allenai.org/objaverse-1.0) and [Objaverse-XL](https://objaverse.allenai.org/).
+
+<a href="https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.gltf.html"><img src="./assets/gltf.png" alt="gltf" height="250" /></a>
 
 
-Check our new tutorials:
+Check our new tutorial:
+[**Load and render a GLTF file** interactively into a Jupyter notebook:](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/gltf_viz.ipynb)
+In this file we show how to load a gltf file and fully differentiably render it with [nvdiffrast](https://nvlabs.github.io/nvdiffrast/) and [spherical gaussian for diffuse and specular lighting](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html), using displacement mapping and other materials properties from the GLTF file.
 
-[**Bring any custom renderer** into a Jupyter notebook for debugging. Use Kaolin Camera to navigate:](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/interactive_visualizer.ipynb)
+<a href="https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/gltf_viz.ipynb"><img src="./assets/avocado.png" alt="gltf notebook" height="250" /></a>
 
-<a href="https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/interactive_visualizer.ipynb"><img src="./assets/visualizer.gif" alt="visualizer" height="300" /></a>
-
-[Read and manage **batched mesh attributes** with convenience using SurfaceMesh:](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/working_with_meshes.ipynb)
-
-<a href="https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/working_with_meshes.ipynb"><img src="./assets/working_with_meshes.png" alt="working_with_meshes" height="250" /></a>
-
-See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.14.0) for details.
+See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.15.0) for details.
 
 ## Contributing
 
@@ -58,9 +57,12 @@ Please review our [contribution guidelines](CONTRIBUTING.md).
 * [Neural Geometric Level of Detail: Real-time Rendering with Implicit 3D Surfaces](https://github.com/nv-tlabs/nglod):
     * Use [SPC](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.spc.html) conversions and [ray-tracing](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.spc.html#kaolin.render.spc.unbatched_raytrace), yielding 30x memory and 3x training time reduction.
 * [Learning Deformable Tetrahedral Meshes for 3D Reconstruction](https://github.com/nv-tlabs/DefTet):
-    * Use [Kaolin's DefTet volumetric renderer](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.mesh.html#kaolin.render.mesh.deftet_sparse_render), [tetrahedral losses](https://kaolin.readthedocs.io/en/latest/modules/kaolin.metrics.tetmesh.html), [camera_functions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.camera.html), [mesh operators and conversions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.html), [ShapeNet dataset](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.shapenet.html#kaolin.io.shapenet.ShapeNetV1), [point_to_mesh_distance](https://kaolin.readthedocs.io/en/latest/modules/kaolin.metrics.trianglemesh.html#kaolin.metrics.trianglemesh.point_to_mesh_distance)and [sided_distance](https://kaolin.readthedocs.io/en/latest/modules/kaolin.metrics.pointcloud.html#kaolin.metrics.pointcloud.sided_distance).
+    * Use [Kaolin's DefTet volumetric renderer](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.mesh.html#kaolin.render.mesh.deftet_sparse_render), [tetrahedral losses](https://kaolin.readthedocs.io/en/latest/modules/kaolin.metrics.tetmesh.html), [camera_functions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.camera.html), [mesh operators and conversions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.html), [ShapeNet dataset](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.shapenet.html#kaolin.io.shapenet.ShapeNetV1), [point_to_mesh_distance](https://kaolin.readthedocs.io/en/latest/modules/kaolin.metrics.trianglemesh.html#kaolin.metrics.trianglemesh.point_to_mesh_distance) and [sided_distance](https://kaolin.readthedocs.io/en/latest/modules/kaolin.metrics.pointcloud.html#kaolin.metrics.pointcloud.sided_distance).
 * [Text2Mesh](https://github.com/threedle/text2mesh):
     * Use [Kaolin's rendering functions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.mesh.html#), [camera functions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.camera.html), and [obj](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.obj.html#kaolin.io.obj.import_mesh) and [off](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.off.html#kaolin.io.off.import_mesh) importers.
+* [Flexible Isosurface Extraction for Gradient-Based Mesh Optimization (FlexiCubes)
+](https://github.com/nv-tlabs/FlexiCubes):
+    * Use [Flexicube class](https://kaolin.readthedocs.io/en/latest/modules/kaolin.non_commercial.html#kaolin.non_commercial.FlexiCubes), [obj loader](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.obj.html), [turntable visualizer](https://kaolin.readthedocs.io/en/latest/modules/kaolin.visualize.html#kaolin.visualize.IpyTurntableVisualizer)
 
 ## Licenses
 

@@ -72,10 +72,14 @@ spec:
           - key: "kubernetes.io/hostname"
             operator: "NotIn"
             values:${node_blacklist}
+          - key: "nvidia.com/driver_version"
+            operator: "NotIn"
+            values:
+            - "545.23"
 """) {
   node(POD_LABEL) {
     container("docker") {
-      timeout(time: 40, unit: 'MINUTES') {
+      timeout(time: 60, unit: 'MINUTES') {
         stage("Install deps") {
           sh 'pip install -r /kaolin/tools/ci_requirements.txt'
           sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'

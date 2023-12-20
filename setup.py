@@ -14,7 +14,7 @@ import subprocess
 import warnings
 
 TORCH_MIN_VER = '1.6.0'
-TORCH_MAX_VER = '2.1.0'
+TORCH_MAX_VER = '2.1.1'
 CYTHON_MIN_VER = '0.29.20'
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
 

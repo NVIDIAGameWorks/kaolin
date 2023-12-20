@@ -72,14 +72,6 @@ def ubuntu_for_wheels_configs = [
 /*
     [
         'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.11.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.5.2', 'cudnnVer': '8',
-        'torchVer': '1.11.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.3.1', 'cudnnVer': '8',
         'torchVer': '1.12.0', 'archsToTest': 'MULTI'
     ],
     [
@@ -125,22 +117,30 @@ def ubuntu_for_wheels_configs = [
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
         'torchVer': '2.0.1', 'archsToTest': 'MULTI'
-    ]
-*/  
+    ],
+    [
+        'cudaVer': '11.8.0', 'cudnnVer': '8',
+        'torchVer': '2.1.0', 'archsToTest': 'MULTI'
+    ],
+    [
+        'cudaVer': '12.1.0', 'cudnnVer': '8',
+        'torchVer': '2.1.0', 'archsToTest': 'MULTI'
+    ],
+    [
+        'cudaVer': '11.8.0', 'cudnnVer': '8',
+        'torchVer': '2.1.1', 'archsToTest': 'MULTI'
+    ],
+    [
+        'cudaVer': '12.1.0', 'cudnnVer': '8',
+        'torchVer': '2.1.1', 'archsToTest': 'MULTI'
+    ],
+*/
 ]
 
 def windows_for_wheels_configs = [
 /*
     [
         'cudaVer': '11.3', 'cudnnVer': '8',
-        'torchVer': '1.11.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.5', 'cudnnVer': '8',
-        'torchVer': '1.11.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.3', 'cudnnVer': '8',
         'torchVer': '1.12.0', 'archsToTest': ''
     ],
     [
@@ -186,6 +186,22 @@ def windows_for_wheels_configs = [
     [
         'cudaVer': '11.8', 'cudnnVer': '8',
         'torchVer': '2.0.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.1.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.1.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.1.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.1.1', 'archsToTest': ''
     ]
 */
 ]

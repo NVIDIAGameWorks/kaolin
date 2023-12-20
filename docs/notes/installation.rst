@@ -13,9 +13,9 @@ Requirements
 ------------
 
 * Linux, Windows, or macOS (CPU-only)
-* Python >= 3.7, <= 3.10
+* Python >= 3.8, <= 3.10
 * `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ >= 10.0 (with 'nvcc' installed) See `CUDA Toolkit Archive <https://developer.nvidia.com/cuda-toolkit-archive>`_ to install older version.
-* torch >= 1.8, <= 2.0.1
+* torch >= 1.8, <= 2.1.1
 
 Quick Start (Linux, Windows)
 ----------------------------
@@ -24,7 +24,7 @@ Quick Start (Linux, Windows)
 
 .. code-block:: bash
 
-    $ pip install kaolin==0.14.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VER}_cu{CUDA_VER}.html
+    $ pip install kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VER}_cu{CUDA_VER}.html
 
 .. Note::
     Replace *TORCH_VER* and *CUDA_VER* with any of the compatible options below.
@@ -33,28 +33,30 @@ Quick Start (Linux, Windows)
 .. rst-class:: center-align-center-col
 
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch / CUDA** | **cu113** | **cu115** | **cu116** | **cu117** | **cu118** |
+    | **torch / CUDA** | **cu113** | **cu116** | **cu117** | **cu118** | **cu121** |
     +==================+===========+===========+===========+===========+===========+
-    | **torch-2.0.0**  |           |           |           |     ✓     |     ✓     |
+    | **torch-2.1.1**  |           |           |           |     ✓     |     ✓     |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-2.0.1**  |           |           |           |     ✓     |     ✓     |
+    | **torch-2.1.0**  |           |           |           |     ✓     |     ✓     |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.13.1** |           |           |     ✓     |     ✓     |           |
+    | **torch-2.0.1**  |           |           |     ✓     |     ✓     |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.13.0** |           |           |     ✓     |     ✓     |           |
+    | **torch-2.0.0**  |           |           |     ✓     |     ✓     |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.12.1** |     ✓     |           |     ✓     |           |           |
+    | **torch-1.13.1** |           |     ✓     |     ✓     |           |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.12.0** |     ✓     |           |     ✓     |           |           |
+    | **torch-1.13.0** |           |     ✓     |     ✓     |           |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-    | **torch-1.11.0** |     ✓     |     ✓     |           |           |           |
+    | **torch-1.12.1** |     ✓     |     ✓     |           |           |           |
     +------------------+-----------+-----------+-----------+-----------+-----------+
-
+    | **torch-1.12.0** |     ✓     |     ✓     |           |           |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+
+   
 For example, to install kaolin for torch 1.12.1 and CUDA 11.3:
 
 .. code-block:: bash
 
-    $ pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
+    $ pip install kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
 
 You can check https://nvidia-kaolin.s3.us-east-2.amazonaws.com/index.html to see all the wheels available.
 
@@ -66,7 +68,7 @@ Installation from source
     
     .. code-block:: bash
     
-        $ conda create --name kaolin python=3.7
+        $ conda create --name kaolin python=3.8
         $ conda activate kaolin
 
 1. Clone Repository
@@ -78,7 +80,7 @@ Clone and optionally check out an `official release <https://github.com/NVIDIAGa
 
     $ git clone --recursive https://github.com/NVIDIAGameWorks/kaolin
     $ cd kaolin
-    $ git checkout v0.13.0 # optional
+    $ git checkout v0.15.0 # optional
 
 2. Install dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -103,14 +105,14 @@ You can verify that CUDA is properly installed at the desired version with nvcc 
 ^^^^^^^^^^^^^^^^^^
 
 Follow `official instructions <https://pytorch.org>`_ to install PyTorch of a supported version.
-Kaolin may be able to work with other PyTorch versions, but we only explicitly test within the version range 1.10.0 to 2.0.0.
+Kaolin may be able to work with other PyTorch versions, but we only explicitly test within the version range 1.10.0 to 2.1.1.
 See below for overriding PyTorch version check during install.
 
 Here is how to install the latest Pytorch version supported by Kaolin for cuda 11.8:
 
 .. code-block:: bash
 
-    $ pip install torch==2.0.1 --extra-index-url https://download.pytorch.org/whl/cu118
+    $ pip install torch==2.1.1 --extra-index-url https://download.pytorch.org/whl/cu118
 
 
 4. Optional Environment Variables
