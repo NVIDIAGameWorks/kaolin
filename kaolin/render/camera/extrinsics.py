@@ -469,8 +469,8 @@ class CameraExtrinsics():
             (CameraExtrinsics): the camera extrinsics
         """
         view_matrix = cls._to_tensor_input(view_matrix, device=device, dtype=dtype)
-        backend = cls._make_backend(view_matrix, dtype, device, requires_grad, backend)
-        extrinsics = CameraExtrinsics(backend)
+        backend_obj = cls._make_backend(view_matrix, dtype, device, requires_grad, backend)
+        extrinsics = CameraExtrinsics(backend_obj)
         extrinsics._shared_fields['user_requested_backend'] = backend is not None
         return extrinsics
 
