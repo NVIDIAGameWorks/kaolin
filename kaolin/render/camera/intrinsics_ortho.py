@@ -16,16 +16,12 @@
 from __future__ import annotations
 from typing import Type, Union
 import torch
-from .intrinsics import (
-    CameraIntrinsics,
-    IntrinsicsParamsDefEnum,
-    up_to_homogeneous,
-    down_from_homogeneous,
-    default_dtype,
-)
+from .intrinsics import CameraIntrinsics, IntrinsicsParamsDefEnum,\
+    up_to_homogeneous, down_from_homogeneous, default_dtype
 
-__all__ = ["OrthographicIntrinsics"]
-
+__all__ = [
+    "OrthographicIntrinsics"
+]
 
 class OrthoParamsDefEnum(IntrinsicsParamsDefEnum):
     """Orthographic projections do not use real intrinsics.
@@ -33,10 +29,7 @@ class OrthoParamsDefEnum(IntrinsicsParamsDefEnum):
     distance to the camera, a scale factor is included with the intrinsics, to allow
     for "zoom" adjustments.
     """
-
-    fov_distance = (
-        0  # Zoom factor, to adjust the scale of the view. Measured in distance units.
-    )
+    fov_distance = 0   # Zoom factor, to adjust the scale of the view. Measured in distance units.
 
 
 class OrthographicIntrinsics(CameraIntrinsics):
@@ -54,18 +47,11 @@ class OrthographicIntrinsics(CameraIntrinsics):
 
     The matrix returned by this class supports differentiable torch operations.
     """
-
     DEFAULT_NEAR = 1e-2
     DEFAULT_FAR = 1e2
 
-    def __init__(
-        self,
-        width: int,
-        height: int,
-        params: torch.Tensor,
-        near: float = DEFAULT_NEAR,
-        far: float = DEFAULT_FAR,
-    ):
+    def __init__(self, width: int, height: int, params: torch.Tensor,
+                 near: float = DEFAULT_NEAR, far: float = DEFAULT_FAR):
         super().__init__(width, height, params, near, far)
 
     @classmethod
@@ -81,20 +67,14 @@ class OrthographicIntrinsics(CameraIntrinsics):
 
     @property
     def lens_type(self) -> str:
-        return "ortho"
+        return 'ortho'
 
     @classmethod
-    def from_frustum(
-        cls,
-        width: int,
-        height: int,
-        fov_distance: float = 1.0,
-        near: float = DEFAULT_NEAR,
-        far: float = DEFAULT_FAR,
-        num_cameras: int = 1,
-        device: Union[torch.device, str] = None,
-        dtype: torch.dtype = default_dtype,
-    ) -> OrthographicIntrinsics:
+    def from_frustum(cls, width: int, height: int, fov_distance: float = 1.0,
+                     near: float = DEFAULT_NEAR, far: float = DEFAULT_FAR,
+                     num_cameras: int = 1,
+                     device: Union[torch.device, str] = None,
+                     dtype: torch.dtype = default_dtype) -> OrthographicIntrinsics:
         """Constructs a new instance of OrthographicIntrinsics from view frustum dimensions
 
         fov_distance artificially defines the "zoom scale" of the view.
@@ -116,9 +96,7 @@ class OrthographicIntrinsics(CameraIntrinsics):
         Returns:
             (OrthographicIntrinsics): the constructed orthographic camera intrinsics
         """
-        params = cls._allocate_params(
-            fov_distance, num_cameras=num_cameras, device=device, dtype=dtype
-        )
+        params = cls._allocate_params(fov_distance, num_cameras=num_cameras, device=device, dtype=dtype)
         return OrthographicIntrinsics(width, height, params, near, far)
 
     def orthographic_matrix(self, left, right, bottom, top, near, far) -> torch.Tensor:
@@ -155,12 +133,8 @@ class OrthographicIntrinsics(CameraIntrinsics):
         """
         zero = torch.zeros_like(self.fov_distance)
         one = torch.ones_like(self.fov_distance)
-        tx = torch.full_like(
-            self.fov_distance, fill_value=-(right + left) / (right - left)
-        )
-        ty = torch.full_like(
-            self.fov_distance, fill_value=-(top + bottom) / (top - bottom)
-        )
+        tx = torch.full_like(self.fov_distance, fill_value=-(right + left) / (right - left))
+        ty = torch.full_like(self.fov_distance, fill_value=-(top + bottom) / (top - bottom))
         tz = torch.full_like(self.fov_distance, fill_value=-(far + near) / (far - near))
         W = right - left
         H = top - bottom
@@ -173,10 +147,10 @@ class OrthographicIntrinsics(CameraIntrinsics):
         #     [0.0,              0.0,              -2.0 / D,   tz],
         #     [0.0,              0.0,              0,          1.0]
         rows = [
-            torch.stack([2.0 / (fov * W), zero, zero, tx], dim=-1),
-            torch.stack([zero, 2.0 / (fov * H), zero, ty], dim=-1),
-            torch.stack([zero, zero, -2.0 / D, tz], dim=-1),
-            torch.stack([zero, zero, zero, one], dim=-1),
+            torch.stack([2.0 / (fov * W),  zero,             zero,       tx],       dim=-1),
+            torch.stack([zero,             2.0 / (fov * H),  zero,       ty],       dim=-1),
+            torch.stack([zero,             zero,             -2.0 / D,   tz],       dim=-1),
+            torch.stack([zero,             zero,             zero,       one],     dim=-1)
         ]
         ortho_mat = torch.stack(rows, dim=1)
         return ortho_mat
@@ -195,7 +169,6 @@ class OrthographicIntrinsics(CameraIntrinsics):
         bottom = -top
         right = self.width / 2
         left = -right
-
         ortho = self.orthographic_matrix(left, right, bottom, top, self.near, self.far)
         return ortho
 
@@ -224,15 +197,11 @@ class OrthographicIntrinsics(CameraIntrinsics):
         # Expand input vectors to 4D homogeneous coordinates if needed
         homogeneous_vecs = up_to_homogeneous(vectors)
 
-        num_cameras = len(self)  # C - number of cameras
+        num_cameras = len(self)         # C - number of cameras
         batch_size = vectors.shape[-2]  # B - number of vectors
 
-        v = homogeneous_vecs.expand(num_cameras, batch_size, 4)[
-            ..., None
-        ]  # Expand as (C, B, 4, 1)
-        proj = proj[:, None].expand(
-            num_cameras, batch_size, 4, 4
-        )  # Expand as (C, B, 4, 4)
+        v = homogeneous_vecs.expand(num_cameras, batch_size, 4)[..., None]  # Expand as (C, B, 4, 1)
+        proj = proj[:, None].expand(num_cameras, batch_size, 4, 4)          # Expand as (C, B, 4, 4)
 
         transformed_v = proj @ v
         transformed_v = transformed_v.squeeze(-1)  # Reshape:  (C, B, 4)
@@ -258,17 +227,13 @@ class OrthographicIntrinsics(CameraIntrinsics):
         proj = self.projection_matrix()
         a = -proj[:, 2, 2]
         b = -proj[:, 2, 3]
-        depth = torch.clamp(
-            depth, min=min(self.near, self.far), max=max(self.near, self.far)
-        )
+        depth = torch.clamp(depth, min=min(self.near, self.far), max=max(self.near, self.far))
         # Here we allow depth to be 0, as it will result in 'inf' values which torch will soon clamp.
         # If b is 0 as well, it most likely means the choice of near / far planes and ndc coordinates is invalid.
-        ndc_depth = a - b / depth  # from near: ndc_min to far: ndc_nax
+        ndc_depth = a - b / depth                   # from near: ndc_min to far: ndc_nax
         ndc_min = min(self.ndc_min, self.ndc_max)
         ndc_max = max(self.ndc_min, self.ndc_max)
-        normalized_depth = (ndc_depth - ndc_min) / (
-            ndc_max - ndc_min
-        )  # from near: 0 to far: 1
+        normalized_depth = (ndc_depth - ndc_min) / (ndc_max - ndc_min)  # from near: 0 to far: 1
         normalized_depth = torch.clamp(normalized_depth, min=0.0, max=1.0)
         return normalized_depth
 
@@ -282,6 +247,4 @@ class OrthographicIntrinsics(CameraIntrinsics):
 
     def zoom(self, amount):
         self.fov_distance += amount
-        self.fov_distance = torch.max(
-            self.fov_distance, self.fov_distance.new_tensor(1e-5)
-        )  # Don't go below eps
+        self.fov_distance = torch.max(self.fov_distance, self.fov_distance.new_tensor(1e-5))    # Don't go below eps
