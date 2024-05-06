@@ -17,8 +17,10 @@ import copy
 from collections import namedtuple
 import logging
 import numpy as np
+import os
 import pytest
 import random
+import shutil
 import torch
 
 from kaolin.ops.random import random_tensor
@@ -31,6 +33,14 @@ logger = logging.getLogger(__name__)
 
 sample_tuple = namedtuple('sample_tuple', ['A', 'B', 'C', 'D'])
 
+
+@pytest.fixture(scope='class')
+def out_dir():
+    # Create temporary output directory
+    out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '_out')
+    os.makedirs(out_dir, exist_ok=True)
+    yield out_dir
+    shutil.rmtree(out_dir)
 
 class TestCheckTensor:
     @pytest.fixture(autouse=True)
@@ -588,7 +598,7 @@ class TestCheckTensorAttributeShapes:
             assert testing.check_tensor_attribute_shapes(container, throw=True, cat=(1, 5, 6), colors=(59, 3))
         assert not testing.check_tensor_attribute_shapes(container, throw=False, cat=(1, 50, 6), colors=(59, 3))
 
-class TestPrintDiagnostics:
+class TestMisc:
     def test_print_namedtuple_attributes(self, capsys):
         sample1 = sample_tuple('My Name', [1, 2, 3], torch.zeros((5, 5, 5)), {'a': torch.rand(5)})
 
@@ -599,5 +609,47 @@ class TestPrintDiagnostics:
         testing.print_namedtuple_attributes(sample1, detailed=True)
         out1_detailed, err = capsys.readouterr()
         assert len(out1) < len(out1_detailed)
+
+    def test_file_contents_equal(self, out_dir):
+        f1 = os.path.join(out_dir, 'f1.txt')
+        open(f1, 'w').writelines(['hi\n', 'ok\n', '\n', 'bye  \n'])
+        f2 = os.path.join(out_dir, 'f2.txt')
+        open(f2, 'w').writelines(['hi\n', '  ok\n', 'bye  \n', '\n'])
+        assert testing.file_contents_equal(f1, f2)
+
+        f3 = os.path.join(out_dir, 'f2.txt')
+        open(f3, 'w').writelines(['hiHiHello\n', '  ok\n', 'bye  \n', '\n'])
+        assert not testing.file_contents_equal(f1, f3)
+        assert testing.file_contents_equal(f1, f3, exclude_pattern='hi')
+        assert not testing.file_contents_equal(f1, f3, exclude_pattern='bye')
+
+    def test_assert_images_close(self):
+        width = 20
+        height = 10
+        im0 = torch.rand((height, width, 3)).float()
+        im1 = torch.clone(im0)
+        testing.assert_images_close(im0, im1)
+
+        im1[0:10, 0:3, 0] += 0.02  # 30 = 15% of pixels differ by ~0.02
+        testing.assert_images_close(im0, im1)
+        with pytest.raises(AssertionError):
+            testing.assert_images_close(im0, im1, pixel_disagreement_threshold=0.001)
+        testing.assert_images_close(im0, im1, pixel_disagreement_threshold=0.001, max_percent_disagreeing_pixels=20)
+
+        im1[0:10, 3:6, 1] += 0.1  # 30 = 15% of pixels differ by ~0.1
+        with pytest.raises(AssertionError):
+            testing.assert_images_close(im0, im1)
+        testing.assert_images_close(im0, im1, max_percent_disagreeing_pixels=35)
+        testing.assert_images_close(im0, im1, pixel_disagreement_threshold=0.5)
+
+        # resizing
+        im0 = torch.ones((height, width, 3)).float()
+        im0[0:height//2, 0:width//2, :] = 0.5
+        im1 = torch.ones((height * 2, width * 2, 3)).float()
+        im1[0:height, 0:width, :] = 0.5
+        testing.assert_images_close(im0, im1)
+        with pytest.raises(AssertionError):
+            testing.assert_images_close(im0, im1, do_resize=False)
+
 
 

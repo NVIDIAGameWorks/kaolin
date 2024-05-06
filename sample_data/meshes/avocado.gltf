@@ -73,19 +73,19 @@
   ],
   "buffers": [
     {
-      "uri": "Avocado.bin",
+      "uri": "avocado.bin",
       "byteLength": 23580
     }
   ],
   "images": [
     {
-      "uri": "Avocado_baseColor.png"
+      "uri": "textures/Avocado_baseColor.png"
     },
     {
-      "uri": "Avocado_roughnessMetallic.png"
+      "uri": "textures/Avocado_roughnessMetallic.png"
     },
     {
-      "uri": "Avocado_normal.png"
+      "uri": "textures/Avocado_normal.png"
     }
   ],
   "meshes": [

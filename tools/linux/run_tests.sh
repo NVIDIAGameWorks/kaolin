@@ -156,6 +156,7 @@ if [ $BUILD_DOCS -eq "1" ]; then
 
     echo " ...copying docs/ to build_docs/ to avoid git confusion" >> $DOCS_LOG 2>&1
     mkdir -p build_docs
+    rm -rf build_docs/*
     cp -r docs/* build_docs/.
     cd build_docs
     echo " ...replacing DOCS_MODULE_PATH in build_docs/kaolin_ext.py" >> $DOCS_LOG 2>&1

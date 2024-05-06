@@ -83,10 +83,10 @@ class TestLoadObj:
     @pytest.fixture(autouse=True)
     def expected_uvs(self):
         return torch.Tensor([
-            [0.0, 0.0],
             [0.0, 1.0],
-            [1.0, 0.0],
-            [1.0, 1.0]
+            [0.0, 0.0],
+            [1.0, 1.0],
+            [1.0, 0.0]
         ])
 
     @pytest.fixture(autouse=True)

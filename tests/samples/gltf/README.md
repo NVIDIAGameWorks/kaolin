@@ -1,1 +1,0 @@
-../../../sample_data/meshes/gltf_avocado/README.md

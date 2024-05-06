@@ -30,12 +30,14 @@ __all__  = [
     'create_stage',
 ]
 
-def _get_stage_from_maybe_file(file_path_or_stage):
-    """Returns a stage from a file or itself if input is a Usd.Stage
+def _get_stage_from_maybe_file(file_path_or_stage, check_exists=True):
+    """Returns a stage from a file or itself if input is a Usd.Stage. If input is a file that does not exist,
+    will raise Exception if `check_exists` is `True`, or will open new file and create stage.
 
     Args:
         file_path_or_stage (str or Usd.Stage):
             Path to usd file (/*.usd, /*.usda) or :class:`Usd.Stage`.
+        check_exists (bool): if True and input is a file will raise exception if the file does not exist.
 
     Returns:
         (Usd.Stage): The output stage.
@@ -43,8 +45,12 @@ def _get_stage_from_maybe_file(file_path_or_stage):
     if isinstance(file_path_or_stage, Usd.Stage):
         return file_path_or_stage
     else:
-        assert os.path.exists(file_path_or_stage)
-        return Usd.Stage.Open(file_path_or_stage)
+        if os.path.exists(file_path_or_stage):
+            return Usd.Stage.Open(file_path_or_stage)
+        else:
+            if check_exists:
+                raise RuntimeError(f'File does not exist: {file_path_or_stage}')
+            return create_stage(file_path_or_stage)
 
 def get_scene_paths(file_path_or_stage, scene_path_regex=None, prim_types=None,
                     conditional=lambda x: True):

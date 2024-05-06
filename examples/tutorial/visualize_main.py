@@ -30,7 +30,7 @@ def __normalize_vertices(vertices):
     Normalizes vertices to fit an [-1...1] bounding box,
     common during training, but not necessary for visualization.
     """
-    return kaolin.ops.pointcloud.center_points(res.vertices.unsqueeze(0), normalize=True).squeeze(0) * 2
+    return kaolin.ops.pointcloud.center_points(vertices.unsqueeze(0), normalize=True).squeeze(0) * 2
 
 
 if __name__ == "__main__":
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     # TODO: add textured example
     for f in obj_files:
         res = kaolin.io.obj.import_mesh(f)
-        vertices = res.vertices if args.skip_normalization else __normalize_vertices(vertices)
+        vertices = res.vertices if args.skip_normalization else __normalize_vertices(res.vertices)
         num_samples = random.randint(1000, 1500)  # Vary to ensure robustness
         pts = kaolin.ops.mesh.sample_points(
             vertices.unsqueeze(0), res.faces, num_samples)[0].squeeze(0)

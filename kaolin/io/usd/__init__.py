@@ -1,4 +1,5 @@
 from .utils import *
+from .materials import *
 from .mesh import *
 from .pointcloud import *
 from .voxelgrid import *

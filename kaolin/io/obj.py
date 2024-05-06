@@ -15,7 +15,7 @@
 import os
 import warnings
 from collections import namedtuple
-
+import logging
 import numpy as np
 import torch
 from PIL import Image
@@ -23,6 +23,7 @@ from PIL import Image
 from kaolin.io.materials import MaterialLoadError, MaterialFileError, MaterialNotFoundError, \
     process_materials_and_assignments
 from kaolin.io import utils
+from kaolin.render.materials import PBRMaterial
 from kaolin.rep import SurfaceMesh
 
 __all__ = [
@@ -77,7 +78,7 @@ def flatten_feature(feature):
 # TODO(cfujitsang): support https://en.wikipedia.org/wiki/Wavefront_.obj_file#Geometric_vertex ?
 def import_mesh(path, with_materials=False, with_normals=False,
                 error_handler=None, heterogeneous_mesh_handler=None,
-                triangulate=False):
+                triangulate=False, raw_materials=True):
     r"""Load data from an obj file as a single mesh, and return data as CPU pytorch tensors in an easy-to-manage
     :class:`kaolin.rep.SurfaceMesh` container.
 
@@ -109,26 +110,28 @@ def import_mesh(path, with_materials=False, with_normals=False,
             If `heterogeneous_mesh_handler` is not set, this flag will cause non-homogeneous meshes to
             be triangulated and loaded without error; otherwise triangulation executes after `heterogeneous_mesh_handler`,
             which may skip or throw an error.
+        raw_materials: if True (default) and `with_materials`, will return raw material values as a dictionary
+            (see return values of :func:`load_mtl`); if False will instead return materials
+            as instances of :class:`kaolin.render.materials.PBRMaterial`.
 
     Returns:
         (SurfaceMesh):
             an unbatched instance of :class:`kaolin.rep.SurfaceMesh`, where:
 
             * **normals** and **face_normals_idx** will only be filled if `with_normals=True`
-            * **materials** will be a list
-              of materials (see return values of :func:`load_mtl`) sorted by their `material_name`;
-              filled only if `with_materials=True`.
+            * **materials** will be a list of materials (see `raw_materials` argument for available return types)
+              sorted by their `material_name`; filled only if `with_materials=True`.
             * **material_assignments** will be a tensor
               of shape ``(num_faces,)`` containing the index
               of the material (in the `materials` list) assigned to the corresponding face,
               or `-1` if no material was assigned; filled only if `with_materials=True`.
 
     Raises:
-        MaterialNotFoundError:
+        kaolin.io.materials.MaterialNotFoundError:
             The .obj is using a material not parsed from material libraries (set `error_handler` to skip).
-        MaterialFileError:
+        kaolin.io.materials.MaterialFileError:
             From :func:`load_mtl`: Failed to open material path (set `error_handler` to skip).
-        MaterialLoadError:
+        kaolin.io.materials.MaterialLoadError:
             From :func:`load_mtl`: Failed to load material, very often due to path to
             map_Kd/map_Ka/map_ks being invalid (set `error_handler` to skip).
         NonHomogeneousMeshError:
@@ -264,7 +267,7 @@ def import_mesh(path, with_materials=False, with_normals=False,
         return handler(vertices, face_vertex_counts, *all_features, face_assignments=material_assignments_dict)
 
     # Handle non-homogeneous meshes
-    is_heterogeneous = not torch.all(face_vertex_counts == face_vertex_counts[0])
+    is_heterogeneous = face_vertex_counts.numel() > 0 and not torch.all(face_vertex_counts == face_vertex_counts[0])
     if is_heterogeneous:
         if heterogeneous_mesh_handler is None:
             raise utils.NonHomogeneousMeshError(f'Mesh is non-homogeneous '
@@ -290,9 +293,12 @@ def import_mesh(path, with_materials=False, with_normals=False,
     if with_materials:
         uvs = torch.FloatTensor([float(el) for sublist in uvs
                                  for el in sublist]).view(-1, 2)
+        uvs[..., 1] = 1 - uvs[..., 1]
         face_uvs_idx = torch.LongTensor(face_uvs_idx) - 1
         materials, material_assignments = process_materials_and_assignments(
             materials_dict, material_assignments_dict, error_handler, faces.shape[0], error_context_str=path)
+        if not raw_materials:
+            materials = [raw_material_to_pbr(m) for m in materials]
     else:
         uvs = None
         face_uvs_idx = None
@@ -312,9 +318,13 @@ def import_mesh(path, with_materials=False, with_normals=False,
                        material_assignments=material_assignments, normals=normals, face_normals_idx=face_normals_idx,
                        unset_attributes_return_none=True)   # for greater backward compatibility
 
-
+# http://www.paulbourke.net/dataformats/mtl/
+# https://github.com/tinyobjloader/tinyobjloader/blob/release/tiny_obj_loader.h#L220
+# https://archive.blender.org/developer/D11019
+# https://projects.blender.org/blender/blender/commit/a99a62231e
+# https://scylardor.fr/2021/05/21/coercing-assimp-into-reading-obj-pbr-materials/
 def load_mtl(mtl_path, error_handler):
-    """Load and parse a Material file.
+    """Load and parse a Material file and return its raw values.
 
     Followed format described in: https://people.sc.fsu.edu/~jburkardt/data/mtl/mtl.html.
     Currently only support diffuse, ambient and specular parameters (Kd, Ka, Ks)
@@ -325,14 +335,21 @@ def load_mtl(mtl_path, error_handler):
 
     Returns:
         (dict):
-            Dictionary of materials, which are dictionary of properties with optional torch.Tensor values:
+            Dictionary of materials, each a dictionary of properties, containing the following keys, torch.Tensor
+            values if present in the mtl file. Only keys present in mtl will be set, capitalization of keys
+            will be consistent with original mtl, but both upper and lowercase strings will be parsed.
 
             - **Kd**: diffuse color of shape (3)
             - **map_Kd**: diffuse texture map of shape (H, W, 3)
             - **Ks**: specular color of shape (3)
-            - **map_Ks**: specular texture map of shape (H', W', 3)
+            - **map_Ks**: specular texture map of shape (H1, W1, 3)
             - **Ka**: ambient color of shape (3)
-            - **map_Ka**: ambient texture map of shape (H'', W'', 3)
+            - **map_Ka**: ambient texture map of shape (H2, W2, 3)
+            - **bump** or **map_bump**: normals texture, typically of shape (H3, W3, 3)
+            - **disp**: displacement map, typically of shape (H3, W3, 1)
+            - **map_d**: opacity map, typically of shape (H4, W4, 1)
+            - **map_ns**: roughness map
+            - **map_refl**: metallic map
             - **material_name**: string name of the material
 
     Raises:
@@ -343,6 +360,44 @@ def load_mtl(mtl_path, error_handler):
     """
     mtl_data = {}
     root_dir = os.path.dirname(mtl_path)
+
+    def _read_image_with_options(root_dir, data):
+        # TOOD: this assumption may be wrong; see https://github.com/tinyobjloader/tinyobjloader/blob/cab4ad7254cbf7eaaafdb73d272f99e92f166df8/models/texture-options-issue-85.mtl#L22
+        fpath = data[-1]
+        texture_path = os.path.join(root_dir, fpath)
+        img = Image.open(texture_path)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        img = np.array(img)
+
+        options = {}
+        option_vals = []
+        for i in range(1, len(data) - 1):
+            dval = data[i].strip()
+            if dval[0] == '-':
+                if len(option_vals) > 0:
+                    options[option_vals[0]] = option_vals[1:]
+                    option_vals = []
+            option_vals.append(dval)
+
+        if len(option_vals) > 0:
+            options[option_vals[0]] = option_vals[1:]
+
+        for k, v in options.items():
+            if k == '-imfchan':  # parse the channel option
+                if len(v) > 0 and len(img.shape) > 2 and img.shape[-1] > 1:
+                    if v[0] == 'r':
+                        img = img[..., :1]
+                    elif v[0] == 'g':
+                        img = img[..., 1:2]
+                    elif v[0] == 'b':
+                        img = img[..., 2:3]
+                    else:
+                        logging.warning(f'Unrecognized value {v[0]} for flag -imfchan; r, g, or b expected')
+            else:
+                logging.warning(f'Flag option {k} not supported')
+        return torch.from_numpy(img)
+
 
     try:
         f = open(mtl_path, 'r', encoding='utf-8')
@@ -359,14 +414,10 @@ def load_mtl(mtl_path, error_handler):
                 if data[0] == 'newmtl':
                     material_name = data[1]
                     mtl_data[material_name] = {'material_name': material_name}
-                elif data[0] in {'map_Kd', 'map_Ka', 'map_Ks'}:
-                    texture_path = os.path.join(root_dir, data[1])
-                    img = Image.open(texture_path)
-                    if img.mode != 'RGB':
-                        img = img.convert('RGB')
-                    mtl_data[material_name][data[0]] = torch.from_numpy(
-                        np.array(img))
-                elif data[0] in {'Kd', 'Ka', 'Ks'}:
+                # TODO: this is not quite right; need to make this agree with standard.
+                elif data[0].lower() in {'map_kd', 'map_ka', 'map_ks', 'bump', 'map_bump', 'disp', 'map_d', 'map_ns', 'map_refl'}:
+                    mtl_data[material_name][data[0]] = _read_image_with_options(root_dir, data)
+                elif data[0].lower() in {'kd', 'ka', 'ks'}:
                     mtl_data[material_name][data[0]] = torch.tensor(
                         [float(val) for val in data[1:]])
             except Exception as e:
@@ -375,3 +426,42 @@ def load_mtl(mtl_path, error_handler):
                     data=data, mtl_data=mtl_data)
         f.close()
     return mtl_data
+
+
+def raw_material_to_pbr(material):
+    pbr_params = {'is_specular_workflow': False}  # TODO: is this right?
+
+    # TODO: this is not quite right; need to make this agree with standard
+    # See also https://github.com/tinyobjloader/tinyobjloader/blob/release/tiny_obj_loader.h#L220
+    # https://projects.blender.org/blender/blender/commit/a99a62231e
+    # https://scylardor.fr/2021/05/21/coercing-assimp-into-reading-obj-pbr-materials/
+    supported_maps = {
+        'map_kd': 'diffuse_texture',
+        'map_ks': 'specular_texture',
+        'bump': 'normals_texture',
+        'map_bump': 'normals_texture',
+        'disp': 'displacement_texture',
+        'map_d': 'opacity_texture',
+        'map_refl': 'metallic_texture',
+        'map_ns': 'roughness_texture'
+    }
+    supported_values = {
+        'kd': 'diffuse_color',
+        'ks': 'specular_color'
+    }
+    # TODO: looks like we're missing ambient occlusions in PBRMaterial (map_Ka)
+    for k, v in material.items():
+        if k == 'material_name':
+            pbr_params[k] = v
+        elif k.lower() in supported_maps.keys():
+            pbr_name = supported_maps[k.lower()]
+            pbr_params[pbr_name] = v.float() / 255.
+            if pbr_name == 'normals_texture':
+                pbr_params[pbr_name] = pbr_params[pbr_name] * 2 - 1.
+        elif k.lower() in supported_values.keys():
+            pbr_name = supported_values[k.lower()]
+            pbr_params[pbr_name] = v
+        else:
+            logging.warning(f'Cannot convert {k} from obj mtl to PBR spec; use raw_materials=True to import raw values')
+
+    return PBRMaterial(**pbr_params)

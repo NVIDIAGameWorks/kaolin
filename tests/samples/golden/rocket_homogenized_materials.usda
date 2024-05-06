@@ -49,7 +49,7 @@ def Xform "World"
                 {
                     uniform token info:id = "UsdUVTexture"
                     token inputs:colorspace = "auto"
-                    asset inputs:file = @material_0/diffuse.png@
+                    asset inputs:file = @rocket_homogenized_materials_textures/material_0_diffuse.png@
                     float outputs:b
                     float outputs:g
                     float outputs:r
@@ -60,7 +60,7 @@ def Xform "World"
                 {
                     uniform token info:id = "UsdUVTexture"
                     token inputs:colorspace = "auto"
-                    asset inputs:file = @material_0/roughness.png@
+                    asset inputs:file = @rocket_homogenized_materials_textures/material_0_roughness.png@
                     float outputs:r
                 }
 
@@ -68,7 +68,7 @@ def Xform "World"
                 {
                     uniform token info:id = "UsdUVTexture"
                     token inputs:colorspace = "auto"
-                    asset inputs:file = @material_0/metallic.png@
+                    asset inputs:file = @rocket_homogenized_materials_textures/material_0_metallic.png@
                     float outputs:r
                 }
             }
@@ -143,4 +143,3 @@ def Xform "World"
         }
     }
 }
-

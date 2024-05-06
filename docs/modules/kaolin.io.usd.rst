@@ -20,7 +20,10 @@ More tutorials and documentation can be found `here <https://graphics.pixar.com/
 
 Viewing USD Files
 ~~~~~~~~~~~~~~~~~
-USD files can be visualized with realtime pathtracing using the [Omniverse Kaolin App](https://docs.omniverse.nvidia.com/app_kaolin/app_kaolin/user_manual.html#training-visualizer).
+USD files can be visualized in `NVIDIA Omniverse <https://www.nvidia.com/en-us/omniverse/>`_.
+
+For easy mesh visualization, see also `Kaolin Jupyter Visualizer recipe for meshes <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/easy_mesh_render.ipynb>`_.
+
 Alternatively, you may use Pixar's USDView which can be obtained by visiting
 `https://developer.nvidia.com/usd <https://developer.nvidia.com/usd>`_ and selecting the
 corresponding platform under *USD Pre-Built Libraries and Tools*.
@@ -35,4 +38,12 @@ Functions
 .. automodule:: kaolin.io.usd
     :members:
     :exclude-members:
-        mesh_return_type
+        mesh_return_type,
+        MaterialError,
+        MaterialLoadError,
+        MaterialFileError,
+        MaterialWriteError,
+        MaterialNotFoundError,
+        MaterialNotSupportedError,
+        Material,
+        PBRMaterial

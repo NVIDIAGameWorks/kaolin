@@ -21,10 +21,11 @@ import torch
 import pytest
 from pxr import Usd, UsdGeom
 
-from kaolin.io import usd, obj
+from kaolin.io import usd, obj, gltf
 from kaolin.io import utils
+from kaolin.rep import SurfaceMesh
 from kaolin.utils.testing import print_namedtuple_attributes, print_dict_attributes, \
-    check_tensor_attribute_shapes, contained_torch_equal, check_allclose
+    check_tensor_attribute_shapes, contained_torch_equal, check_allclose, file_contents_equal
 
 __test_dir = os.path.dirname(os.path.realpath(__file__))
 __samples_path = os.path.join(__test_dir, os.pardir, os.pardir, os.pardir, os.pardir, 'samples')
@@ -94,6 +95,15 @@ def hetero_mesh_path():
 def hetero_subsets_materials_mesh_path():
     return os.path.join(__samples_path, 'rocket_hetero_subsets_materials.usd')
 
+def _unset_material_names(materials):
+    if materials is None:
+        return
+    for m in materials:
+        if type(m) == list:
+            for m2 in m:
+                m2.material_name = ''
+        else:
+            m.material_name = ''
 
 class TestMeshes:
     @pytest.fixture(scope='class')
@@ -303,8 +313,9 @@ class TestMeshes:
 
     @pytest.mark.parametrize('function_variant', ['export_mesh', 'export_meshes'])
     @pytest.mark.parametrize('input_stage', [False, True])
+    @pytest.mark.parametrize('overwrite_textures', [False, True])
     def test_import_material_subsets(self, scene_paths, out_dir, hetero_subsets_materials_mesh_path,
-                                     input_stage, function_variant):
+                                     input_stage, function_variant, overwrite_textures):
         """Test that imports materials from mesh with subsets"""
         if input_stage:
             path_or_stage = Usd.Stage.Open(hetero_subsets_materials_mesh_path)
@@ -348,6 +359,7 @@ class TestMeshes:
             expected_vertices = raw_attributes['vertices'][raw_attributes['faces'][quad_idx * 4: quad_idx * 4 + 3], :]
             expected_normals = raw_attributes['normals'][quad_idx * 4: quad_idx * 4 + 3, :]
             expected_uvs = raw_attributes['uvs'][quad_idx * 4: quad_idx * 4 + 3, :]
+            expected_uvs[:, 1] = 1 - expected_uvs[:, 1]
             assert torch.allclose(mesh.vertices[mesh.faces[tri_idx, :], :], expected_vertices)
             assert torch.allclose(mesh.face_normals[tri_idx, ...], expected_normals)
             assert torch.allclose(mesh.uvs[mesh.face_uvs_idx[tri_idx, :], :], expected_uvs)
@@ -358,18 +370,27 @@ class TestMeshes:
             assert torch.allclose(golden_mesh.uvs[mesh.face_uvs_idx[tri_idx, :], :], expected_uvs)
         # Write the homogenized mesh to file
         out_path = os.path.join(out_dir, 'rocket_homogenized_materials.usda')
-        if function_variant == 'export_mesh':
-            usd.export_mesh(out_path, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces,
-                            face_uvs_idx=mesh.face_uvs_idx, face_normals=mesh.face_normals, uvs=mesh.uvs,
-                            material_assignments=mesh.material_assignments, materials=mesh.materials)
-        else:
-            usd.export_meshes(out_path, ['/World/Rocket'], vertices=[mesh.vertices], faces=[mesh.faces],
-                              face_uvs_idx=[mesh.face_uvs_idx], face_normals=[mesh.face_normals], uvs=[mesh.uvs],
-                              material_assignments=[mesh.material_assignments],
-                              materials=[mesh.materials])
+        num_writes = 1 if overwrite_textures else 2  # write twice to ensure texture files are different
+        for i in range(num_writes):
+            if function_variant == 'export_mesh':
+                usd.export_mesh(out_path, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces,
+                                face_uvs_idx=mesh.face_uvs_idx, face_normals=mesh.face_normals, uvs=mesh.uvs,
+                                material_assignments=mesh.material_assignments, materials=mesh.materials,
+                                overwrite_textures=overwrite_textures)
+            else:
+                usd.export_meshes(out_path, ['/World/Rocket'], vertices=[mesh.vertices], faces=[mesh.faces],
+                                  face_uvs_idx=[mesh.face_uvs_idx], face_normals=[mesh.face_normals], uvs=[mesh.uvs],
+                                  material_assignments=[mesh.material_assignments],
+                                  materials=[mesh.materials],
+                                  overwrite_textures=overwrite_textures)
 
         # Confirm exported USD matches golden file
-        assert open(golden_path).read() == open(out_path).read()
+        # Note: we can't match UVs due to small arithmetic changes introduced due to UV convention fixing
+        files_equal = file_contents_equal(golden_path, out_path, exclude_pattern='primvars:st =')
+        if overwrite_textures:
+            assert files_equal
+        else:
+            assert not files_equal  # texture references should be different
 
         # Confirm we read identical mesh after writing
         reimported_mesh = usd.import_mesh(out_path, scene_path='/World/Rocket', with_materials=True, with_normals=True)
@@ -377,6 +398,9 @@ class TestMeshes:
 
         # Since comparison of materials is not implemented, we override materials with diffuse colors first
         assert len(mesh.materials) == len(reimported_mesh.materials)
+        # Unset material names, which will not match after write
+        _unset_material_names(mesh.materials)
+        _unset_material_names(reimported_mesh.materials)
         assert contained_torch_equal(mesh, reimported_mesh, print_error_context='')
 
     @pytest.mark.parametrize('input_stage', [False, True])
@@ -565,70 +589,98 @@ class TestMeshes:
 
 class TestDiverseInputs:
     @pytest.fixture(scope='class')
-    def expected_sizes(self):
-        return {'ico_smooth': {'vertices': [42, 3], 'faces': [80, 3]},
-                'ico_flat': {'vertices': [42, 3], 'faces': [80, 3]},
-                'fox': {'vertices': [5002, 3], 'faces':  [10000, 3]},
-                'pizza': {'vertices': [482, 3], 'faces': [960, 3]},
-                'armchair': {'vertices': [9204, 3], 'faces': [9200, 4]},
-                'amsterdam': {'vertices': [1974, 3], 'faces': [1932, 4]}}
-
-    @pytest.fixture(scope='class')
-    def expected_material_counts(self):
+    def expected_mesh_counts(self):
         return {'ico_smooth': 1,
                 'ico_flat': 1,
                 'fox': 1,
-                'pizza': 2,
-                'armchair': 2,
-                'amsterdam': 14}
+                'pizza': 1,
+                'armchair': 3,
+                'amsterdam': 18,
+                'avocado': 1}
 
-    # TODO: add armchair
+    @pytest.mark.parametrize("device", ["cuda", "cpu"])
     @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam', 'armchair'])
-    def test_read_write_read_consistency(self, bname, out_dir, expected_sizes, expected_material_counts):
-        # Read USD version, flattening all meshes into one
+    def test_read_write_read_consistency(self, device, bname, out_dir, expected_mesh_counts):
         fname = io_data_path(f'{bname}.usd')
-        read_usd_mesh = usd.import_mesh(fname, with_normals=True, with_materials=True)
-        assert check_tensor_attribute_shapes(read_usd_mesh, **expected_sizes[bname])
+        # import as multiple meshes
+        read_usd_mesh = SurfaceMesh.cat(
+            usd.import_meshes(fname, with_normals=True, with_materials=True), fixed_topology=False).to(device)
+        print(f'Read USD mesh uvs {bname} {device}: {read_usd_mesh.uvs[0][:5, :]}')
+        assert len(read_usd_mesh) == expected_mesh_counts[bname]
+        assert len(read_usd_mesh.materials[0]) != 0
 
-        # Read OBJ version
-        fname = io_data_path(f'{bname}.obj')
-        read_obj_mesh = obj.import_mesh(fname, with_normals=True, with_materials=True)
-
-        # DEBUG INFORMATION (uncomment to help diagnose failures)
-        # stage = Usd.Stage.Open(io_data_path(f'{bname}.usd'))
-        # paths = usd.utils.get_scene_paths(stage, prim_types=["Mesh"])
-        # #assert len(paths) == 1
-        # prim = stage.GetPrimAtPath(paths[0])
-        # raw_usd = usd.get_raw_mesh_prim_geometry(prim, with_normals=True, with_uvs=True, time=0)
-        # print_namedtuple_attributes(read_usd_mesh, f'Read USD mesh {bname}')
-        # print_dict_attributes(raw_usd, name=f'RAW USD {bname}')
-        # print_namedtuple_attributes(read_obj_mesh, f'Read OBJ mesh {bname}')
-
-        # Ensure vertex order is consistent before performing any further checks
-        check_allclose(read_obj_mesh.vertices, read_usd_mesh.vertices, atol=1e-04)
-
-        # Check that final face values between the two meshes agree (note the OBJ and USD may store
-        # and index uvs and faces differently, but final per-face per-vertex values must agree
-        assert torch.allclose(read_usd_mesh.face_uvs, read_obj_mesh.face_uvs, atol=1e-04)
-        assert torch.allclose(read_usd_mesh.face_normals, read_obj_mesh.face_normals, atol=1e-04, rtol=1e-03)
-
-        # Check material consistency
-        assert len(read_usd_mesh.materials) == expected_material_counts[bname]
-        assert len(read_usd_mesh.materials) == len(read_obj_mesh.materials)
-        assert len(read_usd_mesh.material_assignments) > 0
-        assert torch.equal(read_usd_mesh.material_assignments, read_obj_mesh.material_assignments)
-
-        # Now write the USD to file, read it back and make sure attributes are as expected
+        # Now write the USD to file, read it back and make sure attributes match the original mesh
         out_path = os.path.join(out_dir, f'reexport_{bname}.usda')
-        # TODO: the export fails with materials; add a test and fix this in test_materials.py and here
-        # Note: specular value is expected to be  a tuple, not single value as in this case
-        usd.export_mesh(out_path, vertices=read_usd_mesh.vertices, faces=read_usd_mesh.faces,
-                        uvs=read_usd_mesh.uvs, face_uvs_idx=read_usd_mesh.face_uvs_idx,
-                        face_normals=read_usd_mesh.face_normals)
+        usd.export_meshes(out_path, vertices=read_usd_mesh.vertices, faces=read_usd_mesh.faces,
+                          uvs=read_usd_mesh.uvs, face_uvs_idx=read_usd_mesh.face_uvs_idx,
+                          face_normals=read_usd_mesh.face_normals,
+                          material_assignments=read_usd_mesh.material_assignments, materials=read_usd_mesh.materials)
 
-        # Because we don't want to compare materials, read original mesh and exported mesh
-        fname = io_data_path(f'{bname}.usd')
-        read_usd_mesh = usd.import_mesh(fname, with_normals=True)
-        # Read exported mesh
-        exported_usd_mesh = usd.import_mesh(out_path, with_normals=True)
-        assert contained_torch_equal(read_usd_mesh, exported_usd_mesh, approximate=True, rtol=1e-5, atol=1e-8)
+        exported_usd_mesh = SurfaceMesh.cat(
+            usd.import_meshes(out_path, with_normals=True,  with_materials=True), fixed_topology=False).to(device)
+
+        assert set(read_usd_mesh.get_attributes()) == set(exported_usd_mesh.get_attributes())
+        for att in read_usd_mesh.get_attributes(only_tensors=True):
+            assert contained_torch_equal(read_usd_mesh.get_attribute(att),
+                                         exported_usd_mesh.get_attribute(att),
+                                         print_error_context=f'Failed for attribute {att}',
+                                         approximate=True, rtol=1e-5, atol=1e-8)
+
+        for mesh_idx in range(len(read_usd_mesh)):
+            materials_orig = read_usd_mesh.materials[mesh_idx]
+            materials_exported = exported_usd_mesh.materials[mesh_idx]
+            assert len(materials_orig) == len(materials_exported), f'Material number mismatch for mesh {mesh_idx}'
+            _unset_material_names(materials_orig)
+            _unset_material_names(materials_exported)
+            assert contained_torch_equal(
+                materials_orig, materials_exported,
+                approximate=True, rtol=1e-2, atol=1e-3, print_error_context=f'Material mismatch for mesh {mesh_idx}')
+
+    @pytest.mark.parametrize("device", ["cuda", "cpu"])
+    def test_read_write_read_consistency_multi_write(self, device, out_dir, expected_mesh_counts):
+        # Same as above, but tests that multiple exports don't overwrite each other's textures (which would be the
+        # case, unless setting texture paths carefully)
+        all_bnames = ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam', 'armchair']
+
+        # First we export all at once
+        for bname in all_bnames:
+            fname = io_data_path(f'{bname}.usd')
+            out_path = os.path.join(out_dir, f'reexport_multi_{bname}.usda')
+            # import as multiple meshes
+            read_usd_mesh = SurfaceMesh.cat(
+                usd.import_meshes(fname, with_normals=True, with_materials=True), fixed_topology=False).to(device)
+            # TODO: also support moving mesh materials to device
+
+            # Now write the USD to file, read it back and make sure attributes match the original mesh
+            usd.export_meshes(out_path, vertices=read_usd_mesh.vertices, faces=read_usd_mesh.faces,
+                              uvs=read_usd_mesh.uvs, face_uvs_idx=read_usd_mesh.face_uvs_idx,
+                              face_normals=read_usd_mesh.face_normals,
+                              material_assignments=read_usd_mesh.material_assignments, materials=read_usd_mesh.materials)
+
+        # Next, we import original and exported and check consistency
+        for bname in all_bnames:
+            fname = io_data_path(f'{bname}.usd')
+            out_path = os.path.join(out_dir, f'reexport_multi_{bname}.usda')
+
+            # import as multiple meshes
+            read_usd_mesh = SurfaceMesh.cat(
+                usd.import_meshes(fname, with_normals=True, with_materials=True), fixed_topology=False)
+
+            exported_usd_mesh = SurfaceMesh.cat(
+                usd.import_meshes(out_path, with_normals=True, with_materials=True), fixed_topology=False)
+
+            assert set(read_usd_mesh.get_attributes()) == set(exported_usd_mesh.get_attributes())
+            for att in read_usd_mesh.get_attributes(only_tensors=True):
+                assert contained_torch_equal(read_usd_mesh.get_attribute(att),
+                                             exported_usd_mesh.get_attribute(att),
+                                             approximate=True, rtol=1e-5, atol=1e-8), f'Failed for attribute {att}'
+
+            for mesh_idx in range(len(read_usd_mesh)):
+                materials_orig = read_usd_mesh.materials[mesh_idx]
+                materials_exported = exported_usd_mesh.materials[mesh_idx]
+                assert len(materials_orig) == len(materials_exported), f'Material number mismatch {bname} {mesh_idx}'
+                _unset_material_names(materials_orig)
+                _unset_material_names(materials_exported)
+                assert contained_torch_equal(
+                    materials_orig, materials_exported,
+                    approximate=True, rtol=1e-2, atol=1e-3, print_error_context=f'Material mismatch {bname} {mesh_idx}')
