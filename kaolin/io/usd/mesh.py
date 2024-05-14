@@ -320,7 +320,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
 
     def _process_mesh_prim(mesh_prim, attrs, time):
         start_vertex_idx = sum([len(v) for v in attrs.get('vertices', [])])
-        start_uv_idx = sum([len(u) for u in attrs.get('uvs', [])])
+        start_uv_idx = sum([0 if u is None else len(u)for u in attrs.get('uvs', [])])
         start_face_idx = sum([len(f) for f in attrs.get('face_sizes', [])])
 
         # Returns dict of attributes:
