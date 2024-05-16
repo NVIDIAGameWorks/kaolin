@@ -271,9 +271,13 @@ def get_face_uvs_idx(faces, face_sizes, uvs, uv_idx, uv_interpolation, **kwargs)
     return face_uvs_idx
 
 
-def get_face_normals(normals, normals_interpolation, **kwargs):
+def set_normals(geo):
+    normals_interpolation = geo.get('normals_interpolation')
+    normals = geo.get('normals')
     if normals_interpolation == 'faceVarying':
-        return normals
+        geo['face_normals'] = normals
+    elif normals_interpolation == 'vertex':
+        geo['vertex_normals'] = normals
     else:
         raise NotImplementedError(f'Interpolation type {normals_interpolation} is '
                                   'not supported')
@@ -320,7 +324,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
 
     def _process_mesh_prim(mesh_prim, attrs, time):
         start_vertex_idx = sum([len(v) for v in attrs.get('vertices', [])])
-        start_uv_idx = sum([len(u) for u in attrs.get('uvs', [])])
+        start_uv_idx = sum([0 if u is None else len(u) for u in attrs.get('uvs', [])])
         start_face_idx = sum([len(f) for f in attrs.get('face_sizes', [])])
 
         # Returns dict of attributes:
@@ -334,7 +338,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
         geo['faces'] += start_vertex_idx
 
         if geo.get('normals') is not None:
-            geo['face_normals'] = get_face_normals(**geo)
+            set_normals(geo)
             del geo['normals']  # save memory
 
         for k, v in geo.items():
