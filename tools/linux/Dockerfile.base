@@ -50,9 +50,8 @@ ENV PATH /opt/conda/bin:$PATH
 RUN CUDA_MAJOR="$(echo ${CUDA_VERSION} | cut -d'.' -f1)" && \
     CUDA_MINOR="$(echo ${CUDA_VERSION} | cut -d'.' -f2)" && \
     CUDA_TAG="$(echo ${CUDA_MAJOR}${CUDA_MINOR})" && \
-    pip install --no-cache-dir torch==${PYTORCH_VERSION}+cu${CUDA_TAG} \
-        -f https://download.pytorch.org/whl/cu${CUDA_TAG} \
-        -f https://download.pytorch.org/whl/torch_stable.html
+    pip install --no-cache-dir torch==${PYTORCH_VERSION}+cu${CUDA_TAG} torchvision \
+        --index-url https://download.pytorch.org/whl/cu${CUDA_TAG}
 
 
 WORKDIR /tmp

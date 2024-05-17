@@ -76,7 +76,7 @@ class TestRenderMeshMain:
         assert len(os.listdir(out_dir)) > 0
 
         # Spot check one of the outputs
-        checked_passes = [easy_render.RenderPass.render, easy_render.RenderPass.normals, easy_render.RenderPass.albedo]
+        checked_passes = [easy_render.RenderPass.render.name, easy_render.RenderPass.normals.name, easy_render.RenderPass.albedo.name]
         for p in checked_passes:
             if include_bname:
                 expected_fname = os.path.join(out_dir, f'{bname}_{p}.png')

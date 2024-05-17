@@ -10,32 +10,28 @@ gitlabCommitStatus("launch all builds") {
 // (See: https://hub.docker.com/r/pytorch/pytorch/tags)
 def ubuntu_from_pytorch_configs = [
     [
-        // python: 3.7
-        'cudaVer': '11.3', 'cudnnVer': '8', 'torchVer': '1.12.1',
-        'archsToTest': 'MULTI'
-    ],
-    [
-        // python: 3.7
-        'cudaVer': '11.6', 'cudnnVer': '8', 'torchVer': '1.13.1',
-        'archsToTest': 'MULTI'
-    ],
-    [
-        // python: 3.7
-        'cudaVer': '12.1', 'cudnnVer': '8', 'torchVer': '2.1.0',
+        // python: 3.10
+        'cudaVer': '11.7', 'cudnnVer': '8', 'torchVer': '2.0.0',
         'archsToTest': 'MULTI'
     ],
     [
         // python: 3.10
-        'cudaVer': '11.8', 'cudnnVer': '8', 'torchVer': '2.1.0',
+        'cudaVer': '12.1', 'cudnnVer': '8', 'torchVer': '2.3.1',
+        'archsToTest': 'MULTI'
+    ],
+    [
+        // python: 3.10
+        'cudaVer': '11.8', 'cudnnVer': '8', 'torchVer': '2.3.1',
         'archsToTest': 'MULTI'
     ]
+
 ]
 
 // Configs for build from NGC pytorch docker images
 // (See: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch/tags)
 def ubuntu_from_nvcr_configs = [
     [
-        'baseImageTag': '23.10-py3',
+        'baseImageTag': '24.06-py3',
         'archsToTest': 'MULTI'
     ],
 ]
@@ -45,13 +41,13 @@ def ubuntu_from_nvcr_configs = [
 // (See: https://hub.docker.com/r/nvidia/cuda/tags)
 def ubuntu_from_cuda_configs = [
     [
-        'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'pythonVer': '3.8', 'torchVer': '1.11.0',
+        'cudaVer': '11.8.0', 'cudnnVer': '8',
+        'pythonVer': '3.9', 'torchVer': '2.0.0',
         'archsToTest': 'MULTI'
     ],
     [
         'cudaVer': '12.1.0', 'cudnnVer': '8',
-        'pythonVer': '3.10', 'torchVer': '2.1.0',
+        'pythonVer': '3.11', 'torchVer': '2.3.1',
         'archsToTest': 'MULTI'
     ],
 ]
@@ -60,152 +56,63 @@ def ubuntu_from_cuda_configs = [
 // (Use docker image ubuntu:18.04 as a base)
 def ubuntu_cpuonly_configs = [
     [
-        'pythonVer': '3.8', 'torchVer': '1.11.0',
+        'pythonVer': '3.9', 'torchVer': '2.1.2',
     ],
     [
-        'pythonVer': '3.10', 'torchVer': '2.0.1',
+        'pythonVer': '3.11', 'torchVer': '2.3.1',
     ]
 ]
 
 // Configs for building python wheels
-def ubuntu_for_wheels_configs = [
+def ubuntu_for_cuda_wheels_configs = [
+    [
+        'cudaVer': '11.8.0', 'cudnnVer': '8',
+        'torchVer': '2.0.0', 'archsToTest': 'MULTI'
+    ],
 /*
     [
-        'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.12.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.6.2', 'cudnnVer': '8',
-        'torchVer': '1.12.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.3.1', 'cudnnVer': '8',
-        'torchVer': '1.12.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.6.2', 'cudnnVer': '8',
-        'torchVer': '1.12.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.6.2', 'cudnnVer': '8',
-        'torchVer': '1.13.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.7.1', 'cudnnVer': '8',
-        'torchVer': '1.13.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.6.2', 'cudnnVer': '8',
-        'torchVer': '1.13.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.7.1', 'cudnnVer': '8',
-        'torchVer': '1.13.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.7.1', 'cudnnVer': '8',
-        'torchVer': '2.0.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'torchVer': '2.0.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.7.1', 'cudnnVer': '8',
-        'torchVer': '2.0.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'torchVer': '2.0.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'torchVer': '2.1.0', 'archsToTest': 'MULTI'
-    ],
-    [
         'cudaVer': '12.1.0', 'cudnnVer': '8',
         'torchVer': '2.1.0', 'archsToTest': 'MULTI'
     ],
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'torchVer': '2.1.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '12.1.0', 'cudnnVer': '8',
-        'torchVer': '2.1.1', 'archsToTest': 'MULTI'
+        'torchVer': '2.3.1', 'archsToTest': 'MULTI'
     ],
 */
+    [
+        'cudaVer': '12.1.0', 'cudnnVer': '8',
+        'torchVer': '2.3.1', 'archsToTest': 'MULTI'
+    ],
 ]
 
-def windows_for_wheels_configs = [
-/*
+def ubuntu_for_cpu_wheels_configs = [
     [
-        'cudaVer': '11.3', 'cudnnVer': '8',
-        'torchVer': '1.12.0', 'archsToTest': ''
+        'torchVer': '2.3,1'
     ],
     [
-        'cudaVer': '11.6', 'cudnnVer': '8',
-        'torchVer': '1.12.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.3', 'cudnnVer': '8',
-        'torchVer': '1.12.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.6', 'cudnnVer': '8',
-        'torchVer': '1.12.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.6', 'cudnnVer': '8',
-        'torchVer': '1.13.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.7', 'cudnnVer': '8',
-        'torchVer': '1.13.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.6', 'cudnnVer': '8',
-        'torchVer': '1.13.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.7', 'cudnnVer': '8',
-        'torchVer': '1.13.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.7', 'cudnnVer': '8',
-        'torchVer': '2.0.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.0.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.7', 'cudnnVer': '8',
-        'torchVer': '2.0.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.0.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.1.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.1.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.1.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.1.1', 'archsToTest': ''
+        'torchVer': '2.0.0'
     ]
-*/
 ]
 
+def windows_for_cuda_wheels_configs = [
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.0.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.3.1', 'archsToTest': ''
+    ]
+]
+
+def windows_for_cpu_wheels_configs = [
+    [
+        'torchVer': '2.0.0', 'archsToTest': ''
+    ],
+    [
+        'torchVer': '2.3.1', 'archsToTest': ''
+    ]
+]
 // Configs for build from Windows server docker images
 // (See: https://hub.docker.com/_/microsoft-dotnet-framework-sdk)
 def windows_from_server_configs = [
@@ -214,13 +121,13 @@ def windows_from_server_configs = [
     // test machines currently are the only option, named 'gpu_tester'
     //      two machines exist, only the TITAN RTX will pass tests
     [
-        'cudaVer': '11.3',
-        'pythonVer': '3.8', 'torchVer': '1.11.0',
+        'cudaVer': '11.8',
+        'pythonVer': '3.9', 'torchVer': '2.0.0',
         'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
     ],
     [
-        'cudaVer': '11.8',
-        'pythonVer': '3.10', 'torchVer': '2.0.1',
+        'cudaVer': '12.1',
+        'pythonVer': '3.11', 'torchVer': '2.3.1',
         'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
     ]
 ]
@@ -251,8 +158,8 @@ node {
     sh "echo ${commitHash}"
     if (gitlabActionType == "MERGE" &&
         gitlabMergeRequestTitle.contains("[for wheels]")) {
-            for (config in ubuntu_for_wheels_configs) {
-                for (pythonVer in ['3.8', '3.9', '3.10']) {
+            for (config in ubuntu_for_cuda_wheels_configs) {
+                for (pythonVer in ['3.9', '3.10', '3.11']) {
                     def configName = "custom-wheels-torch${config['torchVer']}-" + \
                                      "cuda${config['cudaVer']}-" +
                                      "cudnn${config['cudnnVer']}-" +
@@ -268,16 +175,41 @@ node {
                     )
                 }
             }
-            for (config in windows_for_wheels_configs) {
-                for (pythonVer in ['3.8', '3.9', '3.10']) {
-
+            for (config in ubuntu_for_cpu_wheels_configs) {
+                for (pythonVer in ['3.9', '3.10', '3.11']) {
+                    def configName = "custom-wheels-torch${config['torchVer']}-" + \
+                                     "cpu-py${pythonVer}"
+                    jobMap["${configName}"] = prepareUbuntuCPUOnlyJob(
+                        configName,
+                        pythonVer,
+                        config['torchVer'],
+                        true 
+                    )
+                }
+            }
+            for (config in windows_for_cuda_wheels_configs) {
+                for (pythonVer in ['3.9', '3.10', '3.11']) {
                     def cudaVerLabel = config['cudaVer'].split('\\.').join('')
                     def torchVerLabel = config['torchVer'].split('\\.').join('')
                     def pythonVerLabel = pythonVer.split('\\.').join('')
                     def configName = "windows-wheels-cuda${cudaVerLabel}-py${pythonVerLabel}-torch${torchVerLabel}"
-                    jobMap["${configName}"] = prepareWindowsJob(
+                    jobMap["${configName}"] = prepareWindowsCUDAJob(
                         configName,
                         config['cudaVer'],
+                        pythonVer,
+                        config['torchVer'],
+                        config['archsToTest'],
+                        true
+                    )
+                }
+            }
+            for (config in windows_for_cpu_wheels_configs) {
+                for (pythonVer in ['3.9', '3.10', '3.11']) {
+                    def torchVerLabel = config['torchVer'].split('\\.').join('')
+                    def pythonVerLabel = pythonVer.split('\\.').join('')
+                    def configName = "windows-wheels-cpu-py${pythonVerLabel}-torch${torchVerLabel}"
+                    jobMap["${configName}"] = prepareWindowsCpuOnlyJob(
+                        configName,
                         pythonVer,
                         config['torchVer'],
                         config['archsToTest'],
@@ -343,7 +275,8 @@ node {
             jobMap["${configName}"] = prepareUbuntuCPUOnlyJob(
                 configName,
                 config['pythonVer'],
-                config['torchVer']
+                config['torchVer'],
+                false
             )
         }
 
@@ -352,7 +285,7 @@ node {
             def torchVerLabel = config['torchVer'].split('\\.').join('')
             def pythonVerLabel = config['pythonVer'].split('\\.').join('')
             def configName = "windows-cuda${cudaVerLabel}-py${pythonVerLabel}-torch${torchVerLabel}"
-            jobMap["${configName}"] = prepareWindowsJob(
+            jobMap["${configName}"] = prepareWindowsCUDAJob(
                 configName,
                 config['cudaVer'],
                 config['pythonVer'],
@@ -436,7 +369,7 @@ def prepareUbuntuFromCUDAJob(configName, cudaVer, cudnnVer, pythonVer, torchVer,
   }
 }
 
-def prepareUbuntuCPUOnlyJob(configName, pythonVer, torchVer) {
+def prepareUbuntuCPUOnlyJob(configName, pythonVer, torchVer, buildWheel) {
   return {
     stage("${configName}") {
       updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
@@ -450,7 +383,8 @@ def prepareUbuntuCPUOnlyJob(configName, pythonVer, torchVer) {
                value: "${imageBaseTag}:${branchRef}-${BUILD_ID}-${configName}"),
         string(name: 'sourceBranch', value: "${env.gitlabSourceBranch}"),
         string(name: 'repoUrl', value: "${scm.userRemoteConfigs[0].url}" ),
-        string(name: 'commitHash', value: "${commitHash}")
+        string(name: 'commitHash', value: "${commitHash}"),
+        booleanParam(name: 'buildWheel', value: "${buildWheel}")
       ],
       wait: false,
       propagate: false
@@ -458,8 +392,8 @@ def prepareUbuntuCPUOnlyJob(configName, pythonVer, torchVer) {
   }
 }
 
-def prepareWindowsJob(configName, cudaVer, pythonVer, torchVer, archsToTest,
-                      buildWheel) {
+def prepareWindowsCUDAJob(configName, cudaVer, pythonVer, torchVer, archsToTest,
+                          buildWheel) {
   return {
     stage("${configName}") {
       updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
@@ -475,6 +409,38 @@ def prepareWindowsJob(configName, cudaVer, pythonVer, torchVer, archsToTest,
       parameters: [
         string(name: 'configName', value: "${configName}"),
         string(name: 'cudaVer', value: "${cudaVer}"),
+        string(name: 'pythonVer', value: "${pythonVer}"),
+        string(name: 'torchVer', value: "${torchVer}"),
+        string(name: 'targetImageTag',
+               value: "${imageBaseTag}:${branchRef}-${BUILD_ID}-${configName}"),
+        string(name: 'sourceBranch', value: "${gitlabSourceBranch}"),
+        string(name: 'repoUrl', value: "${scm.userRemoteConfigs[0].url}" ),
+        string(name: 'commitHash', value: "${commitHash}"),
+        string(name: 'archsToTest', value: "${archsToTest}"),
+        booleanParam(name: 'buildWheel', value: "${buildWheel}")
+      ],
+      wait: false,
+      propagate: false
+    }
+  }
+}
+
+def prepareWindowsCpuOnlyJob(configName, pythonVer, torchVer, archsToTest,
+                             buildWheel) {
+  return {
+    stage("${configName}") {
+      updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
+      if (buildWheel.toBoolean()) {
+        updateGitlabCommitStatus(name: "test-${configName}", state: "pending")
+      } //else {
+      //  for (arch in archsToTest.split(';')) {
+      //    updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "pending")
+      //  }
+      //}
+
+      build job: "windows_cpuonly_template_CI",
+      parameters: [
+        string(name: 'configName', value: "${configName}"),
         string(name: 'pythonVer', value: "${pythonVer}"),
         string(name: 'torchVer', value: "${torchVer}"),
         string(name: 'targetImageTag',

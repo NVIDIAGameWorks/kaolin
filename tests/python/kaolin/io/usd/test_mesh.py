@@ -16,6 +16,7 @@
 
 import os
 import shutil
+import glob
 
 import torch
 import pytest
@@ -530,7 +531,7 @@ class TestMeshes:
     @pytest.mark.parametrize('with_materials', [False, True])
     @pytest.mark.parametrize('flatten', [True, False])
     def test_import_triangulate(self, with_normals, with_materials, flatten):
-        input_path = io_data_path(f'amsterdam.usd')  # Multiple quad meshes
+        input_path = io_data_path(f'amsterdam.usda')  # Multiple quad meshes
         if flatten:
             # Import as one mesh
             orig = [usd.import_mesh(input_path, with_materials=with_materials, with_normals=with_normals)]
@@ -601,7 +602,7 @@ class TestDiverseInputs:
     @pytest.mark.parametrize("device", ["cuda", "cpu"])
     @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam', 'armchair'])
     def test_read_write_read_consistency(self, device, bname, out_dir, expected_mesh_counts):
-        fname = io_data_path(f'{bname}.usd')
+        fname = glob.glob(io_data_path(f'{bname}.usd') + '*')[0]
         # import as multiple meshes
         read_usd_mesh = SurfaceMesh.cat(
             usd.import_meshes(fname, with_normals=True, with_materials=True), fixed_topology=False).to(device)
@@ -644,7 +645,7 @@ class TestDiverseInputs:
 
         # First we export all at once
         for bname in all_bnames:
-            fname = io_data_path(f'{bname}.usd')
+            fname = glob.glob(io_data_path(f'{bname}.usd') + '*')[0]
             out_path = os.path.join(out_dir, f'reexport_multi_{bname}.usda')
             # import as multiple meshes
             read_usd_mesh = SurfaceMesh.cat(
@@ -659,7 +660,7 @@ class TestDiverseInputs:
 
         # Next, we import original and exported and check consistency
         for bname in all_bnames:
-            fname = io_data_path(f'{bname}.usd')
+            fname = glob.glob(io_data_path(f'{bname}.usd') + '*')[0]
             out_path = os.path.join(out_dir, f'reexport_multi_{bname}.usda')
 
             # import as multiple meshes
