@@ -19,11 +19,11 @@ import urllib.request
 
 import pytest
 
-
+BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 @pytest.fixture(scope='module')
 def kitchen_set_dir():
     # Create temporary output directory
-    data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '_data')
+    data_dir = os.path.join(BASE_DIR, '_data')
     os.makedirs(data_dir, exist_ok=True)
     kitchen_set_path = os.path.join(data_dir, 'kitchenset.zip')
 
@@ -39,7 +39,7 @@ def kitchen_set_dir():
 @pytest.fixture(scope='module')
 def out_dir():
     # Create temporary output directory
-    out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '_out')
+    out_dir = os.path.join(BASE_DIR, '_out')
     os.makedirs(out_dir, exist_ok=True)
     yield out_dir
     shutil.rmtree(out_dir)
@@ -48,7 +48,10 @@ def out_dir():
 class TestUsdKitchenSet:
     def test_runs(self, kitchen_set_dir, out_dir):
         args = f'--kitchen_set_dir={kitchen_set_dir} --output_dir={out_dir}'
-        os.system(f'python examples/tutorial/usd_kitchenset.py {args}')
+        path = os.path.join(BASE_DIR, os.pardir, os.pardir, os.pardir, os.pardir,
+                            'examples', 'tutorial', 'usd_kitchenset.py')
+        #os.system(f'python examples/tutorial/usd_kitchenset.py {args}')
+        os.system(f'python {path} {args}')
 
         # Confirm that there are 426 meshes exported
         assert len(os.listdir(out_dir)) == 426
