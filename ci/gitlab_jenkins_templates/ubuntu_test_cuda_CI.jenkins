@@ -108,7 +108,7 @@ spec:
                 --log-disable=PIL.PngImagePlugin \
                 --log-disable=PIL.TiffImagePlugin \
                 --log-disable=kaolin.rep.surface_mesh \
-                /kaolin/tests/python/kaolin
+                /kaolin/tests/python/
             '''
           }
         } catch(e) {
