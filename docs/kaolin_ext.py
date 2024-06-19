@@ -33,6 +33,7 @@ def run_apidoc(_):
             "kaolin/version.txt",
             "kaolin/io/usd/utils.py",
             "kaolin/io/usd/mesh.py",
+            "kaolin/io/usd/materials.py",
             "kaolin/io/usd/voxelgrid.py",
             "kaolin/io/usd/pointcloud.py",
             "kaolin/ops/conversions/pointcloud.py",

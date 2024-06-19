@@ -8,6 +8,9 @@ kaolin.render
    :titlesonly:
 
    kaolin.render.camera
+   kaolin.render.easy_render
    kaolin.render.lighting
+   kaolin.render.materials
    kaolin.render.mesh
    kaolin.render.spc
+   kaolin.render.rays

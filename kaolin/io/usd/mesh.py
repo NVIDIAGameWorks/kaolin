@@ -15,8 +15,8 @@
 
 import os
 import warnings
-from collections import namedtuple
 import numpy as np
+import pathlib
 from tqdm import tqdm
 
 import torch
@@ -26,10 +26,11 @@ try:
 except ImportError:
     pass
 
-from kaolin.io import materials as usd_materials
+from kaolin.io.materials import MaterialLoadError, MaterialNotSupportedError, process_materials_and_assignments
 from kaolin.io import utils
 from kaolin.rep import SurfaceMesh
 
+from .materials import export_material, UsdMaterialIoManager
 from .utils import _get_stage_from_maybe_file, get_scene_paths, create_stage
 
 
@@ -217,12 +218,11 @@ def get_mesh_prim_materials(mesh_prim, stage_dir, num_faces, time=None):
 
         res = None
         try:
-            # TODO: can we also read it from a loaded USD, no path?
-            res = usd_materials.MaterialManager.read_usd_material(mat, mat_path, time)
+            res = UsdMaterialIoManager.read_material(mat, mat_path, time)
             materials[mesh_material_path] = res
-        except usd_materials.MaterialNotSupportedError as e:
+        except MaterialNotSupportedError as e:
             warnings.warn(e.args[0])
-        except usd_materials.MaterialLoadError as e:
+        except MaterialLoadError as e:
             warnings.warn(e.args[0])
 
         return mesh_material_path, res
@@ -661,6 +661,7 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
         # Process face-related attributes, correctly handling absence of face information
         if face_uvs_idx is not None and face_uvs_idx.size(0) > 0:
             uvs = uvs.reshape(-1, 2)
+            uvs[..., 1] = 1 - uvs[..., 1]  # modify according to convention
             face_uvs_idx = face_uvs_idx.reshape(-1, max(1, facesize))
         else:
             uvs = None
@@ -677,7 +678,7 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
             # TODO: add support for custom material error_handler
             def _default_error_handler(error, **kwargs):
                 raise error
-            materials, material_assignments = usd_materials.process_materials_and_assignments(
+            materials, material_assignments = process_materials_and_assignments(
                 materials_dict, material_assignments_dict, _default_error_handler, nfaces,
                 error_context_str=scene_path)
 
@@ -690,8 +691,9 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
 
 
 def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_idx=None, face_normals=None,
-             material_assignments=None, materials=None, time=None):
-    r"""Add a mesh to an existing USD stage. The stage is modified but not saved to disk.
+             material_assignments=None, materials=None, time=None, overwrite_textures=False):
+    r"""Add a mesh to an existing USD stage. The stage is modified but not saved to disk; material textures are written
+    to disk.
 
     Args:
         stage (Usd.Stage): Stage onto which to add the mesh.
@@ -708,6 +710,8 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
             material (in the above list) assigned to the corresponding face, or `-1` if no material was assigned
         time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
             correspond to.
+        overwrite_textures (bool): set to True to overwrite existing image files when writing textures; if False
+            (default) will add index to filename to avoid conflicts.
     Returns:
         (Usd.Stage)
 
@@ -733,7 +737,8 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         vertices_list = vertices.detach().cpu().float().numpy()
         usd_mesh.GetPointsAttr().Set(Vt.Vec3fArray.FromNumpy(vertices_list), time=time)
     if uvs is not None:
-        uvs_list = uvs.view(-1, 2).detach().cpu().float().numpy()
+        uvs_list = uvs.view(-1, 2).detach().cpu().float().numpy().copy()
+        uvs_list[:, 1] = 1 - uvs_list[:, 1]  # reverse convention we use in the code
         pv = UsdGeom.PrimvarsAPI(usd_mesh.GetPrim()).CreatePrimvar(
             'st', Sdf.ValueTypeNames.Float2Array)
         pv.Set(uvs_list, time=time)
@@ -763,20 +768,30 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         # Create submeshes
         for i, material in enumerate(materials):
             # Note: without int(x) for ... fails in Set with type mismatch
-            face_idx = [int(x) for x in list((material_assignments == i).nonzero().squeeze().numpy())]
+            face_idx = [int(x) for x in list((material_assignments == i).nonzero().reshape((-1,)).detach().cpu().numpy())]
             subset_prim = stage.DefinePrim(f'{scene_path}/subset_{i}', 'GeomSubset')
             subset_prim.GetAttribute('indices').Set(face_idx)
-            if isinstance(material, usd_materials.Material):
-                # TODO: should be write_to_usd
-                material._write_usd_preview_surface(stage, f'{scene_path}/Looks/material_{i}',
-                                                    [subset_prim], time, texture_dir=f'material_{i}',
-                                                    texture_file_prefix='')    # TODO allow users to pass root path to save textures to
+            try:
+                # Note: this has the desirable property of always rewriting the materials under scene_path, but
+                # TODO: more thought is required on when it is desirable to overwrite textures vs. not;
+                # e.g. when re-exporting to the same file overwriting might be good, when calling `add_mesh`
+                # repeatedly with new meshes, the textures of new materials should not overwrite existing
+                # materials. Current default ensures meshes can be added without overwriting each other's
+                # material files, and when a mesh is re-added, its materials will be reset.
+                basename = str(pathlib.Path(stage.GetRootLayer().realPath).stem)
+                export_material(material, stage, bound_prims=[subset_prim], time=time,
+                                scene_path=f'{scene_path}/Looks/material_{i}',
+                                texture_path=f'{basename}_textures',
+                                overwrite_textures=overwrite_textures)
+            except Exception as e:
+                raise(e)
+
     return usd_mesh.GetPrim()
 
 
 def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, faces=None,
                 uvs=None, face_uvs_idx=None, face_normals=None, material_assignments=None, materials=None,
-                up_axis='Y', time=None):
+                up_axis='Y', time=None, overwrite_textures=False):
     r"""Export a single mesh to USD and save the stage to disk.
 
     Args:
@@ -799,6 +814,8 @@ def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, fac
         up_axis (str, optional): Specifies the scene's up axis. Choose from ``['Y', 'Z']``
         time (convertible to float, optional):
             Positive integer defining the time at which the supplied parameters correspond to.
+        overwrite_textures (bool): set to True to overwrite existing image files when writing textures; if False
+            (default) will add index to filename to avoid conflicts.
 
     Returns:
        (Usd.Stage)
@@ -817,7 +834,7 @@ def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, fac
     else:
         stage = create_stage(file_path, up_axis)
     add_mesh(stage, scene_path, vertices, faces, uvs, face_uvs_idx,
-             face_normals, material_assignments, materials, time=time)
+             face_normals, material_assignments, materials, time=time, overwrite_textures=overwrite_textures)
     stage.Save()
 
     return stage
@@ -825,7 +842,7 @@ def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, fac
 
 def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
                   uvs=None, face_uvs_idx=None, face_normals=None, material_assignments=None, materials=None,
-                  up_axis='Y', times=None):
+                  up_axis='Y', times=None, overwrite_textures=False):
     r"""Export multiple meshes to a new USD stage.
 
     Export multiple meshes defined by lists vertices and faces and save the stage to disk.
@@ -848,6 +865,9 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
         up_axis (str, optional): Specifies the scene's up axis. Choose from ``['Y', 'Z']``.
         times (list of int, optional): Positive integers defining the time at which the supplied parameters
             correspond to.
+        overwrite_textures (bool): set to True to overwrite existing image files when writing textures; if False
+            (default) will add index to filename to avoid conflicts.
+
     Returns:
         (Usd.Stage)
 
@@ -856,7 +876,11 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
         >>> faces_list = [torch.tensor([[0, 1, 2]]) for _ in range(3)]
         >>> stage = export_meshes('./new_stage.usd', vertices=vertices_list, faces=faces_list)
     """
-    stage = create_stage(file_path, up_axis)
+    if os.path.exists(file_path):
+        stage = Usd.Stage.Open(file_path)
+        UsdGeom.SetStageUpAxis(stage, up_axis)
+    else:
+        stage = create_stage(file_path, up_axis)
     num_meshes = -1
     # TODO: might want to consider sharing materials
     for param in [scene_paths, vertices, faces, uvs, face_uvs_idx,
@@ -887,7 +911,7 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
                  face_normals=None if face_normals is None else face_normals[i],
                  material_assignments=None if material_assignments is None else material_assignments[i],
                  materials=None if materials is None else materials[i],
-                 time=times[i])
+                 time=times[i], overwrite_textures=overwrite_textures)
     stage.Save()
 
     return stage

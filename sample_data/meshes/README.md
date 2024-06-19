@@ -133,3 +133,24 @@ and are not meant to be high-quality 3D examples.
 * UVs
 
 <div style="clear:both"></div>
+
+## Avocado, Multi-format
+
+**Filenames:** [avocado.gltf](avocado.gltf),  [avocado.obj](avocado.obj),  [avocado.usda](avocado.usda).
+
+**Source**: originally obtained from [KhronosGroup](https://github.com/KhronosGroup/glTF-Sample-Models/tree/main/sourceModels/Avocado) source file, processed in Blender and 
+manually to obtain consistent reference files.
+
+**License**: Licensed under [Creative Commons CC0 License](http://creativecommons.org/publicdomain/zero/1.0/). To the extent possible under law, Microsoft has waived all copyright and related or neighboring rights to this asset.
+
+**Formats**: was exported as `gltf`, `usda` (ascii) and `obj` from Blender.
+
+**Sanity checks**: displays correctly in Blender 3.1 in all formats and as `usda` imported into [NVIDIA Omniverse](https://www.nvidia.com/en-us/omniverse/).
+
+<img width="30%" style="padding:0 20px 0 0; float: left" src="renders/avocado.jpg">
+
+**Attributes** of the single avocado mesh:
+* Vertices: 406
+* Faces: 682 triangles
+* Materials: single material with albedo, normals and roughness/metallic texture
+* Normals and UVs are consistent across `.obj`, `.gltf`, and `.usd` formats

@@ -73,6 +73,47 @@ def test_adjacency_consistent(device, dtype):
     assert torch.equal(sparse_to_dense, dense)
 
 
+def test_index_vertices_by_faces():
+    vertex_features = torch.tensor([[0., 1., 2., 3.],
+                                    [4., 5., 6., 7.],
+                                    [8., 9., 10., 11.],
+                                    [12., 13., 14., 15.]]).float().unsqueeze(0)
+    faces = torch.tensor([[0, 1, 2],
+                          [2, 1, 3]]).long()
+    face_features = mesh.index_vertices_by_faces(vertex_features, faces)
+    expected_shape = [1, 2, 3, 4]
+    assert list(face_features.shape) == expected_shape
+    for b in range(expected_shape[0]):
+        for f in range(expected_shape[1]):
+            for v in range(expected_shape[2]):
+                assert torch.allclose(face_features[b, f, v, :], vertex_features[b, faces[f, v], ...])
+
+
+def test_unindex_vertices_by_faces():
+    # Unbatched
+    nfaces = 5
+    fsize = 3
+    channels = 2
+    face_vertex_features = torch.rand((nfaces, fsize, channels))
+
+    vertex_features, face_indices = mesh.unindex_vertices_by_faces(face_vertex_features)
+    assert list(vertex_features.shape) == [nfaces * fsize, channels]
+    assert list(face_indices.shape) == [nfaces, fsize]
+    for f in range(nfaces):
+        for v in range(fsize):
+            assert torch.allclose(face_vertex_features[f, v, :], vertex_features[face_indices[f, v], :])
+
+    # Batched
+    batch_size = 4
+    face_vertex_features = torch.rand((batch_size, nfaces, fsize, channels))
+    vertex_features, face_indices = mesh.unindex_vertices_by_faces(face_vertex_features)
+    assert list(vertex_features.shape) == [batch_size, nfaces * fsize, channels]
+    assert list(face_indices.shape) == [nfaces, fsize]
+    for b in range(batch_size):
+        for f in range(nfaces):
+            for v in range(fsize):
+                assert torch.allclose(face_vertex_features[b, f, v, :], vertex_features[b, face_indices[f, v], :])
+
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 class TestUniformLaplacian:
 
@@ -103,6 +144,36 @@ class TestUniformLaplacian:
 
 @pytest.mark.parametrize('device,dtype', FLOAT_TYPES)
 class TestComputeVertexNormals:
+    def test_average_face_vertex_features(self, device, dtype):
+        faces = torch.tensor([[0, 1, 2],
+                              [1, 2, 4],
+                              [2, 4, 5],
+                              [2, 5, 6]],
+                             device=device, dtype=torch.long)
+        B = 3
+        F = faces.shape[0]
+        FSize = faces.shape[1]
+        V = 7
+        num_feat = 10
+        face_features = torch.rand((B, F, FSize, num_feat), device=device, dtype=dtype)
+
+        expected = torch.zeros((B, V, num_feat), device=device, dtype=dtype)
+        for b in range(B):
+            expected[b, 0, :] = face_features[b, 0, 0, :]
+            expected[b, 1, :] = (face_features[b, 0, 1, :] + face_features[b, 1, 0, :]) / 2
+            expected[b, 2, :] = (face_features[b, 0, 2, :] + face_features[b, 1, 1, :] +
+                                 face_features[b, 2, 0, :] + face_features[b, 3, 0, :]) / 4
+            expected[b, 3, :] = 0  # DNE in faces
+            expected[b, 4, :] = (face_features[b, 1, 2, :] + face_features[b, 2, 1, :]) / 2
+            expected[b, 5, :] = (face_features[b, 2, 2, :] + face_features[b, 3, 1, :]) / 2
+            expected[b, 6, :] = face_features[b, 3, 2, :]
+
+        vertex_features = mesh.average_face_vertex_features(faces, face_features)
+        if dtype == torch.half:
+            assert torch.allclose(expected, vertex_features, rtol=1e-03, atol=1e-05)
+        else:
+            assert torch.allclose(expected, vertex_features)
+
     def test_compute_vertex_normals(self, device, dtype):
         # Faces are a fan around the 0th vertex
         faces = torch.tensor([[0, 2, 1],

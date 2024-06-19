@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +21,7 @@ import torch
 import pytest
 
 
+from kaolin.render.materials import PBRMaterial
 from kaolin import io
 from kaolin.visualize import timelapse
 from kaolin.ops.conversions import trianglemeshes_to_voxelgrids
@@ -84,7 +86,7 @@ def material_values():
         'specular_color': (1., 0., 0.),
         'is_specular_workflow': True,
     }
-    material = io.materials.PBRMaterial(**params)
+    material = PBRMaterial(**params)
     yield material
 
 
@@ -97,7 +99,7 @@ def material_textures():
         'specular_texture': torch.rand((3, 256, 256)),
         'is_specular_workflow': True,
     }
-    material = io.materials.PBRMaterial(**params)
+    material = PBRMaterial(**params)
     yield material
 
 
@@ -149,7 +151,7 @@ class TestTimelapse:
 
             # Verify material properties
             for variant_name, material_data in materials.items():
-                mat = io.materials.PBRMaterial().read_from_usd(filename, f'/mesh_0/{variant_name}', time=iteration)
+                mat = io.usd.import_material(filename, f'/mesh_0/{variant_name}', time=iteration).chw()
                 assert pytest.approx(mat.diffuse_color, 1e-5) == material_data.diffuse_color
                 assert pytest.approx(mat.specular_color, 1e-5) == material_data.specular_color
                 assert pytest.approx(mat.roughness_value, 1e-5) == material_data.roughness_value

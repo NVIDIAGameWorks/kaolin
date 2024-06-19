@@ -17,7 +17,7 @@ import torch
 from torch.autograd import Function
 
 from kaolin import _C
-from .rasterization import rasterize, _legacy_to_opengl, nvdiff, _get_nvdiff_glctx
+from .rasterization import rasterize
 
 __all__ = [
     "dibr_soft_mask",
