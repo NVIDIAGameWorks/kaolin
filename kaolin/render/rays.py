@@ -57,3 +57,19 @@ def generate_pinhole_rays_dir(camera, height=None, width=None, device='cuda'):
     ray_dir /= torch.linalg.norm(ray_dir, dim=-1, keepdim=True)
 
     return ray_dir[0].reshape(1, height, width, 3)
+
+def generate_orthographic_rays_dir(camera, height, width, device='cuda'):
+    """Generate centered grid.
+    
+    This is a utility function for specular reflectance with spherical gaussian.
+    """
+    points_camera = torch.tensor([[0,0,1], [0,0,2]], dtype=torch.float32, device=device)
+    ray_dir = points_camera[0] - points_camera[1]
+    ray_dir = ray_dir.expand(1, 1, 3)
+    ray_org = torch.zeros_like(ray_dir)
+
+    ray_orig, ray_dir = camera.extrinsics.inv_transform_rays(ray_org, ray_dir)
+
+    ray_dir = ray_dir / torch.linalg.norm(ray_dir, dim=-1, keepdim=True)
+
+    return ray_dir.expand(1, height, width, 3)

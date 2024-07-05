@@ -208,7 +208,11 @@ def mesh_rasterize_interpolate_nvdiffrast(
             (tuple of): face_idx, im_normals, im_tangents, im_uvs, im_features
         """
     vertices_camera = camera.extrinsics.transform(mesh.vertices)
-    vertices_clip = camera.intrinsics.project(vertices_camera)
+    if camera.lens_type == 'ortho':
+        vertices_clip = camera.intrinsics.transform(vertices_camera) 
+        vertices_clip = kal.render.camera.intrinsics.up_to_homogeneous(vertices_clip)
+    else:
+        vertices_clip = camera.intrinsics.project(vertices_camera)
 
     faces_int = mesh.faces.int()
     rast = nvdiffrast.torch.rasterize(nvdiffrast_context, vertices_clip, faces_int,
@@ -420,7 +424,11 @@ def sg_shade(camera, face_idx, albedo, spec_albedo, im_roughness, im_world_norma
     diffuse_img = torch.zeros_like(img)
     diffuse_img[hard_mask] = diffuse_effect
 
-    rays_d = kal.render.rays.generate_pinhole_rays_dir(camera, height, width)
+    if camera.lens_type == 'ortho':
+        rays_d = kal.render.rays.generate_orthographic_rays_dir(camera, height, width)
+    else:
+        rays_d = kal.render.rays.generate_pinhole_rays_dir(camera, height, width)
+        
     specular_effect = kal.render.lighting.sg_warp_specular_term(
         amplitude, direction, sharpness,
         _im_world_normals,
