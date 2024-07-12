@@ -19,8 +19,13 @@ from torch import Tensor
 from .rotation33 import rot33_from_quat
 from .util import pad_mat33_to_mat44
 
-### CONVERSIONS ###
+__all__ = [
+    'rot44_from_quat',
+    'translation_to_mat44',
+    'scale_to_mat44'
+]
 
+### CONVERSIONS ###
 
 @torch.jit.script
 def rot44_from_quat(quat: Tensor) -> Tensor:
