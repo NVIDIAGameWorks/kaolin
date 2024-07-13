@@ -484,7 +484,7 @@ def assert_images_close(im0, im1, pixel_disagreement_threshold=0.03, max_percent
     elif im0.shape != im1.shape:
         if torchvision is None:
             raise ValueError(f'Resize requested, but no torchvision in environment')
-        im1 = torchvision.transforms.Resize((im0.shape[0], im0.shape[1]))(im1.permute(2, 0, 1)).permute(1, 2, 0)
+        im1 = torchvision.transforms.Resize(im0.shape[:2], antialias=False)(im1.permute(2, 0, 1)).permute(1, 2, 0)
     width = im0.shape[1]
     height = im0.shape[0]
 

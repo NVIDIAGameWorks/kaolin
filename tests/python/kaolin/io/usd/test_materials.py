@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import glob
 import random
 import os
 import shutil
@@ -87,8 +88,8 @@ class TestUsdPreviewSurfaceIo:
         mat2 = kaolin.render.materials.PBRMaterial(**random_material_textures(), **random_material_colorspaces())
         mat2.material_name = '/World/Looks2/pretty_material'
 
-        file_path1 = os.path.join(out_dir, 'pretty_material.usda')
-        file_path2 = os.path.join(out_dir, 'pretty_material2.usda')
+        file_path1 = os.path.join(out_dir, f'pretty_material_{same_filepath}.usda')
+        file_path2 = os.path.join(out_dir, f'pretty_material2_{same_filepath}.usda')
         if same_filepath:
             file_path2 = file_path1
 
@@ -157,7 +158,7 @@ class TestUsdPreviewSurfaceIo:
 
     @pytest.mark.parametrize("input_values", ["values", "textures", "both", "none"])
     def test_cycle_write_read(self, out_dir, input_values, material_values, material_textures):
-        file_path = os.path.join(out_dir, 'pbr_test.usda')
+        file_path = os.path.join(out_dir, f'pbr_test_{input_values}.usda')
         scene_path = '/World/Looks/pbr'
 
         colorspaces = random_material_colorspaces()
@@ -257,7 +258,7 @@ class TestUsdPreviewSurfaceIo:
             checkerboard[:, 1, 1] = torch.tensor(val2)
             checkerboard = torch.nn.functional.interpolate(checkerboard[None, ...], scale_factor=128)[0]
             return checkerboard
-        out_path = os.path.join(out_dir, 'pbr_material_textures.usda')
+        out_path = os.path.join(out_dir, f'pbr_material_textures_{device}.usda')
         stage = usd.create_stage(out_path)
 
         tests = {
@@ -340,7 +341,7 @@ class TestUsdPreviewSurfaceIo:
 
 class TestDiverseUsdPreviewSurfaceIo:
     def test_reads_real_world_textures(self):
-        fname = samples_data_path('io', 'armchair.usd')
+        fname = samples_data_path('io', 'armchair.usdc')
         scene_paths = ['/_materials/M_Armchair_Cushions', '/_materials/M_Armchair_Legs']
 
         materials = [usd_materials.import_material(fname, sp) for sp in scene_paths]
@@ -351,7 +352,7 @@ class TestDiverseUsdPreviewSurfaceIo:
 
     @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam', 'armchair'])
     def test_read_write_read_complex(self, out_dir, bname):
-        fname = samples_data_path('io', f'{bname}.usd')
+        fname = glob.glob(samples_data_path('io', f'{bname}.usd') + '*')[0]
         out_fname = os.path.join(out_dir, f'exported_materials_{bname}.usd')
 
         scene_paths = usd.get_scene_paths(fname, prim_types='Material')

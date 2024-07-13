@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import glob
 import torch
 import pytest
 
@@ -64,7 +65,7 @@ class TestDiverseInputs:
     @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam', 'armchair', 'avocado'])
     def test_read_usd_obj_consistency(self, bname, expected_sizes, expected_material_counts, method_to_test, triangulate):
         # Read USD version, flattening all meshes into one
-        fname = io_data_path(f'{bname}.usd')
+        fname = glob.glob(io_data_path(f'{bname}.usd') + '*')[0]
         if method_to_test == 'generic':
             read_usd_mesh = import_mesh(fname, triangulate=triangulate)
         else:
@@ -108,10 +109,11 @@ class TestDiverseInputs:
     def test_read_usd_obj_gltf_consistency(self, expected_sizes, expected_material_counts, method_to_test):
         bname = 'avocado'
         # Read USD version
-        fname = io_data_path(f'{bname}.usd')
+        fname = glob.glob(io_data_path(f'{bname}.usd') + '*')[0]
         if method_to_test == 'generic':
             read_usd_mesh = import_mesh(fname, triangulate=True)
         else:
+            print("fname")
             read_usd_mesh = usd.import_mesh(fname, with_normals=True, with_materials=True, triangulate=True)
 
         # Read gltf version

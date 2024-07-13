@@ -3,7 +3,6 @@ ipython < 8.13 ; python_version < "3.9"
 ipycanvas
 ipyevents
 jupyter_client<8
-pyzmq<25
 flask
 tornado
 comm>=0.1.3

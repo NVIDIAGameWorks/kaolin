@@ -14,8 +14,8 @@ import subprocess
 import warnings
 
 TORCH_MIN_VER = '1.6.0'
-TORCH_MAX_VER = '2.1.1'
-CYTHON_MIN_VER = '0.29.20'
+TORCH_MAX_VER = '2.3.1'
+CYTHON_MIN_VER = '0.29.37'
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
 
 # Module required before installation
@@ -133,7 +133,7 @@ if not torch.cuda.is_available():
                 elif int(bare_metal_minor) < 8:
                     os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6"
                 else:
-                    os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0"
+                    os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;8.9;9.0"
             elif int(bare_metal_major) == 12:
                 os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0"
             else:

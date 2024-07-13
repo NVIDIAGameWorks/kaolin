@@ -15,6 +15,7 @@
 import copy
 import logging
 import os
+import glob
 import pytest
 import random
 
@@ -32,8 +33,8 @@ __samples_path = os.path.join(__test_dir, os.pardir, os.pardir, os.pardir, 'samp
 
 
 def data_path(fname):
-    """ Return path relative to tests/samples/rep"""
-    return os.path.join(__samples_path, 'rep', fname)
+    """ Return path relative to tests/samples/io"""
+    return os.path.join(__samples_path, 'io', fname)
 
 
 def rand_float_vec(shp, device):
@@ -1447,7 +1448,8 @@ class TestCoreParameterized:
         import_args = {'with_materials': True, 'with_normals': True}
 
         # Load multiple meshes from USD and concatenate them
-        amsterdam_meshes = usd.import_meshes(data_path('amsterdam.usd'), **import_args)
+        fname = glob.glob(data_path('amsterdam.usd') + '*')[0]
+        amsterdam_meshes = usd.import_meshes(fname, **import_args)
         input_meshes = amsterdam_meshes
         num_amsterdam = 18
         assert len(amsterdam_meshes) == num_amsterdam   # list
@@ -1464,7 +1466,8 @@ class TestCoreParameterized:
             print(f'\nFixed meshes {fixed_meshes}')
 
         # Load another mesh and convert it to any batching strategy
-        pizza_mesh = usd.import_mesh(data_path('pizza.usd'), **import_args)
+        fname = glob.glob(data_path('pizza.usd') + '*')[0]
+        pizza_mesh = usd.import_mesh(fname, **import_args)
         input_meshes.append(copy.deepcopy(pizza_mesh))
         pizza_mesh.set_batching(batching)
 
@@ -1636,7 +1639,7 @@ class TestCoreUnparameterized:
     @pytest.mark.parametrize('with_normals', [True, False])
     @pytest.mark.parametrize('group_materials_by_name', [True, False])
     def test_flatten(self, with_materials, with_normals, group_materials_by_name):
-        input_path = data_path('armchair.usd')
+        input_path = data_path('armchair.usdc')
         meshes = usd.import_meshes(input_path, with_materials=with_materials, with_normals=with_normals)
         meshes[0].set_batching(SurfaceMesh.Batching.NONE)
         meshes[1].set_batching(SurfaceMesh.Batching.FIXED)
@@ -1685,7 +1688,7 @@ class TestCoreUnparameterized:
         num_faces = 9200 * 2 + 1932 * 2 + 80 + 80
 
         # Meshes with materials and normals, concatenated into a LIST mesh
-        imported = usd.import_meshes(data_path('armchair.usd'),
+        imported = usd.import_meshes(data_path('armchair.usdc'),
                                      with_materials=True, with_normals=True, triangulate=triangulate)
         meshes.append(SurfaceMesh.cat(imported, fixed_topology=False))
 

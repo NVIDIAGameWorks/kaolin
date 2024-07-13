@@ -1,0 +1,105 @@
+#!/usr/bin/env groovy
+
+docker_registry_server = ImageTag.split(':')[0..1].join(':')
+currentBuild.displayName = ImageTag.split(':')[2] + "-cpu"
+currentBuild.description = sourceBranch + ": " + commitHash
+
+gitlabCommitStatus("test-${configName}") {
+
+podTemplate(
+cloud:'sc-ipp-blossom-prod',
+yaml:"""
+apiVersion: v1
+kind: Pod
+spec:
+  volumes:
+  - name: pvc-mount
+    persistentVolumeClaim:
+      claimName: 'kaolin-pvc'
+  containers:
+  - name: docker
+    image: ${imageTag}
+    command:
+    - cat
+    tty: true
+    volumeMounts:
+      - mountPath: /mnt
+        name: pvc-mount
+  imagePullSecrets:
+  - name: gitlabcred
+  nodeSelector:
+    kubernetes.io/os: linux
+""") {
+  node(POD_LABEL) {
+    container("docker") {
+      timeout(time: 60, unit: 'MINUTES') {
+        stage("Install deps") {
+          sh 'pip install -r /kaolin/tools/ci_requirements.txt'
+          sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'
+        }
+        def build_passed = true
+        try {
+          stage('Disp info') {
+            sh 'python --version'
+            sh 'lscpu'
+            sh 'free -h --si'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Pytest") {
+            sh '''
+            export KAOLIN_TEST_SHAPENETV1_PATH=/mnt/data/ci_shapenetv1
+            export KAOLIN_TEST_SHAPENETV2_PATH=/mnt/data/ci_shapenetv2
+            export KAOLIN_TEST_MODELNET_PATH=/mnt/data/ModelNet
+            export KAOLIN_TEST_SHREC16_PATH=/mnt/data/ci_shrec16
+            pytest --durations=50 --import-mode=importlib -rs \
+                --log-disable=PIL.PngImagePlugin \
+                --log-disable=PIL.TiffImagePlugin \
+                --log-disable=kaolin.rep.surface_mesh \
+                /kaolin/tests/python/kaolin/io/test_gltf.py \
+                /kaolin/tests/python/kaolin/io/test_obj.py
+            '''
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Dash3D") {
+            sh '''
+            pytest -s --cov=/kaolin/kaolin /kaolin/tests/integration/
+            '''
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Doc examples") {
+            // using wheel you don't have /kaolin/kaolin
+            sh '''
+            if [ -f "/kaolin/kaolin" ]; then
+                pytest --doctest-modules --ignore=/kaolin/kaolin/experimental /kaolin/kaolin
+            fi
+            '''
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        
+        if (build_passed) {
+          currentBuild.result = "SUCCESS"
+        } else {
+          currentBuild.result = "FAILURE"
+          error "Build failed. See logs..."
+        }
+      }
+    }
+  }
+}
+
+}  // gitlabCommitStatus
