@@ -1,21 +1,5 @@
 #!/usr/bin/env groovy
 
-// Map from CUDA version to URL to obtain windows installer
-def cuda_version_url = [
-    // CUDA drivers on test machines only available for CUDA version >= 11.0
-    //  see: https://gitlab-master.nvidia.com/ipp/cloud-infra/blossom/dev/windows-gpu-pods/-/tree/master/ContainerDriverSetup
-    // test machines currently are the only option, named 'gpu_tester'
-    //      two machines exist, only the TITAN RTX will pass tests
-    '11.1': 'http://developer.download.nvidia.com/compute/cuda/11.1.1/local_installers/cuda_11.1.1_456.81_win10.exe',
-    '11.3': 'https://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda_11.3.1_465.89_win10.exe',
-    '11.5': 'https://developer.download.nvidia.com/compute/cuda/11.5.2/local_installers/cuda_11.5.2_496.13_windows.exe',
-    '11.6': 'https://developer.download.nvidia.com/compute/cuda/11.6.2/local_installers/cuda_11.6.2_511.65_windows.exe',
-    '11.7': 'https://developer.download.nvidia.com/compute/cuda/11.7.1/local_installers/cuda_11.7.1_516.94_windows.exe',
-    '11.8': 'https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe',
-    '12.1': 'https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_531.14_windows.exe'
-]
-
-
 docker_registry_server = targetImageTag.split(':')[0..1].join(':')
 // This will be the "RUN" displayed on Blue Ocean
 currentBuild.displayName = targetImageTag.split(':')[2]
@@ -83,12 +67,9 @@ spec:
         }
         docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
           stage("Build base") {
-            cudaUrl = cuda_version_url[cudaVer]
             baseImage = docker.build(
                 "${targetImageTag}-base",
-                """-m 32g --no-cache -f ./tools/windows/Dockerfile.base \
-                    --build-arg CUDA_VERSION=${cudaVer} \
-                    --build-arg CUDA_URL=${cudaUrl} \
+                """-m 32g --no-cache -f ./tools/windows/Dockerfile.base_cpuonly \
                     --build-arg PYTHON_VERSION=${pythonVer} \
                     --build-arg PYTORCH_VERSION=${torchVer} \
                     .
@@ -172,16 +153,13 @@ def prepareWindowsTestJob(arch) {
 def prepareWindowsWheelTestJob() {
   return {
     stage("Test") {
-      def cudaTag = cudaVer.split('\\.')[0..<2].join('')
       build job: "windows_wheels_template_CI",
       parameters: [
         string(name: 'sourceBranch', value: "${sourceBranch}"),
         string(name: 'configName', value: "${configName}"),
         string(name: 'imageTag', value: "${targetImageTag}"),
         string(name: 'commitHash', value: "${commitHash}"),
-        string(name: 'folderName', value: "torch-${torchVer}_cu${cudaTag}")
-        //string(name: 'torchVer', value: "${torchVer}"),
-        //string(name: 'cudaVer', value: "${cudaVer}"),
+        string(name: 'folderName', value: "torch-${torchVer}_cpu")
       ],
       // This node doesn't need to be held while tests run.
       wait: false,

@@ -69,6 +69,7 @@ spec:
                 "${targetImageTag}",
                 """--no-cache --network host -f ./tools/linux/Dockerfile.install \
                    --build-arg BASE_IMAGE=${baseImageTag} \
+                   --build-arg IGNORE_TORCH_VER=1 \
                    .
                 """)
           }
