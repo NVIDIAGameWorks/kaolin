@@ -89,4 +89,10 @@
     } \
   }()
 
+#ifdef __CUDACC__
+#define _EXP(x) __expf(x) // faster exp
+#else
+#define _EXP(x) expf(x)
+#endif
+
 #endif  // KAOLIN_UTILS_H_

@@ -32,6 +32,12 @@
 #include "./ops/spc/query.h"
 #include "./ops/spc/point_utils.h"
 
+#include "./ops/gsplats/gsplat_utils.h"
+#include "./ops/conversions/gs_to_spc/gs_to_spc.h"
+#include "./densify/spc_recon/recon.h"
+#include "./densify/spc_recon/bf.h"
+#include "./densify/query/query.h"
+
 namespace kaolin {
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
@@ -96,6 +102,30 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 		&unbatched_reduced_sg_inner_product_forward_cuda);
   render_sg.def("unbatched_reduced_sg_inner_product_backward_cuda",
 		&unbatched_reduced_sg_inner_product_backward_cuda);
+
+//  py::module tbdr = m.def_submodule("gsplats");
+//  tbdr.def("eval_gaussian_field", &eval_gaussian_field);
+  m.def("gs_to_spc_cuda", &gs_to_spc::gs_to_spc_cuda);
+  m.def("inclusive_sum", &inclusive_sum);
+  m.def("compactify", &compactify);
+  m.def("compactify2", &compactify2);
+  m.def("subdivide", &subdivide);
+  m.def("subdivide2", &subdivide2);
+  m.def("scalar_to_rgb", &scalar_to_rgb);
+  m.def("slice_image", &slice_image);
+  m.def("slice_image_empty", &slice_image_empty);
+  m.def("build_mip2d", &build_mip2d);
+  m.def("oracleB", &oracleB);
+  m.def("colorsB_final", &colorsB_final);
+  m.def("oracleB_final", &oracleB_final);
+  m.def("process_final_voxels", &process_final_voxels);
+  m.def("compactify_nodes", &compactify_nodes);
+  m.def("merge_empty", &merge_empty);
+  m.def("bq_merge", &bq_merge);
+  m.def("bq_extract", &bq_extract);
+  m.def("bq_touch", &bq_touch);
+  m.def("bq_touch_extract", &bq_touch_extract);
+  m.def("query_cuda_empty", &query_cuda);
 }
 
 }  // namespace kaolin

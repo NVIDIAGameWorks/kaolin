@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <vector_types.h>
 #include <vector_functions.h>
+#include <math_constants.h>
 
 #ifndef __CUDACC__
 
@@ -47,6 +48,10 @@ typedef ulong3               tri_index;
 typedef struct {
   float m[3][3];
 } float3x3;
+
+typedef struct {
+  float m[3][4];
+} float3x4;
 
 typedef struct {
   float m[4][4];
@@ -136,6 +141,13 @@ static __inline__ __host__ __device__ float3 mul3x4(float3 a, float4x4 m) {
   );
 }
 
+static __inline__ __host__ __device__ float3 mul3x4(float3x4 m, float4 a) {
+  return make_float3(
+    a.x * m.m[0][0] + a.y * m.m[0][1] + a.z * m.m[0][2] + a.w * m.m[0][3],
+    a.x * m.m[1][0] + a.y * m.m[1][1] + a.z * m.m[1][2] + a.w * m.m[1][3],
+    a.x * m.m[2][0] + a.y * m.m[2][1] + a.z * m.m[2][2] + a.w * m.m[2][3]
+  );
+}
 
 static __inline__ __host__ __device__ float4 mul4x4(float4 a, float4x4 m) {
   return make_float4(
@@ -143,6 +155,15 @@ static __inline__ __host__ __device__ float4 mul4x4(float4 a, float4x4 m) {
     a.x * m.m[0][1] + a.y * m.m[1][1] + a.z * m.m[2][1] + a.w * m.m[3][1],
     a.x * m.m[0][2] + a.y * m.m[1][2] + a.z * m.m[2][2] + a.w * m.m[3][2],
     a.x * m.m[0][3] + a.y * m.m[1][3] + a.z * m.m[2][3] + a.w * m.m[3][3]
+  );
+}
+
+static __inline__ __host__ __device__ float4 mul4x4(float4x4 m, float4 a) {
+  return make_float4(
+    a.x * m.m[0][0] + a.y * m.m[0][1] + a.z * m.m[0][2] + a.w * m.m[0][3],
+    a.x * m.m[1][0] + a.y * m.m[1][1] + a.z * m.m[1][2] + a.w * m.m[1][3],
+    a.x * m.m[2][0] + a.y * m.m[2][1] + a.z * m.m[2][2] + a.w * m.m[2][3],
+    a.x * m.m[3][0] + a.y * m.m[3][1] + a.z * m.m[3][2] + a.w * m.m[3][3]
   );
 }
 
@@ -177,6 +198,48 @@ static __inline__ __host__ __device__ float4x4 make_float4x4(
   return a;
 }
 
+static __inline__ __host__ __device__ float3x3 operator* (const float3x3& a, const float3x3& b)
+{
+    float3x3 c;
+
+    c.m[0][0] = a.m[0][0] * b.m[0][0] + a.m[0][1] * b.m[1][0] + a.m[0][2] * b.m[2][0];
+    c.m[0][1] = a.m[0][0] * b.m[0][1] + a.m[0][1] * b.m[1][1] + a.m[0][2] * b.m[2][1];
+    c.m[0][2] = a.m[0][0] * b.m[0][2] + a.m[0][1] * b.m[1][2] + a.m[0][2] * b.m[2][2];
+
+    c.m[1][0] = a.m[1][0] * b.m[0][0] + a.m[1][1] * b.m[1][0] + a.m[1][2] * b.m[2][0];
+    c.m[1][1] = a.m[1][0] * b.m[0][1] + a.m[1][1] * b.m[1][1] + a.m[1][2] * b.m[2][1];
+    c.m[1][2] = a.m[1][0] * b.m[0][2] + a.m[1][1] * b.m[1][2] + a.m[1][2] * b.m[2][2];
+
+    c.m[2][0] = a.m[2][0] * b.m[0][0] + a.m[2][1] * b.m[1][0] + a.m[2][2] * b.m[2][0];
+    c.m[2][1] = a.m[2][0] * b.m[0][1] + a.m[2][1] * b.m[1][1] + a.m[2][2] * b.m[2][1];
+    c.m[2][2] = a.m[2][0] * b.m[0][2] + a.m[2][1] * b.m[1][2] + a.m[2][2] * b.m[2][2];
+
+    return c;
+}
+
+
+static __inline__ __host__ __device__ float3x4 operator* (const float3x4& a, const float4x4& b)
+{
+    float3x4 c;
+
+    c.m[0][0] = a.m[0][0] * b.m[0][0] + a.m[0][1] * b.m[1][0] + a.m[0][2] * b.m[2][0] + a.m[0][3] * b.m[3][0];
+    c.m[0][1] = a.m[0][0] * b.m[0][1] + a.m[0][1] * b.m[1][1] + a.m[0][2] * b.m[2][1] + a.m[0][3] * b.m[3][1];
+    c.m[0][2] = a.m[0][0] * b.m[0][2] + a.m[0][1] * b.m[1][2] + a.m[0][2] * b.m[2][2] + a.m[0][3] * b.m[3][2];
+    c.m[0][3] = a.m[0][0] * b.m[0][3] + a.m[0][1] * b.m[1][3] + a.m[0][2] * b.m[2][3] + a.m[0][3] * b.m[3][3];
+
+    c.m[1][0] = a.m[1][0] * b.m[0][0] + a.m[1][1] * b.m[1][0] + a.m[1][2] * b.m[2][0] + a.m[1][3] * b.m[3][0];
+    c.m[1][1] = a.m[1][0] * b.m[0][1] + a.m[1][1] * b.m[1][1] + a.m[1][2] * b.m[2][1] + a.m[1][3] * b.m[3][1];
+    c.m[1][2] = a.m[1][0] * b.m[0][2] + a.m[1][1] * b.m[1][2] + a.m[1][2] * b.m[2][2] + a.m[1][3] * b.m[3][2];
+    c.m[1][3] = a.m[1][0] * b.m[0][3] + a.m[1][1] * b.m[1][3] + a.m[1][2] * b.m[2][3] + a.m[1][3] * b.m[3][3];
+
+    c.m[2][0] = a.m[2][0] * b.m[0][0] + a.m[2][1] * b.m[1][0] + a.m[2][2] * b.m[2][0] + a.m[2][3] * b.m[3][0];
+    c.m[2][1] = a.m[2][0] * b.m[0][1] + a.m[2][1] * b.m[1][1] + a.m[2][2] * b.m[2][1] + a.m[2][3] * b.m[3][1];
+    c.m[2][2] = a.m[2][0] * b.m[0][2] + a.m[2][1] * b.m[1][2] + a.m[2][2] * b.m[2][2] + a.m[2][3] * b.m[3][2];
+    c.m[2][3] = a.m[2][0] * b.m[0][3] + a.m[2][1] * b.m[1][3] + a.m[2][2] * b.m[2][3] + a.m[2][3] * b.m[3][3];
+
+    return c;
+}
+
 static __inline__ __host__ __device__ void  matmul4x4(const float4x4& a, const float4x4& b, float4x4& c)
 {
     c.m[0][0] = a.m[0][0] * b.m[0][0] + a.m[0][1] * b.m[1][0] + a.m[0][2] * b.m[2][0] + a.m[0][3] * b.m[3][0];
@@ -209,6 +272,14 @@ static __inline__ __host__ __device__ float4x4 transpose(const float4x4& a) {
   float4x4 b;
   for (int i=0; i<4; i++)
     for (int j=0; j<4; j++)
+      b.m[i][j] = a.m[j][i];
+  return b;
+}
+
+static __inline__ __host__ __device__ float3x3 transpose(const float3x3& a) {
+  float3x3 b;
+  for (int i=0; i<3; i++)
+    for (int j=0; j<3; j++)
       b.m[i][j] = a.m[j][i];
   return b;
 }
@@ -354,7 +425,6 @@ static __host__ __device__ __forceinline__ float3 point_at(
   return vertex + (edge * t);
 }
 
-
 static __host__ __device__  float3 triangle_closest_point(
     const float3& v1, const float3& v2, const float3& v3,
     const float3& p) {
@@ -384,6 +454,76 @@ static __host__ __device__  float3 triangle_closest_point(
       }
     }
   }
+}
+
+static inline __host__ __device__ float4 operator+(float4 a, float4 b)
+{
+  return make_float4(a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w);
+}
+
+static __inline__ __host__ __device__ float3 operator* (const float3x4 m, const float4 a)
+{
+    return mul3x4(m, a);
+}
+
+static __inline__ __host__ __device__ float4 operator* (const float4 a, const float4x4 M)
+{
+    return mul4x4(a, M);
+}
+
+static __inline__ __host__ __device__ float4 operator* (const float4x4 m, const float4 a)
+{
+    // return mul4x4(m, a);
+  return make_float4(
+    a.x * m.m[0][0] + a.y * m.m[0][1] + a.z * m.m[0][2] + a.w * m.m[0][3],
+    a.x * m.m[1][0] + a.y * m.m[1][1] + a.z * m.m[1][2] + a.w * m.m[1][3],
+    a.x * m.m[2][0] + a.y * m.m[2][1] + a.z * m.m[2][2] + a.w * m.m[2][3],
+    a.x * m.m[3][0] + a.y * m.m[3][1] + a.z * m.m[3][2] + a.w * m.m[3][3]
+  );
+}
+
+static inline __device__ float altmax(float a, float b, float m)
+{
+  if (a == m) return b;
+  if (b == m) return a;
+  return fmax(a,b);
+}
+
+__device__ inline void transform_corners(point_data V, float4x4 T, float4 pos[8])
+{
+	float4 X = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * T;
+	float4 Y = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * T;
+	float4 Z = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * T;
+	float4 O = make_float4((float)V.x, (float)V.y, (float)V.z, 1.0f) * T;
+
+	pos[0] = O;
+	pos[4] = pos[0] + X;
+
+	pos[2] = pos[0] + Y;
+	pos[6] = pos[4] + Y;
+
+	pos[1] = pos[0] + Z;
+	pos[3] = pos[2] + Z;
+	pos[5] = pos[4] + Z;
+	pos[7] = pos[6] + Z;
+}
+
+inline __device__ void voxel_extent(point_data V, float4x4 T, float3* minExtent, float3* maxExtent)
+{
+	float4 pos[8];
+
+	transform_corners(V, T, pos);
+
+	*minExtent = make_float3(CUDART_NORM_HUGE_F, CUDART_NORM_HUGE_F, CUDART_NORM_HUGE_F);
+	*maxExtent = make_float3(-CUDART_NORM_HUGE_F, -CUDART_NORM_HUGE_F, -CUDART_NORM_HUGE_F);
+
+	for (uint idx = 0; idx < 8; idx++)
+	{
+		float3 q = make_float3(pos[idx].x / pos[idx].z, pos[idx].y / pos[idx].z, pos[idx].z);
+
+		*minExtent = make_float3(fminf(minExtent->x, q.x), fminf(minExtent->y, q.y), fminf(minExtent->z, q.z));
+		*maxExtent = make_float3(fmaxf(maxExtent->x, q.x), fmaxf(maxExtent->y, q.y), fmaxf(maxExtent->z, q.z));
+	}
 }
 
 #endif  // WITH_CUDA
