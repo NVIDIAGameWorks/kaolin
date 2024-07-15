@@ -54,18 +54,26 @@ def update_canvas(canvas, image):
         canvas.clear_rect(0, 0, canvas.width, canvas.height)
         canvas.draw_image(image, 0, 0, canvas.width, canvas.height)
 
+def _get_tensor_pixel_info(canvas, item, x, y):
+    """helper function to get info of items produced by render"""
+    assert len(item.shape) in [2, 3], f"item is of shape {item.shape}"
+    item_height = item.shape[0]
+    item_width = item.shape[1]
+    if item_height == canvas.height and item_width == canvas.width:
+        return item[y, x], None
+    else:
+        scaled_x = int(x * item_width / canvas.width)
+        scaled_y = int(y * item_height / canvas.height)
+        return item[scaled_y, scaled_x], (scaled_x, scaled_y)
+
 def _print_item_pixel_info(canvas, item, x, y):
     """helper function to print info of items produced by render"""
     if torch.is_tensor(item):
-        assert len(item.shape) in [2, 3], f"item is of shape {item.shape}"
-        item_height = item.shape[0]
-        item_width = item.shape[1]
-        if item_height == canvas.height and item_width == canvas.width:
-            print(f"{item[y, x]}")
-        else:
-            scaled_x = int(x * item_width / canvas.width)
-            scaled_y = int(y * item_height / canvas.height)
-            print(f"{item[scaled_y, scaled_x]} (coords scaled to {scaled_x, scaled_y})")
+        val, scaled = _get_tensor_pixel_info(canvas, item, x, y)
+        str_out = f"{val}"
+        if scaled is not None:
+            str_out += f"(coords scaled to {scaled[0], scaled[1]})"
+        print(str_out)
     else:
         print(f"{item}")
 
@@ -167,7 +175,6 @@ class BaseIpyVisualizer(object):
         )
         self.event.on_dom_event(self._handle_event)
 
-
     def render_update(self):
         """Update the Canvas with :func:`render`"""
         with torch.no_grad():
@@ -195,19 +202,33 @@ class BaseIpyVisualizer(object):
         self.render_update()
         display(self.canvas, self.out)
 
-    def _print_pixel_all_infos(self, event):
-        """print pixel all infos from event query"""
-        self.out.clear_output()
+    def _get_clamped_coords(self, event):
         scaled_x = int(event["relativeX"] * self.canvas.width / event["boundingRectWidth"])
         scaled_y = int(event["relativeY"] * self.canvas.height / event["boundingRectHeight"])
 
         clamped_x = min(max(scaled_x, 0), self.canvas.width - 1)
         clamped_y = min(max(scaled_y, 0), self.canvas.height - 1)
+        return clamped_x, clamped_y
+
+    def _print_pixel_all_infos(self, event):
+        """print pixel all infos from event query"""
+        self.out.clear_output()
+        clamped_x, clamped_y = self._get_clamped_coords(event)
         print(f'pixel coords: {clamped_x}, {clamped_y}')
         for key, item in self.current_output.items():
             print(key, end=': ')
             _print_item_pixel_info(self.canvas, item, clamped_x, clamped_y)
 
+    def get_values_under_cursor(self, event):
+        """returns output values under cursor provided by current event"""
+        clamped_x, clamped_y = self._get_clamped_coords(event)
+        res = {}
+        if self.current_output is None:
+            return res
+        for key, item in self.current_output.items():
+            if torch.is_tensor(item):
+                res[key] = _get_tensor_pixel_info(self.canvas, item, clamped_x, clamped_y)
+        return res
 
     @abstractmethod
     def _handle_event(self, event):
