@@ -12,7 +12,7 @@ def defaultWheelsPythonVers = ['3.9', '3.10', '3.11', '3.12']
 def ubuntu_from_pytorch_configs = [
     [
         // python: 3.10
-        'cudaVer': '11.7', 'cudnnVer': '8', 'torchVer': '2.0.0',
+        'cudaVer': '11.7', 'cudnnVer': '8', 'torchVer': '2.0.1',
         'archsToTest': 'MULTI'
     ],
     [
@@ -45,8 +45,13 @@ def ubuntu_from_nvcr_configs = [
 // (See: https://hub.docker.com/r/nvidia/cuda/tags)
 def ubuntu_from_cuda_configs = [
     [
+        'cudaVer': '11.7.1', 'cudnnVer': '8',
+        'pythonVer': '3.9', 'torchVer': '2.0.1',
+        'archsToTest': 'MULTI'
+    ],
+    [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'pythonVer': '3.9', 'torchVer': '2.0.0',
+        'pythonVer': '3.10', 'torchVer': '2.0.1',
         'archsToTest': 'MULTI'
     ],
     [

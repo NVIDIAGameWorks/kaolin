@@ -37,6 +37,7 @@ using namespace at::indexing;
 
 #define NUM_THREADS 64
 
+namespace {
 
 size_t get_cub_storage_bytes_sort_pairs(
   void* d_temp_storage, 
@@ -91,6 +92,8 @@ d_Compactify(
     idx_out[prefix_sum[tidx]] = idx_in[tidx];
   }
 }
+
+} // namespace
 
 // determine if triangle and voxel overlap w.r.t. axis using separating axis theorem
 __device__ bool 
@@ -158,6 +161,7 @@ TriangleVoxelTest(float3 fva, float3 fvb, float3 fvc, float3 voxelcenter, float 
     return true;
 }
 
+namespace {
 
 // This function will iterate over t(triangle intersection proposals) and determine if they result in an 
 // intersection. If they do, the occupancy tensor is set to number of voxels in subdivision or compaction
@@ -246,7 +250,7 @@ compactify_cuda_kernel(
   }
 }
 
-
+} // namespace
 // compute 3x3 matrix that maps 3d cartesian coords to 3d barycentriuc coods, w.r.t a given triangle
 __global__ void
 d_ComputeBaryCoords(
