@@ -103,8 +103,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   render_sg.def("unbatched_reduced_sg_inner_product_backward_cuda",
 		&unbatched_reduced_sg_inner_product_backward_cuda);
 
-//  py::module tbdr = m.def_submodule("gsplats");
-//  tbdr.def("eval_gaussian_field", &eval_gaussian_field);
   m.def("gs_to_spc_cuda", &gs_to_spc::gs_to_spc_cuda);
   m.def("inclusive_sum", &inclusive_sum);
   m.def("compactify", &compactify);

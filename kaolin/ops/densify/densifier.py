@@ -1,3 +1,19 @@
+# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 import torch
 from .gs_spc_solid import solidify
 
@@ -6,7 +22,16 @@ __all__ = [
 ]
 
 class VolumeDensifier:
-    """ """
+    """ Logic for sampling additional points inside a shape represented by sparse 3D Gaussian Splats.
+    Reconstructions based on 3D Gaussian Splats result in shells of objects, leaving the internal volume unfilled.
+    In addition, the resulting shell is not a watertight shell, but rather,
+    a collection of anisotropic gaussian samples on it.
+
+    Certain applications require additional samples within the volume.
+    For example: physics simulations are more accurate when using volumetric mass.
+    The logic in this class approximates the volumetric interior with additional points injected to the interior of
+    objects.
+    """
 
     def __init__(self, resolution: int=8, opacity_threshold=0.35, post_scale_factor=0.93, jitter=True):
         self.resolution = resolution
@@ -48,6 +73,28 @@ class VolumeDensifier:
         """ Samples 3D points inside the approximated volume of a radiance field, represented by Gaussian Splats.
         The gaussians are assumed to reside on the shell of the object. The algorithm will attempt to voxelize
         the gaussians and predict an approximated surface, and then sample additional points within it.
+
+        .. note::  Implementation Details:
+
+        The object sampling takes place in 2 steps.
+
+        1. The set of 3D Gaussians is converted to voxels using a novel hierarchical algorithm which builds on
+           kaolin’s :ref:`Structured Point Cloud (SPC)<spc>` (which functions as an octree).
+           The axis aligned bounding box of the gaussians is enclosed in a cubical root node of an octree.
+           This node is subdivided in an 8-way split, and a list of overlapping gaussian IDs is
+           maintained for each sub node. The nodes that contain voxels are subdivided again and tested for overlap.
+           This process repeats until a desired resolution is achieved.
+           The nodes at the frontier of the octree are a voxelization of the gaussians, represented by an SPC.
+           At the end of this step, the SPC does not include voxels ‘inside’ the object represented by the gaussians.
+
+        2. Volume filling of voxelized shell by carving the space of voxels using rendered depth maps.
+
+           This is achieved by ray-tracing the SPC from an icosahedral collection of viewpoints to create a depth map
+           for each view. These depth maps are fused together into a second sparse SPC using a novel algorithm that
+           maintains the occupancy state for each node of the full octree.
+           These states are: empty, occupied, or unseen.
+           Finally, the occupancy state of points in a regular grid are determined by querying this SPC.
+           The union of the sets of occupied and unseen points serves as a sampling of the solid object.
 
         Args:
             xyz (torch.FloatTensor):
