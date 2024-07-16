@@ -38,3 +38,9 @@ node_modules/
 .test_logs/
 .test_coverage/
 .coverage
+
+# example-output
+examples/tutorial/output/
+examples/tutorial/logs/
+examples/tutorial/physics/*.log
+examples/tutorial/physics/results/

@@ -154,3 +154,23 @@ manually to obtain consistent reference files.
 * Faces: 682 triangles
 * Materials: single material with albedo, normals and roughness/metallic texture
 * Normals and UVs are consistent across `.obj`, `.gltf`, and `.usd` formats
+
+## Simple Muscle, Folder With Files
+
+**Filenames:** [simple_muscle.mtl](simple_muscle.mtl),  [simple_muscle.obj](simple_muscle.obj), [simple_muscle_vol_pts.pt](simple_muscle_vol_pts.pt), [simple_muscle_fibers.pt](simple_muscle_fibers.pt).
+
+**Source**: originally obtained mesh [EMU](https://arxiv.org/abs/2006.08821) examples.
+
+**License**: Licensed under [Creative Commons CC0 License](http://creativecommons.org/publicdomain/zero/1.0/). To the extent possible under law, Microsoft has waived all copyright and related or neighboring rights to this asset.
+
+**Formats**: was exported as `obj` from Blender. materials were painted on in Blender. Volumetric points were generated via TetWild and fiber directions were generated using heat flow over the muscle volume.
+
+**Sanity checks**: displays correctly in Blender 3.6 and in Meshlab.
+
+<img width="30%" style="padding:0 20px 0 0; float: left" src="renders/simple_muscle.jpg">
+
+**Attributes** of the simple_muscle:
+*Vertices: 4624
+*Faces: 9112
+*Vol_pts: volumetric sample points
+*Fibers: fiber directions based on heat flow for each vol pt

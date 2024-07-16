@@ -25,9 +25,10 @@ Note that Kaolin library is part of the larger `NVIDIA Kaolin effort <https://de
    :maxdepth: 1
    :caption: API Reference:
 
-   modules/kaolin.ops
-   modules/kaolin.metrics
    modules/kaolin.io
+   modules/kaolin.metrics
+   modules/kaolin.ops
+   modules/kaolin.physics
    modules/kaolin.render
    modules/kaolin.rep
    modules/kaolin.utils
