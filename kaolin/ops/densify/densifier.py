@@ -1,7 +1,12 @@
 import torch
-from .densify.gs_spc_solid import solidify
+from .gs_spc_solid import solidify
+
+__all__ = [
+    'VolumeDensifier'
+]
 
 class VolumeDensifier:
+    """ """
 
     def __init__(self, resolution: int=8, opacity_threshold=0.35, post_scale_factor=0.93, jitter=True):
         self.resolution = resolution
@@ -39,17 +44,45 @@ class VolumeDensifier:
         return pts + delta
 
     @torch.no_grad()
-    def sample_points_in_volume(self, model, mask=None, count=None):
+    def sample_points_in_volume(self, xyz, scale, rotation, opacity, mask=None, count=None):
+        """ Samples 3D points inside the approximated volume of a radiance field, represented by Gaussian Splats.
+        The gaussians are assumed to reside on the shell of the object. The algorithm will attempt to voxelize
+        the gaussians and predict an approximated surface, and then sample additional points within it.
+
+        Args:
+            xyz (torch.FloatTensor):
+                A tensor of shape (N,3) containing the Gaussian means.
+                For example, using the original Inria codebase, this corresponds to GaussianModel.get_xyz
+            scale (torch.FloatTensor):
+                A tensor of shape (N,3) containing the Gaussian covariance scale components, in a format
+                of a 3D scale vector per Gaussian. The scale is assumed to be post-activation.
+                For example, using the original Inria codebase, this corresponds to GaussianModel.get_scaling
+            rotation (torch.FloatTensor):
+                A tensor of shape (N,4) containing the Gaussian covariance rotation components, in a format
+                of a 4D quaternion per Gaussian. The rotation is assumed to be post-activation.
+                For example, using the original Inria codebase, this corresponds to GaussianModel.get_rotation
+            opacity (torch.FloatTensor):
+                A tensor of shape (N,1) containing the Gaussian opacities.
+                For example, using the original Inria codebase, this corresponds to GaussianModel.get_opacity
+            mask (optional, torch.BoolTensor):
+                An optional (N,) binary mask which selects only a subset of the gaussian to use
+                for predicting the shell. Useful if some Gaussians are suspected as noise.
+                By default, the mask is assumed to be a tensor of ones to select all Gaussians.
+            count (optional, int):
+                An optional upper cap on the number of points sampled in the predicted volume.
+                If not specified, the volume is evenly sampled in space according to the VolumeDensifier resolution.
+
+        Return:
+            (torch.FloatTensor): a tensor of (K, 3) points sampled inside the approximated shape volume.
+        """
+
         # Select the required points and solidify
-        xyz = model.get_xyz.cuda().clone()
-        scale = model.get_scaling.cuda().clone()
-        rotation = model.get_rotation.cuda().clone()
-        opacity = model.get_opacity.cuda().clone()
         num_surface_pts = xyz.shape[0]
-        mask = mask.cuda().clone() if mask is not None else xyz.new_ones((num_surface_pts,), device='cuda')
+        mask = mask.cuda().clone() if mask is not None \
+            else xyz.new_ones((num_surface_pts,), device='cuda', dtype=torch.bool)
         # Preprocess: prune low opacity points
         if self.opacity_threshold < 1.0:
-            opacity_mask = model.get_opacity[:, 0] < self.opacity_threshold
+            opacity_mask = opacity.reshape(-1) < self.opacity_threshold
             mask &= ~opacity_mask
         xyz = xyz[mask]
         scale = scale[mask]

@@ -339,8 +339,6 @@ def bf_recon(transformed_dataset, final_level, sigma):
             lengths = torch.tensor([len(octree0)], dtype=torch.int)
             level, pyramid0, exsum0 = spc.scan_octrees(octree0, lengths)
 
-        from IPython.display import display
-        display(f'frame_no({frame_no}) - octree0 {octree0})')
         frame_no += 1
 
     octree, empty, colors = extractBQ(octree0, empty0, probs0, colors0, normals0)

@@ -5,8 +5,8 @@ import torch
 from kaolin.ops.spc import scan_octrees, morton_to_points
 from kaolin import _C
 
-from kaolin.densify_temp.densify.bf_recon import bf_recon, unbatched_query
-from kaolin.densify_temp.densify.raytraced_dataset import raytraced_dataset
+from kaolin.ops.densify.bf_recon import bf_recon, unbatched_query
+from kaolin.ops.densify.raytraced_spc_dataset import RayTracedSPCDataset
 
 # collection of viewpoints used to 'carve' out seen space (might need more!)
 anchors = torch.tensor([
@@ -119,7 +119,7 @@ def solidify(xyz, scales, rots, opacities, gs_level, query_level):
     gs_octree = _C.ops.spc.morton_to_octree(morton, gs_level)
 
     # create depthmaps
-    dataset = raytraced_dataset(viewpoints, gs_octree)
+    dataset = RayTracedSPCDataset(viewpoints, gs_octree)
 
     # fuse depthmaps into seen/unseen aware spc
     bf_octree, bf_empty, _ = bf_recon(dataset, final_level=query_level, sigma=0.005)
@@ -140,38 +140,3 @@ def solidify(xyz, scales, rots, opacities, gs_level, query_level):
     # still need to untransform
     sample_points =  2**(1-query_level) * sample_points - torch.ones((3), device='cuda')
     return dmax * sample_points + cen
-
-
-
-
-if __name__ == "__main__":
-    from plyfile import PlyData # PlyElement
-
-    # path to GS model
-    MODEL_PATH = "/home/cloop/src/Work/gaussian-splatting/output/1c3540a1-8/point_cloud/iteration_30000/point_cloud.ply" #lego
-    plydata = PlyData.read(MODEL_PATH)
-
-    xyz = torch.stack((torch.asarray(plydata.elements[0]["x"], device='cuda'),
-                    torch.asarray(plydata.elements[0]["y"], device='cuda'),
-                    torch.asarray(plydata.elements[0]["z"], device='cuda')),  axis=1)
-
-    opacities = torch.asarray(plydata.elements[0]["opacity"], device='cuda')#[..., None]
-
-    scale_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("scale_")]
-    scale_names = sorted(scale_names, key = lambda x: int(x.split('_')[-1]))
-    scales = torch.zeros((xyz.shape[0], len(scale_names)), dtype=torch.float32, device='cuda')
-    for idx, attr_name in enumerate(scale_names):
-        scales[:, idx] = torch.asarray(plydata.elements[0][attr_name])
-
-    rot_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("rot")]
-    rot_names = sorted(rot_names, key = lambda x: int(x.split('_')[-1]))
-    rots = torch.zeros((xyz.shape[0], len(rot_names)), dtype=torch.float32, device='cuda')
-    for idx, attr_name in enumerate(rot_names):
-        rots[:, idx] = torch.asarray(plydata.elements[0][attr_name])
-
-
-    my_points = solidify(xyz, scales, rots, opacities, 8, 4)
-
-
-    for pnt in my_points:
-        print("{{{}, {}, {}}},".format(pnt[0].item(), pnt[1].item(), pnt[2].item()))
