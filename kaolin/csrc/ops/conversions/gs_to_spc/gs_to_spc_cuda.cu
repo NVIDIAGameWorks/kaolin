@@ -542,10 +542,6 @@ MergeOpacities_kernel(
   float power = -0.5f * gval;
   float alpha = min(0.99, opacities[gidx] * exp(power));
 
-  // if (alpha < 1.0f / 255.0f)
-  //   return;
-
-  // atomicAdd(&(merged_opacities[base_idx]), logf(alpha));
   atomicAlpha(&(merged_opacities[base_idx]), alpha);
   atomicAdd(&(gs_per_voxel[base_idx]), 1);
 }
@@ -628,7 +624,6 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
                sizeof(uint32_t), cudaMemcpyDeviceToHost);
 
     if (next_cnt == 0) {
-      printf("early out %d\n", l);
       at::Tensor mcodes = at::empty({0}, means3D.options().dtype(at::kLong));
       at::Tensor merged_opacities = at::empty({0}, means3D.options().dtype(at::kFloat));
       at::Tensor gs_per_voxel = at::empty({0}, means3D.options().dtype(at::kInt));
@@ -722,7 +717,6 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
     reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()));
 
   at::Tensor merged_opacities = at::zeros({psize}, means3D.options().dtype(at::kFloat));
-  // at::Tensor merged_opacities = at::ones({psize}, means3D.options().dtype(at::kFloat));
   at::Tensor gs_per_voxel = at::zeros({psize}, means3D.options().dtype(at::kInt));
 
   MergeOpacities_kernel << <(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>> (

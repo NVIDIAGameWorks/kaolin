@@ -38,13 +38,13 @@ class raytraced_dataset(Dataset):
         origins, dirs = generate_pinhole_rays(camera, ray_grid)
 
         ridx, pidx, depths = unbatched_raytrace(self.gs_octree, self.point_hierarchy, self.pyramid[0], self.exsum, origins, dirs, 
-                                        self.level, return_depth=True, with_exit=False)
+                                                self.level, return_depth=True, with_exit=False)
 
 
         # get closest hits
         first_hits_mask = mark_pack_boundaries(ridx)
         first_hits_point = pidx[first_hits_mask]
-        first_hits_ray = ridx[first_hits_mask]
+        first_hits_ray = ridx[first_hits_mask].long()
         first_depths = depths[first_hits_mask]
 
         # black background

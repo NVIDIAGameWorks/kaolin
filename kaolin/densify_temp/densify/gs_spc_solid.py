@@ -5,8 +5,8 @@ import torch
 from kaolin.ops.spc import scan_octrees, morton_to_points
 from kaolin import _C
 
-from densify.bf_recon import bf_recon, unbatched_query
-from densify.raytraced_dataset import raytraced_dataset
+from kaolin.densify_temp.densify.bf_recon import bf_recon, unbatched_query
+from kaolin.densify_temp.densify.raytraced_dataset import raytraced_dataset
 
 # collection of viewpoints used to 'carve' out seen space (might need more!)
 anchors = torch.tensor([

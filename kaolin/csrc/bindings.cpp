@@ -125,7 +125,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("bq_extract", &bq_extract);
   m.def("bq_touch", &bq_touch);
   m.def("bq_touch_extract", &bq_touch_extract);
-  m.def("query_cuda_empty", &query_cuda);
+  m.def("query_cuda_empty", &query_cuda_empty);
 }
 
 }  // namespace kaolin

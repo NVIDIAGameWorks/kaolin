@@ -24,7 +24,7 @@ def processFrame(batch, level, sigma, frame_no):
 
 
     # # generate depth minmaxmip
-    mips = _C.spc_recon.build_mip2d(dm, In, mip_levels, maxdepth, true_depth).contiguous()
+    mips = _C.build_mip2d(dm, In, mip_levels, maxdepth, true_depth).contiguous()
 
     # # useful code to visualize mipmaps
     # s = 2**mip_levels
@@ -74,11 +74,11 @@ def processFrame(batch, level, sigma, frame_no):
 
     for l in range(start_level, level):
         vcnt[l] = points.size(0)
-        occupancies, empty_state = _C.spc_recon.oracleB(points, l, sigma, Cam, dm, mips, mip_levels)
-        insum = _C.spc_recon.inclusive_sum(occupancies)
+        occupancies, empty_state = _C.oracleB(points, l, sigma, Cam, dm, mips, mip_levels)
+        insum = _C.inclusive_sum(occupancies)
         if insum[-1].item() == 0:
             print("recon terminated")
-        points, nvsum = _C.spc_recon.subdivide2(points, insum)
+        points, nvsum = _C.subdivide2(points, insum)
 
         Occ.append(occupancies)
         Sta.append(empty_state)
@@ -88,14 +88,14 @@ def processFrame(batch, level, sigma, frame_no):
 
     vcnt[level] = points.size(0)
 
-    occupancies, empty_state, probabilities = _C.spc_recon.oracleB_final(points, level, sigma, Cam, dm)
-    insum = _C.spc_recon.inclusive_sum(occupancies)
+    occupancies, empty_state, probabilities = _C.oracleB_final(points, level, sigma, Cam, dm)
+    insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
         print("recon terminated")
-    points, nvsum = _C.spc_recon.compactify2(points, insum)
+    points, nvsum = _C.compactify2(points, insum)
     probabilities = probabilities[nvsum[:]]
 
-    colors, normals = _C.spc_recon.colorsB_final(points, level, Cam, sigma, im, dm, probabilities)
+    colors, normals = _C.colorsB_final(points, level, Cam, sigma, im, dm, probabilities)
 
     Occ.append(occupancies)
     Sta.append(empty_state)
@@ -112,7 +112,7 @@ def processFrame(batch, level, sigma, frame_no):
 
     for l in range(level, 0, -1):
 
-        octree, empty, occupancies = _C.spc_recon.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
+        octree, empty, occupancies = _C.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
 
         num_voxels = vcnt[l-1].item()
         num_nodes = num_voxels >> 3
@@ -120,10 +120,10 @@ def processFrame(batch, level, sigma, frame_no):
 
     # print(occupancies.size(0))
 
-    insum = _C.spc_recon.inclusive_sum(occupancies)
+    insum = _C.inclusive_sum(occupancies)
     cnt = insum[-1].item()
 
-    octree, empty = _C.spc_recon.compactify_nodes(total_nodes, insum, octree, empty)
+    octree, empty = _C.compactify_nodes(total_nodes, insum, octree, empty)
 
     return octree, empty, probabilities, colors, normals
 
@@ -159,11 +159,11 @@ def fuseBF(level,
 
     for l in range(start_level, level):
         vcnt[l] = points.size(0)
-        occupancies, empty_state = _C.spc_recon.merge_empty(points, l, octree0, octree1, empty0, empty1, pyramid0, pyramid1, exsum0, exsum1)
+        occupancies, empty_state = _C.merge_empty(points, l, octree0, octree1, empty0, empty1, pyramid0, pyramid1, exsum0, exsum1)
         if occupancies.max().item() == 0:
             print("recon terminated")
-        insum = _C.spc_recon.inclusive_sum(occupancies)
-        points, nvsum = _C.spc_recon.subdivide2(points, insum)
+        insum = _C.inclusive_sum(occupancies)
+        points, nvsum = _C.subdivide2(points, insum)
 
         Sta.append(empty_state)
         Nvs.append(nvsum)
@@ -173,7 +173,7 @@ def fuseBF(level,
 
     vcnt[level] = points.size(0)
 
-    occupancies, empty_state, occ_prob, colors, normals = _C.spc_recon.bq_merge(points, level,
+    occupancies, empty_state, occ_prob, colors, normals = _C.bq_merge(points, level,
             octree0, octree1, 
             empty0, empty1, 
             probs0, probs1, 
@@ -184,8 +184,8 @@ def fuseBF(level,
 
     if occupancies.max().item() == 0:
         print("recon terminated")
-    insum = _C.spc_recon.inclusive_sum(occupancies)
-    points, nvsum = _C.spc_recon.compactify2(points, insum)
+    insum = _C.inclusive_sum(occupancies)
+    points, nvsum = _C.compactify2(points, insum)
 
 
 
@@ -209,9 +209,9 @@ def fuseBF(level,
     for l in range(level, 0, -1):
         # print(l, init_size-total_nodes)
 
-        octree, empty, occupancies = _C.spc_recon.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
+        octree, empty, occupancies = _C.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
 
-        insum = _C.spc_recon.inclusive_sum(occupancies)
+        insum = _C.inclusive_sum(occupancies)
         if insum[-1].item() == 0:
             print("recon terminated")
 
@@ -220,10 +220,10 @@ def fuseBF(level,
         total_nodes += num_nodes
 
 
-    insum = _C.spc_recon.inclusive_sum(occupancies)
+    insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
         print("recon terminated")
-    octree, empty = _C.spc_recon.compactify_nodes(total_nodes, insum, octree, empty)
+    octree, empty = _C.compactify_nodes(total_nodes, insum, octree, empty)
 
 
     return octree, empty, occ_prob, colors, normals
@@ -246,11 +246,11 @@ def extractBQ(octree, empty, probs, colors, normal):
     vcnt[0] = pyramid[0,0,0] # = 1
 
     for l in range(1, level):
-        occupancies, empty_state = _C.spc_recon.bq_touch(points, l, octree, empty, pyramid)
+        occupancies, empty_state = _C.bq_touch(points, l, octree, empty, pyramid)
         if occupancies.max().item() == 0:
             print("recon terminated")
-        insum = _C.spc_recon.inclusive_sum(occupancies)
-        points, nvsum = _C.spc_recon.subdivide2(points, insum)
+        insum = _C.inclusive_sum(occupancies)
+        points, nvsum = _C.subdivide2(points, insum)
 
         vcnt[l] = insum.size(0)
         Sta.append(empty_state)
@@ -258,11 +258,11 @@ def extractBQ(octree, empty, probs, colors, normal):
 
     vcnt[level] = points.size(0)
 
-    occupancies, empty_state = _C.spc_recon.bq_touch(points, level, octree, empty, pyramid)
-    insum = _C.spc_recon.inclusive_sum(occupancies)
+    occupancies, empty_state = _C.bq_touch(points, level, octree, empty, pyramid)
+    insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
         print("recon terminated")
-    points, nvsum = _C.spc_recon.compactify2(points, insum)
+    points, nvsum = _C.compactify2(points, insum)
 
     Sta.append(empty_state)
 
@@ -271,15 +271,15 @@ def extractBQ(octree, empty, probs, colors, normal):
     Nvs.append(newsum)
 
 
-    occupancies, empty_state = _C.spc_recon.bq_extract(points, level, octree, empty, probs, pyramid, exsum)
-    insum = _C.spc_recon.inclusive_sum(occupancies)
+    occupancies, empty_state = _C.bq_extract(points, level, octree, empty, probs, pyramid, exsum)
+    insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
         print("recon terminated")
-    points, nvsum = _C.spc_recon.compactify2(points, insum)
+    points, nvsum = _C.compactify2(points, insum)
     out_colors = colors[nvsum[:]]
  
     num_voxels = empty_state.size(0)
-    _C.spc_recon.bq_touch_extract(num_voxels, empty_state, Nvs[level], Sta[level])
+    _C.bq_touch_extract(num_voxels, empty_state, Nvs[level], Sta[level])
 
     # process final voxels
     init_size = vcnt[1:].sum().item() >> 3
@@ -292,8 +292,8 @@ def extractBQ(octree, empty, probs, colors, normal):
     total_nodes = num_nodes
 
     for l in range(level, 0, -1):
-        octree, empty, occupancies = _C.spc_recon.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
-        insum = _C.spc_recon.inclusive_sum(occupancies)
+        octree, empty, occupancies = _C.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
+        insum = _C.inclusive_sum(occupancies)
         if insum[-1].item() == 0:
             print("recon terminated")
 
@@ -301,10 +301,10 @@ def extractBQ(octree, empty, probs, colors, normal):
         num_nodes = num_voxels >> 3
         total_nodes += num_nodes
 
-    insum = _C.spc_recon.inclusive_sum(occupancies)
+    insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
         print("recon terminated")
-    octree, empty = _C.spc_recon.compactify_nodes(total_nodes, insum, octree, empty)
+    octree, empty = _C.compactify_nodes(total_nodes, insum, octree, empty)
 
     return octree, empty, out_colors
 
@@ -339,6 +339,8 @@ def bf_recon(transformed_dataset, final_level, sigma):
             lengths = torch.tensor([len(octree0)], dtype=torch.int)
             level, pyramid0, exsum0 = spc.scan_octrees(octree0, lengths)
 
+        from IPython.display import display
+        display(f'frame_no({frame_no}) - octree0 {octree0})')
         frame_no += 1
 
     octree, empty, colors = extractBQ(octree0, empty0, probs0, colors0, normals0)
@@ -382,5 +384,5 @@ def unbatched_query(octree, empty, exsum, query_coords, level):
     else:
         input_coords = query_coords
 
-    return _C.spc_recon.query_cuda_empty(octree.contiguous(), empty.contiguous(), exsum.contiguous(),
+    return _C.query_cuda_empty(octree.contiguous(), empty.contiguous(), exsum.contiguous(),
                                          input_coords.contiguous(), level).long()

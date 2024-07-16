@@ -8,6 +8,7 @@ from . import utils
 from . import visualize
 from . import physics
 from . import non_commercial
+from . import densify_temp
 
 try:
     from .version import __version__  # noqa: F401
