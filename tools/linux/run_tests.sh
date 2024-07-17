@@ -164,7 +164,9 @@ if [ $BUILD_DOCS -eq "1" ]; then
 
     echo " ...building docs in build_docs dir" >> $DOCS_LOG 2>&1
     CMDLINE="python -m sphinx -T -E -W --keep-going -b html -d _build/doctrees -D language=en . _build/html"
+    export PYTORCH_JIT=0
     $CMDLINE >> $DOCS_LOG 2>&1
+    export PYTORCH_JIT=1
     RES=$?
 
     cd $KAOLIN_ROOT
