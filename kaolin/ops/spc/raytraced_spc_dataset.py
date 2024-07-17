@@ -60,9 +60,7 @@ class RayTracedSPCDataset(Dataset):
             device=self.device
         )
 
-        ray_grid = generate_centered_pixel_coords(camera.width, camera.height, 
-                                                  camera.width, camera.height, device=self.device)
-        origins, dirs = generate_pinhole_rays(camera, ray_grid)
+        origins, dirs = generate_pinhole_rays(camera)
 
         ridx, pidx, depths = unbatched_raytrace(self.gs_octree, self.point_hierarchy, self.pyramid[0],
                                                 self.exsum, origins, dirs,

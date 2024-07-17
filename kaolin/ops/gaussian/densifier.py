@@ -74,7 +74,7 @@ class VolumeDensifier:
 
     @classmethod
     def _generate_default_viewpoints(cls):
-        """ Generates a collection of default viewpoints used to 'carve' out seen space.
+        r""" Generates a collection of default viewpoints used to 'carve' out seen space.
         These anchors are chosen based on empirical heuristics
         """
         anchors = torch.tensor([
@@ -141,7 +141,7 @@ class VolumeDensifier:
         return viewpoints
 
     def _jitter(self, pts):
-        """ Applies random pertubrations to a set of voxelized points.
+        r""" Applies random pertubrations to a set of voxelized points.
         The pertubrations are small enough such that each point remains in the voxel cell it belongs in.
         """
         N = pts.shape[0]
@@ -237,7 +237,7 @@ class VolumeDensifier:
 
     @torch.no_grad()
     def sample_points_in_volume(self, xyz, scale, rotation, opacity, mask=None, count=None):
-        """ Samples 3D points inside the approximated volume of a radiance field, represented by Gaussian Splats.
+        r""" Samples 3D points inside the approximated volume of a radiance field, represented by Gaussian Splats.
         The gaussians are assumed to reside on the shell of the object. The algorithm will attempt to voxelize
         the gaussians and predict an approximated surface, and then sample additional points within it.
 
