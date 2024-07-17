@@ -63,7 +63,7 @@ def processFrame(batch, level, sigma):
         insum = _C.ops.spc.inclusive_sum(occupancies)
         if insum[-1].item() == 0:
             logger.debug("recon terminated")
-        points, nvsum = _C.ops.spc.subdivide2(points, insum)
+        points, nvsum = _C.ops.spc.subdivide(points, insum)
 
         Occ.append(occupancies)
         Sta.append(empty_state)
@@ -75,7 +75,7 @@ def processFrame(batch, level, sigma):
     insum = _C.ops.spc.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
         logger.debug("recon terminated")
-    points, nvsum = _C.ops.spc.compactify2(points, insum)
+    points, nvsum = _C.ops.spc.compactify(points, insum)
     probabilities = probabilities[nvsum[:]]
 
     colors, normals = _C.ops.spc.colorsB_final(points, level, Cam, sigma, im, dm, probabilities)
@@ -147,7 +147,7 @@ def fuseBF(
         if occupancies.max().item() == 0:
             logger.debug("recon terminated")
         insum = _C.ops.spc.inclusive_sum(occupancies)
-        points, nvsum = _C.ops.spc.subdivide2(points, insum)
+        points, nvsum = _C.ops.spc.subdivide(points, insum)
 
         Sta.append(empty_state)
         Nvs.append(nvsum)
@@ -165,7 +165,7 @@ def fuseBF(
     if occupancies.max().item() == 0:
         logger.debug("recon terminated")
     insum = _C.ops.spc.inclusive_sum(occupancies)
-    points, nvsum = _C.ops.spc.compactify2(points, insum)
+    points, nvsum = _C.ops.spc.compactify(points, insum)
 
     occ_prob = occ_prob[nvsum[:]]
     colors = colors[nvsum[:]]
@@ -223,7 +223,7 @@ def extractBQ(octree, empty, probs, colors):
         if occupancies.max().item() == 0:
             logger.debug("recon terminated")
         insum = _C.ops.spc.inclusive_sum(occupancies)
-        points, nvsum = _C.ops.spc.subdivide2(points, insum)
+        points, nvsum = _C.ops.spc.subdivide(points, insum)
 
         vcnt[l] = insum.size(0)
         Sta.append(empty_state)
@@ -235,7 +235,7 @@ def extractBQ(octree, empty, probs, colors):
     insum = _C.ops.spc.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
         logger.debug("recon terminated")
-    points, nvsum = _C.ops.spc.compactify2(points, insum)
+    points, nvsum = _C.ops.spc.compactify(points, insum)
 
     Sta.append(empty_state)
 
@@ -247,7 +247,7 @@ def extractBQ(octree, empty, probs, colors):
     insum = _C.ops.spc.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
         logger.debug("recon terminated")
-    points, nvsum = _C.ops.spc.compactify2(points, insum)
+    points, nvsum = _C.ops.spc.compactify(points, insum)
     out_colors = colors[nvsum[:]]
  
     num_voxels = empty_state.size(0)
@@ -285,6 +285,15 @@ def extractBQ(octree, empty, probs, colors):
 
 
 def bf_recon(transformed_dataset, final_level, sigma):
+    r""" Reconstruct object from a collection of calibrated depth maps using algoritm found in
+    cite BF. 
+    The object is represented by an empty space aware Structured Point Cloud. 
+
+    Args:
+        transformed_dataset (RayTracedSPCDataset): 
+
+    """
+
     frame_no = 0
     octree0, empty0, probs0, colors0, normals0, pyramid0, exsum0, weights = \
         None, None, None, None, None, None, None, None

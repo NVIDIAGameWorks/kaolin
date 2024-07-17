@@ -19,7 +19,11 @@
 
 namespace kaolin {
 
-std::vector<at::Tensor> compactify_nodes(uint num_nodes, at::Tensor sum, at::Tensor occ_ptr, at::Tensor emp_ptr);
+std::vector<at::Tensor> compactify_nodes(
+  uint num_nodes, 
+  at::Tensor sum, 
+  at::Tensor occ_ptr, 
+  at::Tensor emp_ptr);
 
 std::vector<at::Tensor> oracleB(
   at::Tensor Points, 

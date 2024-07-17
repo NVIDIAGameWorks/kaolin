@@ -30,6 +30,7 @@
 #include <ATen/cuda/CUDAContext.h>
 
 #include "../../spc_math.h"
+#include "../../spc_utils.cuh"
 
 namespace kaolin {
 
@@ -96,63 +97,16 @@ __device__ inline float DBQ(cudaTextureObject_t ProfileCurve, float x)
 	}
 }
 
-inline __device__ int Identify(
-  const short3 	k,
-  const uint 		Level,
-  const uint* 	Exsum,
-  const uchar* 	Oroot,
-  const uchar* 	Eroot,
-  const uint 		offset)
-{
-  int maxval = (0x1 << Level) - 1;
-  if (k.x < 0 || k.y < 0 || k.z < 0 || k.x > maxval || k.y > maxval || k.z > maxval)
-    return -1;
 
-  int ord = 0;
-  int prev = 0;
-  for (uint l = 0; l < Level; l++)
-  {
-    uint depth = Level - l - 1;
-    uint mask = (0x1 << depth);
-    uint child_idx = ((mask&k.x) << 2 | (mask&k.y) << 1 | (mask&k.z)) >> depth;
-    uint bits = (uint)Oroot[ord];
-    uint mpty = (uint)Eroot[ord];
-
-    // count set bits up to child - inclusive sum
-    uint cnt = __popc(bits&((0x2 << child_idx) - 1));
-    ord = Exsum[prev];
-
-    // if bit set, keep going
-    if (bits&(0x1 << child_idx))
-    {
-      ord += cnt;
-
-      if (depth == 0)
-        return ord - offset;
-    }
-    else
-    {
-      if (mpty&(0x1 << child_idx))
-        return -2 - depth;
-      else
-        return -1;
-    }
-
-    prev = ord;
-  }
-
-  return ord; // only if called with Level=0
-}
-
-__global__ void d_CompacifyNodes(uint num, uint* sum, 
+__global__ void d_CompacifyNodes(uint32_t num, uint32_t* sum, 
                   uchar* in_occ, uchar* in_empty, 
                   uchar* out_occ, uchar* out_empty)
 {
-  uint tidx = blockIdx.x * blockDim.x + threadIdx.x;
+  uint32_t tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (tidx < num)
   {
-    uint new_index = (tidx == 0u) ? 0 : sum[tidx-1];
+    uint32_t new_index = (tidx == 0u) ? 0 : sum[tidx-1];
     if (new_index != sum[tidx])
     {
       out_occ[new_index] = in_occ[tidx];
@@ -161,7 +115,7 @@ __global__ void d_CompacifyNodes(uint num, uint* sum,
   }
 }
 
-void CompactifyNodes_cuda(uint num_nodes, uint* d_insum, uchar* d_occ_ptr, uchar* d_emp_ptr, uchar* d_octree, uchar* d_empty)
+void CompactifyNodes_cuda(uint32_t num_nodes, uint32_t* d_insum, uchar* d_occ_ptr, uchar* d_emp_ptr, uchar* d_octree, uchar* d_empty)
 {
 
 	if (num_nodes == 0) return;
@@ -173,7 +127,7 @@ void CompactifyNodes_cuda(uint num_nodes, uint* d_insum, uchar* d_occ_ptr, uchar
 }
 
 __global__ void d_OracleB(
-	uint num, 
+	uint32_t num, 
 	point_data* points, 
 	float4x4 T,  
     float sigma,
@@ -183,17 +137,17 @@ __global__ void d_OracleB(
     int num_levels,
 	float2* mip,
     int hw,
-	uint* occupied, 
-	uint* state)
+	uint32_t* occupied, 
+	uint32_t* state)
 {
-	uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
+	uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
 	if (tidx < num)
 	{
     point_data V = points[tidx];
 
-    uint result = 1;
-    uint result2 = 1;
+    uint32_t result = 1;
+    uint32_t result2 = 1;
 
     // x,y coordinates in pixel space
     float3 minExtent, maxExtent;
@@ -203,7 +157,7 @@ __global__ void d_OracleB(
     if ((minExtent.x >= 0.0f) && (maxExtent.x < depth_width) && (minExtent.y >= 0.0f) && (maxExtent.y < depth_height) && minExtent.z > NEAR_CLIPPING)
     {
       // compute mip level
-      uint miplevel = max(ceil(log2(max(maxExtent.x - minExtent.x, maxExtent.y - minExtent.y))), 0.0);
+      uint32_t miplevel = max(ceil(log2(max(maxExtent.x - minExtent.x, maxExtent.y - minExtent.y))), 0.0);
 
       if (miplevel <= num_levels)
       {
@@ -213,12 +167,12 @@ __global__ void d_OracleB(
         // scale according to miplevel
         float adaptInv = 1.0f / pow(2, miplevel);
 
-        uint xmin = (uint)(adaptInv*minExtent.x);
-        uint ymin = (uint)(adaptInv*minExtent.y);
-        uint xmax = (uint)(adaptInv*maxExtent.x);
-        uint ymax = (uint)(adaptInv*maxExtent.y);
+        uint32_t xmin = (uint32_t)(adaptInv*minExtent.x);
+        uint32_t ymin = (uint32_t)(adaptInv*minExtent.y);
+        uint32_t xmax = (uint32_t)(adaptInv*maxExtent.x);
+        uint32_t ymax = (uint32_t)(adaptInv*maxExtent.y);
 
-        uint stride = (uint)(adaptInv*depth_width);
+        uint32_t stride = (uint32_t)(adaptInv*depth_width);
 
         float z0, z1;
 
@@ -281,7 +235,7 @@ __global__ void d_OracleB(
   }
 }
 
-void OracleB_cuda(uint num, 
+void OracleB_cuda(uint32_t num, 
                   point_data* points, 
                   float4x4 T, 
                   float sigma, 
@@ -291,8 +245,8 @@ void OracleB_cuda(uint num,
                   int mip_levels,
                   float2* mip, 
                   int hw,
-                  uint* occ, 
-                  uint* estate)
+                  uint32_t* occ, 
+                  uint32_t* estate)
 {
     if (num == 0) return;
 
@@ -302,19 +256,19 @@ void OracleB_cuda(uint num,
 }
 
 __global__ void d_OracleBFinal(
-	uint num, 
+	uint32_t num, 
 	point_data* points, 
 	float4x4 T,  
   float one_over_sigma,
   float* Dmap, 
   int depth_height,
   int depth_width,
-    uint* occupied, 
-  uint* state, 
+    uint32_t* occupied, 
+  uint32_t* state, 
   float* out_probs,
   cudaTextureObject_t		ProfileCurve)
 {
-	uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
+	uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
 	if (tidx < num)
 	{
@@ -324,7 +278,7 @@ __global__ void d_OracleBFinal(
 
     float pmin = 1.0f;
     float pmax = -1.0f;
-    for (uint idx = 0; idx < 8; idx++)
+    for (uint32_t idx = 0; idx < 8; idx++)
     {
       float3 q = make_float3(P[idx].x / P[idx].z, P[idx].y / P[idx].z, P[idx].z);
       float prob = 0.5f;
@@ -332,8 +286,8 @@ __global__ void d_OracleBFinal(
       if ((q.x >= 0.0f) && (q.x <= depth_width) && 
           (q.y >= 0.0f) && (q.y <= depth_height) && q.z > NEAR_CLIPPING)
       {
-        uint x = (uint)q.x;
-        uint y = (uint)q.y;
+        uint32_t x = (uint32_t)q.x;
+        uint32_t y = (uint32_t)q.y;
 
         float d = Dmap[y*depth_width + x];
         prob = BQ(ProfileCurve, one_over_sigma*(q.z-d));
@@ -371,8 +325,8 @@ void OracleBFinal_cuda(
   float* Dmap, 
   int depth_height,
   int depth_width,
-  uint* occ, 
-  uint* estate, 
+  uint32_t* occ, 
+  uint32_t* estate, 
   float* out_probs,
   cudaTextureObject_t		ProfileCurve)
 {
@@ -384,22 +338,22 @@ void OracleBFinal_cuda(
 }
 
 __global__ void d_ProcessFinalVoxels(
-  uint 	num_nodes, 
-  uint* 	in_state, 
-  uint* 	in_nvsum, 
-  uint* 	out_occ, 
-  uint* 	out_state, 
+  uint32_t 	num_nodes, 
+  uint32_t* 	in_state, 
+  uint32_t* 	in_nvsum, 
+  uint32_t* 	out_occ, 
+  uint32_t* 	out_state, 
   uchar* 	out_octree, 
   uchar* 	out_empty)
 {
-  uint index = blockIdx.x * blockDim.x + threadIdx.x;
+  uint32_t index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index >= num_nodes)
     return;
 
-  uint base = 8 * index;
-  uint cnt = 0;
-  uint occupancy = 0;
-  uint emptiness = 0;
+  uint32_t base = 8 * index;
+  uint32_t cnt = 0;
+  uint32_t occupancy = 0;
+  uint32_t emptiness = 0;
 
   for (int i=0; i < 8; i++)
   {
@@ -415,7 +369,7 @@ __global__ void d_ProcessFinalVoxels(
     }
   }
 
-  uint up_index = in_nvsum[index];
+  uint32_t up_index = in_nvsum[index];
 
   if (cnt == 0)
   {
@@ -432,7 +386,7 @@ __global__ void d_ProcessFinalVoxels(
   out_empty[index] = emptiness;
 }
 
-void ProcessFinalVoxels_cuda(uint num_nodes, uint* state, uint* nvsum, uint* occup,  uint* prev_state, uchar* octree, uchar* empty)
+void ProcessFinalVoxels_cuda(uint32_t num_nodes, uint32_t* state, uint32_t* nvsum, uint32_t* occup,  uint32_t* prev_state, uchar* octree, uchar* empty)
 {
 	if (num_nodes == 0) return;
 
@@ -442,7 +396,7 @@ void ProcessFinalVoxels_cuda(uint num_nodes, uint* state, uint* nvsum, uint* occ
 }
 
 __global__ void d_ColorsBFinal(
-	uint num, 
+	uint32_t num, 
 	point_data* points, 
 	float4x4 T,  
   float one_over_sigma,
@@ -455,7 +409,7 @@ __global__ void d_ColorsBFinal(
   float3* out_normals,
   cudaTextureObject_t		ProfileCurve)
 {
-	uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
+	uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
 	if (tidx < num)
 	{
@@ -464,8 +418,8 @@ __global__ void d_ColorsBFinal(
     float4 Q = make_float4((float)V.x, (float)V.y, (float)V.z, 1.0f) * T;
     float3 q = make_float3(Q.x / Q.z, Q.y / Q.z, Q.z);
 
-    uint x = (uint)q.x;
-    uint y = (uint)q.y;
+    uint32_t x = (uint32_t)q.x;
+    uint32_t y = (uint32_t)q.y;
 
 
     if ((x > 0) && (x < depth_width-1) && (y > 0) && (y < depth_height-1) && q.z > NEAR_CLIPPING) //inbounds
@@ -492,10 +446,10 @@ __global__ void d_ColorsBFinal(
         out_colors[tidx] = make_uchar4(b, g, r, 0);
 
         // gradient
-        uint imx = max(x - 1, 0);
-        uint imy = max(y - 1, 0);
-        uint ipx = min(x + 1, depth_width);
-        uint ipy = min(y + 1, depth_height);
+        uint32_t imx = max(x - 1, 0);
+        uint32_t imy = max(y - 1, 0);
+        uint32_t ipx = min(x + 1, depth_width);
+        uint32_t ipy = min(y + 1, depth_height);
         
         float d00 = Dmap[y*depth_width + x];
         float dp0 = Dmap[y*depth_width + ipx];
@@ -556,27 +510,27 @@ void ColorsBFinal_cuda(
 }
 
 __global__ void d_MergeEmpty(
-  const uint num, 
+  const uint32_t num, 
   const point_data* d_points, 
-  const uint  level,
+  const uint32_t  level,
   const uchar* d_octree0, 
   const uchar* d_octree1, 
   const uchar* d_empty0, 
   const uchar* d_empty1, 
-  const uint* d_exsum0, 
-  const uint* d_exsum1, 
-	uint* occupied, 
-	uint* state)
+  const int32_t* d_exsum0, 
+  const int32_t* d_exsum1, 
+	uint32_t* occupied, 
+	uint32_t* state)
 {
-  uint tidx = blockIdx.x * blockDim.x + threadIdx.x;
+  uint32_t tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (tidx < num)
   {
 
     point_data V = d_points[tidx];
 
-    int id0 = Identify(V, level, d_exsum0, d_octree0, d_empty0, 0);
-    int id1 = Identify(V, level, d_exsum1, d_octree1, d_empty1, 0);
+    int id0 = identify(V, level, d_exsum0, d_octree0, d_empty0);
+    int id1 = identify(V, level, d_exsum1, d_octree1, d_empty1);
 
     if (id0 == -1 || id1 == -1) // empty 
     {
@@ -598,17 +552,17 @@ __global__ void d_MergeEmpty(
 }
 
 void MergeEmpty_cuda(
-  uint num, 
+  uint32_t num, 
   point_data* d_points, 
-  uint level, 
+  uint32_t level, 
   uchar* d_octree0, 
   uchar* d_octree1, 
   uchar* d_empty0, 
   uchar* d_empty1, 
-  uint* d_exsum0, 
-  uint* d_exsum1, 
-  uint* occ,
-  uint* estate)
+  int32_t* d_exsum0, 
+  int32_t* d_exsum1, 
+  uint32_t* occ,
+  uint32_t* estate)
 {
 	if (num == 0) return;
 
@@ -618,9 +572,9 @@ void MergeEmpty_cuda(
 }
 
 __global__ void d_BQMerge(
-  const uint num, 
+  const uint32_t num, 
   const point_data* d_points, 
-  const uint  level,
+  const uint32_t  level,
   const uchar* d_octree0, 
   const uchar* d_octree1, 
   const uchar* d_empty0, 
@@ -631,23 +585,23 @@ __global__ void d_BQMerge(
   const uchar4* d_colors1,  
   float3* d_normals0,
   float3* d_normals1,  
-  const uint* d_exsum0, 
-  const uint* d_exsum1, 
-  const uint offset0,
-  const uint offset1,
-	uint* occupied, 
-	uint* state,
+  const int32_t* d_exsum0, 
+  const int32_t* d_exsum1, 
+  const uint32_t offset0,
+  const uint32_t offset1,
+	uint32_t* occupied, 
+	uint32_t* state,
   float* d_out_probs,
   uchar4* d_out_colors)
 {
-  uint tidx = blockIdx.x * blockDim.x + threadIdx.x;
+  uint32_t tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (tidx < num)
   {
     point_data V = d_points[tidx];
 
-    int id0 = Identify(V, level, d_exsum0, d_octree0, d_empty0, offset0);
-    int id1 = Identify(V, level, d_exsum1, d_octree1, d_empty1, offset1);
+    int id0 = identify(V, level, d_exsum0, d_octree0, d_empty0) - offset0;
+    int id1 = identify(V, level, d_exsum1, d_octree1, d_empty1) - offset1;
 
     float p0 = id0 >= 0 ? d_probs0[id0] : id0 < -1 ? 0.5f : 0.0f;
     float p1 = id1 >= 0 ? d_probs1[id1] : id1 < -1 ? 0.5f : 0.0f;   
@@ -676,9 +630,9 @@ __global__ void d_BQMerge(
 }
 
 void BQMerge_cuda(
-  uint num, 
+  uint32_t num, 
   point_data* d_points, 
-  uint level, 
+  uint32_t level, 
   uchar* d_octree0, 
   uchar* d_octree1, 
   uchar* d_empty0, 
@@ -689,12 +643,12 @@ void BQMerge_cuda(
   uchar4* d_color1,
   float3* d_normals0,
   float3* d_normals1,  
-  uint* d_exsum0, 
-  uint* d_exsum1, 
-  uint offset0,
-  uint offset1,
-  uint* occ,
-  uint* estate,
+  int32_t* d_exsum0, 
+  int32_t* d_exsum1, 
+  uint32_t offset0,
+  uint32_t offset1,
+  uint32_t* occ,
+  uint32_t* estate,
   float* d_out_probs,
   uchar4* d_out_colors)
 {
@@ -708,21 +662,21 @@ void BQMerge_cuda(
 }
 
 __global__ void d_TouchExtract(
-  uint 	num_nodes, 
-  uint* 	in_state, 
-  uint* 	in_nvsum, 
-  uint* 	out_state)
+  uint32_t 	num_nodes, 
+  uint32_t* 	in_state, 
+  uint32_t* 	in_nvsum, 
+  uint32_t* 	out_state)
 {
-  uint index = blockIdx.x * blockDim.x + threadIdx.x;
+  uint32_t index = blockIdx.x * blockDim.x + threadIdx.x;
   if (index >= num_nodes)
     return;
 
-  uint up_index = in_nvsum[index];
+  uint32_t up_index = in_nvsum[index];
   out_state[up_index] = in_state[index];
 
 }
 
-void TouchExtract_cuda(uint num, uint* state, uint* nvsum, uint* prev_state)
+void TouchExtract_cuda(uint32_t num, uint32_t* state, uint32_t* nvsum, uint32_t* prev_state)
 {
 	if (num == 0) return;
 
@@ -732,18 +686,18 @@ void TouchExtract_cuda(uint num, uint* state, uint* nvsum, uint* prev_state)
 }
 
 __global__ void d_BQExtract(
-  uint num, 
+  uint32_t num, 
   point_data* d_points, 
-  uint level, 
+  uint32_t level, 
   uchar* d_octree, 
   uchar* d_empty, 
   float* d_probs,
-  uint* d_exsum, 
-  uint offset,
-  uint* occupied,
-  uint* state)
+  int32_t* d_exsum, 
+  uint32_t offset,
+  uint32_t* occupied,
+  uint32_t* state)
 {
-  uint tidx = blockIdx.x * blockDim.x + threadIdx.x;
+  uint32_t tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (tidx < num)
   {
@@ -752,11 +706,11 @@ __global__ void d_BQExtract(
     float pmin = 1;
     float pmax = -1;
 
-    for (uint i = 0; i < 8; i++)
+    for (uint32_t i = 0; i < 8; i++)
     {
       point_data P = make_point_data(V.x + (i >> 2), V.y + ((i >> 1) & 0x1), V.z + (i & 0x1));
 
-      int id = Identify(P, level, d_exsum, d_octree, d_empty, offset);
+      int id = identify(P, level, d_exsum, d_octree, d_empty) - offset;
 
       float prob;
       if (id >= 0)
@@ -789,16 +743,16 @@ __global__ void d_BQExtract(
 }
 
 void BQExtract_cuda(
-  uint num, 
+  uint32_t num, 
   point_data* d_points, 
-  uint level, 
+  uint32_t level, 
   uchar* d_octree, 
   uchar* d_empty, 
   float* d_probs,
-  uint* d_exsum, 
-  uint offset,
-  uint* occ,
-  uint* estate)
+  int32_t* d_exsum, 
+  uint32_t offset,
+  uint32_t* occ,
+  uint32_t* estate)
 {
 	if (num == 0) return;
 
@@ -808,25 +762,25 @@ void BQExtract_cuda(
 }
 
 __global__ void d_BQTouch(
-  uint num, 
+  uint32_t num, 
   uchar* d_octree, 
   uchar* d_empty, 
-  uint* occupied,
-  uint* state)
+  uint32_t* occupied,
+  uint32_t* state)
 {
-  uint tidx = blockIdx.x * blockDim.x + threadIdx.x;
+  uint32_t tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
   if (tidx < num)
   {
     uchar obits = d_octree[tidx];
     uchar ebits = d_empty[tidx];
 
-    uint bidx = 8*tidx;
+    uint32_t bidx = 8*tidx;
 
-    for (uint i = 0; i < 8; i++)
+    for (uint32_t i = 0; i < 8; i++)
     {
-      uint o = obits&(0x1 << i) ? 1 : 0;
-      uint e = ebits&(0x1 << i) ? 1 : 0;
+      uint32_t o = obits&(0x1 << i) ? 1 : 0;
+      uint32_t e = ebits&(0x1 << i) ? 1 : 0;
 
       if (o == 0)
       {
@@ -851,11 +805,11 @@ __global__ void d_BQTouch(
 }
 
 void BQTouch_cuda(
-  uint num, 
+  uint32_t num, 
   uchar* d_octree, 
   uchar* d_empty, 
-  uint* occ,
-  uint* estate)
+  uint32_t* occ,
+  uint32_t* estate)
 {
 	if (num == 0) return;
 

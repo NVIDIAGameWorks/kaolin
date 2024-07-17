@@ -62,14 +62,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ops_spc.def("points_to_corners_cuda", &points_to_corners_cuda);
 
     ops_spc.def("inclusive_sum", &inclusive_sum);
-    //  m.def("compactify", &compactify);
-    ops_spc.def("compactify2", &compactify2);
+    ops_spc.def("compactify", &compactify);
     ops_spc.def("compactify_nodes", &compactify_nodes);
-    //  m.def("subdivide", &subdivide);
-    ops_spc.def("subdivide2", &subdivide2);
-    //  m.def("scalar_to_rgb", &scalar_to_rgb);
-    //  m.def("slice_image", &slice_image);
-    //  m.def("slice_image_empty", &slice_image_empty);
+    ops_spc.def("subdivide", &subdivide);
     ops_spc.def("build_mip2d", &build_mip2d);
     ops_spc.def("oracleB", &oracleB);
     ops_spc.def("colorsB_final", &colorsB_final);

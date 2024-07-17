@@ -23,31 +23,7 @@ namespace kaolin {
 at::Tensor inclusive_sum(at::Tensor Inputs);
 at::Tensor build_mip2d(at::Tensor imagedata, at::Tensor InInv, int mip_levels, float maxdepth, bool true_depth);
 
-//at::Tensor compactify(at::Tensor Points, at::Tensor Exsum);
-//at::Tensor subdivide(at::Tensor Points, at::Tensor Exsum);
-
-std::vector<at::Tensor> subdivide2(at::Tensor Points, at::Tensor Insum);
-std::vector<at::Tensor> compactify2(at::Tensor Points, at::Tensor Exsum);
-
-//at::Tensor scalar_to_rgb(at::Tensor scalars);
-
-//at::Tensor slice_image(
-//    at::Tensor  octree,
-//    at::Tensor  points,
-//    uint32_t    level,
-//    at::Tensor  pyramid,
-//    at::Tensor  prefixsum,
-//    uint32_t    axes,
-//    uint32_t    val);
-//
-//at::Tensor slice_image_empty(
-//    at::Tensor  octree,
-//    at::Tensor  empty,
-//    at::Tensor  points,
-//    uint32_t    level,
-//    at::Tensor  pyramid,
-//    at::Tensor  prefixsum,
-//    uint32_t    axes,
-//    uint32_t    val);
+std::vector<at::Tensor> subdivide(at::Tensor Points, at::Tensor Insum);
+std::vector<at::Tensor> compactify(at::Tensor Points, at::Tensor Exsum);
 
 }  // namespace kaolin

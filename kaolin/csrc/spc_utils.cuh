@@ -108,11 +108,11 @@ static inline __device__ void identify_multiscale(
 
 // version of 'identify' that understands empty space
 static inline __device__ int32_t identify(
-  const short3 	k,
-  const uint32_t 	Level,
-  const int32_t* 	Exsum,
-  const uchar* 	Oroot,
-  const uchar* 	Eroot)
+  const point_data 	k,
+  const uint32_t    Level,
+  const int32_t*    Exsum,
+  const uchar* 	    Oroot,
+  const uchar* 	    Eroot)
 {
   int maxval = (0x1 << Level) - 1;
   if (k.x < 0 || k.y < 0 || k.z < 0 || k.x > maxval || k.y > maxval || k.z > maxval)
@@ -138,7 +138,6 @@ static inline __device__ int32_t identify(
       ord += cnt;
 
       if (depth == 0)
-        // return ord - offset;
         return ord;
     }
     else

@@ -26,6 +26,10 @@ class RayTracedSPCDataset(Dataset):
     """
     A collection of ray intersections from predefined viewpoints with a structured point cloud (octree).
     Useful for, i.e., carving voxels with ray tracing.
+
+    The return value of `__getitem__` will be:
+        image (torch.FloatTensor) containing an rgb image of SPC object from input viewpoint
+  
     """
 
     def __init__(self, viewpoints, gs_octree):

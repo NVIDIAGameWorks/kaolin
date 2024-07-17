@@ -167,59 +167,7 @@ void BuildMip2D_cuda(float* img,
 }
 
 
-// __global__ void d_Compactify(uint num, point_data* voxelDataIn, point_data* voxelDataOut, uint* InSum)
-// {
-// 	uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-//
-// 	if (tidx < num)
-// 	{
-//     uint IdxOut = (tidx == 0u) ? 0 : InSum[tidx-1];
-// 		if (IdxOut != InSum[tidx])
-// 		{
-// 			voxelDataOut[IdxOut] = voxelDataIn[tidx];
-// 		}
-// 	}
-// }
-//
-//
-// void Compactify_cuda(uint num, point_data* points, uint* insum, point_data* new_points)
-// {
-// 	if (num == 0u) return;
-//
-// 	d_Compactify << <(num + 1023) / 1024, 1024 >> >(num, points, new_points, insum);
-// }
-
-
-// __global__ void d_Subdivide(uint num, point_data* voxelDataIn, point_data* voxelDataOut, uint* InSum)
-// {
-// 	uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-//
-// 	if (tidx < num)
-// 	{
-//     uint IdxOut = (tidx == 0u) ? 0 : InSum[tidx-1];
-// 		if (IdxOut != InSum[tidx])
-// 		{
-// 			point_data Vin = voxelDataIn[tidx];
-// 			point_data Vout = make_point_data(2 * Vin.x, 2 * Vin.y, 2 * Vin.z);
-//
-// 			uint IdxBase = 8 * IdxOut;
-//
-// 			for (uint i = 0; i < 8; i++)
-// 			{
-// 				voxelDataOut[IdxBase + i] = make_point_data(Vout.x + (i >> 2), Vout.y + ((i >> 1) & 0x1), Vout.z + (i & 0x1));
-// 			}
-// 		}
-// 	}
-// }
-//
-// void Subdivide_cuda(uint num, point_data* points, uint* exsum, point_data* new_points)
-// {
-// 	if (num == 0u) return;
-//
-// 	d_Subdivide << <(num + 1023) / 1024, 1024 >> >(num, points, new_points, exsum);
-// }
-
-__global__ void d_Subdivide2(uint num, point_data* voxelDataIn, point_data* voxelDataOut, uint* InSum, uint* out_nvsum)
+__global__ void d_Subdivide(uint num, point_data* voxelDataIn, point_data* voxelDataOut, uint* InSum, uint* out_nvsum)
 {
 	uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -242,14 +190,14 @@ __global__ void d_Subdivide2(uint num, point_data* voxelDataIn, point_data* voxe
 	}
 }
 
-void Subdivide2_cuda(uint num, point_data* points, uint* exsum, point_data* new_points, uint* out_nvsum)
+void Subdivide_cuda(uint num, point_data* points, uint* exsum, point_data* new_points, uint* out_nvsum)
 {
 	if (num == 0u) return;
 
-	d_Subdivide2 << <(num + 1023) / 1024, 1024 >> >(num, points, new_points, exsum, out_nvsum);
+	d_Subdivide << <(num + 1023) / 1024, 1024 >> >(num, points, new_points, exsum, out_nvsum);
 }
 
-__global__ void d_Compactify2(uint num, point_data* voxelDataIn, point_data* voxelDataOut, uint* InSum, int64_t* out_nvsum)
+__global__ void d_Compactify(uint num, point_data* voxelDataIn, point_data* voxelDataOut, uint* InSum, int64_t* out_nvsum)
 {
 	uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -264,183 +212,12 @@ __global__ void d_Compactify2(uint num, point_data* voxelDataIn, point_data* vox
 	}
 }
 
-void Compactify2_cuda(uint num, point_data* points, uint* insum, point_data* new_points, int64_t* out_nvsum)
+void Compactify_cuda(uint num, point_data* points, uint* insum, point_data* new_points, int64_t* out_nvsum)
 {
 	if (num == 0u) return;
 
-	d_Compactify2 << <(num + 1023) / 1024, 1024 >> >(num, points, new_points, insum, out_nvsum);
+	d_Compactify << <(num + 1023) / 1024, 1024 >> >(num, points, new_points, insum, out_nvsum);
 }
-
-// __global__ void d_scalar_to_rgb_cuda(uint num, cudaTextureObject_t ColorRamp, float* scalars, uchar4* out_colors)
-// {
-//
-// 	uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-//
-// 	if (tidx < num)
-// 	{
-//     float4 color;
-//
-//     float s = 0.8*scalars[tidx] + 0.1; // remap for 'clamp' texture mode
-// 		color = tex1D<float4>(ColorRamp, 1.0 - s);
-//
-//     out_colors[tidx] = make_uchar4((uchar)(255.0*color.x), (uchar)(255.0*color.y), (uchar)(255.0*color.z), (uchar)(255.0*color.w));
-// 	}
-// }
-//
-// void scalar_to_rgb_cuda(uint num, cudaTextureObject_t ColorRamp, float* scalars, uchar4* out_colors)
-// {
-//   	if (num == 0u) return;
-//
-// 	d_scalar_to_rgb_cuda << <(num + 1023) / 1024, 1024 >> >(num, ColorRamp, scalars, out_colors);
-
-// }
-
-// __global__ void d_slice_image_cuda (
-//   const uint32_t 	pixel_cnt,
-//   const int axes,
-//   const int	  voxel_slice,
-//   const int32_t* 	exsum,
-//   const uchar* 	octree,
-//   const uint32_t 	level,
-//   const uint32_t 	offset,
-//   uchar4* 		image)
-// {
-//   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-//
-//   if (tidx < pixel_cnt)
-//   {
-//     point_data W;
-//
-//     int res = 0x1 << level;
-//
-//     switch (axes)
-//     {
-//       case 0:
-//         W.z = tidx / res;
-//         W.x = voxel_slice;
-//         W.y = tidx % res;
-//         break;
-//       case 1:
-//         W.x = tidx / res;
-//         W.y = voxel_slice;
-//         W.z = tidx % res;
-//         break;
-//       case 2:
-//         W.y = tidx / res;
-//         W.z = voxel_slice;
-//         W.x = tidx % res;
-//         break;
-//     }
-//
-//     int id = identify(W, level, exsum, octree);
-//     uchar4 clr;
-//
-//     if (id < 0)
-//       clr = make_uchar4(0, 0, 0, 0);
-//     else
-//       clr = make_uchar4(255, 255, 255, 255);
-//
-//     image[tidx] = clr;
-//
-//   }
-// }
-//
-// void slice_image_cuda(
-//   uchar*    octree,
-//   uint32_t  level,
-//   int32_t*  sum,
-//   uint32_t  offset,
-//   uint32_t  axes,
-//   uint32_t  voxel_slice,
-//   uint32_t  pixel_cnt,
-//   uchar4*   d_image)
-// {
-//   d_slice_image_cuda << <(pixel_cnt + 63) / 64, 64 >> >
-//   (
-//     pixel_cnt,
-//     axes,
-//     voxel_slice,
-//     sum,
-//     octree,
-//     level,
-//     offset,
-//     d_image);
-// }
-//
-// __global__ void d_slice_image_empty_cuda (
-//   const uint32_t 	pixel_cnt,
-//   const uint32_t axes,
-//   const uint32_t	  voxel_slice,
-//   const int32_t* 	exsum,
-//   const uchar* 	octree,
-//   uchar* 	empty,
-//   const uint32_t 	level,
-//   const uint32_t    offset,
-//   uchar* 		image)
-// {
-//   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-//
-//   if (tidx < pixel_cnt)
-//   {
-//     point_data W;
-//
-//     int res = 0x1 << level;
-//
-//     switch (axes)
-//     {
-//       case 0:
-//         W.z = tidx / res;
-//         W.x = voxel_slice;
-//         W.y = tidx % res;
-//         break;
-//       case 1:
-//         W.x = tidx / res;
-//         W.y = voxel_slice;
-//         W.z = tidx % res;
-//         break;
-//       case 2:
-//         W.y = tidx / res;
-//         W.z = voxel_slice;
-//         W.x = tidx % res;
-//         break;
-//     }
-//
-//     int id = identify(W, level, exsum, octree, empty);
-//
-//      uchar clr;
-//
-//     if (id < 0)
-//       clr = id == -1 ? 0 : 64+16*(id+9);
-//     else
-//       clr = 255;
-//
-//     image[tidx] = clr;
-//   }
-// }
-//
-// void slice_image_empty_cuda(
-//   uchar* octree,
-//   uchar* empty,
-//   uint32_t level,
-//   int32_t* sum,
-//   uint32_t offset,
-//   uint32_t axes,
-//   uint32_t voxel_slice,
-//   uint32_t pixel_cnt,
-//   uchar* d_image)
-// {
-//   d_slice_image_empty_cuda << <(pixel_cnt + 63) / 64, 64 >> >
-//   (
-//     pixel_cnt,
-//     axes,
-//     voxel_slice,
-//     sum,
-//     octree,
-//     empty,
-//     level,
-//     offset,
-//     d_image);
-// }
 
 }  // namespace kaolin
 
