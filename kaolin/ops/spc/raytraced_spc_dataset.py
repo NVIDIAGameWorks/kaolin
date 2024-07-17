@@ -16,8 +16,8 @@
 
 import torch
 from torch.utils.data import Dataset
-from kaolin.render.camera import Camera
 from kaolin.ops.spc import scan_octrees, generate_points, morton_to_points
+from kaolin.render.camera import Camera
 from kaolin.render.spc import unbatched_raytrace, mark_pack_boundaries
 from kaolin.render.camera import generate_pinhole_rays, generate_centered_pixel_coords
 

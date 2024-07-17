@@ -8,4 +8,4 @@ from . import random
 from . import reduction
 from . import spc
 from . import voxelgrid
-from . import densify
+from . import gaussian

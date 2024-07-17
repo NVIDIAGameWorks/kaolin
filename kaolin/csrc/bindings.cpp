@@ -32,9 +32,8 @@
 #include "./render/spc/raytrace.h"
 #include "./ops/spc/query.h"
 #include "./ops/spc/point_utils.h"
-
-#include "./densify/spc_recon/recon.h"
-#include "./densify/spc_recon/bf.h"
+#include "./ops/spc/recon.h"
+#include "./ops/spc/bf.h"
 
 namespace kaolin {
 
@@ -61,6 +60,26 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ops_spc.def("coords_to_trilinear_cuda", &coords_to_trilinear_cuda);
     //ops_spc.def("coord_to_trilinear_jacobian_cuda", &coord_to_trilinear_jacobian_cuda);
     ops_spc.def("points_to_corners_cuda", &points_to_corners_cuda);
+
+    ops_spc.def("inclusive_sum", &inclusive_sum);
+    //  m.def("compactify", &compactify);
+    ops_spc.def("compactify2", &compactify2);
+    ops_spc.def("compactify_nodes", &compactify_nodes);
+    //  m.def("subdivide", &subdivide);
+    ops_spc.def("subdivide2", &subdivide2);
+    //  m.def("scalar_to_rgb", &scalar_to_rgb);
+    //  m.def("slice_image", &slice_image);
+    //  m.def("slice_image_empty", &slice_image_empty);
+    ops_spc.def("build_mip2d", &build_mip2d);
+    ops_spc.def("oracleB", &oracleB);
+    ops_spc.def("colorsB_final", &colorsB_final);
+    ops_spc.def("oracleB_final", &oracleB_final);
+    ops_spc.def("process_final_voxels", &process_final_voxels);
+    ops_spc.def("merge_empty", &merge_empty);
+    ops_spc.def("bq_merge", &bq_merge);
+    ops_spc.def("bq_extract", &bq_extract);
+    ops_spc.def("bq_touch", &bq_touch);
+    ops_spc.def("bq_touch_extract", &bq_touch_extract);
 #endif  // WITH_CUDA
     ops_spc.def("points_to_octree", &points_to_octree);
     ops_spc.def("morton_to_octree", &morton_to_octree);
@@ -102,26 +121,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 		&unbatched_reduced_sg_inner_product_forward_cuda);
   render_sg.def("unbatched_reduced_sg_inner_product_backward_cuda",
 		&unbatched_reduced_sg_inner_product_backward_cuda);
-
-  m.def("inclusive_sum", &inclusive_sum);
-//  m.def("compactify", &compactify);
-  m.def("compactify2", &compactify2);
-  m.def("compactify_nodes", &compactify_nodes);
-//  m.def("subdivide", &subdivide);
-  m.def("subdivide2", &subdivide2);
-//  m.def("scalar_to_rgb", &scalar_to_rgb);
-//  m.def("slice_image", &slice_image);
-//  m.def("slice_image_empty", &slice_image_empty);
-  m.def("build_mip2d", &build_mip2d);
-  m.def("oracleB", &oracleB);
-  m.def("colorsB_final", &colorsB_final);
-  m.def("oracleB_final", &oracleB_final);
-  m.def("process_final_voxels", &process_final_voxels);
-  m.def("merge_empty", &merge_empty);
-  m.def("bq_merge", &bq_merge);
-  m.def("bq_extract", &bq_extract);
-  m.def("bq_touch", &bq_touch);
-  m.def("bq_touch_extract", &bq_touch_extract);
 }
 
 }  // namespace kaolin

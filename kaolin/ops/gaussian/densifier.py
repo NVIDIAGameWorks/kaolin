@@ -17,10 +17,9 @@ import math
 import numpy as np
 import torch
 from typing import Optional
-from kaolin.ops.spc import scan_octrees, morton_to_points
+from kaolin.ops.spc import scan_octrees, morton_to_points, bf_recon, unbatched_query
+from kaolin.ops.spc.raytraced_spc_dataset import RayTracedSPCDataset
 from kaolin import _C
-from kaolin.ops.densify.bf_recon import bf_recon, unbatched_query
-from kaolin.ops.densify.raytraced_spc_dataset import RayTracedSPCDataset
 
 __all__ = [
     'VolumeDensifier'
