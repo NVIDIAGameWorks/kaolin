@@ -407,8 +407,6 @@ void Compactify2_cuda(uint num, point_data* points, uint* insum, point_data* new
 //
 //     int id = identify(W, level, exsum, octree, empty);
 //
-//     if (W.x == 0 && W.y == 0 && W.z == 0) printf("%d  %d   %d\n", tidx, id, offset);
-//
 //      uchar clr;
 //
 //     if (id < 0)

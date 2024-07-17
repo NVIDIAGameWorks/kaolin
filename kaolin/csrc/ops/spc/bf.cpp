@@ -505,8 +505,6 @@ std::vector<at::Tensor> bq_touch(
   uint num = pyramid_a[0][0][level-1];
   uint offset = pyramid_a[0][1][level-1];
 
-  // printf("touch  %d  %d  %d  %d\n", level, num, points.size(0), offset);
-
   at::Tensor occupancy = at::zeros({8*num}, octree.options().dtype(at::kInt));
   uint* occ = reinterpret_cast<uint*>(occupancy.data_ptr<int>());
 
