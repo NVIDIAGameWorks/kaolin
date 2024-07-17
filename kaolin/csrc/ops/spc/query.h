@@ -36,7 +36,17 @@ at::Tensor query_multiscale_cuda(
     at::Tensor query_coords,
     uint32_t target_level);
 
-} // namespace kaolin
+at::Tensor query_cuda_empty(
+    at::Tensor octree,
+    at::Tensor empty,
+    at::Tensor prefix_sum,
+    at::Tensor query_coords,
+    uint32_t target_level);
+
+}
+
+
+// namespace kaolin
 
 #endif // KAOLIN_OPS_SPC_QUERY_H_
 

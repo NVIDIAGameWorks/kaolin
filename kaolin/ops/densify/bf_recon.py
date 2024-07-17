@@ -397,5 +397,5 @@ def unbatched_query(octree, empty, exsum, query_coords, level):
     else:
         input_coords = query_coords
 
-    return _C.query_cuda_empty(octree.contiguous(), empty.contiguous(), exsum.contiguous(),
-                                         input_coords.contiguous(), level).long()
+    return _C.ops.spc.query_cuda_empty(octree.contiguous(), empty.contiguous(), exsum.contiguous(),
+                                       input_coords.contiguous(), level).long()

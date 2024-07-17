@@ -126,7 +126,9 @@ def solidify(xyz, scales, rots, opacities, gs_level, query_level):
     iso = 11.345 # 99th percentile
 
     # compute spc from gsplats
-    morton, merged_opacities, gs_per_voxel =  _C.gs_to_spc_cuda(xyz, scales, rots, opacities, iso, scale_voxel_tolerance, gs_level)
+    morton, merged_opacities, gs_per_voxel =  _C.ops.conversions.gs_to_spc_cuda(
+        xyz, scales, rots, opacities, iso, scale_voxel_tolerance, gs_level
+    )
 
     # filter out low opacities
     opacity_tol = 0.1

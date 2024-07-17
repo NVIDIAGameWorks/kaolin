@@ -26,17 +26,15 @@
 #include "./render/mesh/rasterization.h"
 #include "./render/sg/unbatched_reduced_sg_inner_product.h"
 #include "./ops/conversions/mesh_to_spc/mesh_to_spc.h"
+#include "./ops/conversions/gs_to_spc/gs_to_spc.h"
 #include "./ops/spc/spc.h"
 #include "./ops/spc/feature_grids.h"
 #include "./render/spc/raytrace.h"
 #include "./ops/spc/query.h"
 #include "./ops/spc/point_utils.h"
 
-#include "./ops/gsplats/gsplat_utils.h"
-#include "./ops/conversions/gs_to_spc/gs_to_spc.h"
 #include "./densify/spc_recon/recon.h"
 #include "./densify/spc_recon/bf.h"
-#include "./densify/query/query.h"
 
 namespace kaolin {
 
@@ -51,10 +49,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     py::module ops_conversions = ops.def_submodule("conversions");
     ops_conversions.def("unbatched_mcube_forward_cuda", &unbatched_mcube_forward_cuda);
     ops_conversions.def("mesh_to_spc_cuda", &mesh_to_spc_cuda);
+    ops_conversions.def("gs_to_spc_cuda", &gs_to_spc::gs_to_spc_cuda);
     py::module ops_spc = ops.def_submodule("spc");
 #if WITH_CUDA
     ops_spc.def("query_cuda", &query_cuda);
     ops_spc.def("query_multiscale_cuda", &query_multiscale_cuda);
+    ops_spc.def("query_cuda_empty", &query_cuda_empty);
     ops_spc.def("points_to_morton_cuda", &points_to_morton_cuda);
     ops_spc.def("morton_to_points_cuda", &morton_to_points_cuda);
     ops_spc.def("interpolate_trilinear_cuda", &interpolate_trilinear_cuda);
@@ -103,27 +103,25 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   render_sg.def("unbatched_reduced_sg_inner_product_backward_cuda",
 		&unbatched_reduced_sg_inner_product_backward_cuda);
 
-  m.def("gs_to_spc_cuda", &gs_to_spc::gs_to_spc_cuda);
   m.def("inclusive_sum", &inclusive_sum);
-  m.def("compactify", &compactify);
+//  m.def("compactify", &compactify);
   m.def("compactify2", &compactify2);
-  m.def("subdivide", &subdivide);
+  m.def("compactify_nodes", &compactify_nodes);
+//  m.def("subdivide", &subdivide);
   m.def("subdivide2", &subdivide2);
-  m.def("scalar_to_rgb", &scalar_to_rgb);
-  m.def("slice_image", &slice_image);
-  m.def("slice_image_empty", &slice_image_empty);
+//  m.def("scalar_to_rgb", &scalar_to_rgb);
+//  m.def("slice_image", &slice_image);
+//  m.def("slice_image_empty", &slice_image_empty);
   m.def("build_mip2d", &build_mip2d);
   m.def("oracleB", &oracleB);
   m.def("colorsB_final", &colorsB_final);
   m.def("oracleB_final", &oracleB_final);
   m.def("process_final_voxels", &process_final_voxels);
-  m.def("compactify_nodes", &compactify_nodes);
   m.def("merge_empty", &merge_empty);
   m.def("bq_merge", &bq_merge);
   m.def("bq_extract", &bq_extract);
   m.def("bq_touch", &bq_touch);
   m.def("bq_touch_extract", &bq_touch_extract);
-  m.def("query_cuda_empty", &query_cuda_empty);
 }
 
 }  // namespace kaolin
