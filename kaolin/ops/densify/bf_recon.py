@@ -12,21 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 
 import torch
 import numpy as np
 import kaolin.ops.spc as spc
 from kaolin import _C
 
-device = 'cuda'
-
 __all__ = [
     'bf_recon',
     'unbatched_query'
 ]
 
+logger = logging.getLogger(__name__)
 
-def processFrame(batch, level, sigma, frame_no):
+def processFrame(batch, level, sigma):
     im = batch[0].contiguous()
     dm = batch[1].contiguous()
     Cam = batch[2]
@@ -36,40 +36,10 @@ def processFrame(batch, level, sigma, frame_no):
     true_depth = batch[6]
     start_level = batch[7]
     points = batch[8]
+    device = points.device
 
-
-    # # generate depth minmaxmip
+    # generate depth minmaxmip
     mips = _C.build_mip2d(dm, In, mip_levels, maxdepth, true_depth).contiguous()
-
-    # # useful code to visualize mipmaps
-    # s = 2**mip_levels
-    # h = dm.size(0)
-    # w = dm.size(1)
-    # h0 = (int)(h/s)
-    # w0 = (int)(w/s)
-    # hw = h0*w0
-
-    # fig = plt.figure()
-
-    # for l in range(mip_levels):
-    #     offset = (int)(hw*(4**(l)-1)/3)
-    #     isz = hw*4**l
-    #     ih = h0*2**l
-
-    #     fig.add_subplot(2, mip_levels, l+1)
-    #     plt.imshow(mips[offset:(offset+isz),0].resize(ih,ih).cpu())
-    #     plt.axis('off')
-
-
-    #     fig.add_subplot(2, mip_levels, mip_levels+l+1)
-    #     plt.imshow(mips[offset:(offset+isz),1].resize(ih,ih).cpu())
-    #     plt.axis('off')
-
-    #     # print(l, offset, isz)
-
-    # plt.waitforbuttonpress()   
-
-
 
     # list for intermediate tensors
     Occ = []
@@ -82,9 +52,9 @@ def processFrame(batch, level, sigma, frame_no):
     # initialize levels above start level as dense
     for l in range(0, start_level):
         num = pow(8,l)
-        Occ.append(torch.ones((num), dtype=torch.int32, device='cuda'))
-        Sta.append(torch.full((num,), 2, dtype=torch.int32, device='cuda'))
-        Nvs.append(torch.arange(num, dtype=torch.int32, device='cuda'))
+        Occ.append(torch.ones((num), dtype=torch.int32, device=device))
+        Sta.append(torch.full((num,), 2, dtype=torch.int32, device=device))
+        Nvs.append(torch.arange(num, dtype=torch.int32, device=device))
         vcnt[l] = num
 
     for l in range(start_level, level):
@@ -92,21 +62,19 @@ def processFrame(batch, level, sigma, frame_no):
         occupancies, empty_state = _C.oracleB(points, l, sigma, Cam, dm, mips, mip_levels)
         insum = _C.inclusive_sum(occupancies)
         if insum[-1].item() == 0:
-            print("recon terminated")
+            logger.debug("recon terminated")
         points, nvsum = _C.subdivide2(points, insum)
 
         Occ.append(occupancies)
         Sta.append(empty_state)
         Nvs.append(nvsum)
 
-        num_voxels = points.size(0)
-
     vcnt[level] = points.size(0)
 
     occupancies, empty_state, probabilities = _C.oracleB_final(points, level, sigma, Cam, dm)
     insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
-        print("recon terminated")
+        logger.debug("recon terminated")
     points, nvsum = _C.compactify2(points, insum)
     probabilities = probabilities[nvsum[:]]
 
@@ -117,41 +85,40 @@ def processFrame(batch, level, sigma, frame_no):
 
     # process final voxels
     init_size = vcnt[1:].sum().item() >> 3
-    octree = torch.zeros((init_size), dtype=torch.uint8, device='cuda')
-    empty = torch.zeros((init_size), dtype=torch.uint8, device='cuda')
-    occupancies = torch.zeros((init_size), dtype=torch.int32, device='cuda')
+    octree = torch.zeros((init_size), dtype=torch.uint8, device=device)
+    empty = torch.zeros((init_size), dtype=torch.uint8, device=device)
+    occupancies = torch.zeros((init_size), dtype=torch.int32, device=device)
 
     num_voxels = vcnt[level].item()
     num_nodes = num_voxels >> 3
     total_nodes = num_nodes
 
     for l in range(level, 0, -1):
-
-        octree, empty, occupancies = _C.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
+        octree, empty, occupancies = \
+            _C.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
 
         num_voxels = vcnt[l-1].item()
         num_nodes = num_voxels >> 3
         total_nodes += num_nodes
 
-    # print(occupancies.size(0))
-
     insum = _C.inclusive_sum(occupancies)
-    cnt = insum[-1].item()
-
     octree, empty = _C.compactify_nodes(total_nodes, insum, octree, empty)
 
     return octree, empty, probabilities, colors, normals
 
 
+def fuseBF(
+    level,
+    octree0, octree1,
+    empty0, empty1,
+    probs0, probs1,
+    colors0, colors1,
+    normals0, normals1,
+    pyramid0, pyramid1,
+    exsum0, exsum1
+):
+    device = octree0.device
 
-def fuseBF(level,
-           octree0, octree1, 
-           empty0, empty1, 
-           probs0, probs1, 
-           colors0, colors1, 
-           normals0, normals1, 
-           pyramid0, pyramid1, 
-           exsum0, exsum1):
     # start at level 
     start_level = 4
 
@@ -167,27 +134,23 @@ def fuseBF(level,
     # initialize levels above start level as dense
     for l in range(0, start_level):
         num = pow(8,l)
-        Sta.append(torch.full((num,), 2, dtype=torch.int32, device='cuda'))
-        Nvs.append(torch.arange(num, dtype=torch.int32, device='cuda'))
+        Sta.append(torch.full((num,), 2, dtype=torch.int32, device=device))
+        Nvs.append(torch.arange(num, dtype=torch.int32, device=device))
         vcnt[l] = num
-
 
     for l in range(start_level, level):
         vcnt[l] = points.size(0)
-        occupancies, empty_state = _C.merge_empty(points, l, octree0, octree1, empty0, empty1, pyramid0, pyramid1, exsum0, exsum1)
+        occupancies, empty_state = \
+            _C.merge_empty(points, l, octree0, octree1, empty0, empty1, pyramid0, pyramid1, exsum0, exsum1)
         if occupancies.max().item() == 0:
-            print("recon terminated")
+            logger.debug("recon terminated")
         insum = _C.inclusive_sum(occupancies)
         points, nvsum = _C.subdivide2(points, insum)
 
         Sta.append(empty_state)
         Nvs.append(nvsum)
 
-        # num_voxels = points.size(0)
-        # print(l+1, points.size(0), num_voxels)
-
     vcnt[level] = points.size(0)
-
     occupancies, empty_state, occ_prob, colors, normals = _C.bq_merge(points, level,
             octree0, octree1, 
             empty0, empty1, 
@@ -198,55 +161,46 @@ def fuseBF(level,
             exsum0, exsum1)
 
     if occupancies.max().item() == 0:
-        print("recon terminated")
+        logger.debug("recon terminated")
     insum = _C.inclusive_sum(occupancies)
     points, nvsum = _C.compactify2(points, insum)
 
-
-
     occ_prob = occ_prob[nvsum[:]]
     colors = colors[nvsum[:]]
-
-    # Occ.append(occupancies)
     Sta.append(empty_state)
-
 
     # process final voxels
     init_size = vcnt[1:].sum().item() >> 3
-    octree = torch.zeros((init_size), dtype=torch.uint8, device='cuda')
-    empty = torch.zeros((init_size), dtype=torch.uint8, device='cuda')
-    occupancies = torch.zeros((init_size), dtype=torch.int32, device='cuda')
+    octree = torch.zeros((init_size), dtype=torch.uint8, device=device)
+    empty = torch.zeros((init_size), dtype=torch.uint8, device=device)
+    occupancies = torch.zeros((init_size), dtype=torch.int32, device=device)
 
     num_voxels = vcnt[level].item()
     num_nodes = num_voxels >> 3
     total_nodes = num_nodes
 
     for l in range(level, 0, -1):
-        # print(l, init_size-total_nodes)
-
-        octree, empty, occupancies = _C.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
+        octree, empty, occupancies =\
+            _C.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
 
         insum = _C.inclusive_sum(occupancies)
         if insum[-1].item() == 0:
-            print("recon terminated")
+            logger.debug("recon terminated")
 
         num_voxels = vcnt[l-1].item()
         num_nodes = num_voxels >> 3
         total_nodes += num_nodes
 
-
     insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
-        print("recon terminated")
+        logger.debug("recon terminated")
     octree, empty = _C.compactify_nodes(total_nodes, insum, octree, empty)
-
 
     return octree, empty, occ_prob, colors, normals
 
 
-
-def extractBQ(octree, empty, probs, colors, normal):
-
+def extractBQ(octree, empty, probs, colors):
+    device = octree.device
     lengths = torch.tensor([len(octree)], dtype=torch.int)
     level, pyramid, exsum = spc.scan_octrees(octree, lengths)
 
@@ -254,8 +208,8 @@ def extractBQ(octree, empty, probs, colors, normal):
     vcnt = np.zeros((level+1), dtype=np.uint32)
 
     # list for intermediate tensors
-    Sta = [torch.full((1,), 2, dtype=torch.int32, device='cuda')]
-    Nvs = [torch.arange(1, dtype=torch.int32, device='cuda')]
+    Sta = [torch.full((1,), 2, dtype=torch.int32, device=device)]
+    Nvs = [torch.arange(1, dtype=torch.int32, device=device)]
 
     points = spc.morton_to_points(torch.arange(pow(8, 1)).to(device))
     vcnt[0] = pyramid[0,0,0] # = 1
@@ -263,7 +217,7 @@ def extractBQ(octree, empty, probs, colors, normal):
     for l in range(1, level):
         occupancies, empty_state = _C.bq_touch(points, l, octree, empty, pyramid)
         if occupancies.max().item() == 0:
-            print("recon terminated")
+            logger.debug("recon terminated")
         insum = _C.inclusive_sum(occupancies)
         points, nvsum = _C.subdivide2(points, insum)
 
@@ -276,7 +230,7 @@ def extractBQ(octree, empty, probs, colors, normal):
     occupancies, empty_state = _C.bq_touch(points, level, octree, empty, pyramid)
     insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
-        print("recon terminated")
+        logger.debug("recon terminated")
     points, nvsum = _C.compactify2(points, insum)
 
     Sta.append(empty_state)
@@ -285,11 +239,10 @@ def extractBQ(octree, empty, probs, colors, normal):
     newsum[:] = nvsum[:]
     Nvs.append(newsum)
 
-
     occupancies, empty_state = _C.bq_extract(points, level, octree, empty, probs, pyramid, exsum)
     insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
-        print("recon terminated")
+        logger.debug("recon terminated")
     points, nvsum = _C.compactify2(points, insum)
     out_colors = colors[nvsum[:]]
  
@@ -298,19 +251,20 @@ def extractBQ(octree, empty, probs, colors, normal):
 
     # process final voxels
     init_size = vcnt[1:].sum().item() >> 3
-    octree = torch.zeros((init_size), dtype=torch.uint8, device='cuda')
-    empty = torch.zeros((init_size), dtype=torch.uint8, device='cuda')
-    occupancies = torch.zeros((init_size), dtype=torch.int32, device='cuda')
+    octree = torch.zeros((init_size), dtype=torch.uint8, device=device)
+    empty = torch.zeros((init_size), dtype=torch.uint8, device=device)
+    occupancies = torch.zeros((init_size), dtype=torch.int32, device=device)
 
     num_voxels = vcnt[level]
     num_nodes = num_voxels >> 3
     total_nodes = num_nodes
 
     for l in range(level, 0, -1):
-        octree, empty, occupancies = _C.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
+        octree, empty, occupancies =\
+            _C.process_final_voxels(num_nodes, total_nodes, Sta[l], Nvs[l-1], occupancies, Sta[l-1], octree, empty)
         insum = _C.inclusive_sum(occupancies)
         if insum[-1].item() == 0:
-            print("recon terminated")
+            logger.debug("recon terminated")
 
         num_voxels = vcnt[l-1].item()
         num_nodes = num_voxels >> 3
@@ -318,7 +272,7 @@ def extractBQ(octree, empty, probs, colors, normal):
 
     insum = _C.inclusive_sum(occupancies)
     if insum[-1].item() == 0:
-        print("recon terminated")
+        logger.debug("recon terminated")
     octree, empty = _C.compactify_nodes(total_nodes, insum, octree, empty)
 
     return octree, empty, out_colors
@@ -326,22 +280,18 @@ def extractBQ(octree, empty, probs, colors, normal):
 
 def bf_recon(transformed_dataset, final_level, sigma):
     frame_no = 0
-    octree0, empty0, probs0, colors0, normals0, pyramid0, exsum0, weights = None, None, None, None, None, None, None, None
-    level = 0
+    octree0, empty0, probs0, colors0, normals0, pyramid0, exsum0, weights = \
+        None, None, None, None, None, None, None, None
 
     for batch in transformed_dataset:
         if frame_no == 0:
-            octree0, empty0, probs0, colors0, normals0 = processFrame(batch, final_level, sigma, frame_no)
-
+            octree0, empty0, probs0, colors0, normals0 = processFrame(batch, final_level, sigma)
             lengths = torch.tensor([len(octree0)], dtype=torch.int)
             level, pyramid0, exsum0 = spc.scan_octrees(octree0, lengths)
-
         else :
-            octree1, empty1, probs1, colors1, normals1 = processFrame(batch, final_level, sigma,frame_no)
-
+            octree1, empty1, probs1, colors1, normals1 = processFrame(batch, final_level, sigma)
             lengths = torch.tensor([len(octree1)], dtype=torch.int)
             level, pyramid1, exsum1 = spc.scan_octrees(octree1, lengths)
-
             octree0, empty0, probs0, colors0, normals0 = fuseBF(level,
                                                                 octree0, octree1, 
                                                                 empty0, empty1, 
@@ -350,16 +300,12 @@ def bf_recon(transformed_dataset, final_level, sigma):
                                                                 normals0, normals1, 
                                                                 pyramid0, pyramid1, 
                                                                 exsum0, exsum1)
-
             lengths = torch.tensor([len(octree0)], dtype=torch.int)
             level, pyramid0, exsum0 = spc.scan_octrees(octree0, lengths)
 
         frame_no += 1
-
-    octree, empty, colors = extractBQ(octree0, empty0, probs0, colors0, normals0)
-
+    octree, empty, colors = extractBQ(octree0, empty0, probs0, colors0)
     return octree, empty, colors
- 
 
 
 def unbatched_query(octree, empty, exsum, query_coords, level):

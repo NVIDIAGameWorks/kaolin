@@ -23,14 +23,25 @@ from kaolin.render.camera import generate_pinhole_rays, generate_centered_pixel_
 
 
 class RayTracedSPCDataset(Dataset):
-    def __init__(self, viewpoints, gs_octree):
+    """
+    A collection of ray intersections from predefined viewpoints with a structured point cloud (octree).
+    Useful for, i.e., carving voxels with ray tracing.
+    """
 
+    def __init__(self, viewpoints, gs_octree):
         self.viewpoints = viewpoints
         self.gs_octree = gs_octree
 
         lengths = torch.tensor([len(gs_octree)], dtype=torch.int32)
         self.level, self.pyramid, self.exsum = scan_octrees(gs_octree, lengths)
         self.point_hierarchy = generate_points(gs_octree, self.pyramid, self.exsum)
+        self.device = self.gs_octree.device
+
+        # Constants
+        self.carve_camera_fov = 0.644  # In radians
+        self.max_depth = 6.0
+        self.mip_levels = 6
+        self.start_level = 4
 
     def __len__(self):
         # When limiting the number of data
@@ -43,35 +54,34 @@ class RayTracedSPCDataset(Dataset):
             eye=self.viewpoints[index],
             at=torch.tensor([0.0, 0.0, 0.0]),
             up=torch.tensor([0.0, 0.0, 1.0]),
-            fov=0.644,  # In radians
+            fov=self.carve_camera_fov,
             width=res, height=res,
             dtype=torch.float32,
-            device='cuda'
+            device=self.device
         )
 
         ray_grid = generate_centered_pixel_coords(camera.width, camera.height, 
-                                                camera.width, camera.height, device='cuda')
+                                                  camera.width, camera.height, device=self.device)
         origins, dirs = generate_pinhole_rays(camera, ray_grid)
 
-        ridx, pidx, depths = unbatched_raytrace(self.gs_octree, self.point_hierarchy, self.pyramid[0], self.exsum, origins, dirs, 
+        ridx, pidx, depths = unbatched_raytrace(self.gs_octree, self.point_hierarchy, self.pyramid[0],
+                                                self.exsum, origins, dirs,
                                                 self.level, return_depth=True, with_exit=False)
 
 
         # get closest hits
         first_hits_mask = mark_pack_boundaries(ridx)
-        first_hits_point = pidx[first_hits_mask]
         first_hits_ray = ridx[first_hits_mask].long()
         first_depths = depths[first_hits_mask]
 
         # black background
-        image = torch.zeros((camera.height*camera.width, 3), dtype=torch.float32, device='cuda')  
+        image = torch.zeros((camera.height*camera.width, 3), dtype=torch.float32, device=self.device)
 
         # write colors to image
         image[first_hits_ray,:] = 1.0
         image = image.reshape(camera.height, camera.width, 3)
 
-        maxdepth = 6.0
-        depthmap = torch.full((camera.height*camera.width, 1), maxdepth, dtype=torch.float32, device='cuda') 
+        depthmap = torch.full((camera.height*camera.width, 1), self.max_depth, dtype=torch.float32, device=self.device)
         depthmap[first_hits_ray,:] = first_depths[:]
         depthmap = depthmap.reshape(camera.height, camera.width)
 
@@ -95,13 +105,10 @@ class RayTracedSPCDataset(Dataset):
 
         Ex = torch.mm(Ex, G)
         Cam = torch.mm(Ex, In)
-        
-        mip_levels = 6
 
         # generate starting points
-        start_level = 4
-        points = morton_to_points(torch.arange(pow(8, start_level), device='cuda'))
-        return image, depthmap, Cam, In, maxdepth, mip_levels, True, start_level, points
+        points = morton_to_points(torch.arange(pow(8, self.start_level), device=self.device))
+        return image, depthmap, Cam, In, self.max_depth, self.mip_levels, True, self.start_level, points
 
 
 

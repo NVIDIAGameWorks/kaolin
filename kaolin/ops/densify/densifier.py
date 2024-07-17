@@ -13,9 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import math
+import numpy as np
 import torch
-from .gs_spc_solid import solidify
+from typing import Optional
+from kaolin.ops.spc import scan_octrees, morton_to_points
+from kaolin import _C
+from kaolin.ops.densify.bf_recon import bf_recon, unbatched_query
+from kaolin.ops.densify.raytraced_spc_dataset import RayTracedSPCDataset
 
 __all__ = [
     'VolumeDensifier'
@@ -33,24 +38,113 @@ class VolumeDensifier:
     objects.
     """
 
-    def __init__(self, resolution: int=8, opacity_threshold=0.35, post_scale_factor=0.93, jitter=True):
+    def __init__(
+        self,
+        resolution: int = 8,
+        opacity_threshold: float = 0.35,
+        post_scale_factor: float = 0.93,
+        jitter: bool = True,
+        viewpoints: Optional[torch.Tensor]=None
+    ):
+        r"""Creates a new VolumeDensifier, which allows for sampling points within the approximated volume of a
+        shape represented by Gaussian Splatting.
+
+        Args:
+            resolution (int):
+                A Structured Point Cloud of cubic resolution :math:`(\text{2**res})` will be constructed to fill
+                the volume with points. Higher values require more memory. Max resolution supported is 10.
+            opacity_threshold (float):
+                Preprocess: if opacity_threshold < 1.0, points with opacity below the threshold will be masked away.
+            post_scale_factor (float):
+                Postprocess: if post_scale_factor < 1.0, the returned pointcloud will be rescaled to ensure
+                it fits inside the hull of the input points.
+            jitter (bool):
+                If true, applies a small jitter to the returned volume points.
+                If false, the returned points lie on an equally distanced grid
+            viewpoints (optional, torch.Tensor):
+                Collection of viewpoints used to 'carve' out seen voxel space around the shell after it's voxelized.
+                These is a :math:`(\text{C, 3})` tensor of camera viewpoints facing the center,
+                chosen based on empirical heuristics.
+                If not specified, kaolin will opt to use its own set of default views.
+        """
         self.resolution = resolution
-        """ A Structured Point Cloud of cubic resolution 2**res will be constructed to fill the volume.
-        Higher values require more memory. Max resolution supported is 10.
-        """
         self.opacity_threshold = opacity_threshold
-        """ Preprocess: if opacity_threshold < 1.0, points with opacity below the threshold will be masked away. """
         self.post_scale_factor = post_scale_factor
-        """ Postprocess: if post_scale_factor < 1.0, the returned pointcloud will be rescaled to ensure it fits inside
-        the hull of the input points.
-        """
         self.jitter = jitter
+        self.viewpoints = viewpoints or self._generate_default_viewpoints()
+
+    @classmethod
+    def _generate_default_viewpoints(cls):
+        """ Generates a collection of default viewpoints used to 'carve' out seen space.
+        These anchors are chosen based on empirical heuristics
         """
-        If true, applies a small jitter to the returned volume points.
-        If false, the returned points lie on an equally distanced grid
-        """
+        anchors = torch.tensor([
+            [4.0, 0.0, 0.0],
+            [0.0, 4.0, 0.0],
+            [-4.0, 0.0, 0.0],
+            [0.0, -4.0, 0.0],
+            [2.3, 2.3, 2.3],
+            [-2.3, 2.3, 2.3],
+            [2.3, -2.3, 2.3],
+            [-2.3, -2.3, 2.3]
+        ])
+
+        phi = (1 + math.sqrt(5.0)) / 2
+        icosahedron = torch.tensor([
+            [+phi, +1.0, 0.0],
+            [+phi, -1.0, 0.0],
+            [-phi, -1.0, 0.0],
+            [-phi, +1.0, 0.0],
+            [+1.0, 0.0, +phi],
+            [-1.0, 0.0, +phi],
+            [-1.0, 0.0, -phi],
+            [+1.0, 0.0, -phi],
+            [0.0, +phi, +1.0],
+            [0.0, +phi, -1.0],
+            [0.0, -phi, -1.0],
+            [0.0, -phi, +1.0]
+        ])
+
+        # Degrees to radians
+        deg_to_rad = torch.pi / 180.0
+
+        # Rotation angles
+        theta_x = 15 * deg_to_rad
+        theta_y = 27 * deg_to_rad
+        theta_z = 49 * deg_to_rad
+
+        # Rotation matrix
+        R_x = torch.tensor([
+            [1.0, 0.0, 0.0],
+            [0.0, np.cos(theta_x), -np.sin(theta_x)],
+            [0.0, np.sin(theta_x), np.cos(theta_x)]]
+        )
+        R_y = torch.tensor([
+            [np.cos(theta_y), 0.0, np.sin(theta_y)],
+            [0.0, 1.0, 0.0],
+            [-np.sin(theta_y), 0.0, np.cos(theta_y)]])
+        R_z = torch.tensor([
+            [np.cos(theta_z), -np.sin(theta_z), 0.0],
+            [np.sin(theta_z), np.cos(theta_z), 0.0],
+            [0.0, 0.0, 1.0]]
+        )
+        R = (R_z @ R_y @ R_x).unsqueeze(0).float()
+
+        viewpoints = torch.cat([
+            anchors,
+            icosahedron,
+            (R @ (2.0 * icosahedron)[:, :, None]).squeeze(-1),
+            (R @ R @ (3.0 * icosahedron)[:, :, None]).squeeze(-1),
+            (R @ R @ R @ (4.0 * icosahedron)[:, :, None]).squeeze(-1),
+            (R @ R @ R @ R @ (5.0 * icosahedron)[:, :, None]).squeeze(-1),
+            (R @ R @ R @ R @ R @ (6.0 * icosahedron)[:, :, None]).squeeze(-1),
+        ], dim=0)
+        return viewpoints
 
     def _jitter(self, pts):
+        """ Applies random pertubrations to a set of voxelized points.
+        The pertubrations are small enough such that each point remains in the voxel cell it belongs in.
+        """
         N = pts.shape[0]
         device = pts.device
         cell_radius = 1.0 / 2.0 **self.resolution
@@ -67,6 +161,80 @@ class VolumeDensifier:
         z = radius * torch.cos(phi)
         delta = torch.stack([x,y,z], dim=1)
         return pts + delta
+
+    def _solidify(self, xyz, scales, rots, opacities, gs_level, query_level):
+        r"""Creates a tensor of uniform samples 'inside' collection of Gaussian Splats.
+
+        Args:
+            xyz (torch.FloatTensor) : Gaussian Splat means, of shape :math:`(\text{num_guaasians, 3})`.
+            scales (torch.FloatTensor) : Gaussian Splat scales, of shape :math:`(\text{num_guaasians, 3})`.
+            rots (torch.FloatTensor) : Gaussian Splat rots, of shape :math:`(\text{num_guaasians, 4})`.
+            opacities (torch.FloatTensor) : Gaussian Splat opacities, of shape :math:`(\text{num_guaasians})`.
+
+            gs_level (int): The level of the interal octree created.
+            query_level (int): The level of the uniform sample grid.
+
+        Returns:
+            pidx (torch.LongTensor):
+
+                The indices into the point hierarchy of shape :math:`(\text{num_query})`.
+                If with_parents is True, then the shape will be :math:`(\text{num_query, level+1})`.
+
+        """
+        device = xyz.device
+
+        # AABB of Gaussian means
+        pmin = torch.min(xyz, dim=0, keepdim=False)[0]
+        pmax = torch.max(xyz, dim=0, keepdim=False)[0]
+
+        # find the AABB diagonal vector and centroid
+        diff = pmax - pmin
+        cen = (0.5 * (pmin + pmax)).to(device=device)
+
+        # find the maximum diagonal component, add tiny amount to compensate for covariance vectors (a hack!)
+        dmax = (0.5 * torch.max(diff) + 0.05).to(device=device)
+
+        # transform Gaussians to [-1,-1,-1]x[1,1,1]
+        xyz = (xyz - cen) / dmax
+        scales = scales / dmax
+
+        # some constants
+        scale_voxel_tolerance = 0.125
+        iso = 11.345  # 99th percentile
+
+        # compute spc from gsplats
+        morton, merged_opacities, gs_per_voxel = _C.ops.conversions.gs_to_spc_cuda(
+            xyz, scales, rots, opacities, iso, scale_voxel_tolerance, gs_level
+        )
+
+        # filter out low opacities
+        opacity_tol = 0.1
+        mask = merged_opacities[:] > opacity_tol
+        morton = morton[mask]
+        gs_octree = _C.ops.spc.morton_to_octree(morton, gs_level)
+
+        # create depthmaps
+        dataset = RayTracedSPCDataset(self.viewpoints, gs_octree)
+
+        # fuse depthmaps into seen/unseen aware spc
+        bf_octree, bf_empty, _ = bf_recon(dataset, final_level=query_level, sigma=0.005)
+
+        # scan resulting octrees for subsequent querying
+        lengths = torch.tensor([len(bf_octree)], dtype=torch.int)
+        level, pyramid, exsum = scan_octrees(bf_octree, lengths)
+        # should check level == query_level
+
+        # create uniform samples, query volume
+        query_points = morton_to_points(torch.arange(8 ** query_level, dtype=torch.long, device=device))
+        result = unbatched_query(bf_octree, bf_empty, exsum, query_points, query_level)
+
+        # filter out 'empty' space; keep inside and boundary points
+        mask = result[:] != -1
+        sample_points = query_points[mask]
+
+        # still need to untransform
+        sample_points = 2 ** (1 - query_level) * sample_points - torch.ones((3), device=device)
+        return dmax * sample_points + cen
 
     @torch.no_grad()
     def sample_points_in_volume(self, xyz, scale, rotation, opacity, mask=None, count=None):
@@ -98,21 +266,21 @@ class VolumeDensifier:
 
         Args:
             xyz (torch.FloatTensor):
-                A tensor of shape (N,3) containing the Gaussian means.
+                A tensor of shape :math:`(\text{N, 3})` containing the Gaussian means.
                 For example, using the original Inria codebase, this corresponds to GaussianModel.get_xyz
             scale (torch.FloatTensor):
-                A tensor of shape (N,3) containing the Gaussian covariance scale components, in a format
+                A tensor of shape :math:`(\text{N, 3})` containing the Gaussian covariance scale components, in a format
                 of a 3D scale vector per Gaussian. The scale is assumed to be post-activation.
                 For example, using the original Inria codebase, this corresponds to GaussianModel.get_scaling
             rotation (torch.FloatTensor):
-                A tensor of shape (N,4) containing the Gaussian covariance rotation components, in a format
+                A tensor of shape :math:`(\text{N, 4})` containing the Gaussian covariance rotation components, in a format
                 of a 4D quaternion per Gaussian. The rotation is assumed to be post-activation.
                 For example, using the original Inria codebase, this corresponds to GaussianModel.get_rotation
             opacity (torch.FloatTensor):
-                A tensor of shape (N,1) containing the Gaussian opacities.
+                A tensor of shape :math:`(\text{N, 1})` or :math:`(\text{N,})` containing the Gaussian opacities.
                 For example, using the original Inria codebase, this corresponds to GaussianModel.get_opacity
             mask (optional, torch.BoolTensor):
-                An optional (N,) binary mask which selects only a subset of the gaussian to use
+                An optional :math:`(\text{N,})` binary mask which selects only a subset of the gaussian to use
                 for predicting the shell. Useful if some Gaussians are suspected as noise.
                 By default, the mask is assumed to be a tensor of ones to select all Gaussians.
             count (optional, int):
@@ -122,11 +290,16 @@ class VolumeDensifier:
         Return:
             (torch.FloatTensor): a tensor of (K, 3) points sampled inside the approximated shape volume.
         """
+        # Reshape to single dim if needed
+        if opacity.ndim == 2:
+            opacity = opacity.squeeze(1)
+
+        device = xyz.device
 
         # Select the required points and solidify
         num_surface_pts = xyz.shape[0]
-        mask = mask.cuda().clone() if mask is not None \
-            else xyz.new_ones((num_surface_pts,), device='cuda', dtype=torch.bool)
+        mask = mask.to(device=device).clone() if mask is not None \
+            else xyz.new_ones((num_surface_pts,), device=device, dtype=torch.bool)
         # Preprocess: prune low opacity points
         if self.opacity_threshold < 1.0:
             opacity_mask = opacity.reshape(-1) < self.opacity_threshold
@@ -135,8 +308,8 @@ class VolumeDensifier:
         scale = scale[mask]
         rotation = rotation[mask]
         opacity = opacity[mask]
-        volume_pts = solidify(xyz.contiguous(), scale.contiguous(), rotation.contiguous(), opacity.contiguous(),
-                              gs_level=self.resolution, query_level=self.resolution)
+        volume_pts = self._solidify(xyz.contiguous(), scale.contiguous(), rotation.contiguous(), opacity.contiguous(),
+                                    gs_level=self.resolution, query_level=self.resolution)
         if self.jitter:
             volume_pts = self._jitter(volume_pts)
         # Postprocess: rescale returned points to ensure they fit in input points hull

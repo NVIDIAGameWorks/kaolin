@@ -162,7 +162,7 @@ cudaArray* SetupProfileCurve(cudaTextureObject_t* ProfileCurve)
   texDescr.normalizedCoords = 0;
   texDescr.readMode = cudaReadModeNormalizedFloat;
 
-	cudaCreateTextureObject(ProfileCurve, &resDescr, &texDescr, NULL);
+  cudaCreateTextureObject(ProfileCurve, &resDescr, &texDescr, NULL);
 
   return cuArray;
 }
@@ -526,12 +526,12 @@ void bq_touch_extract(
   at::Tensor state, 
   at::Tensor nvsum, 
   at::Tensor prev_state)
-  {
-    uint* d_state = reinterpret_cast<uint*>(state.data_ptr<int>());
-    uint* d_nvsum = reinterpret_cast<uint*>(nvsum.data_ptr<int>());
-    uint* d_prev_state = reinterpret_cast<uint*>(prev_state.data_ptr<int>());
+{
+  uint* d_state = reinterpret_cast<uint*>(state.data_ptr<int>());
+  uint* d_nvsum = reinterpret_cast<uint*>(nvsum.data_ptr<int>());
+  uint* d_prev_state = reinterpret_cast<uint*>(prev_state.data_ptr<int>());
 
-    TouchExtract_cuda(num_nodes, d_state, d_nvsum, d_prev_state);
-  }
+  TouchExtract_cuda(num_nodes, d_state, d_nvsum, d_prev_state);
+}
 
 }  // namespace kaolin
