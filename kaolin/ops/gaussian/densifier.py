@@ -43,7 +43,8 @@ class VolumeDensifier:
         opacity_threshold: float = 0.35,
         post_scale_factor: float = 0.93,
         jitter: bool = True,
-        viewpoints: Optional[torch.Tensor]=None
+        clip_samples_to_input_bbox: bool = True,
+        viewpoints: Optional[torch.Tensor] = None
     ):
         r"""Creates a new VolumeDensifier, which allows for sampling points within the approximated volume of a
         shape represented by Gaussian Splatting.
@@ -53,13 +54,19 @@ class VolumeDensifier:
                 A Structured Point Cloud of cubic resolution :math:`(\text{2**res})` will be constructed to fill
                 the volume with points. Higher values require more memory. resolution range supported is in [6, 10].
             opacity_threshold (float):
-                Preprocess: if opacity_threshold < 1.0, points with opacity below the threshold will be masked away.
+                The densification algorithm starts by voxelizing space using the gaussian responses and their
+                associated opacities. Each cell accumulated the opacity induced by the gaussians overlapping it.
+                Voxels with accumulated opacity below this threshold will be masked away.
+                If opacity_threshold > 0.0, no culling will take place.
             post_scale_factor (float):
                 Postprocess: if post_scale_factor < 1.0, the returned pointcloud will be rescaled to ensure
                 it fits inside the hull of the input points.
             jitter (bool):
                 If true, applies a small jitter to the returned volume points.
                 If false, the returned points lie on an equally distanced grid
+            clip_samples_to_input_bbox (bool):
+                If true, the densifier will compute a bounding box out of the input gaussian means.
+                Any points sampled outside of this bounding box will be rejected.
             viewpoints (optional, torch.Tensor):
                 Collection of viewpoints used to 'carve' out seen voxel space around the shell after it's voxelized.
                 These is a :math:`(\text{C, 3})` tensor of camera viewpoints facing the center,
@@ -70,7 +77,8 @@ class VolumeDensifier:
         self.opacity_threshold = opacity_threshold
         self.post_scale_factor = post_scale_factor
         self.jitter = jitter
-        self.viewpoints = viewpoints or self._generate_default_viewpoints()
+        self.clip_samples_to_input_bbox = clip_samples_to_input_bbox
+        self.viewpoints = viewpoints if viewpoints is not None else self._generate_default_viewpoints()
 
     @classmethod
     def _generate_default_viewpoints(cls):
@@ -161,7 +169,7 @@ class VolumeDensifier:
         delta = torch.stack([x,y,z], dim=1)
         return pts + delta
 
-    def _solidify(self, xyz, scales, rots, opacities, gs_level, query_level):
+    def _solidify(self, xyz, scales, rots, opacities, opacity_threshold, gs_level, query_level):
         r"""Creates a tensor of uniform samples 'inside' collection of Gaussian Splats.
 
         Args:
@@ -169,7 +177,7 @@ class VolumeDensifier:
             scales (torch.FloatTensor) : Gaussian Splat scales, of shape :math:`(\text{num_guaasians, 3})`.
             rots (torch.FloatTensor) : Gaussian Splat rots, of shape :math:`(\text{num_guaasians, 4})`.
             opacities (torch.FloatTensor) : Gaussian Splat opacities, of shape :math:`(\text{num_guaasians})`.
-
+            opacity_threshold (float): Threshold to cull away voxelized cells with low accumulated opacity.
             gs_level (int): The level of the interal octree created.
             query_level (int): The level of the uniform sample grid.
 
@@ -207,9 +215,8 @@ class VolumeDensifier:
         )
 
         # filter out low opacities
-        opacity_tol = 0.1
-        mask = merged_opacities[:] > opacity_tol
-        morton = morton[mask]
+        mask = merged_opacities[:] >= opacity_threshold
+        morton = morton[mask].contiguous()
         gs_octree = _C.ops.spc.morton_to_octree(morton, gs_level)
 
         # create depthmaps
@@ -299,15 +306,12 @@ class VolumeDensifier:
         num_surface_pts = xyz.shape[0]
         mask = mask.to(device=device).clone() if mask is not None \
             else xyz.new_ones((num_surface_pts,), device=device, dtype=torch.bool)
-        # Preprocess: prune low opacity points
-        if self.opacity_threshold < 1.0:
-            opacity_mask = opacity.reshape(-1) < self.opacity_threshold
-            mask &= ~opacity_mask
         xyz = xyz[mask]
         scale = scale[mask]
         rotation = rotation[mask]
         opacity = opacity[mask]
         volume_pts = self._solidify(xyz.contiguous(), scale.contiguous(), rotation.contiguous(), opacity.contiguous(),
+                                    opacity_threshold=self.opacity_threshold,
                                     gs_level=self.resolution, query_level=self.resolution)
         if self.jitter:
             volume_pts = self._jitter(volume_pts)
@@ -317,6 +321,12 @@ class VolumeDensifier:
             volume_pts -= mean
             volume_pts *= self.post_scale_factor
             volume_pts += mean
+
+        if self.clip_samples_to_input_bbox:
+            bbox_min = xyz.min(dim=0)[0]
+            bbox_max = xyz.max(dim=0)[0]
+            out_of_box = (bbox_max <= volume_pts).any(dim=1) | (bbox_min >= volume_pts).any(dim=1)
+            volume_pts = volume_pts[~out_of_box]
 
         num_total_pts = volume_pts.shape[0]
         if count is not None and count < num_total_pts:

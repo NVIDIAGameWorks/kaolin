@@ -29,8 +29,7 @@ SUPPORTED_GSPLATS_DTYPES = [torch.float32]
 
 
 def validate_samples_inside_shell(samples, gaussian_xyz):
-    # TODO (operel, cloop): point goes out of bounds for z coordinate of hot dog
-    # assert (gaussian_xyz.min(dim=0)[0] <= samples.min(dim=0)[0]).all()  # Check points are within shell
+    assert (gaussian_xyz.min(dim=0)[0] <= samples.min(dim=0)[0]).all()  # Check points are within shell
     assert (gaussian_xyz.max(dim=0)[0] >= samples.max(dim=0)[0]).all()  # Check points are within shell
 
 
@@ -55,6 +54,7 @@ class TestVolumeDensifier:
         else:
             model_path = os.path.join(ROOT_DIR, 'gsplats', model_name)
             gaussian_fields = torch.load(os.path.abspath(model_path))
+        gaussian_fields['model_name'] = model_name
         return gaussian_fields
 
     def test_sample_points_in_volume(self, gaussians, device, dtype):
@@ -124,12 +124,6 @@ class TestVolumeDensifier:
         # Points should be equi-distanced
         assert torch.isclose(minimal_nearest_neighbor_distance, maximal_nearest_neighbor_distance)
 
-        # TODO (operel, cloop) - the following fails with
-        #   maximal_nearest_neighbor_distance=0.0389 ; spc_cell_length=0.03125
-        # # Distance is cell length
-        # spc_cell_length = 2.0 / 2**resolution
-        # assert maximal_nearest_neighbor_distance == spc_cell_length
-
     def test_sample_points_in_volume_for_count(self, gaussians, device, dtype):
         pos = gaussians['position'].cuda()                  # model.get_xyz
         scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
@@ -145,7 +139,7 @@ class TestVolumeDensifier:
         check_tensor(output, shape=(5000, 3), dtype=dtype, device=device)
         validate_samples_inside_shell(output, pos)
 
-    def test_sample_points_in_volume_with_opacity_threshold(self, gaussians, device, dtype):
+    def test_sample_points_in_volume_without_opacity_threshold(self, gaussians, device, dtype):
         pos = gaussians['position'].cuda()  # model.get_xyz
         scale = gaussians['scale'].cuda()  # post activation, i.e. model.get_scaling
         rotation = gaussians['rotation'].cuda()  # post activation, i.e. model.get_rotation
@@ -153,7 +147,23 @@ class TestVolumeDensifier:
 
         densifier = VolumeDensifier(opacity_threshold=0.0)
         output = densifier.sample_points_in_volume(
-            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, count=5000
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity
+        )
+
+        assert output.ndim == 2
+        assert output.shape[1] == 3
+        check_tensor(output, dtype=dtype, device=device)
+        validate_samples_inside_shell(output, pos)
+
+    def test_sample_points_in_volume_with_high_opacity_threshold(self, gaussians, device, dtype):
+        pos = gaussians['position'].cuda()  # model.get_xyz
+        scale = gaussians['scale'].cuda()  # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].cuda()  # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).cuda()  # model.get_opacity
+
+        densifier = VolumeDensifier(opacity_threshold=0.5)
+        output = densifier.sample_points_in_volume(
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity
         )
 
         assert output.ndim == 2
@@ -187,11 +197,49 @@ class TestVolumeDensifier:
         assert output1.ndim == 2
         assert output1.shape[1] == 3
         check_tensor(output1, dtype=dtype, device=device)
-        validate_samples_inside_shell(output1, pos)
 
         assert output2.ndim == 2
         assert output2.shape[1] == 3
         check_tensor(output2, dtype=dtype, device=device)
         validate_samples_inside_shell(output2, pos)
 
-        assert torch.allclose(output1, output2)
+        assert output1.shape[0] >= output2.shape[0]
+
+    def test_sample_points_in_volume_with_custom_viewpoints(self, gaussians, device, dtype):
+
+        pos = gaussians['position'].cuda()                  # model.get_xyz
+        scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
+
+        anchors = torch.tensor([
+            [2.3, -2.3, 2.3],
+            [0.0, 4.2, 0.0],
+            [4.0, 0.0, 0.0],
+            [-2.3, 2.3, 2.3],
+            [0.0, -4.1, 0.0],
+            [2.3, 2.3, 2.3],
+            [-4.2, 0.0, 0.0],
+            [-2.3, -2.3, 2.3]
+        ])
+        anchors = torch.cat([anchors, -anchors], dim=0)
+        densifier = VolumeDensifier(viewpoints=anchors)
+        output = densifier.sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
+
+        assert output.ndim == 2
+        assert output.shape[1] == 3
+        check_tensor(output, dtype=dtype, device=device)
+        validate_samples_inside_shell(output, pos)
+
+    def test_sample_points_in_volume_no_clipping(self, gaussians, device, dtype):
+        pos = gaussians['position'].cuda()                  # model.get_xyz
+        scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
+
+        densifier = VolumeDensifier(clip_samples_to_input_bbox=False)
+        output = densifier.sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
+
+        assert output.ndim == 2
+        assert output.shape[1] == 3
+        check_tensor(output, dtype=dtype, device=device)
