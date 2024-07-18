@@ -18,7 +18,7 @@ import os
 
 import math
 import torch
-from kaolin.ops.gaussian import VolumeDensifier
+from kaolin.ops.gaussian import sample_points_in_volume
 from kaolin.utils.testing import check_tensor
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -63,8 +63,7 @@ class TestVolumeDensifier:
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
-        densifier = VolumeDensifier()
-        output = densifier.sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
+        output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
 
         assert output.ndim == 2
         assert output.shape[1] == 3
@@ -78,8 +77,8 @@ class TestVolumeDensifier:
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
         resolution = 6
-        densifier = VolumeDensifier(resolution=resolution, jitter=True)
-        output = densifier.sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
+        output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
+                                         resolution=resolution, jitter=True)
 
         assert output.ndim == 2
         assert output.shape[1] == 3
@@ -107,8 +106,8 @@ class TestVolumeDensifier:
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
         resolution = 6
-        densifier = VolumeDensifier(resolution=resolution, jitter=False, post_scale_factor=1.0)
-        output = densifier.sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
+        output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
+                                         resolution=resolution, jitter=False, post_scale_factor=1.0)
 
         assert output.ndim == 2
         assert output.shape[1] == 3
@@ -130,8 +129,7 @@ class TestVolumeDensifier:
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
-        densifier = VolumeDensifier()
-        output = densifier.sample_points_in_volume(
+        output = sample_points_in_volume(
             xyz=pos, scale=scale, rotation=rotation, opacity=opacity, count=5000
         )
 
@@ -145,9 +143,8 @@ class TestVolumeDensifier:
         rotation = gaussians['rotation'].cuda()  # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()  # model.get_opacity
 
-        densifier = VolumeDensifier(opacity_threshold=0.0)
-        output = densifier.sample_points_in_volume(
-            xyz=pos, scale=scale, rotation=rotation, opacity=opacity
+        output = sample_points_in_volume(
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, opacity_threshold=0.0
         )
 
         assert output.ndim == 2
@@ -161,9 +158,8 @@ class TestVolumeDensifier:
         rotation = gaussians['rotation'].cuda()  # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()  # model.get_opacity
 
-        densifier = VolumeDensifier(opacity_threshold=0.5)
-        output = densifier.sample_points_in_volume(
-            xyz=pos, scale=scale, rotation=rotation, opacity=opacity
+        output = sample_points_in_volume(
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, opacity_threshold=0.5
         )
 
         assert output.ndim == 2
@@ -184,14 +180,12 @@ class TestVolumeDensifier:
         mask = pos.new_ones((N,), device=device, dtype=torch.bool)
         mask &= ~opacity_mask
 
-        densifier1 = VolumeDensifier(opacity_threshold=0.0, jitter=False)
-        output1 = densifier1.sample_points_in_volume(
-            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, mask=mask
+        output1 = sample_points_in_volume(
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, mask=mask, opacity_threshold=0.0, jitter=False
         )
 
-        densifier2 = VolumeDensifier(opacity_threshold=0.35, jitter=False)
-        output2 = densifier2.sample_points_in_volume(
-            xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
+        output2 = sample_points_in_volume(
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, opacity_threshold=0.35, jitter=False
         )
 
         assert output1.ndim == 2
@@ -223,8 +217,7 @@ class TestVolumeDensifier:
             [-2.3, -2.3, 2.3]
         ])
         anchors = torch.cat([anchors, -anchors], dim=0)
-        densifier = VolumeDensifier(viewpoints=anchors)
-        output = densifier.sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
+        output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity, viewpoints=anchors)
 
         assert output.ndim == 2
         assert output.shape[1] == 3
@@ -237,8 +230,8 @@ class TestVolumeDensifier:
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
-        densifier = VolumeDensifier(clip_samples_to_input_bbox=False)
-        output = densifier.sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
+        output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
+                                         clip_samples_to_input_bbox=False)
 
         assert output.ndim == 2
         assert output.shape[1] == 3
