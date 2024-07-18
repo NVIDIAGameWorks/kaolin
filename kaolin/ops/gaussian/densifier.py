@@ -51,7 +51,7 @@ class VolumeDensifier:
         Args:
             resolution (int):
                 A Structured Point Cloud of cubic resolution :math:`(\text{2**res})` will be constructed to fill
-                the volume with points. Higher values require more memory. Max resolution supported is 10.
+                the volume with points. Higher values require more memory. resolution range supported is in [6, 10].
             opacity_threshold (float):
                 Preprocess: if opacity_threshold < 1.0, points with opacity below the threshold will be masked away.
             post_scale_factor (float):

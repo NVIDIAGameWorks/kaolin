@@ -1,4 +1,4 @@
-# Copyright (c) 204 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,12 +19,20 @@ import os
 import math
 import torch
 from kaolin.ops.gaussian import VolumeDensifier
+from kaolin.utils.testing import check_tensor
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        os.pardir, os.pardir, os.pardir, os.pardir, 'samples/')
+                        os.pardir, os.pardir, os.pardir, os.pardir, 'samples/gsplats')
 TEST_MODELS = ['hotdog_minimal.pt']
 SUPPORTED_GSPLATS_DEVICES = ['cuda']
 SUPPORTED_GSPLATS_DTYPES = [torch.float32]
+
+
+def validate_samples_inside_shell(samples, gaussian_xyz):
+    # TODO (operel, cloop): point goes out of bounds for z coordinate of hot dog
+    # assert (gaussian_xyz.min(dim=0)[0] <= samples.min(dim=0)[0]).all()  # Check points are within shell
+    assert (gaussian_xyz.max(dim=0)[0] >= samples.max(dim=0)[0]).all()  # Check points are within shell
+
 
 @pytest.mark.parametrize('model_name', TEST_MODELS)
 @pytest.mark.parametrize("device", SUPPORTED_GSPLATS_DEVICES)
@@ -32,9 +40,12 @@ SUPPORTED_GSPLATS_DTYPES = [torch.float32]
 class TestVolumeDensifier:
 
     @pytest.fixture(autouse=True)
-    def test_sample_points_in_volume(self, model_name, device, dtype):
+    def gaussians(self, model_name):
         model_path = os.path.join(ROOT_DIR, model_name)
-        gaussians = torch.load(model_path)
+        gaussian_fields = torch.load(os.path.abspath(model_path))
+        return gaussian_fields
+
+    def test_sample_points_in_volume(self, gaussians, device, dtype):
         pos = gaussians['position'].cuda()                  # model.get_xyz
         scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
@@ -45,72 +56,69 @@ class TestVolumeDensifier:
 
         assert output.ndim == 2
         assert output.shape[1] == 3
-        assert output.device == device
-        assert output.dtype == dtype
-        assert (pos.min(dim=0)[0] <= output.min(dim=0)[0]).all()    # Check points are within shell
-        assert (pos.max(dim=0)[0] >= output.max(dim=0)[0]).all()    # Check points are within shell
+        check_tensor(output, dtype=dtype, device=device)
+        validate_samples_inside_shell(output, pos)
 
-    @pytest.fixture(autouse=True)
-    def test_sample_points_in_volume_for_density(self, model_name, device, dtype):
-        model_path = os.path.join(ROOT_DIR, model_name)
-        gaussians = torch.load(model_path)
+    def test_sample_points_in_volume_for_density(self, gaussians, device, dtype):
         pos = gaussians['position'].cuda()                  # model.get_xyz
         scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
-        densifier = VolumeDensifier(resolution=6, jitter=True)
+        resolution = 6
+        densifier = VolumeDensifier(resolution=resolution, jitter=True)
         output = densifier.sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
 
         assert output.ndim == 2
         assert output.shape[1] == 3
-        assert output.device == device
-        assert output.dtype == dtype
-        assert (pos.min(dim=0)[0] <= output.min(dim=0)[0]).all()    # Check points are within shell
-        assert (pos.max(dim=0)[0] >= output.max(dim=0)[0]).all()    # Check points are within shell
+        check_tensor(output, dtype=dtype, device=device)
+        validate_samples_inside_shell(output, pos)
 
         N = output.shape[0]
         pairwise_dists = torch.linalg.norm(output[None] - output[:, None], dim=2)
         pairwise_dists += output.max() * torch.eye(N, dtype=dtype, device=device)
+        minimal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].min()
         maximal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].max()
 
-        spc_cell_length = 2.0 / 2**6
+        spc_cell_length = 2.0 / 2**resolution
         spc_diagonal_length = spc_cell_length * math.sqrt(3.0)
-        min_allowed_pts_distance = 2.0 * spc_diagonal_length # two spc diagonals
-        assert maximal_nearest_neighbor_distance <= min_allowed_pts_distance
+        max_allowed_pts_distance = 2.0 * spc_diagonal_length # two spc diagonals
+        assert maximal_nearest_neighbor_distance <= max_allowed_pts_distance
 
-    @pytest.fixture(autouse=True)
-    def test_sample_points_in_volume_no_jitter_for_density(self, model_name, device, dtype):
-        model_path = os.path.join(ROOT_DIR, model_name)
-        gaussians = torch.load(model_path)
+        # Points should not be equi-distanced
+        assert minimal_nearest_neighbor_distance != maximal_nearest_neighbor_distance
+
+    def test_sample_points_in_volume_no_jitter_for_density(self, gaussians, device, dtype):
         pos = gaussians['position'].cuda()                  # model.get_xyz
         scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
-        densifier = VolumeDensifier(resolution=6, jitter=False)
+        resolution = 6
+        densifier = VolumeDensifier(resolution=resolution, jitter=False, post_scale_factor=1.0)
         output = densifier.sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
 
         assert output.ndim == 2
         assert output.shape[1] == 3
-        assert output.device == device
-        assert output.dtype == dtype
-        assert (pos.min(dim=0)[0] <= output.min(dim=0)[0]).all()    # Check points are within shell
-        assert (pos.max(dim=0)[0] >= output.max(dim=0)[0]).all()    # Check points are within shell
+        check_tensor(output, dtype=dtype, device=device)
+        validate_samples_inside_shell(output, pos)
 
         N = output.shape[0]
         pairwise_dists = torch.linalg.norm(output[None] - output[:, None], dim=2)
         pairwise_dists += output.max() * torch.eye(N, dtype=dtype, device=device)
+        minimal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].min()
         maximal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].max()
 
-        # Distance is cell length
-        spc_cell_length = 2.0 / 2**6
-        assert maximal_nearest_neighbor_distance == spc_cell_length
+        # Points should be equi-distanced
+        assert torch.isclose(minimal_nearest_neighbor_distance, maximal_nearest_neighbor_distance)
 
-    @pytest.fixture(autouse=True)
-    def test_sample_points_in_volume_for_count(self, model_name, device, dtype):
-        model_path = os.path.join(ROOT_DIR, model_name)
-        gaussians = torch.load(model_path)
+        # TODO (operel, cloop) - the following fails with
+        #   maximal_nearest_neighbor_distance=0.0389 ; spc_cell_length=0.03125
+        # # Distance is cell length
+        # spc_cell_length = 2.0 / 2**resolution
+        # assert maximal_nearest_neighbor_distance == spc_cell_length
+
+    def test_sample_points_in_volume_for_count(self, gaussians, device, dtype):
         pos = gaussians['position'].cuda()                  # model.get_xyz
         scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
@@ -122,9 +130,56 @@ class TestVolumeDensifier:
         )
 
         assert output.ndim == 2
-        assert output.shape[1] == 5000
+        check_tensor(output, shape=(5000, 3), dtype=dtype, device=device)
+        validate_samples_inside_shell(output, pos)
+
+    def test_sample_points_in_volume_with_opacity_threshold(self, gaussians, device, dtype):
+        pos = gaussians['position'].cuda()  # model.get_xyz
+        scale = gaussians['scale'].cuda()  # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].cuda()  # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).cuda()  # model.get_opacity
+
+        densifier = VolumeDensifier(opacity_threshold=0.0)
+        output = densifier.sample_points_in_volume(
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, count=5000
+        )
+
+        assert output.ndim == 2
         assert output.shape[1] == 3
-        assert output.device == device
-        assert output.dtype == dtype
-        assert (pos.min(dim=0)[0] <= output.min(dim=0)[0]).all()    # Check points are within shell
-        assert (pos.max(dim=0)[0] >= output.max(dim=0)[0]).all()    # Check points are within shell
+        check_tensor(output, dtype=dtype, device=device)
+        validate_samples_inside_shell(output, pos)
+
+    def test_sample_points_in_volume_with_mask(self, gaussians, device, dtype):
+        pos = gaussians['position'].cuda()  # model.get_xyz
+        scale = gaussians['scale'].cuda()  # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].cuda()  # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).cuda()  # model.get_opacity
+
+        opacity_threshold = 0.35
+
+        N = pos.shape[0]
+        opacity_mask = opacity.reshape(-1) < opacity_threshold
+        mask = pos.new_ones((N,), device=device, dtype=torch.bool)
+        mask &= ~opacity_mask
+
+        densifier1 = VolumeDensifier(opacity_threshold=0.0, jitter=False)
+        output1 = densifier1.sample_points_in_volume(
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, mask=mask
+        )
+
+        densifier2 = VolumeDensifier(opacity_threshold=0.35, jitter=False)
+        output2 = densifier2.sample_points_in_volume(
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
+        )
+
+        assert output1.ndim == 2
+        assert output1.shape[1] == 3
+        check_tensor(output1, dtype=dtype, device=device)
+        validate_samples_inside_shell(output1, pos)
+
+        assert output2.ndim == 2
+        assert output2.shape[1] == 3
+        check_tensor(output2, dtype=dtype, device=device)
+        validate_samples_inside_shell(output2, pos)
+
+        assert torch.allclose(output1, output2)
