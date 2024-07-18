@@ -230,6 +230,20 @@ CameraIntrinsics class
     currently there are two subclasses of intrinsics: :class:`kaolin.render.camera.OrthographicIntrinsics` and
     :class:`kaolin.render.camera.PinholeIntrinsics`.
 
+Ray Generation
+======================
+Starting with kaolin 0.16.0, :class:`kaolin.render.camera.Camera` supports ray generation of pinhole and
+orthographic cameras via
+:func:`generate_rays() <Camera.generate_rays()>`.
+
+The full functional api is included in the :ref:`raygen.py module<kaolin.render.camera>`,
+and allows for lower level operations such as :func:`generate_centered_custom_resolution_pixel_coords()`
+for creating a custom pixel-grid to guide ray-generation.
+This is useful for supporting ray-tracing with lower resolution image planes,
+or implementing more advanced effects like ray-jittering.
+
+.. image:: ../img/camera_raygen_grid.png
+
 API Documentation:
 ------------------
 

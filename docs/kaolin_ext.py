@@ -92,6 +92,7 @@ def run_apidoc(_):
             "kaolin/render/camera/intrinsics_pinhole.py",
             "kaolin/render/camera/intrinsics.py",
             "kaolin/render/camera/legacy.py",
+            "kaolin/render/camera/raygen.py",
             "kaolin/non_commercial/flexicubes/",
             "kaolin/non_commercial/flexicubes/flexicubes.py",
             "kaolin/non_commercial/flexicubes/tables.py"

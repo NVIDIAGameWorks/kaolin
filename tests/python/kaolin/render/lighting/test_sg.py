@@ -173,53 +173,6 @@ class TestUnbatchedReducedSgInnerProduct:
         assert torch.allclose(other_sharpness.grad, gt_other_sharpness.grad,
                               rtol=1e-4, atol=1e-4)
 
-# TODO: use raygen utility instead
-def _generate_pinhole_rays_dir(camera, device='cuda'):
-    """Ray direction generation function for pinhole cameras.
-
-    This function assumes that the principal point (the pinhole location) is specified by a 
-    displacement (camera.x0, camera.y0) in pixel coordinates from the center of the image. 
-    The Kaolin camera class does not enforce a coordinate space for how the principal point is specified,
-    so users will need to make sure that the correct principal point conventions are followed for 
-    the cameras passed into this function.
-
-    Args:
-        height (int): The resolution height.
-        width (int): The resolution width.
-        camera (kaolin.render.camera.Camera): The camera instance, should be of batch == 1.
-    Returns:
-        (torch.Tensor): the rays directions, of shape (height, width, 3)
-    """
-    # Generate centered grid
-    pixel_y, pixel_x = torch.meshgrid(
-        torch.arange(camera.height, device=device),
-        torch.arange(camera.width, device=device),
-    )
-    pixel_x = pixel_x + 0.5  # scale and add bias to pixel center
-    pixel_y = pixel_y + 0.5  # scale and add bias to pixel center
-
-    # Account for principal point (offsets from the center)
-    pixel_x = pixel_x - camera.x0
-    pixel_y = pixel_y + camera.y0
-
-    # pixel values are now in range [-1, 1], both tensors are of shape res_y x res_x
-    # Convert to NDC
-    pixel_x = 2 * (pixel_x / camera.width) - 1.0
-    pixel_y = 2 * (pixel_y / camera.height) - 1.0
-
-    ray_dir = torch.stack((pixel_x * camera.tan_half_fov(kal.render.camera.intrinsics.CameraFOV.HORIZONTAL),
-                           -pixel_y * camera.tan_half_fov(kal.render.camera.intrinsics.CameraFOV.VERTICAL),
-                           -torch.ones_like(pixel_x)), dim=-1)
-
-    ray_dir = ray_dir.reshape(-1, 3)    # Flatten grid rays to 1D array
-    ray_orig = torch.zeros_like(ray_dir)
-
-    # Transform from camera to world coordinates
-    ray_orig, ray_dir = camera.extrinsics.inv_transform_rays(ray_orig, ray_dir)
-    ray_dir /= torch.linalg.norm(ray_dir, dim=-1, keepdim=True)
-
-    return ray_dir[0].reshape(camera.height, camera.width, 3)
-
 @pytest.mark.parametrize('scene_idx,azimuth,elevation,amplitude,sharpness', [
     (0, torch.tensor([0., math.pi / 2.], device='cuda'), torch.tensor([0., 0.], device='cuda'),
      torch.tensor([[5., 2., 2.], [5., 10., 5.]], device='cuda'), torch.tensor([6., 20.], device='cuda')),
@@ -277,7 +230,9 @@ class TestRenderLighting:
         # Compute the rays
         rays_d = []
         for cam in cams:
-            rays_d.append(_generate_pinhole_rays_dir(cam))
+            _, per_cam_ray_dirs = kal.render.camera.raygen.generate_pinhole_rays(cam)
+            per_cam_ray_dirs = per_cam_ray_dirs.reshape(cam.height, cam.width, 3)
+            rays_d.append(per_cam_ray_dirs)
         # Rays must be toward the camera
         rays_d = -torch.stack(rays_d, dim=0)
         imsize = 256

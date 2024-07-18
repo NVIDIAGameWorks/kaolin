@@ -5,46 +5,9 @@
 
 import torch
 import numpy as np
-from typing import Tuple
-from kaolin.render.camera import Camera, CameraFOV
-
-def generate_pixel_grid(res_x=None, res_y=None, device='cuda'):
-    h_coords = torch.arange(res_x, device=device)
-    w_coords = torch.arange(res_y, device=device)
-    pixel_y, pixel_x = torch.meshgrid(h_coords, w_coords)
-    pixel_x = pixel_x + 0.5
-    pixel_y = pixel_y + 0.5
-    return pixel_y, pixel_x
-
-
-def generate_perspective_rays(camera: Camera, pixel_grid: Tuple[torch.Tensor, torch.Tensor]):
-    # coords_grid should remain immutable (a new tensor is implicitly created here)
-    pixel_y, pixel_x = pixel_grid
-    pixel_x = pixel_x.to(camera.device, camera.dtype)
-    pixel_y = pixel_y.to(camera.device, camera.dtype)
-
-    # Account for principal point offset from canvas center
-    pixel_x = pixel_x - camera.x0
-    pixel_y = pixel_y + camera.y0
-
-    # pixel values are now in range [-1, 1], both tensors are of shape res_y x res_x
-    pixel_x = 2 * (pixel_x / camera.width) - 1.0
-    pixel_y = 2 * (pixel_y / camera.height) - 1.0
-
-    ray_dir = torch.stack((pixel_x * camera.tan_half_fov(CameraFOV.HORIZONTAL),
-                           -pixel_y * camera.tan_half_fov(CameraFOV.VERTICAL),
-                           -torch.ones_like(pixel_x)), dim=-1)
-
-    ray_dir = ray_dir.reshape(-1, 3)    # Flatten grid rays to 1D array
-    ray_orig = torch.zeros_like(ray_dir)
-
-    # Transform from camera to world coordinates
-    ray_orig, ray_dir = camera.extrinsics.inv_transform_rays(ray_orig, ray_dir)
-    ray_dir /= torch.linalg.norm(ray_dir, dim=-1, keepdim=True)
-    ray_orig, ray_dir = ray_orig[0], ray_dir[0]  # Assume a single camera
-
-    return ray_orig, ray_dir, camera.near, camera.far
-
+from kaolin.render.camera import Camera, \
+    generate_rays, generate_pinhole_rays, \
+    generate_centered_pixel_coords, generate_centered_custom_resolution_pixel_coords
 
 camera = Camera.from_args(
     eye=torch.tensor([4.0, 4.0, 4.0]),
@@ -58,14 +21,41 @@ camera = Camera.from_args(
     device='cuda'
 )
 
-pixel_grid = generate_pixel_grid(200, 200)
-ray_orig, ray_dir, near, far = generate_perspective_rays(camera, pixel_grid)
-
+# General raygen functiontional version -- will invoke raygen according to the camera lens type
+ray_orig, ray_dir = generate_rays(camera)
+print(f'Created a ray grid of dimensions: {ray_orig.shape}')
 print('Ray origins:')
 print(ray_orig)
 print('Ray directions:')
 print(ray_dir)
-print('Near clipping plane:')
-print(near)
-print('Far clipping plane:')
-print(far)
+print('\n')
+
+# General raygen function OOP version -- can also be invoked directly on the camera object
+ray_orig, ray_dir = camera.generate_rays()
+print(f'Created a ray grid of dimensions: {ray_orig.shape}')
+print('Ray origins:')
+print(ray_orig)
+print('Ray directions:')
+print(ray_dir)
+print('\n')
+
+# A specific raygen function can also be invoked directly. You may also add your own custom raygen functions that way
+ray_orig, ray_dir = generate_pinhole_rays(camera)
+print(f'Created a ray grid of dimensions: {ray_orig.shape}')
+print('Ray origins:')
+print(ray_orig)
+print('Ray directions:')
+print(ray_dir)
+print('\n')
+
+# By using a custom grid input, other effects like lower resolution images can be supported
+height = 200
+width = 400
+pixel_grid = generate_centered_custom_resolution_pixel_coords(camera.width, camera.height, width, height, camera.device)
+ray_orig, ray_dir = generate_pinhole_rays(camera, pixel_grid)
+print(f'Created a ray grid of different dimensions from camera image plane resolution: {ray_orig.shape}')
+print('Ray origins:')
+print(ray_orig)
+print('Ray directions:')
+print(ray_dir)
+print('\n')

@@ -18,12 +18,13 @@ import functools
 from copy import deepcopy
 import torch
 import inspect
-from typing import Sequence, List, Dict, Union, Tuple, Type, FrozenSet, Callable
+from typing import Sequence, List, Dict, Union, Tuple, Type, FrozenSet, Callable, Optional
 from torch.types import _float, _bool
 from .extrinsics import CameraExtrinsics, ExtrinsicsParamsDefEnum
 from .intrinsics import CameraIntrinsics, IntrinsicsParamsDefEnum
 from .intrinsics_ortho import OrthographicIntrinsics
 from .intrinsics_pinhole import PinholeIntrinsics
+
 
 __all__ = [
     'Camera',
@@ -542,6 +543,26 @@ class Camera:
         view = self.extrinsics.view_matrix()
         projection = self.intrinsics.projection_matrix()
         return torch.bmm(projection, view)
+
+    def generate_rays(self, coords_grid: Optional[torch.Tensor] = None):
+        r"""Default ray generation function for kaolin cameras.
+        The camera lens type will determine the exact raygen logic that runs (i.e. pinhole, ortho..)
+
+        Args:
+            camera (kaolin.render.camera): The camera class.
+            coords_grid (optional, torch.FloatTensor):
+                Pixel grid of ray-intersecting coordinates of shape :math:`(\text{H, W, 2})`.
+                Coordinates integer parts represent the pixel (i,j) coords, and the fraction part of [0,1]
+                represents the location within the pixel itself.
+                For example, a coordinate of (0.5, 0.5) represents the center of the top-left pixel.
+
+        Returns:
+            (torch.FloatTensor, torch.FloatTensor):
+                The generated camera rays according to the camera lens type, as ray origins and ray direction tensors of
+                :math:`(\text{HxW, 3})`.
+        """
+        from .raygen import generate_rays as raygen
+        return raygen(self, coords_grid)
 
     @classmethod
     def cat(cls, cameras: Sequence[Camera]):
