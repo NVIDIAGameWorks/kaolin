@@ -284,13 +284,15 @@ def extractBQ(octree, empty, probs, colors):
     return octree, empty, out_colors
 
 
-def bf_recon(transformed_dataset, final_level, sigma):
+def bf_recon(input_dataset, final_level, sigma):
     r""" Reconstruct object from a collection of calibrated depth maps using algoritm found in
     cite BF. 
     The object is represented by an empty space aware Structured Point Cloud. 
 
     Args:
-        transformed_dataset (RayTracedSPCDataset): 
+        input_dataset (RayTracedSPCDataset): dataset containing calibrated rgbd images
+        final_level (int) Desired depth of output SPC
+        sigma (float) parameter that rough equates to noise level of input depths
 
     """
 
@@ -298,7 +300,7 @@ def bf_recon(transformed_dataset, final_level, sigma):
     octree0, empty0, probs0, colors0, normals0, pyramid0, exsum0, weights = \
         None, None, None, None, None, None, None, None
 
-    for batch in transformed_dataset:
+    for batch in input_dataset:
         if frame_no == 0:
             octree0, empty0, probs0, colors0, normals0 = processFrame(batch, final_level, sigma)
             lengths = torch.tensor([len(octree0)], dtype=torch.int)
