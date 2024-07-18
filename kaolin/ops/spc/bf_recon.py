@@ -285,15 +285,31 @@ def extractBQ(octree, empty, probs, colors):
 
 
 def bf_recon(input_dataset, final_level, sigma):
-    r""" Reconstruct object from a collection of calibrated depth maps using algoritm found in
-    cite BF. 
+    r""" Reconstruct an object from a collection of calibrated depth maps.
+
+    .. note::
+        For more details, see the 3DV 2016 paper
+        `A Closed-Form Bayesian Fusion Equation Using Occupancy Probabilities`_.
+
     The object is represented by an empty space aware Structured Point Cloud. 
+    That is, octree tensor, and a corresponding empty space tensor. Taken together,
+    each octree bit and corresponding empty space bit represent the occupancy state
+    of the octree cell. These states are seen, empty, and occupied. This augmented SPC
+    be queried at arbirary points in space to determine their state.
 
     Args:
         input_dataset (RayTracedSPCDataset): dataset containing calibrated rgbd images
         final_level (int) Desired depth of output SPC
         sigma (float) parameter that rough equates to noise level of input depths
 
+    Return:
+        (torch.ByteTensor) octree representing the geometry of reconstructed model
+        (torch.ByteTensor) auxilary structure in bit-to-bit correspondence with octree
+        (torch.ByteTensor) colors for final level of octree of size (n,4)
+
+        
+    .. _A Closed-Form Bayesian Fusion Equation Using Occupancy Probabilities:
+        https://ieeexplore.ieee.org/document/7785112
     """
 
     frame_no = 0
