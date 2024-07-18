@@ -300,15 +300,19 @@ def bf_recon(input_dataset, final_level, sigma):
     octree0, empty0, probs0, colors0, normals0, pyramid0, exsum0, weights = \
         None, None, None, None, None, None, None, None
 
+    # Iterate over calibrated rgbd data
     for batch in input_dataset:
         if frame_no == 0:
+            # create SPC model corresponding to a single image
             octree0, empty0, probs0, colors0, normals0 = processFrame(batch, final_level, sigma)
             lengths = torch.tensor([len(octree0)], dtype=torch.int)
             level, pyramid0, exsum0 = spc.scan_octrees(octree0, lengths)
         else :
+            # create SPC model corresponding to a single image
             octree1, empty1, probs1, colors1, normals1 = processFrame(batch, final_level, sigma)
             lengths = torch.tensor([len(octree1)], dtype=torch.int)
             level, pyramid1, exsum1 = spc.scan_octrees(octree1, lengths)
+            # fuse new single frame SPC into existing cummulative SPC model
             octree0, empty0, probs0, colors0, normals0 = fuseBF(level,
                                                                 octree0, octree1, 
                                                                 empty0, empty1, 
@@ -321,6 +325,8 @@ def bf_recon(input_dataset, final_level, sigma):
             level, pyramid0, exsum0 = spc.scan_octrees(octree0, lengths)
 
         frame_no += 1
+
+    # extract iso surface from over voxelized model
     octree, empty, colors = extractBQ(octree0, empty0, probs0, colors0)
     return octree, empty, colors
 
