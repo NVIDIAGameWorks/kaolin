@@ -22,8 +22,8 @@ from kaolin.ops.gaussian import VolumeDensifier
 from kaolin.utils.testing import check_tensor
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        os.pardir, os.pardir, os.pardir, os.pardir, 'samples/gsplats')
-TEST_MODELS = ['hotdog_minimal.pt']
+                        os.pardir, os.pardir, os.pardir, os.pardir, 'samples')
+TEST_MODELS = ['spheres', 'hotdog_minimal.pt']
 SUPPORTED_GSPLATS_DEVICES = ['cuda']
 SUPPORTED_GSPLATS_DTYPES = [torch.float32]
 
@@ -41,8 +41,20 @@ class TestVolumeDensifier:
 
     @pytest.fixture(autouse=True)
     def gaussians(self, model_name):
-        model_path = os.path.join(ROOT_DIR, model_name)
-        gaussian_fields = torch.load(os.path.abspath(model_path))
+        if model_name == 'spheres':
+            N = 100000
+            pts = torch.rand(N, 3)
+            pts /= pts.norm(dim=1).unsqueeze(1)
+            pts *= 6.0
+            gaussian_fields = dict(
+                position=pts,
+                scale=torch.full([N, 3], 0.01),
+                rotation=torch.tensor([0.0, 0.0, 0.0, 1.0]).repeat(N, 1),
+                opacity=torch.full([N, 1], 0.80)
+            )
+        else:
+            model_path = os.path.join(ROOT_DIR, 'gsplats', model_name)
+            gaussian_fields = torch.load(os.path.abspath(model_path))
         return gaussian_fields
 
     def test_sample_points_in_volume(self, gaussians, device, dtype):
