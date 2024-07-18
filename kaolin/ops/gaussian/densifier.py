@@ -202,7 +202,7 @@ class VolumeDensifier:
         iso = 11.345  # 99th percentile
 
         # compute spc from gsplats
-        morton, merged_opacities, gs_per_voxel = _C.ops.conversions.gs_to_spc_cuda(
+        morton, merged_opacities = _C.ops.conversions.gs_to_spc_cuda(
             xyz, scales, rots, opacities, iso, scale_voxel_tolerance, gs_level
         )
 

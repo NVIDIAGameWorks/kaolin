@@ -510,7 +510,6 @@ MergeOpacities_kernel(
   const float* __restrict__ Cov3DInvs,
   const float* __restrict__ opacities, 
   float* __restrict__ merged_opacities,
-  int* __restrict__ gs_per_voxel,
   const uint32_t level) {
 
   uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -543,7 +542,6 @@ MergeOpacities_kernel(
   float alpha = min(0.99, opacities[gidx] * exp(power));
 
   atomicAlpha(&(merged_opacities[base_idx]), alpha);
-  atomicAdd(&(gs_per_voxel[base_idx]), 1);
 }
 
 std::vector<at::Tensor> gs_to_spc_cuda_impl(
@@ -626,8 +624,7 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
     if (next_cnt == 0) {
       at::Tensor mcodes = at::empty({0}, means3D.options().dtype(at::kLong));
       at::Tensor merged_opacities = at::empty({0}, means3D.options().dtype(at::kFloat));
-      at::Tensor gs_per_voxel = at::empty({0}, means3D.options().dtype(at::kInt));
-      return { mcodes, merged_opacities, gs_per_voxel };
+      return { mcodes, merged_opacities };
     }
     else {
       // re-allocate local GPU storage
@@ -717,7 +714,6 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
     reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()));
 
   at::Tensor merged_opacities = at::zeros({psize}, means3D.options().dtype(at::kFloat));
-  at::Tensor gs_per_voxel = at::zeros({psize}, means3D.options().dtype(at::kInt));
 
   MergeOpacities_kernel << <(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>> (
     curr_cnt, 
@@ -728,10 +724,9 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
     Cov3DInvs.data_ptr<float>(),
     opacities.data_ptr<float>(),
     merged_opacities.data_ptr<float>(),
-    gs_per_voxel.data_ptr<int>(),
     target_level);
 
-  return { morton_codes[curr_buf], merged_opacities, gs_per_voxel };
+  return { morton_codes[curr_buf], merged_opacities };
 }
 
 }  // namespace kaolin
