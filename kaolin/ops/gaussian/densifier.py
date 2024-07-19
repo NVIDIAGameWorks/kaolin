@@ -181,7 +181,7 @@ def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_l
     query_points = morton_to_points(torch.arange(8 ** query_level, dtype=torch.long, device=device))
     result = unbatched_query(bf_octree, bf_empty, exsum, query_points, query_level)
 
-    # filter out 'empty' space; keep inside and boundary points
+    # filter out 'empty' space; keep inside and occupied points
     mask = result[:] != -1
     sample_points = query_points[mask]
 
