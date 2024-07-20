@@ -49,6 +49,9 @@ class TestEasyRender:
     @pytest.mark.parametrize('bname', ['armchair', 'avocado'])
     @pytest.mark.parametrize('backend', ['cuda', None, 'nvdiffrast'])
     def test_obj_usd_gltf_render_consistency(self, bname, backend):
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0' and backend == 'nvdiffrast':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
+
         # default settings
         camera = easy_render.default_camera(512).cuda()
         lighting = easy_render.default_lighting().cuda()
@@ -63,8 +66,33 @@ class TestEasyRender:
             assert_images_close(gt_image, res[easy_render.RenderPass.render.name].squeeze(0))
 
     @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam'])
+    @pytest.mark.parametrize('backend', ['cuda', 'nvdiffrast'])
     @pytest.mark.parametrize('with_features', [True, False])
-    def test_render_all(self, out_dir, bname, with_features):
+    def test_render_all(self, out_dir, bname, backend, with_features):
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0' and backend == 'nvdiffrast':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
+
+        camera = easy_render.default_camera(512).cuda()
+        lighting = easy_render.default_lighting().cuda()
+
+        # full render
+        mesh = import_mesh(render_data_path(f'{bname}.usd'), triangulate=True).cuda()
+        mesh.vertices = kaolin.ops.pointcloud.center_points(mesh.vertices.unsqueeze(0), normalize=True).squeeze(0)
+        if with_features:
+            mesh.face_features = torch.rand((mesh.faces.shape[0], mesh.faces.shape[1], 6)).float().cuda()
+
+        res = easy_render.render_mesh(camera, mesh, lighting=lighting, backend=backend)
+        for pass_name in [easy_render.RenderPass.render.name]:  # just compare full render for now
+            gt_image = gt_image_float(f'{bname}_{pass_name}.png').cuda()
+            assert_images_close(gt_image, res[pass_name].squeeze(0))
+
+        if with_features:
+            assert easy_render.RenderPass.features.name in res.keys(), f'Features not rendered'
+
+    @pytest.mark.skipif(os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0', reason='test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
+    @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam'])
+    @pytest.mark.parametrize('with_features', [True, False])
+    def test_render_comp(self, out_dir, bname, with_features):
         camera = easy_render.default_camera(512).cuda()
         lighting = easy_render.default_lighting().cuda()
 
@@ -76,14 +104,8 @@ class TestEasyRender:
 
         res_cuda = easy_render.render_mesh(camera, mesh, lighting=lighting, backend='cuda')
         res_nvdif = easy_render.render_mesh(camera, mesh, lighting=lighting, backend='nvdiffrast')
-        for pass_name in [easy_render.RenderPass.render.name]:  # just compare full render for now
-            gt_image = gt_image_float(f'{bname}_{pass_name}.png').cuda()
-            assert_images_close(gt_image, res_cuda[pass_name].squeeze(0))
-            assert_images_close(gt_image, res_nvdif[pass_name].squeeze(0))
 
         assert set(res_cuda.keys()) == set(res_nvdif.keys())
-        if with_features:
-            assert easy_render.RenderPass.features.name in res_cuda.keys(), f'Features not rendered'
         for pass_name in res_cuda.keys():
             if pass_name == easy_render.RenderPass.features.name:
                 # TODO: why a bigger difference for features?
@@ -105,6 +127,9 @@ class TestEasyRender:
     @pytest.mark.parametrize('normals_variant', ['normals', 'nonormals'])
     @pytest.mark.parametrize('uvs_variant', ['uvs', 'nouvs'])
     def test_missing_attributes(self, out_dir, bname, backend, material_variant, lighting_variant, normals_variant, uvs_variant):
+        if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0' and backend == 'nvdiffrast':
+            pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
+
         camera = easy_render.default_camera(150).cuda()
 
         # full render
