@@ -20,8 +20,12 @@ from torch import Tensor
 
 from .quaternion import quat_from_rot33, quat_imaginary, quat_unit_positive, quat_real
 
-### CONVERSIONS ###
+__all__ = [
+    'angle_axis_from_quat',
+    'angle_axis_from_rot33'
+]
 
+### CONVERSIONS ###
 
 @torch.jit.script
 def angle_axis_from_quat(quat: Tensor) -> Tuple[Tensor, Tensor]:
