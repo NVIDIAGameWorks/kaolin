@@ -148,7 +148,7 @@ def sg_from_sun(direction, strength, angle, color):
 
     Args:
         strength (torch.Tensor):
-            The strength of the suns, of shape :math:`(\text{num_suns},)`, [0..inf] expected,
+            The strength of the suns, of shape :math:`(\text{num_suns},)`, [1..inf] expected,
             usually in low integer range.
         color (torch.Tensor):
             The color of the suns,
