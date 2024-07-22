@@ -101,13 +101,13 @@ def _generate_default_viewpoints():
     return viewpoints
 
 
-def _jitter(pts, resolution):
+def _jitter(pts, octree_level):
     r""" Applies random perturbations to a set of voxelized points.
     The perturbations are small enough such that each point remains in the voxel cell it belongs in.
     """
     N = pts.shape[0]
     device = pts.device
-    cell_radius = 1.0 / 2.0 **resolution
+    cell_radius = 1.0 / 2.0 **octree_level
     radius = cell_radius * torch.sqrt(torch.rand(N, device=device))
 
     # azimuth [0~2pi]
@@ -204,8 +204,8 @@ def sample_points_in_volume(
     rotation: torch.Tensor,
     opacity: torch.Tensor,
     mask: Optional[torch.BoolTensor] = None,
-    count: Optional[int] = None,
-    resolution: int = 8,
+    num_samples: Optional[int] = None,
+    octree_level: int = 8,
     opacity_threshold: float = 0.35,
     post_scale_factor: float = 0.93,
     jitter: bool = True,
@@ -223,8 +223,26 @@ def sample_points_in_volume(
     objects.
 
     The algorithm will attempt to voxelize the Gaussians and predict an approximated surface,
-    and then sample additional points within it.
+    and then sample additional points within it making sure the volume is evenly spaced (e.g. no voxel is sampled
+    more than once).
     Note that reconstructions of poor quality may obtain samples with varying degrees of quality.
+
+    .. note::
+
+        **Choosing Densifier Args.**
+
+        The *densifier* is a non-learned method described in details below.
+        Consequentially, different models of varying quality may require adjusting the parameters.
+        As a rule of thumb, `octree_level` controls the density of volume samples. Higher density
+        ensures more points are sampled within the volume, but may also expose holes within the shape shell.
+        `opacity_threshold` controls how quickly low opacity cells get culled away. Lower quality models may
+        want to lower this parameter as low as 0.0 to avoid exposing holes.
+        `jitter` ensures the returned points are random, the exact usage should vary by application.
+        The default `viewpoints` provide adequate coverage for common objects, but more complex objects with many
+        cavities may benefit from a more specialized set of viewpoints.
+        `post_scale_factor` downscales the returned points using their mean as the center of scale, to ensure
+        they reside within the shape shell. It is recommended to leave this value close to 1.0 -- for concave shapes
+        downscaling too much may cause the points to drift away from the shape shell.
 
     .. note::
 
@@ -235,12 +253,14 @@ def sample_points_in_volume(
            The axis aligned bounding box of the Gaussians is enclosed in a cubical root node of an octree.
            This node is subdivided in an 8-way split, and a list of overlapping gaussian IDs is
            maintained for each sub node. The nodes that contain voxels are subdivided again and tested for overlap.
-           This process repeats until a desired resolution is achieved.
+           This process repeats until a desired resolution is achieved according to the octree level.
            The nodes at the frontier of the octree are a voxelization of the Gaussians, represented by an SPC.
-           At the end of this step, the SPC does not include voxels ‘inside’ the object represented by the Gaussians.
+           The opacity_threshold parameter may cause some cells to get culled if they haven't accumulated enough density
+           from the 3D Gaussians overlapping them.
+           At the end of this step, the SPC does not include voxels ‘inside’ the object represented by the Gaussians,
+           but rather, voxels that represent the shape shell.
 
         2. Volume filling of voxelized shell by carving the space of voxels using rendered depth maps.
-
            This is achieved by ray-tracing the SPC from an icosahedral collection of viewpoints to create a depth map
            for each view. These depth maps are fused together into a second sparse SPC using a novel algorithm that
            maintains the occupancy state for each node of the full octree.
@@ -248,32 +268,41 @@ def sample_points_in_volume(
            Finally, the occupancy state of points in a regular grid are determined by querying this SPC.
            The union of the sets of occupied and unseen points serves as a sampling of the solid object.
 
+        Post process: the Gaussians are now converted to dense voxels including the volume.
+        A point is sampled at the center of each voxel.
+        If jitter is true, a small perturbation is also applied to
+        each point. The perturbation is small enough such that each point remains within the voxel.
+        Each voxel should contain at most one point by the end of this phase.
+        If num_samples is specified, the points are randomly subsampled to return a sized sample pool.
+
     Args:
         xyz (torch.FloatTensor):
             A tensor of shape :math:`(\text{N, 3})` containing the Gaussian means.
-            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_xyz`
+            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_xyz`.
         scale (torch.FloatTensor):
             A tensor of shape :math:`(\text{N, 3})` containing the Gaussian covariance scale components, in a format
             of a 3D scale vector per Gaussian. The scale is assumed to be post-activation.
-            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_scaling`
+            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_scaling`.
         rotation (torch.FloatTensor):
             A tensor of shape :math:`(\text{N, 4})` containing the Gaussian covariance rotation components, in a format
             of a 4D quaternion per Gaussian. The rotation is assumed to be post-activation.
-            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_rotation`
+            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_rotation`.
         opacity (torch.FloatTensor):
             A tensor of shape :math:`(\text{N, 1})` or :math:`(\text{N,})` containing the Gaussian opacities.
-            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_opacity`
+            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_opacity`.
         mask (optional, torch.BoolTensor):
             An optional :math:`(\text{N,})` binary mask which selects only a subset of the gaussian to use
             for predicting the shell. Useful if some Gaussians are suspected as noise.
             By default, the mask is assumed to be a tensor of ones to select all Gaussians.
-        count (optional, int):
+        num_samples (optional, int):
             An optional upper cap on the number of points sampled in the predicted volume.
-            If not specified, the volume is evenly sampled in space according to the resolution.
-        resolution (int):
-            A Structured Point Cloud of cubic resolution :math:`(\text{2**res})` will be constructed to voxelize and
-            fill the volume with points. Higher values require more memory.
-            resolution range supported is in :math:`[\text{6, 10}]`.
+            If not specified, the volume is evenly sampled in space according to the octree resolution.
+        octree_level (int):
+            A Structured Point Cloud of cubic resolution :math:`(\text{3**level})` will be constructed to voxelize and
+            fill the volume with points. A single point will be sampled within each voxel.
+            Higher values require more memory, and may suffer from holes in the shell.
+            At the same time, higher values provide more points within the shape volume.
+            octree_level range supported is in :math:`[\text{6, 10}]`.
         opacity_threshold (float):
             The densification algorithm starts by voxelizing space using the gaussian responses and their
             associated opacities. Each cell accumulated the opacity induced by the Gaussians overlapping it.
@@ -286,8 +315,9 @@ def sample_points_in_volume(
             If true, applies a small jitter to the returned volume points.
             If false, the returned points lie on an equally distanced grid.
         clip_samples_to_input_bbox (bool):
-            If true, the densifier will compute a bounding box out of the input gaussian means.
+            If true, the *densifier* will compute a bounding box out of the input gaussian means.
             Any points sampled outside of this bounding box will be rejected.
+            For most purposes, it is recommended to leave this "safety mechanism" toggled on.
         viewpoints (optional, torch.Tensor):
             Collection of viewpoints used to 'carve' out seen voxel space around the shell after it's voxelized.
             These is a :math:`(\text{C, 3})` tensor of camera viewpoints facing the center,
@@ -295,7 +325,7 @@ def sample_points_in_volume(
             If not specified, kaolin will opt to use its own set of default views.
 
     Return:
-        (torch.FloatTensor): a tensor of :math:`(\text{K, 3})` points sampled inside the approximated shape volume.
+        (torch.FloatTensor): A tensor of :math:`(\text{K, 3})` points sampled inside the approximated shape volume.
     """
     # Reshape to single dim if needed
     if opacity.ndim == 2:
@@ -317,10 +347,10 @@ def sample_points_in_volume(
     volume_pts = _solidify(
         xyz.contiguous(), scale.contiguous(), rotation.contiguous(), opacity.contiguous(),
         opacity_threshold=opacity_threshold,
-        gs_level=resolution, query_level=resolution, viewpoints=viewpoints
+        gs_level=octree_level, query_level=octree_level, viewpoints=viewpoints
     )
     if jitter:
-        volume_pts = _jitter(volume_pts, resolution)
+        volume_pts = _jitter(volume_pts, octree_level)
     # Postprocess: rescale returned points to ensure they fit in input points hull
     if post_scale_factor < 1.0:
         mean = volume_pts.mean(dim=0)
@@ -335,7 +365,7 @@ def sample_points_in_volume(
         volume_pts = volume_pts[~out_of_box]
 
     num_total_pts = volume_pts.shape[0]
-    if count is not None and count < num_total_pts:
-        sample_indices = torch.randperm(num_total_pts)[:count]
+    if num_samples is not None and num_samples < num_total_pts:
+        sample_indices = torch.randperm(num_total_pts)[:num_samples]
         volume_pts = volume_pts[sample_indices]
     return volume_pts

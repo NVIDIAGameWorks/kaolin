@@ -76,9 +76,9 @@ class TestVolumeDensifier:
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
-        resolution = 6
+        octree_level = 6
         output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
-                                         resolution=resolution, jitter=True)
+                                         octree_level=octree_level, jitter=True)
 
         assert output.ndim == 2
         assert output.shape[1] == 3
@@ -91,7 +91,7 @@ class TestVolumeDensifier:
         minimal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].min()
         maximal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].max()
 
-        spc_cell_length = 2.0 / 2**resolution
+        spc_cell_length = 2.0 / 2**octree_level
         spc_diagonal_length = spc_cell_length * math.sqrt(3.0)
         max_allowed_pts_distance = 2.0 * spc_diagonal_length # two spc diagonals
         assert maximal_nearest_neighbor_distance <= max_allowed_pts_distance
@@ -105,9 +105,9 @@ class TestVolumeDensifier:
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
-        resolution = 6
+        octree_level = 6
         output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
-                                         resolution=resolution, jitter=False, post_scale_factor=1.0)
+                                         octree_level=octree_level, jitter=False, post_scale_factor=1.0)
 
         assert output.ndim == 2
         assert output.shape[1] == 3
@@ -123,14 +123,14 @@ class TestVolumeDensifier:
         # Points should be equi-distanced
         assert torch.isclose(minimal_nearest_neighbor_distance, maximal_nearest_neighbor_distance)
 
-    def test_sample_points_in_volume_for_count(self, gaussians, device, dtype):
+    def test_sample_points_in_volume_for_num_samples(self, gaussians, device, dtype):
         pos = gaussians['position'].cuda()                  # model.get_xyz
         scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
         rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
         opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
 
         output = sample_points_in_volume(
-            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, count=5000
+            xyz=pos, scale=scale, rotation=rotation, opacity=opacity, num_samples=5000
         )
 
         assert output.ndim == 2
