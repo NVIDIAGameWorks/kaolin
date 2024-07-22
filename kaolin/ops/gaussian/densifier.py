@@ -95,8 +95,8 @@ def _generate_default_viewpoints():
 
 
 def _jitter(pts, resolution):
-    r""" Applies random pertubrations to a set of voxelized points.
-    The pertubrations are small enough such that each point remains in the voxel cell it belongs in.
+    r""" Applies random perturbations to a set of voxelized points.
+    The perturbations are small enough such that each point remains in the voxel cell it belongs in.
     """
     N = pts.shape[0]
     device = pts.device
@@ -120,10 +120,10 @@ def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_l
     r"""Creates a tensor of uniform samples 'inside' collection of Gaussian Splats.
 
     Args:
-        xyz (torch.FloatTensor) : Gaussian Splat means, of shape :math:`(\text{num_guaasians, 3})`.
-        scales (torch.FloatTensor) : Gaussian Splat scales, of shape :math:`(\text{num_guaasians, 3})`.
+        xyz (torch.FloatTensor) : Gaussian Splat means, of shape :math:`(\text{num_guassians, 3})`.
+        scales (torch.FloatTensor) : Gaussian Splat scales, of shape :math:`(\text{num_guassians, 3})`.
         rots (torch.FloatTensor) : Gaussian Splat rots, of shape :math:`(\text{num_guaasians, 4})`.
-        opacities (torch.FloatTensor) : Gaussian Splat opacities, of shape :math:`(\text{num_guaasians})`.
+        opacities (torch.FloatTensor) : Gaussian Splat opacities, of shape :math:`(\text{num_guassians})`.
         opacity_threshold (float): Threshold to cull away voxelized cells with low accumulated opacity.
         gs_level (int): The level of the interal octree created.
         query_level (int): The level of the uniform sample grid.
@@ -215,47 +215,46 @@ def sample_points_in_volume(
     The logic in this class approximates the volumetric interior with additional points injected to the interior of
     objects.
 
-    The algorithm will attempt to voxelize the gaussians and predict an approximated surface,
+    The algorithm will attempt to voxelize the Gaussians and predict an approximated surface,
     and then sample additional points within it.
     Note that reconstructions of poor quality may obtain samples with varying degrees of quality.
 
-    .. note::  Implementation Details:
+    .. note::
 
-    The object sampling takes place in 2 steps.
+        **Implementation Details.** The object sampling takes place in 2 steps.
 
-    1. The set of 3D Gaussians is converted to voxels using a novel hierarchical algorithm which builds on
-       kaolin’s :ref:`Structured Point Cloud (SPC)<spc>` (which functions as an octree).
-       The axis aligned bounding box of the gaussians is enclosed in a cubical root node of an octree.
-       This node is subdivided in an 8-way split, and a list of overlapping gaussian IDs is
-       maintained for each sub node. The nodes that contain voxels are subdivided again and tested for overlap.
-       This process repeats until a desired resolution is achieved.
-       The nodes at the frontier of the octree are a voxelization of the gaussians, represented by an SPC.
-       At the end of this step, the SPC does not include voxels ‘inside’ the object represented by the gaussians.
+        1. The set of 3D Gaussians is converted to voxels using a novel hierarchical algorithm which builds on
+           kaolin’s :ref:`Structured Point Cloud (SPC)<spc>` (which functions as an octree).
+           The axis aligned bounding box of the Gaussians is enclosed in a cubical root node of an octree.
+           This node is subdivided in an 8-way split, and a list of overlapping gaussian IDs is
+           maintained for each sub node. The nodes that contain voxels are subdivided again and tested for overlap.
+           This process repeats until a desired resolution is achieved.
+           The nodes at the frontier of the octree are a voxelization of the Gaussians, represented by an SPC.
+           At the end of this step, the SPC does not include voxels ‘inside’ the object represented by the Gaussians.
+        2. Volume filling of voxelized shell by carving the space of voxels using rendered depth maps.
 
-    2. Volume filling of voxelized shell by carving the space of voxels using rendered depth maps.
-
-       This is achieved by ray-tracing the SPC from an icosahedral collection of viewpoints to create a depth map
-       for each view. These depth maps are fused together into a second sparse SPC using a novel algorithm that
-       maintains the occupancy state for each node of the full octree.
-       These states are: empty, occupied, or unseen.
-       Finally, the occupancy state of points in a regular grid are determined by querying this SPC.
-       The union of the sets of occupied and unseen points serves as a sampling of the solid object.
+           This is achieved by ray-tracing the SPC from an icosahedral collection of viewpoints to create a depth map
+           for each view. These depth maps are fused together into a second sparse SPC using a novel algorithm that
+           maintains the occupancy state for each node of the full octree.
+           These states are: empty, occupied, or unseen.
+           Finally, the occupancy state of points in a regular grid are determined by querying this SPC.
+           The union of the sets of occupied and unseen points serves as a sampling of the solid object.
 
     Args:
         xyz (torch.FloatTensor):
             A tensor of shape :math:`(\text{N, 3})` containing the Gaussian means.
-            For example, using the original Inria codebase, this corresponds to GaussianModel.get_xyz
+            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_xyz`
         scale (torch.FloatTensor):
             A tensor of shape :math:`(\text{N, 3})` containing the Gaussian covariance scale components, in a format
             of a 3D scale vector per Gaussian. The scale is assumed to be post-activation.
-            For example, using the original Inria codebase, this corresponds to GaussianModel.get_scaling
+            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_scaling`
         rotation (torch.FloatTensor):
             A tensor of shape :math:`(\text{N, 4})` containing the Gaussian covariance rotation components, in a format
             of a 4D quaternion per Gaussian. The rotation is assumed to be post-activation.
-            For example, using the original Inria codebase, this corresponds to GaussianModel.get_rotation
+            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_rotation`
         opacity (torch.FloatTensor):
             A tensor of shape :math:`(\text{N, 1})` or :math:`(\text{N,})` containing the Gaussian opacities.
-            For example, using the original Inria codebase, this corresponds to GaussianModel.get_opacity
+            For example, using the original Inria codebase, this corresponds to `GaussianModel.get_opacity`
         mask (optional, torch.BoolTensor):
             An optional :math:`(\text{N,})` binary mask which selects only a subset of the gaussian to use
             for predicting the shell. Useful if some Gaussians are suspected as noise.
@@ -266,14 +265,14 @@ def sample_points_in_volume(
         resolution (int):
             A Structured Point Cloud of cubic resolution :math:`(\text{2**res})` will be constructed to voxelize and
             fill the volume with points. Higher values require more memory.
-            resolution range supported is in :math:`[\text{[6, 10,}]`.
+            resolution range supported is in :math:`[\text{6, 10}]`.
         opacity_threshold (float):
             The densification algorithm starts by voxelizing space using the gaussian responses and their
-            associated opacities. Each cell accumulated the opacity induced by the gaussians overlapping it.
+            associated opacities. Each cell accumulated the opacity induced by the Gaussians overlapping it.
             Voxels with accumulated opacity below this threshold will be masked away.
-            If opacity_threshold > 0.0, no culling will take place.
+            If :math:`\text{opacity_threshold} > 0.0`, no culling will take place.
         post_scale_factor (float):
-            Postprocess: if post_scale_factor < 1.0, the returned pointcloud will be rescaled to ensure
+            Postprocess: if :math:`\text{post_scale_factor} < 1.0`, the returned pointcloud will be rescaled to ensure
             it fits inside the hull of the input points.
         jitter (bool):
             If true, applies a small jitter to the returned volume points.
@@ -288,7 +287,7 @@ def sample_points_in_volume(
             If not specified, kaolin will opt to use its own set of default views.
 
     Return:
-        (torch.FloatTensor): a tensor of (K, 3) points sampled inside the approximated shape volume.
+        (torch.FloatTensor): a tensor of :math:`(\text{K, 3})` points sampled inside the approximated shape volume.
     """
     # Reshape to single dim if needed
     if opacity.ndim == 2:

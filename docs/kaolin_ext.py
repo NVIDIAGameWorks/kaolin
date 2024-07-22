@@ -52,6 +52,7 @@ def run_apidoc(_):
             "kaolin/ops/mesh/mesh.py",
             "kaolin/ops/mesh/tetmesh.py",
             "kaolin/ops/mesh/trianglemesh.py",
+            "kaolin/ops/gaussian/densifier.py",
             "kaolin/ops/spc/spc.py",
             "kaolin/ops/spc/convolution.py",
             "kaolin/ops/spc/points.py",
