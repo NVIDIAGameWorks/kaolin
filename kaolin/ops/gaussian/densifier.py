@@ -17,6 +17,7 @@ import math
 import numpy as np
 import torch
 from typing import Optional
+from kaolin.ops.random import sample_spherical_coords
 from kaolin.ops.spc import scan_octrees, morton_to_points, bf_recon, unbatched_query
 from kaolin.ops.spc.raytraced_spc_dataset import RayTracedSPCDataset
 from kaolin.ops.spc.bf_recon import bf_recon, unbatched_query
@@ -107,18 +108,19 @@ def _jitter(pts, octree_level):
     """
     N = pts.shape[0]
     device = pts.device
+    dtype = pts.dtype
     cell_radius = 1.0 / 2.0 **octree_level
     radius = cell_radius * torch.sqrt(torch.rand(N, device=device))
 
-    # azimuth [0~2pi]
-    theta = torch.rand(N, device=device) * 2.0 * torch.pi
-    # polar [0~pi]
-    phi = torch.rand(N, device=device) * torch.pi
+    azimuth, elevation = sample_spherical_coords((N,),
+        azimuth_low=0., azimuth_high=math.pi * 2., elevation_low=0., elevation_high=math.pi,
+        device=device, dtype=dtype
+    )
 
     # spherical coordinates to cartesian
-    x = radius * torch.sin(phi) * torch.cos(theta)
-    y = radius * torch.sin(phi) * torch.sin(theta)
-    z = radius * torch.cos(phi)
+    x = radius * torch.sin(elevation) * torch.cos(azimuth)
+    y = radius * torch.sin(elevation) * torch.sin(azimuth)
+    z = radius * torch.cos(elevation)
     delta = torch.stack([x,y,z], dim=1)
     return pts + delta
 
