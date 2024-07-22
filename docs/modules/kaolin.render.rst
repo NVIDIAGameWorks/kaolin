@@ -1,5 +1,8 @@
 .. _kaolin.render:
 
+This submodule contains all the features related to rendering, including differentiable rasterizer, raytracer, lighting, materials and our Camera API.
+
+
 kaolin.render
 =============
 
@@ -13,4 +16,3 @@ kaolin.render
    kaolin.render.materials
    kaolin.render.mesh
    kaolin.render.spc
-   kaolin.render.rays

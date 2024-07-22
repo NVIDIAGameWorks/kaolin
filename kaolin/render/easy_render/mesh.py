@@ -420,7 +420,11 @@ def sg_shade(camera, face_idx, albedo, spec_albedo, im_roughness, im_world_norma
     diffuse_img = torch.zeros_like(img)
     diffuse_img[hard_mask] = diffuse_effect
 
-    rays_d = kal.render.rays.generate_pinhole_rays_dir(camera, height, width)
+    pixel_grid = kal.render.camera.raygen.generate_centered_custom_resolution_pixel_coords(
+        img_width=camera.width, img_height=camera.height, res_x=width, res_y=height, device=camera.device
+    )
+    _, rays_d = kal.render.camera.raygen.generate_pinhole_rays(camera, pixel_grid)
+    rays_d = rays_d.reshape(1, height, width, 3)
     specular_effect = kal.render.lighting.sg_warp_specular_term(
         amplitude, direction, sharpness,
         _im_world_normals,
