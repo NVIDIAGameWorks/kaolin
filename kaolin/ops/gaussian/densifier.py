@@ -19,6 +19,7 @@ import torch
 from typing import Optional
 from kaolin.ops.spc import scan_octrees, morton_to_points, bf_recon, unbatched_query
 from kaolin.ops.spc.raytraced_spc_dataset import RayTracedSPCDataset
+from kaolin.ops.spc.bf_recon import bf_recon, unbatched_query
 from kaolin import _C
 
 __all__ = [
@@ -33,12 +34,18 @@ def _generate_default_viewpoints():
     anchors = torch.tensor([
         [4.0, 0.0, 0.0],
         [0.0, 4.0, 0.0],
+        [0.0, 0.0, 4.0],
         [-4.0, 0.0, 0.0],
         [0.0, -4.0, 0.0],
+        [0.0, 0.0, -4.0],
         [2.3, 2.3, 2.3],
         [-2.3, 2.3, 2.3],
         [2.3, -2.3, 2.3],
-        [-2.3, -2.3, 2.3]
+        [2.3, 2.3, -2.3],
+        [-2.3, -2.3, 2.3],
+        [-2.3, 2.3, -2.3],
+        [2.3, -2.3, -2.3],
+        [-2.3, -2.3, -2.3]
     ])
 
     phi = (1 + math.sqrt(5.0)) / 2
@@ -143,10 +150,10 @@ def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_l
 
     # find the AABB diagonal vector and centroid
     diff = pmax - pmin
-    cen = (0.5 * (pmin + pmax)).to(device=device)
+    cen = (0.5 * (pmin + pmax))
 
     # find the maximum diagonal component, add tiny amount to compensate for covariance vectors (a hack!)
-    dmax = (0.5 * torch.max(diff) + 0.05).to(device=device)
+    dmax = (0.5 * torch.max(diff) + 0.05)
 
     # transform Gaussians to [-1,-1,-1]x[1,1,1]
     xyz = (xyz - cen) / dmax
@@ -231,6 +238,7 @@ def sample_points_in_volume(
            This process repeats until a desired resolution is achieved.
            The nodes at the frontier of the octree are a voxelization of the Gaussians, represented by an SPC.
            At the end of this step, the SPC does not include voxels ‘inside’ the object represented by the Gaussians.
+
         2. Volume filling of voxelized shell by carving the space of voxels using rendered depth maps.
 
            This is achieved by ray-tracing the SPC from an icosahedral collection of viewpoints to create a depth map

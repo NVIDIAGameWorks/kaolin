@@ -57,6 +57,8 @@ def run_apidoc(_):
             "kaolin/ops/spc/convolution.py",
             "kaolin/ops/spc/points.py",
             "kaolin/ops/spc/uint8.py",
+            "kaolin/ops/spc/raytraced_spc_dataset.py",
+            "kaolin/ops/spc/bf_recon.py",
             "kaolin/physics/materials/linear_elastic_material.py",
             "kaolin/physics/materials/material_forces.py",
             "kaolin/physics/materials/muscle_material.py",

@@ -12,17 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
 
+import logging
 import torch
 import numpy as np
 import kaolin.ops.spc as spc
 from kaolin import _C
-
-__all__ = [
-    'bf_recon',
-    'unbatched_query'
-]
 
 logger = logging.getLogger(__name__)
 
