@@ -29,13 +29,13 @@ def _validate_tet_vertices(tet_vertices):
             :math:`(\text{batch_size}, \text{num_tetrahedrons}, 4, 3)`.
     """
     assert tet_vertices.ndim == 4, \
-        f"tetrahedrons has {tetrahedrons.ndim} but must have 4 dimensions."
+        f"tetrahedrons has {tet_vertices.ndim} but must have 4 dimensions."
     assert tet_vertices.shape[2] == 4, \
         f"The third dimension of the tetrahedrons must be 4 " \
-        f"but the input has {tetrahedrons.shape[2]}. Each tetrahedron has 4 vertices."
+        f"but the input has {tet_vertices.shape[2]}. Each tetrahedron has 4 vertices."
     assert tet_vertices.shape[3] == 3, \
         f"The fourth dimension of the tetrahedrons must be 3 " \
-        f"but the input has {tetrahedrons.shape[3]}. Each vertex must have 3 dimensions."
+        f"but the input has {tet_vertices.shape[3]}. Each vertex must have 3 dimensions."
 
 
 def inverse_vertices_offset(tet_vertices):
