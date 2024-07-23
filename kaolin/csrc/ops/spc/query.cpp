@@ -62,8 +62,9 @@ at::Tensor query_cuda(
   at::checkScalarTypes(__func__, query_coords_arg, {at::kHalf, at::kFloat, at::kDouble});
 
   int num_query = query_coords.size(0);
-  at::Tensor pidx = at::zeros({ num_query }, octree.options().dtype(at::kInt));
-  query_cuda_impl(octree, prefix_sum, query_coords, pidx, target_level);
+  at::Tensor pidx = at::full({ num_query }, -1, octree.options().dtype(at::kInt));
+  if (octree.numel() > 0)
+    query_cuda_impl(octree, prefix_sum, query_coords, pidx, target_level);
   return pidx;
 #else
   KAOLIN_NO_CUDA_ERROR(__func__);
@@ -87,8 +88,9 @@ at::Tensor query_multiscale_cuda(
   at::checkScalarTypes(__func__, query_coords_arg, {at::kHalf, at::kFloat, at::kDouble});
 
   int num_query = query_coords.size(0);
-  at::Tensor pidx = at::zeros({ num_query, target_level + 1 }, octree.options().dtype(at::kInt));
-  query_multiscale_cuda_impl(octree, prefix_sum, query_coords, pidx, target_level);
+  at::Tensor pidx = at::full({ num_query, target_level + 1 }, -1, octree.options().dtype(at::kInt));
+  if (octree.numel() > 0)
+    query_multiscale_cuda_impl(octree, prefix_sum, query_coords, pidx, target_level);
   return pidx;
 #else
   KAOLIN_NO_CUDA_ERROR(__func__);
@@ -116,8 +118,9 @@ at::Tensor query_cuda_empty(
   at::checkScalarTypes(__func__, query_coords_arg, {at::kHalf, at::kFloat, at::kDouble});
 
   int num_query = query_coords.size(0);
-  at::Tensor pidx = at::zeros({ num_query }, octree.options().dtype(at::kInt));
-  query_cuda_impl_empty(octree, empty, prefix_sum, query_coords, pidx, target_level);
+  at::Tensor pidx = at::full({ num_query }, -1, octree.options().dtype(at::kInt));
+  if (octree.numel() > 0)
+    query_cuda_impl_empty(octree, empty, prefix_sum, query_coords, pidx, target_level);
   return pidx;
 #else
   KAOLIN_NO_CUDA_ERROR(__func__);
