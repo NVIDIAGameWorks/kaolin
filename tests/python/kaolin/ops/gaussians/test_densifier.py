@@ -15,25 +15,39 @@
 
 import pytest
 import os
-
+import wget
+import shutil
 import math
 import torch
+from pathlib import Path
 from kaolin.ops.gaussian import sample_points_in_volume
 from kaolin.utils.testing import check_tensor
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        os.pardir, os.pardir, os.pardir, os.pardir, 'samples')
-TEST_MODELS = ['hotdog_minimal.pt']
+                        os.pardir, os.pardir, os.pardir, os.pardir, 'samples', 'gsplats')
+TEST_MODELS = ['dozer_minimal.pt', 'ficus_minimal.pt', 'hotdog_minimal.pt', 'materials_minimal.pt']
 BAD_TEST_MODELS = ['part_sphere', 'sparse_sphere']
 SUPPORTED_GSPLATS_DEVICES = ['cuda']
 SUPPORTED_GSPLATS_DTYPES = [torch.float32]
 
+S3_MODEL_PATHS = [
+    'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/dozer_minimal.pt',
+    'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/ficus_minimal.pt',
+    'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/hotdog_minimal.pt',
+    'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/materials_minimal.pt',
+]
 
-# @pytest.fixture(autouse=True, scope='module')
-# def hotdog():
-#     # wget
-#     yield out
-#     # delete
+
+@pytest.fixture(autouse=True, scope='class')
+def setup():
+    """ Fetches all large models from S3 before running the tests, and deletes them when done """
+    downloaded_files = []
+    for model_path in S3_MODEL_PATHS:
+        local_asset_path = wget.download(model_path, out=ROOT_DIR)
+        downloaded_files.append(local_asset_path)
+    yield
+    for local_asset_path in downloaded_files:
+        Path(local_asset_path).unlink(missing_ok=True)
 
 
 def validate_samples_inside_shell(samples, gaussian_xyz):
@@ -48,7 +62,7 @@ class TestVolumeDensifier:
 
     @pytest.fixture(autouse=True)
     def gaussians(self, model_name):
-        model_path = os.path.join(ROOT_DIR, 'gsplats', model_name)
+        model_path = os.path.join(ROOT_DIR, model_name)
         gaussian_fields = torch.load(os.path.abspath(model_path))
         gaussian_fields['model_name'] = model_name
         return gaussian_fields
