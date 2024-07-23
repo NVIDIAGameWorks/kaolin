@@ -166,8 +166,8 @@ if [ $BUILD_DOCS -eq "1" ]; then
     CMDLINE="python -m sphinx -T -E -W --keep-going -b html -d _build/doctrees -D language=en . _build/html"
     export PYTORCH_JIT=0
     $CMDLINE >> $DOCS_LOG 2>&1
-    export PYTORCH_JIT=1
     RES=$?
+    export PYTORCH_JIT=1
 
     cd $KAOLIN_ROOT
     DOCS_URL="build_docs/_build/html/index.html"

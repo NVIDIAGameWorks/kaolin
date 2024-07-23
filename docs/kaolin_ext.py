@@ -75,6 +75,8 @@ def run_apidoc(_):
             "kaolin/physics/utils/scene_forces.py",
             "kaolin/render/lighting/sg.py",
             "kaolin/render/lighting/sh.py",
+            "kaolin/render/easy_render/common.py",
+            "kaolin/render/easy_render/mesh.py",
             "kaolin/render/mesh/deftet.py",
             "kaolin/render/mesh/dibr.py",
             "kaolin/render/mesh/rasterization.py",
