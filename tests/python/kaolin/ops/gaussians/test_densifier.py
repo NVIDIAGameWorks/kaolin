@@ -23,7 +23,8 @@ from kaolin.utils.testing import check_tensor
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         os.pardir, os.pardir, os.pardir, os.pardir, 'samples')
-TEST_MODELS = ['spheres', 'hotdog_minimal.pt']
+TEST_MODELS = ['sphere', 'hotdog_minimal.pt']
+BAD_TEST_MODELS = ['part_sphere', 'sparse_sphere']
 SUPPORTED_GSPLATS_DEVICES = ['cuda']
 SUPPORTED_GSPLATS_DTYPES = [torch.float32]
 
@@ -40,15 +41,16 @@ class TestVolumeDensifier:
 
     @pytest.fixture(autouse=True)
     def gaussians(self, model_name):
-        if model_name == 'spheres':
-            N = 100000
-            pts = torch.rand(N, 3)
+        if model_name == 'sphere':
+            N = 1000000
+            pts = 2.0 * torch.rand(N, 3) - 1.0
             pts /= pts.norm(dim=1).unsqueeze(1)
-            pts *= 6.0
+            pts *= 3.0
+            rotations = torch.nn.functional.normalize(2.0 * torch.rand(N, 4) - 1.0)
             gaussian_fields = dict(
                 position=pts,
                 scale=torch.full([N, 3], 0.01),
-                rotation=torch.tensor([0.0, 0.0, 0.0, 1.0]).repeat(N, 1),
+                rotation=rotations,
                 opacity=torch.full([N, 1], 0.80)
             )
         else:
@@ -58,10 +60,10 @@ class TestVolumeDensifier:
         return gaussian_fields
 
     def test_sample_points_in_volume(self, gaussians, device, dtype):
-        pos = gaussians['position'].cuda()                  # model.get_xyz
-        scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
-        rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
-        opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
+        pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
 
         output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity)
 
@@ -71,10 +73,10 @@ class TestVolumeDensifier:
         validate_samples_inside_shell(output, pos)
 
     def test_sample_points_in_volume_for_density(self, gaussians, device, dtype):
-        pos = gaussians['position'].cuda()                  # model.get_xyz
-        scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
-        rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
-        opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
+        pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
 
         octree_level = 6
         output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
@@ -100,10 +102,10 @@ class TestVolumeDensifier:
         assert minimal_nearest_neighbor_distance != maximal_nearest_neighbor_distance
 
     def test_sample_points_in_volume_no_jitter_for_density(self, gaussians, device, dtype):
-        pos = gaussians['position'].cuda()                  # model.get_xyz
-        scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
-        rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
-        opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
+        pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
 
         octree_level = 6
         output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
@@ -124,10 +126,10 @@ class TestVolumeDensifier:
         assert torch.isclose(minimal_nearest_neighbor_distance, maximal_nearest_neighbor_distance)
 
     def test_sample_points_in_volume_for_num_samples(self, gaussians, device, dtype):
-        pos = gaussians['position'].cuda()                  # model.get_xyz
-        scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
-        rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
-        opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
+        pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
 
         output = sample_points_in_volume(
             xyz=pos, scale=scale, rotation=rotation, opacity=opacity, num_samples=5000
@@ -138,10 +140,10 @@ class TestVolumeDensifier:
         validate_samples_inside_shell(output, pos)
 
     def test_sample_points_in_volume_without_opacity_threshold(self, gaussians, device, dtype):
-        pos = gaussians['position'].cuda()  # model.get_xyz
-        scale = gaussians['scale'].cuda()  # post activation, i.e. model.get_scaling
-        rotation = gaussians['rotation'].cuda()  # post activation, i.e. model.get_rotation
-        opacity = gaussians['opacity'].squeeze(1).cuda()  # model.get_opacity
+        pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
 
         output = sample_points_in_volume(
             xyz=pos, scale=scale, rotation=rotation, opacity=opacity, opacity_threshold=0.0
@@ -153,10 +155,10 @@ class TestVolumeDensifier:
         validate_samples_inside_shell(output, pos)
 
     def test_sample_points_in_volume_with_high_opacity_threshold(self, gaussians, device, dtype):
-        pos = gaussians['position'].cuda()  # model.get_xyz
-        scale = gaussians['scale'].cuda()  # post activation, i.e. model.get_scaling
-        rotation = gaussians['rotation'].cuda()  # post activation, i.e. model.get_rotation
-        opacity = gaussians['opacity'].squeeze(1).cuda()  # model.get_opacity
+        pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
 
         output = sample_points_in_volume(
             xyz=pos, scale=scale, rotation=rotation, opacity=opacity, opacity_threshold=0.5
@@ -168,10 +170,10 @@ class TestVolumeDensifier:
         validate_samples_inside_shell(output, pos)
 
     def test_sample_points_in_volume_with_mask(self, gaussians, device, dtype):
-        pos = gaussians['position'].cuda()  # model.get_xyz
-        scale = gaussians['scale'].cuda()  # post activation, i.e. model.get_scaling
-        rotation = gaussians['rotation'].cuda()  # post activation, i.e. model.get_rotation
-        opacity = gaussians['opacity'].squeeze(1).cuda()  # model.get_opacity
+        pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
 
         opacity_threshold = 0.35
 
@@ -200,11 +202,10 @@ class TestVolumeDensifier:
         assert output1.shape[0] >= output2.shape[0]
 
     def test_sample_points_in_volume_with_custom_viewpoints(self, gaussians, device, dtype):
-
-        pos = gaussians['position'].cuda()                  # model.get_xyz
-        scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
-        rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
-        opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
+        pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
 
         anchors = torch.tensor([
             [2.3, -2.3, 2.3],
@@ -225,14 +226,65 @@ class TestVolumeDensifier:
         validate_samples_inside_shell(output, pos)
 
     def test_sample_points_in_volume_no_clipping(self, gaussians, device, dtype):
-        pos = gaussians['position'].cuda()                  # model.get_xyz
-        scale = gaussians['scale'].cuda()                   # post activation, i.e. model.get_scaling
-        rotation = gaussians['rotation'].cuda()             # post activation, i.e. model.get_rotation
-        opacity = gaussians['opacity'].squeeze(1).cuda()    # model.get_opacity
+        pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
 
         output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
                                          clip_samples_to_input_bbox=False)
 
         assert output.ndim == 2
+        assert output.shape[1] == 3
+        check_tensor(output, dtype=dtype, device=device)
+
+
+@pytest.mark.parametrize('bad_model_name', BAD_TEST_MODELS)
+@pytest.mark.parametrize("device", SUPPORTED_GSPLATS_DEVICES)
+@pytest.mark.parametrize("dtype", SUPPORTED_GSPLATS_DTYPES)
+class TestVolumeDensifierBadInputs:
+
+
+    @pytest.fixture(autouse=True)
+    def bad_gaussians(self, bad_model_name):
+        if bad_model_name == 'part_sphere':
+            N = 100000
+            pts = torch.rand(N, 3)
+            pts /= pts.norm(dim=1).unsqueeze(1)
+            pts *= 6.0
+            gaussian_fields = dict(
+                position=pts,
+                scale=torch.full([N, 3], 0.01),
+                rotation=torch.tensor([0.0, 0.0, 0.0, 1.0]).repeat(N, 1),
+                opacity=torch.full([N, 1], 0.80)
+            )
+        elif bad_model_name == 'sparse_sphere':
+            N = 100
+            pts = torch.rand(N, 3)
+            pts /= pts.norm(dim=1).unsqueeze(1)
+            pts *= 3.0
+            gaussian_fields = dict(
+                position=pts,
+                scale=torch.full([N, 3], 0.01),
+                rotation=torch.tensor([0.0, 0.0, 0.0, 1.0]).repeat(N, 1),
+                opacity=torch.full([N, 1], 0.80)
+            )
+        else:
+            raise ValueError('Unknown bad_gaussian test model')
+        gaussian_fields['model_name'] = bad_model_name
+        return gaussian_fields
+
+    def test_resilience_to_bad_inputs(self, bad_gaussians, device, dtype):
+        pos = bad_gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
+        scale = bad_gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
+        rotation = bad_gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
+        opacity = bad_gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
+
+        octree_level = 6
+        output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
+                                         octree_level=octree_level, jitter=True)
+
+        assert output.ndim == 2
+        assert output.shape[0] == 0
         assert output.shape[1] == 3
         check_tensor(output, dtype=dtype, device=device)

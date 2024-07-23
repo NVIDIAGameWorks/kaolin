@@ -16,12 +16,15 @@
 import math
 import numpy as np
 import torch
+import logging
 from typing import Optional
 from kaolin.ops.random import sample_spherical_coords
 from kaolin.ops.spc import scan_octrees, morton_to_points, bf_recon, unbatched_query
 from kaolin.ops.spc.raytraced_spc_dataset import RayTracedSPCDataset
 from kaolin.ops.spc.bf_recon import bf_recon, unbatched_query
 from kaolin import _C
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     'sample_points_in_volume'
@@ -180,6 +183,16 @@ def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_l
 
     # fuse depthmaps into seen/unseen aware spc
     bf_octree, bf_empty, _ = bf_recon(dataset, final_level=query_level, sigma=0.005)
+    if bf_octree is None or bf_empty is None or len(bf_octree) == 0 or len(bf_empty) == 0:
+        logging.warning(
+            "3D Gaussian densifier failed to produce a voxelized volume out of the shape.\n"
+            "Usually, it means the shape represented by 3D Gaussians has regions of very low "
+            "quality which resulted in holes in the shell. \n"
+            "To fix this issue, double check your shape, "
+            "or try adjusting args passed to the volume sampling function.\n"
+            "For example, try reducing the opacity_threshold towards 0.0, or octree_level towards 7 or 6."
+        )
+        return xyz.new_empty([0, 3])
 
     # scan resulting octrees for subsequent querying
     lengths = torch.tensor([len(bf_octree)], dtype=torch.int)
@@ -351,21 +364,27 @@ def sample_points_in_volume(
         opacity_threshold=opacity_threshold,
         gs_level=octree_level, query_level=octree_level, viewpoints=viewpoints
     )
+    # An empty tensor means densification failed - in that case we return an empty point set
+    # and skip post-processing
+    if len(volume_pts) == 0:
+        return volume_pts
+    # Postprocess: apply small jitter to sampled points so they don't reside exactly on voxel centers
     if jitter:
         volume_pts = _jitter(volume_pts, octree_level)
-    # Postprocess: rescale returned points to ensure they fit in input points hull
+    # Postprocess: rescale returned points to fit in input points hull
+    # post_scale_factor should be very low, otherwise concave shapes may rescale out of the shape volume.
     if post_scale_factor < 1.0:
         mean = volume_pts.mean(dim=0)
         volume_pts -= mean
         volume_pts *= post_scale_factor
         volume_pts += mean
-
+    # Failsafe mechanism: eradicate points sampled out of the original gaussians bounding box
     if clip_samples_to_input_bbox:
         bbox_min = xyz.min(dim=0)[0]
         bbox_max = xyz.max(dim=0)[0]
         out_of_box = (bbox_max <= volume_pts).any(dim=1) | (bbox_min >= volume_pts).any(dim=1)
         volume_pts = volume_pts[~out_of_box]
-
+    # Subsample the returned point set if num_samples is specified
     num_total_pts = volume_pts.shape[0]
     if num_samples is not None and num_samples < num_total_pts:
         sample_indices = torch.randperm(num_total_pts)[:num_samples]
