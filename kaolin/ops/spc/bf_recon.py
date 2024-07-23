@@ -309,13 +309,16 @@ def bf_recon(input_dataset, final_level, sigma):
         https://ieeexplore.ieee.org/document/7785112
     """
     try:
-        frame_no = 0
+        first_frame_processed = False
         octree0, empty0, probs0, colors0, normals0, pyramid0, exsum0, weights = \
             None, None, None, None, None, None, None, None
 
         # Iterate over calibrated rgbd data
         for batch in input_dataset:
-            if frame_no == 0:
+            is_any_ray_hit = batch[9]
+            if not is_any_ray_hit:
+                continue
+            if not first_frame_processed:
                 # create SPC model corresponding to a single image
                 octree0, empty0, probs0, colors0, normals0 = processFrame(batch, final_level, sigma)
                 lengths = torch.tensor([len(octree0)], dtype=torch.int)
@@ -337,7 +340,7 @@ def bf_recon(input_dataset, final_level, sigma):
                 lengths = torch.tensor([len(octree0)], dtype=torch.int)
                 level, pyramid0, exsum0 = spc.scan_octrees(octree0, lengths)
 
-            frame_no += 1
+            first_frame_processed = True
 
         # extract iso surface from over voxelized model
         octree, empty, colors = extractBQ(octree0, empty0, probs0, colors0)

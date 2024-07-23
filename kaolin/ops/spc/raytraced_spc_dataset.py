@@ -50,7 +50,7 @@ class RayTracedSPCDataset(Dataset):
 
         # Constants
         self.carve_camera_fov = 0.644  # In radians
-        self.max_depth = 6.0
+        self.max_depth = torch.finfo(torch.float32).max
         self.mip_levels = 6
         self.start_level = 4
 
@@ -82,6 +82,7 @@ class RayTracedSPCDataset(Dataset):
         first_hits_mask = mark_pack_boundaries(ridx)
         first_hits_ray = ridx[first_hits_mask].long()
         first_depths = depths[first_hits_mask]
+        is_any_ray_hit = len(ridx) > 0
 
         # black background
         image = torch.zeros((camera.height*camera.width, 3), dtype=torch.float32, device=self.device)
@@ -117,7 +118,7 @@ class RayTracedSPCDataset(Dataset):
 
         # generate starting points
         points = morton_to_points(torch.arange(pow(8, self.start_level), device=self.device))
-        return image, depthmap, Cam, In, self.max_depth, self.mip_levels, True, self.start_level, points
+        return image, depthmap, Cam, In, self.max_depth, self.mip_levels, True, self.start_level, points, is_any_ray_hit
 
 
 

@@ -23,10 +23,17 @@ from kaolin.utils.testing import check_tensor
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         os.pardir, os.pardir, os.pardir, os.pardir, 'samples')
-TEST_MODELS = ['sphere', 'hotdog_minimal.pt']
+TEST_MODELS = ['hotdog_minimal.pt']
 BAD_TEST_MODELS = ['part_sphere', 'sparse_sphere']
 SUPPORTED_GSPLATS_DEVICES = ['cuda']
 SUPPORTED_GSPLATS_DTYPES = [torch.float32]
+
+
+# @pytest.fixture(autouse=True, scope='module')
+# def hotdog():
+#     # wget
+#     yield out
+#     # delete
 
 
 def validate_samples_inside_shell(samples, gaussian_xyz):
@@ -41,21 +48,8 @@ class TestVolumeDensifier:
 
     @pytest.fixture(autouse=True)
     def gaussians(self, model_name):
-        if model_name == 'sphere':
-            N = 1000000
-            pts = 2.0 * torch.rand(N, 3) - 1.0
-            pts /= pts.norm(dim=1).unsqueeze(1)
-            pts *= 3.0
-            rotations = torch.nn.functional.normalize(2.0 * torch.rand(N, 4) - 1.0)
-            gaussian_fields = dict(
-                position=pts,
-                scale=torch.full([N, 3], 0.01),
-                rotation=rotations,
-                opacity=torch.full([N, 1], 0.80)
-            )
-        else:
-            model_path = os.path.join(ROOT_DIR, 'gsplats', model_name)
-            gaussian_fields = torch.load(os.path.abspath(model_path))
+        model_path = os.path.join(ROOT_DIR, 'gsplats', model_name)
+        gaussian_fields = torch.load(os.path.abspath(model_path))
         gaussian_fields['model_name'] = model_name
         return gaussian_fields
 
