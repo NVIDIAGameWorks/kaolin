@@ -222,7 +222,7 @@ def sample_points_in_volume(
     num_samples: Optional[int] = None,
     octree_level: int = 8,
     opacity_threshold: float = 0.35,
-    post_scale_factor: float = 0.93,
+    post_scale_factor: float = 1.0,
     jitter: bool = True,
     clip_samples_to_input_bbox: bool = True,
     viewpoints: Optional[torch.Tensor] = None
@@ -256,8 +256,8 @@ def sample_points_in_volume(
         The default `viewpoints` provide adequate coverage for common objects, but more complex objects with many
         cavities may benefit from a more specialized set of viewpoints.
         `post_scale_factor` downscales the returned points using their mean as the center of scale, to ensure
-        they reside within the shape shell. It is recommended to leave this value close to 1.0 -- for concave shapes
-        downscaling too much may cause the points to drift away from the shape shell.
+        they reside within the shape shell. It is recommended to leave this value lower than and
+        close to 1.0 -- for concave shapes downscaling too much may cause the points to drift away from the shape shell.
 
     .. note::
 
@@ -326,6 +326,7 @@ def sample_points_in_volume(
         post_scale_factor (float):
             Postprocess: if :math:`\text{post_scale_factor} < 1.0`, the returned pointcloud will be rescaled to ensure
             it fits inside the hull of the input points.
+            It is recommended to avoid values significantly lower than 1 with concave or multi-part objects.
         jitter (bool):
             If true, applies a small jitter to the returned volume points.
             If false, the returned points lie on an equally distanced grid.
@@ -372,7 +373,7 @@ def sample_points_in_volume(
     if jitter:
         volume_pts = _jitter(volume_pts, octree_level)
     # Postprocess: rescale returned points to fit in input points hull
-    # post_scale_factor should be very low, otherwise concave shapes may rescale out of the shape volume.
+    # post_scale_factor should be very close to 1.0, otherwise concave shapes may rescale out of the shape boundary.
     if post_scale_factor < 1.0:
         mean = volume_pts.mean(dim=0)
         volume_pts -= mean
