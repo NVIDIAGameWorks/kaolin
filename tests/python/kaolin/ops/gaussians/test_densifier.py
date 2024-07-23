@@ -42,12 +42,14 @@ def setup():
     """ Fetches all large models from S3 before running the tests, and deletes them when done """
     os.makedirs(ROOT_DIR, exist_ok=True)
     downloaded_files = []
-    for model_path in S3_MODEL_PATHS:
-        local_asset_path = wget.download(model_path, out=ROOT_DIR)
-        downloaded_files.append(local_asset_path)
-    yield
-    for local_asset_path in downloaded_files:
-        Path(local_asset_path).unlink(missing_ok=True)
+    try:
+        for model_path in S3_MODEL_PATHS:
+            local_asset_path = wget.download(model_path, out=ROOT_DIR)
+            downloaded_files.append(local_asset_path)
+        yield
+    finally:
+        for local_asset_path in downloaded_files:
+            Path(local_asset_path).unlink(missing_ok=True)
 
 
 def validate_samples_inside_shell(samples, gaussian_xyz):
