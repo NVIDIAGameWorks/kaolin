@@ -14,33 +14,36 @@ Note that Kaolin library is part of the larger [NVIDIA Kaolin effort](https://de
 Starting with v0.12.0, Kaolin supports installation with wheels:
 ```
 # Replace TORCH_VERSION and CUDA_VERSION with your torch / cuda versions
-pip install kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
+pip install kaolin==0.16.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
 ```
-For example, to install kaolin 0.15.0 over torch 1.12.1 and cuda 11.3:
+For example, to install kaolin 0.16.0 over torch 2.0.0 and cuda 11.8:
 ```
-pip install kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.12.1_cu113.html
+pip install kaolin==0.16.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.0_cu118.html
 ```
 
-## About the Latest Release (0.15.0)
+## About the Latest Release (0.16.0)
 
-In this version we added a [non commercial section](https://kaolin.readthedocs.io/en/latest/modules/kaolin.non_commercial.html) under [NSCL license](LICENSE.NSCL). See [The license section for more info](#Licenses) for more details.
+In this version we added a [Physics section](https://kaolin.readthedocs.io/en/latest/modules/physics.html).
 
-In this new section we implemented [features for Flexicubes](https://kaolin.readthedocs.io/en/latest/modules/kaolin.non_commercial.html#kaolin.non_commercial.FlexiCubes) a method to extract meshes from scalar fields. See more information in [the official repository](https://github.com/nv-tlabs/FlexiCubes) which is now using Kaolin's implementation.
+In this new section we implemented [Simplicits](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.html) a geometry-agnostic method for elastic simulation. See more information in [the project page](https://research.nvidia.com/labs/toronto-ai/simplicits/).
 
-<a href="https://kaolin.readthedocs.io/en/latest/modules/kaolin.non_commercial.html#kaolin.non_commercial.FlexiCubes"><img src="./assets/flexicubes.png" alt="flexicubes" height="250" /></a>
+<a href="TODO"><img src="./assets/simplicit.png" alt="Simplicit" height="250" /></a>
 
-In addition we implemented a [GLTF mesh loader](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.gltf.html) that can be used to load models from [Objaverse](https://objaverse.allenai.org/objaverse-1.0) and [Objaverse-XL](https://objaverse.allenai.org/).
+We've also added a [math section](https://kaolin.readthedocs.io/en/latest/modules/kaolin.math.html) with quaternions math features.
 
-<a href="https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.gltf.html"><img src="./assets/gltf.png" alt="gltf" height="250" /></a>
+Finally we've improved workflow, with an [easy rendering API](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.easy_render.html), for quickly visualizing a model.
+
+Check our new tutorials:
+[Use Simplicit's Easy API to Simulate a Mesh](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_easy_api.ipynb) In this notebook we show how to use the high-level Simplicit API to simulate an imported Mesh.
+[Interact with a Physics Simulation](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_interactive.ipynb) In this notebook we show to interact with the simulation by moving objects.
+[Use Simplicit's Full-Feature API](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_low_level_api.ipynb) In this notebook we show how to use the low-level API to simulate a pointcloud.
 
 
-Check our new tutorial:
-[**Load and render a GLTF file** interactively into a Jupyter notebook:](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/gltf_viz.ipynb)
-In this file we show how to load a gltf file and fully differentiably render it with [nvdiffrast](https://nvlabs.github.io/nvdiffrast/) and [spherical gaussian for diffuse and specular lighting](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html), using displacement mapping and other materials properties from the GLTF file.
+[Easy rendering of Meshes](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/easy_mesh_render.ipynb) Use our new high-level API to load a mesh, create a camera and lighting parameters and render interactively.
 
-<a href="https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/gltf_viz.ipynb"><img src="./assets/avocado.png" alt="gltf notebook" height="250" /></a>
+<a href="https://github.com/NVIDIAGameWorks/kaolin/tree/master/examples/tutorial/physics"><img src="./assets/physics_bulldozer.gif" alt="physics documentation" height="250" /></a>
 
-See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.15.0) for details.
+See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.16.0) for details.
 
 ## Contributing
 
@@ -98,6 +101,7 @@ Current Team:
 - Technical Lead: Clement Fuji Tsang
 - Manager: Maria (Masha) Shugrina
 - Charles Loop
+- Vismay Modi
 - Or Perel
 - Alexander Zook
 

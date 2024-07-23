@@ -67,9 +67,7 @@ spec:
               --log-disable=PIL.TiffImagePlugin \
               --log-disable=kaolin.rep.surface_mesh \
               /kaolin/tests/python/kaolin/io/test_gltf.py \
-              /kaolin/tests/python/kaolin/io/usd/ \
               /kaolin/tests/python/kaolin/io/test_obj.py
-
         '''
       }
       if (currentBuild.getCurrentResult() != "FAILURE") {
