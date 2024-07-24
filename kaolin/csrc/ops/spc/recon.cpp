@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <ATen/ATen.h>
 
+#include "../../check.h"
 #include "../../spc_math.h"
 
 #include <iostream>

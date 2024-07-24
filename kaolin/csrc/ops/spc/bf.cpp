@@ -19,6 +19,7 @@
 #include <vector_types.h>
 #include <iostream>
 
+#include "../../check.h"
 #include "../../spc_math.h"
 
 namespace kaolin {
