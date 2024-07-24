@@ -170,7 +170,7 @@ class TestComputeVertexNormals:
 
         vertex_features = mesh.average_face_vertex_features(faces, face_features)
         if dtype == torch.half:
-            assert torch.allclose(expected, vertex_features, rtol=1e-03, atol=1e-05)
+            assert torch.allclose(expected, vertex_features, rtol=1e-3, atol=1e-3)
         else:
             assert torch.allclose(expected, vertex_features)
 

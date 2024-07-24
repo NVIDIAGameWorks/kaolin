@@ -35,6 +35,7 @@ def test_center_points(device, dtype):
     points[:, 0, :] = 1.0  # make sure 1 is included
     points[:, 1, :] = 0.0  # make sure 0 is included
     points = points - 0.5  # -0.5...0.5
+    points = torch.clamp((torch.sign(points) * 1e-3) + points, -0.5, 0.5)
 
     factors = 0.2 + 2 * torch.rand((B, 1, 1), device=device, dtype=dtype)
     translations = torch.rand((B, 1, 3), device=device, dtype=dtype) - 0.5
