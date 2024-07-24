@@ -18,28 +18,28 @@
 
 #include "../../../check.h"
 
-namespace kaolin::gs_to_spc {
+namespace kaolin {
 
 #ifdef WITH_CUDA
 
 std::vector<at::Tensor> gs_to_spc_cuda_impl(
-	const at::Tensor& means3D,
-	const at::Tensor& scales,
-	const at::Tensor& rotations,
-	const at::Tensor& opacities,
-	const float iso,
+  const at::Tensor& means3D,
+  const at::Tensor& scales,
+  const at::Tensor& rotations,
+  const at::Tensor& opacities,
+  const float iso,
   const float tol,
-  const uint target_level);
+  const uint32_t target_level);
 
 #endif
 
 std::vector<at::Tensor>
 gs_to_spc_cuda(
-	const at::Tensor& means3D,
-	const at::Tensor& scales,
-	const at::Tensor& rotations,
-	const at::Tensor& opacities,
-	const float iso,
+  const at::Tensor& means3D,
+  const at::Tensor& scales,
+  const at::Tensor& rotations,
+  const at::Tensor& opacities,
+  const float iso,
   const float tol,
   const uint32_t level) {
 #ifdef WITH_CUDA

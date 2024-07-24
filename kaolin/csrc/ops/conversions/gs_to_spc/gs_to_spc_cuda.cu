@@ -28,12 +28,13 @@
 #include "../../../spc_math.h"
 #include "../../../spc_utils.cuh"
 
-namespace kaolin::gs_to_spc {
+namespace kaolin {
 
 using namespace std;
 using namespace at::indexing;
 
 #define NUM_THREADS 256
+namespace {
 
 size_t get_cub_storage_bytes_sort_pairs(
   void* d_temp_storage, 
@@ -136,6 +137,7 @@ compactify_cuda_kernel(
   }
 }
 
+} // namespace
 
 ///////// methods below are unique to gs_to_spc
 

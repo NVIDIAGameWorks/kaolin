@@ -139,7 +139,7 @@ static inline __device__ int32_t identify(
     else
     {
       if (mpty&(0x1 << child_idx))
-        return -2 - depth;
+        return -2 - static_cast<int32_t>(depth);
       else
         return -1;
     }

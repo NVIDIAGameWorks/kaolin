@@ -30,30 +30,30 @@ using namespace at::indexing;
 
 #ifdef WITH_CUDA
 
-ulong GetTempSize(void* d_temp_storage, uint* d_M0, uint* d_M1, uint max_total_points);
+uint64_t GetTempSize(void* d_temp_storage, uint32_t* d_M0, uint32_t* d_M1, uint32_t max_total_points);
 
-void InclusiveSum_cuda(uint num, uint* inputs, uint* outputs, void* d_temp_storage, ulong temp_storage_bytes);
-void BuildMip2D_cuda(float* img, uint width, uint miplevels, uint hw, 
+void InclusiveSum_cuda(uint32_t num, uint32_t* inputs, uint32_t* outputs, void* d_temp_storage, uint64_t temp_storage_bytes);
+void BuildMip2D_cuda(float* img, uint32_t width, uint32_t miplevels, uint32_t hw, 
                      float fx, float fy, float cx, float cy, float2* mipmap, float maxdepth, bool true_depth);
 
-void Subdivide_cuda(uint num, point_data* points, uint* insum, point_data* new_points, uint* nvsum);
-void Compactify_cuda(uint num, point_data* points, uint* insum, point_data* new_points, int64_t* out_nvsum);
+void Subdivide_cuda(uint32_t num, point_data* points, uint32_t* insum, point_data* new_points, uint32_t* nvsum);
+void Compactify_cuda(uint32_t num, point_data* points, uint32_t* insum, point_data* new_points, int64_t* out_nvsum);
 
 #endif // WITH_CUDA
 
 at::Tensor inclusive_sum(at::Tensor Inputs)
 {
 #ifdef WITH_CUDA
-  uint num = Inputs.size(0);
+  uint32_t num = Inputs.size(0);
 
   at::Tensor Outputs = at::zeros_like(Inputs);
 
-  uint* inputs = reinterpret_cast<uint*>(Inputs.data_ptr<int>()); 
-  uint* outputs = reinterpret_cast<uint*>(Outputs.data_ptr<int>());
+  uint32_t* inputs = reinterpret_cast<uint32_t*>(Inputs.data_ptr<int>()); 
+  uint32_t* outputs = reinterpret_cast<uint32_t*>(Outputs.data_ptr<int>());
 
   // set up memory for DeviceScan and DeviceRadixSort calls
   void* d_temp_storage = NULL;
-  ulong temp_storage_bytes = GetTempSize(d_temp_storage, inputs, outputs, num);
+  uint64_t temp_storage_bytes = GetTempSize(d_temp_storage, inputs, outputs, num);
 
   at::Tensor temp_storage = at::zeros({(long)temp_storage_bytes}, Inputs.options().dtype(at::kByte));
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
@@ -99,8 +99,8 @@ at::Tensor build_mip2d(at::Tensor image, at::Tensor In, int mip_levels, float ma
 std::vector<at::Tensor> subdivide(at::Tensor Points, at::Tensor Insum)
 {
 #ifdef WITH_CUDA
-  uint num = Points.size(0);
-  uint pass = Insum[-1].item<int>();
+  uint32_t num = Points.size(0);
+  uint32_t pass = Insum[-1].item<int>();
 
   at::Tensor NewPoints = at::zeros({8*pass, 3}, Points.options());
   at::Tensor NVSum = at::zeros({pass}, Points.options().dtype(at::kInt));
@@ -108,8 +108,8 @@ std::vector<at::Tensor> subdivide(at::Tensor Points, at::Tensor Insum)
   point_data*  points = (point_data*)Points.data_ptr<short>();
   point_data*  new_points = (point_data*)NewPoints.data_ptr<short>();
 
-  uint* insum = reinterpret_cast<uint*>(Insum.data_ptr<int>());
-  uint* nvsum = reinterpret_cast<uint*>(NVSum.data_ptr<int>());
+  uint32_t* insum = reinterpret_cast<uint32_t*>(Insum.data_ptr<int>());
+  uint32_t* nvsum = reinterpret_cast<uint32_t*>(NVSum.data_ptr<int>());
 
   Subdivide_cuda(num, points, insum, new_points, nvsum);
 
@@ -123,8 +123,8 @@ std::vector<at::Tensor> subdivide(at::Tensor Points, at::Tensor Insum)
 std::vector<at::Tensor> compactify(at::Tensor Points, at::Tensor Insum)
 {
 #ifdef WITH_CUDA
-  uint num = Points.size(0);
-  uint pass = Insum[-1].item<int>();
+  uint32_t num = Points.size(0);
+  uint32_t pass = Insum[-1].item<int>();
 
   at::Tensor NewPoints = at::zeros({pass, 3}, Points.options());
   at::Tensor NVSum = at::zeros({pass}, Points.options().dtype(at::kLong));
@@ -132,7 +132,7 @@ std::vector<at::Tensor> compactify(at::Tensor Points, at::Tensor Insum)
   point_data*  points = reinterpret_cast<point_data*>(Points.data_ptr<short>());
   point_data*  new_points = reinterpret_cast<point_data*>(NewPoints.data_ptr<short>());
 
-  uint* insum = reinterpret_cast<uint*>(Insum.data_ptr<int>());
+  uint32_t* insum = reinterpret_cast<uint32_t*>(Insum.data_ptr<int>());
   int64_t* nvsum = reinterpret_cast<int64_t*>(NVSum.data_ptr<int64_t>());
 
   Compactify_cuda(num, points, insum, new_points, nvsum);

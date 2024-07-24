@@ -13,24 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef KAOLIN_OPS_CONVERSIONS_GS_TO_SPC_MESH_TO_SPC_H_
-#define KAOLIN_OPS_CONVERSIONS_GS_TO_SPC_MESH_TO_SPC_H_
+#ifndef KAOLIN_OPS_CONVERSIONS_GS_TO_SPC_GS_TO_SPC_H_
+#define KAOLIN_OPS_CONVERSIONS_GS_TO_SPC_GS_TO_SPC_H_
 
 #include <ATen/ATen.h>
 
-namespace kaolin::gs_to_spc {
+namespace kaolin {
 
 std::vector<at::Tensor>
 gs_to_spc_cuda(
-	const at::Tensor& means3D,
-	const at::Tensor& scales,
-	const at::Tensor& rotations,
-	const at::Tensor& opacities,
-	const float iso,
-    const float tol,
-    const uint32_t level);
+  const at::Tensor& means3D,
+  const at::Tensor& scales,
+  const at::Tensor& rotations,
+  const at::Tensor& opacities,
+  const float iso,
+  const float tol,
+  const uint32_t level);
 
 
 }  // namespace kaolin
 
-#endif  // KAOLIN_OPS_CONVERSIONS_GS_TO_SPC_MESH_TO_SPC_H_
+#endif  // KAOLIN_OPS_CONVERSIONS_GS_TO_SPC_GS_TO_SPC_H_

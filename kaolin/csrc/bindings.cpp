@@ -48,7 +48,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     py::module ops_conversions = ops.def_submodule("conversions");
     ops_conversions.def("unbatched_mcube_forward_cuda", &unbatched_mcube_forward_cuda);
     ops_conversions.def("mesh_to_spc_cuda", &mesh_to_spc_cuda);
-    ops_conversions.def("gs_to_spc_cuda", &gs_to_spc::gs_to_spc_cuda);
+    ops_conversions.def("gs_to_spc_cuda", &gs_to_spc_cuda);
     py::module ops_spc = ops.def_submodule("spc");
 #if WITH_CUDA
     ops_spc.def("query_cuda", &query_cuda);

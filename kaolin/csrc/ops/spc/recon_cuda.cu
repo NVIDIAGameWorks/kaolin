@@ -34,15 +34,15 @@ namespace kaolin {
 using namespace cub;
 using namespace std;
 
-ulong GetTempSize(void* d_temp_storage, uint* d_M0, uint* d_M1, uint max_total_points)
+uint64_t GetTempSize(void* d_temp_storage, uint* d_M0, uint* d_M1, uint max_total_points)
 {
-    ulong    temp_storage_bytes = 0;
+    uint64_t    temp_storage_bytes = 0;
     CubDebugExit(DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_M0, d_M1, max_total_points));
     return temp_storage_bytes;
 }
 
 
-void InclusiveSum_cuda(uint num, uint* inputs, uint* outputs, void* d_temp_storage, ulong temp_storage_bytes)
+void InclusiveSum_cuda(uint num, uint* inputs, uint* outputs, void* d_temp_storage, uint64_t temp_storage_bytes)
 {
   DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, inputs, outputs, num);
   CubDebugExit(cudaGetLastError());
