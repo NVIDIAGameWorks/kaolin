@@ -1,5 +1,5 @@
-kaolin.render.easy\_render package
-==================================
+kaolin.render.easy\_render
+==========================
 
 Common Utilities
 ----------------

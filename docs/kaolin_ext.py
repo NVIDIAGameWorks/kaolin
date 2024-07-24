@@ -79,6 +79,7 @@ def run_apidoc(_):
             "kaolin/render/easy_render/mesh.py",
             "kaolin/render/mesh/deftet.py",
             "kaolin/render/mesh/dibr.py",
+            "kaolin/render/mesh/nvdiffrast_context.py",
             "kaolin/render/mesh/rasterization.py",
             "kaolin/render/mesh/utils.py",
             "kaolin/render/spc/raytrace.py",
