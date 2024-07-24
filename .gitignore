@@ -44,3 +44,4 @@ examples/tutorial/output/
 examples/tutorial/logs/
 examples/tutorial/physics/*.log
 examples/tutorial/physics/results/
+examples/tutorial/physics/inria/

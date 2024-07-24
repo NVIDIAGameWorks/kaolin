@@ -82,6 +82,7 @@ class SimplicitsObject:
 
         norm_appx_vol = self.appx_vol*(norm_bb_vol/bb_vol)
         
+            
         self.normalized_pts = self.pts#(self.pts - self.bb_min)/(self.bb_max - self.bb_min)
 
         self.num_samples = num_samples
@@ -96,7 +97,7 @@ class SimplicitsObject:
         if self.num_handles == 0:
             self.model_plus_rigid = lambda pts: torch.ones((pts.shape[0], 1), device=self.default_device)
         else:
-            self.model_plus_rigid = lambda pts: torch.cat((self.model((pts-self.bb_min)/(self.bb_max-self.bb_min)), torch.ones((pts.shape[0], 1), device=self.default_device)), dim=1) 
+            self.model_plus_rigid = lambda pts: torch.cat((self.model((pts-self.bb_min)/(self.bb_max-self.bb_min)), torch.ones((pts.shape[0], 1), device=self.default_device)), dim=1)
 
     def save_model(self, pth):
         r"""Saves the Simplicits network model (not including rigid mode)
@@ -151,8 +152,9 @@ class SimplicitsObject:
             for grp in optimizer.param_groups:
                 grp['lr'] = lr_start + float(i/num_steps)*(lr_end - lr_start)
 
-            # if i%100 == 0:
-            #     logger.debug(f'Training step: {i}, le: {le.item()}, lo: {lo.item()}')
+            #if i%100 == 0:
+                #print(f'Training step: {i}, le: {le.item()}, lo: {lo.item()}')
+                # logger.debug(f'Training step: {i}, le: {le.item()}, lo: {lo.item()}')
 
         self.model.eval()
 
@@ -168,7 +170,7 @@ class SimulatedObject:
                 num_cub_pts (int, optional): Number of cubature points (integration primitives). Defaults to 1000
         """
         self.simplicits_object = obj
-
+        self.num_cub_pts = num_cub_pts
         self._sample_cubatures(num_cub_pts=num_cub_pts)
         self.reset_sim_state(init_tfm)
         self._set_sim_constants()
@@ -256,7 +258,7 @@ class SimulatedObject:
         self.x0_flat = self.sim_pts.flatten().unsqueeze(-1).detach()
         self.weights = self.simplicits_object.model_plus_rigid(self.sim_normalized_pts) 
         self.M, self.invM = precomputed.lumped_mass_matrix(self.sim_rhos, self.simplicits_object.appx_vol, dim = 3)
-        self.bigI = torch.tile(torch.eye(3, device=self.simplicits_object.default_device).flatten().unsqueeze(dim=1), (self.simplicits_object.num_samples,1)).detach()
+        self.bigI = torch.tile(torch.eye(3, device=self.simplicits_object.default_device).flatten().unsqueeze(dim=1), (self.num_cub_pts,1)).detach()
 
         self.dFdz = precomputed.jacobian_dF_dz(self.simplicits_object.model_plus_rigid, self.sim_normalized_pts, self.z).detach() 
         self.B = precomputed.lbs_matrix(self.sim_pts, self.weights).detach() 
@@ -420,17 +422,18 @@ class SimplicitsScene:
         self.current_id = 0
         self.sim_obj_dict = {}
 
-    def add_object(self, sim_object:SimplicitsObject, init_tfm=None):
+    def add_object(self, sim_object:SimplicitsObject, num_cub_pts = 1000, init_tfm=None):
         r"""Adds a simplicits object to the scene as a SimulatedObject.
 
         Args:
             sim_object (SimplicitsObject): Simplicits object that will be wrapped into a SimulatedObject for this scene.
+            num_cub_pts (int, optional): Number of cubature pts (integration primitives) to sample during simulation. Defaults to 1000.
             init_tfm (torch.Tensor, optional): Initial transformation of the object, shape of :math:`[3,4]`. Defaults to None (no initial transformation).
 
         Returns:
             int: Id of object in the scene.
         """
-        self.sim_obj_dict[self.current_id] = SimulatedObject(sim_object, init_tfm=init_tfm)
+        self.sim_obj_dict[self.current_id] = SimulatedObject(sim_object, num_cub_pts=num_cub_pts, init_tfm=init_tfm)
         self.current_id += 1
         return self.current_id-1
 
