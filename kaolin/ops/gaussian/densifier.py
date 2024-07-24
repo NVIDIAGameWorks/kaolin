@@ -132,10 +132,10 @@ def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_l
     r"""Creates a tensor of uniform samples 'inside' collection of Gaussian Splats.
 
     Args:
-        xyz (torch.FloatTensor) : Gaussian Splat means, of shape :math:`(\text{num_guassians, 3})`.
-        scales (torch.FloatTensor) : Gaussian Splat scales, of shape :math:`(\text{num_guassians, 3})`.
-        rots (torch.FloatTensor) : Gaussian Splat rots, of shape :math:`(\text{num_guaasians, 4})`.
-        opacities (torch.FloatTensor) : Gaussian Splat opacities, of shape :math:`(\text{num_guassians})`.
+        xyz (torch.FloatTensor) : Gaussian Splat means, of shape :math:`(\text{num_gaussians, 3})`.
+        scales (torch.FloatTensor) : Gaussian Splat scales, of shape :math:`(\text{num_gaussians, 3})`.
+        rots (torch.FloatTensor) : Gaussian Splat rots, of shape :math:`(\text{num_gaussians, 4})`.
+        opacities (torch.FloatTensor) : Gaussian Splat opacities, of shape :math:`(\text{num_gaussians})`.
         opacity_threshold (float): Threshold to cull away voxelized cells with low accumulated opacity.
         gs_level (int): The level of the interal octree created.
         query_level (int): The level of the uniform sample grid.
