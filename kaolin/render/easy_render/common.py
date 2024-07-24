@@ -20,6 +20,8 @@ from kaolin.render.camera import Camera
 from kaolin.render.lighting import SgLightingParameters, sg_direction_from_azimuth_elevation
 from kaolin.render.materials import PBRMaterial
 
+__all__ = ['default_lighting', 'default_camera', 'default_material']
+
 
 def default_lighting():
     """ Returns default lighting, represented as Spherical Gaussians.

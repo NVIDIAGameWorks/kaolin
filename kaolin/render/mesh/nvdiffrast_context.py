@@ -42,6 +42,7 @@ def nvdiffrast_is_available():
 
 def nvdiffrast_use_cuda():
     """ Configures nvdiffrast back end to use `nvdiffrast.torch.RasterizeCudaContext` by default."""
+    global _default_context_fn
     if nvdiffrast_is_available():
         _default_context_fn = nvdiff.RasterizeCudaContext
     else:
@@ -50,6 +51,7 @@ def nvdiffrast_use_cuda():
 
 def nvdiffrast_use_opengl():
     """ Configures nvdiffrast back end to use `nvdiffrast.torch.RasterizeGLContext` by default."""
+    global _default_context_fn
     if nvdiffrast_is_available():
         _default_context_fn = partial(nvdiff.RasterizeGLContext, output_db=False)
     else:

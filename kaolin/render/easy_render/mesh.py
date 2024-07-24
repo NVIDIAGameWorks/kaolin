@@ -28,6 +28,10 @@ if nvdiffrast_is_available():
     import nvdiffrast.torch
 
 
+__all__ = ['render_mesh', 'mesh_rasterize_interpolate_cuda', 'mesh_rasterize_interpolate_nvdiffrast',
+           'texture_sample_materials', 'sg_shade', 'RenderPass']
+
+
 class RenderPass(str, Enum):
     # TODO: add normals relative to camera, mask, anti-aliasing, depth, wireframe
     face_idx = "face_idx"
