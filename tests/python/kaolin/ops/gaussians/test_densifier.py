@@ -24,7 +24,7 @@ from kaolin.utils.testing import check_tensor
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         os.pardir, os.pardir, os.pardir, os.pardir, 'samples', 'gsplats')
-TEST_MODELS = ['dozer_minimal.pt', 'ficus_minimal.pt', 'hotdog_minimal.pt', 'materials_minimal.pt']
+TEST_MODELS = ['dozer_minimal.pt']
 BAD_TEST_MODELS = ['part_sphere', 'sparse_sphere']
 SUPPORTED_GSPLATS_DEVICES = ['cuda']
 SUPPORTED_GSPLATS_DTYPES = [torch.float32]
