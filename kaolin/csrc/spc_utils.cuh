@@ -16,10 +16,6 @@
 #ifndef KAOLIN_SPC_UTILS_CUH_
 #define KAOLIN_SPC_UTILS_CUH_
 
-#define CUB_NS_PREFIX namespace kaolin {
-#define CUB_NS_POSTFIX }
-#define CUB_NS_QUALIFIER ::kaolin::cub
-
 #include <cub/device/device_scan.cuh>
 #include "spc_math.h"
 
