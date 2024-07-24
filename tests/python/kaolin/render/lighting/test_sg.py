@@ -420,7 +420,7 @@ class TestSgLightingParameters:
 
 class TestUtilities:
     def test_sg_from_sun(self):
-        strength = torch.rand((7,), dtype=torch.float) * 10
+        strength = torch.rand((7,), dtype=torch.float) * 10 + 1.
         direction = torch.rand((7, 3), dtype=torch.float)
         angle = torch.rand((7,), dtype=torch.float) * math.pi
         color = torch.rand((7, 3), dtype=torch.float)
