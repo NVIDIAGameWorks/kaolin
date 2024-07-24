@@ -16,8 +16,8 @@
 #ifndef KAOLIN_CHECK_H_
 #define KAOLIN_CHECK_H_
 
-#include <ATen/native/TypeProperties.h>
-#include <ATen/TensorGeometry.h>
+//#include <ATen/native/TypeProperties.h>
+//#include <ATen/TensorGeometry.h>
 
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x " must be a CUDA tensor")
 #define CHECK_CPU(x) TORCH_CHECK(x.device().is_cpu(), #x " must be a cpu tensor")
