@@ -25,7 +25,7 @@ namespace kaolin {
 using namespace std;
 using namespace at::indexing;
 
-// #ifdef WITH_CUDA
+#ifdef WITH_CUDA
 
 ulong GetTempSize(void* d_temp_storage, uint* d_M0, uint* d_M1, uint max_total_points);
 
@@ -36,9 +36,11 @@ void BuildMip2D_cuda(float* img, uint width, uint miplevels, uint hw,
 void Subdivide_cuda(uint num, point_data* points, uint* insum, point_data* new_points, uint* nvsum);
 void Compactify_cuda(uint num, point_data* points, uint* insum, point_data* new_points, int64_t* out_nvsum);
 
+#endif // WITH_CUDA
 
 at::Tensor inclusive_sum(at::Tensor Inputs)
 {
+#ifdef WITH_CUDA
   uint num = Inputs.size(0);
 
   at::Tensor Outputs = at::zeros_like(Inputs);
@@ -56,10 +58,14 @@ at::Tensor inclusive_sum(at::Tensor Inputs)
   InclusiveSum_cuda(num, inputs, outputs, d_temp_storage, temp_storage_bytes);
 
   return Outputs;
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 at::Tensor build_mip2d(at::Tensor image, at::Tensor In, int mip_levels, float maxdepth, bool true_depth)
 {
+#ifdef WITH_CUDA
   int h = image.size(0);
   int w = image.size(1);
 
@@ -82,10 +88,14 @@ at::Tensor build_mip2d(at::Tensor image, at::Tensor In, int mip_levels, float ma
   BuildMip2D_cuda(img, w, mip_levels, h0*w0, fx, fy, cx, cy, mip, maxdepth, true_depth);
 
   return mipmap;
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 std::vector<at::Tensor> subdivide(at::Tensor Points, at::Tensor Insum)
 {
+#ifdef WITH_CUDA
   uint num = Points.size(0);
   uint pass = Insum[-1].item<int>();
 
@@ -101,11 +111,15 @@ std::vector<at::Tensor> subdivide(at::Tensor Points, at::Tensor Insum)
   Subdivide_cuda(num, points, insum, new_points, nvsum);
 
   return { NewPoints, NVSum };
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 
 std::vector<at::Tensor> compactify(at::Tensor Points, at::Tensor Insum)
 {
+#ifdef WITH_CUDA
   uint num = Points.size(0);
   uint pass = Insum[-1].item<int>();
 
@@ -121,6 +135,9 @@ std::vector<at::Tensor> compactify(at::Tensor Points, at::Tensor Insum)
   Compactify_cuda(num, points, insum, new_points, nvsum);
 
   return { NewPoints, NVSum };
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 }  // namespace kaolin

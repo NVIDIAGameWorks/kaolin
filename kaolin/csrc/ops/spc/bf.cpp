@@ -26,6 +26,8 @@ namespace kaolin {
 using namespace std;
 using namespace at::indexing;
 
+#ifdef WITH_CUDA
+
 void CompactifyNodes_cuda(
   uint32_t num_nodes, 
   uint32_t* d_insum, 
@@ -145,8 +147,11 @@ void BQTouch_cuda(
   uint32_t* occ,
   uint32_t* estate);
 
+#endif // WITH_CUDA
+
 cudaArray* SetupProfileCurve(cudaTextureObject_t* ProfileCurve)
 {
+#ifdef WITH_CUDA
   uint32_t num = 9;
  
   uint32_t BPSVals[] = {	
@@ -182,10 +187,14 @@ cudaArray* SetupProfileCurve(cudaTextureObject_t* ProfileCurve)
   cudaCreateTextureObject(ProfileCurve, &resDescr, &texDescr, NULL);
 
   return cuArray;
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 std::vector<at::Tensor> compactify_nodes(uint32_t num_nodes, at::Tensor insum, at::Tensor occ_ptr, at::Tensor emp_ptr)
 {
+#ifdef WITH_CUDA
   uint32_t pass = insum[-1].item<int32_t>();
 
   at::Tensor octree = at::zeros({pass}, insum.options().dtype(at::kByte));
@@ -201,6 +210,9 @@ std::vector<at::Tensor> compactify_nodes(uint32_t num_nodes, at::Tensor insum, a
   CompactifyNodes_cuda(num_nodes, d_insum, d_occ_ptr, d_emp_ptr, d_octree, d_empty);
 
   return { octree, empty };
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 std::vector<at::Tensor>  oracleB(
@@ -212,6 +224,7 @@ std::vector<at::Tensor>  oracleB(
   at::Tensor mipmap,
   int32_t mip_levels)
 {
+#ifdef WITH_CUDA
   uint32_t num = Points.size(0);
 
   int32_t h = dmap.size(0);
@@ -251,6 +264,9 @@ std::vector<at::Tensor>  oracleB(
   }
 
   return {occupancy, empty_state};
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 std::vector<at::Tensor> oracleB_final(
@@ -260,6 +276,7 @@ std::vector<at::Tensor> oracleB_final(
   at::Tensor cam, 
   at::Tensor dmap)
 {
+#ifdef WITH_CUDA
   uint32_t num = points.size(0);
 
   int32_t h = dmap.size(0);
@@ -302,6 +319,9 @@ std::vector<at::Tensor> oracleB_final(
   }
 
   return {occupancy, empty_state, out_probs};
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 std::vector<at::Tensor> process_final_voxels(
@@ -314,7 +334,7 @@ std::vector<at::Tensor> process_final_voxels(
   at::Tensor octree, 
   at::Tensor empty)
   {
- 
+#ifdef WITH_CUDA
     uint32_t* d_state = reinterpret_cast<uint32_t*>(state.data_ptr<int32_t>());
     uint32_t* d_nvsum = reinterpret_cast<uint32_t*>(nvsum.data_ptr<int32_t>());
     uint32_t* d_prev_state = reinterpret_cast<uint32_t*>(prev_state.data_ptr<int32_t>());
@@ -329,6 +349,9 @@ std::vector<at::Tensor> process_final_voxels(
     ProcessFinalVoxels_cuda(num_nodes, d_state, d_nvsum, d_occup, d_prev_state, d_octree, d_empty);
 
     return {octree, empty, occup};
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
   }
 
 std::vector<at::Tensor> colorsB_final(
@@ -340,6 +363,7 @@ std::vector<at::Tensor> colorsB_final(
   at::Tensor dmap,
   at::Tensor probs)
 {
+#ifdef WITH_CUDA
   uint32_t num = points.size(0);
 
   int32_t h = dmap.size(0);
@@ -376,6 +400,9 @@ std::vector<at::Tensor> colorsB_final(
   cudaFreeArray(cuArray);
 
   return {out_colors, out_normals};
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 std::vector<at::Tensor> merge_empty(
@@ -390,6 +417,7 @@ std::vector<at::Tensor> merge_empty(
   at::Tensor exsum0,
   at::Tensor exsum1)
 {
+#ifdef WITH_CUDA
   uint32_t num = points.size(0);
 
   at::Tensor occupancy = at::zeros({num}, points.options().dtype(at::kInt));
@@ -415,6 +443,9 @@ std::vector<at::Tensor> merge_empty(
   MergeEmpty_cuda(num, d_points, level, d_octree0, d_octree1, d_empty0, d_empty1, d_exsum0, d_exsum1, occ, estate);
 
   return { occupancy, empty_state };
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 std::vector<at::Tensor> bq_merge(
@@ -435,6 +466,7 @@ std::vector<at::Tensor> bq_merge(
   at::Tensor exsum0,
   at::Tensor exsum1)
 {
+#ifdef WITH_CUDA
   uint32_t num = points.size(0);
 
   at::Tensor occupancy = at::zeros({num}, points.options().dtype(at::kInt));
@@ -476,6 +508,9 @@ std::vector<at::Tensor> bq_merge(
   d_normals0, d_normals1, d_exsum0, d_exsum1, offset0, offset1, occ, estate, d_out_probs, d_out_colors);
 
   return { occupancy, empty_state, out_probs, out_colors, out_normals };
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 std::vector<at::Tensor> bq_extract(
@@ -487,6 +522,7 @@ std::vector<at::Tensor> bq_extract(
   at::Tensor pyramid,
   at::Tensor exsum)
   {
+#ifdef WITH_CUDA
   uint32_t num = points.size(0);
 
   at::Tensor occupancy = at::zeros({num}, points.options().dtype(at::kInt));
@@ -507,6 +543,9 @@ std::vector<at::Tensor> bq_extract(
   BQExtract_cuda(num, d_points, level, d_octree, d_empty, d_probs, d_exsum, offset, occ, estate);
 
   return { occupancy, empty_state };
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 std::vector<at::Tensor> bq_touch(
@@ -516,6 +555,7 @@ std::vector<at::Tensor> bq_touch(
   at::Tensor empty,
   at::Tensor pyramid)
 {
+#ifdef WITH_CUDA
   TORCH_CHECK(level > 0, "touch level too low");
 
   auto pyramid_a = pyramid.accessor<int32_t, 3>();
@@ -534,6 +574,9 @@ std::vector<at::Tensor> bq_touch(
   BQTouch_cuda(num, d_octree+offset, d_empty+offset, occ, estate);
 
   return { occupancy, empty_state };
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 void bq_touch_extract(
@@ -542,11 +585,15 @@ void bq_touch_extract(
   at::Tensor nvsum, 
   at::Tensor prev_state)
 {
+#ifdef WITH_CUDA
   uint32_t* d_state = reinterpret_cast<uint32_t*>(state.data_ptr<int32_t>());
   uint32_t* d_nvsum = reinterpret_cast<uint32_t*>(nvsum.data_ptr<int32_t>());
   uint32_t* d_prev_state = reinterpret_cast<uint32_t*>(prev_state.data_ptr<int32_t>());
 
   TouchExtract_cuda(num_nodes, d_state, d_nvsum, d_prev_state);
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
 }
 
 }  // namespace kaolin
