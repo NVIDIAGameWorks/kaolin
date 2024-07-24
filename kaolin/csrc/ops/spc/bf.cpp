@@ -22,7 +22,9 @@
 #endif
 
 #include "../../check.h"
+#ifdef WITH_CUDA
 #include "../../spc_math.h"
+#endif
 
 namespace kaolin {
 
