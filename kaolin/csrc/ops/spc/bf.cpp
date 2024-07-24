@@ -15,9 +15,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <ATen/ATen.h>
-#include <vector_types.h>
 #include <iostream>
+#include <ATen/ATen.h>
+#ifdef WITH_CUDA
+#include <vector_types.h>
+#endif
 
 #include "../../check.h"
 #include "../../spc_math.h"
