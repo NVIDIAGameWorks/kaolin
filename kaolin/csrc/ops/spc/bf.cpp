@@ -150,11 +150,8 @@ void BQTouch_cuda(
   uint32_t* occ,
   uint32_t* estate);
 
-#endif // WITH_CUDA
-
 cudaArray* SetupProfileCurve(cudaTextureObject_t* ProfileCurve)
 {
-#ifdef WITH_CUDA
   uint32_t num = 9;
  
   uint32_t BPSVals[] = {	
@@ -190,10 +187,9 @@ cudaArray* SetupProfileCurve(cudaTextureObject_t* ProfileCurve)
   cudaCreateTextureObject(ProfileCurve, &resDescr, &texDescr, NULL);
 
   return cuArray;
-#else
-  KAOLIN_NO_CUDA_ERROR(__func__);
-#endif  // WITH_CUDA
 }
+
+#endif // WITH_CUDA
 
 std::vector<at::Tensor> compactify_nodes(uint32_t num_nodes, at::Tensor insum, at::Tensor occ_ptr, at::Tensor emp_ptr)
 {
