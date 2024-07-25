@@ -154,7 +154,6 @@ def ubuntu_for_cuda_wheels_configs = [
 ]
 
 def ubuntu_for_cpu_wheels_configs = [
-/*
     [
         'torchVer': '2.0.0'
     ],
@@ -185,7 +184,6 @@ def ubuntu_for_cpu_wheels_configs = [
     [
         'torchVer': '2.4.0'
     ]
-*/
 ]
 
 def windows_for_cuda_wheels_configs = [
@@ -266,7 +264,6 @@ def windows_for_cuda_wheels_configs = [
         'cudaVer': '11.8', 'cudnnVer': '8',
         'torchVer': '2.4.0', 'archsToTest': ''
     ],
-*/
     [
         'cudaVer': '12.1', 'cudnnVer': '8',
         'torchVer': '2.4.0', 'archsToTest': ''
@@ -275,6 +272,7 @@ def windows_for_cuda_wheels_configs = [
         'cudaVer': '12.4', 'cudnnVer': '',
         'torchVer': '2.4.0', 'archsToTest': ''
     ]
+*/
 ]
 
 def windows_for_cpu_wheels_configs = [
@@ -306,10 +304,10 @@ def windows_for_cpu_wheels_configs = [
     [
         'torchVer': '2.3.1', 'archsToTest': ''
     ]
-*/
     [
         'torchVer': '2.4.0', 'archsToTest': ''
     ]
+*/
 ]
 // Configs for build from Windows server docker images
 // (See: https://hub.docker.com/_/microsoft-dotnet-framework-sdk)
