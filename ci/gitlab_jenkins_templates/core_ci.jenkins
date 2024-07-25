@@ -180,7 +180,7 @@ def ubuntu_for_cpu_wheels_configs = [
     ],
     [
         'torchVer': '2.3.1'
-    ]
+    ],
     [
         'torchVer': '2.4.0'
     ]
