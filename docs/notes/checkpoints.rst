@@ -7,7 +7,9 @@
 
 Visualizing 3D inputs and outputs of your model during training is an
 essential diagnostic tool. Kaolin provides a :ref:`simple API to checkpoint<writing checkpoints>` **batches of meshes, pointclouds and voxelgrids**, as well as **colors and
-textures**, saving them in :ref:`the USD format<file format>`. These checkpoints can then be visualized locally using :ref:`Kaolin Omniverse App<ov app>` or by launching :ref:`Kaolin Dash3D<dash 3d>` on the commandline, allowing remote visualization through a web browser.
+textures**, saving them in :ref:`the USD format<file format>`, which is efficient at storing time-varying 3D assets, as constant attributes do not need to be
+replicated in time (e.g. if mesh topology is fixed, face attribute would only be saved once).
+These checkpoints can then be visualized locally using any USD Viewer or (with fewer features) by launching :ref:`Kaolin Dash3D<dash 3d>` on the commandline, allowing remote visualization through a web browser.
 
 .. _writing checkpoints:
 
@@ -59,9 +61,9 @@ Saving Colors and Appearance
 
 We are working on adding support for colors and semantic ids to
 point cloud and voxel grid checkpoints. Mesh API supports multiple time-varying materials
-by specifying a :class:`kaolin.io.PBRMaterial`. For an example
+by specifying a :class:`kaolin.render.materials.PBRMaterial`. For an example
 of using materials, see
-`test_timelapse.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/tests/python/kaolin/visualize/test_timelapse.py>`_. 
+`test_timelapse.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/tests/python/kaolin/visualize/test_timelapse.py>`_.
 
 Sample Code
 ^^^^^^^^^^^
@@ -108,17 +110,6 @@ using the tools below.
 .. Caution::
     Timelapse is designed to only save one visualization batch for every category and type. Saving multiple batches without interleaving the data can be accomplished by creating custom categories.
 
-.. _ov app:
-
-Visualizing with Kaolin Omniverse App:
---------------------------------------
-
-.. image:: ../img/ov_viz.jpg
-
-USD checkpoints can be visualized using a dedicated Omniverse Kaolin App `Training Visualizer <https://docs.omniverse.nvidia.com/app_kaolin/app_kaolin/user_manual.html#training-visualizer>`_.
-This extension provides full-featured support and high-fidelity rendering
-of all data types and materials that can be exported using :class:`~kaolin.visualize.Timelapse`, and allows creating custom visualization layouts and viewing meshes in multiple time-varying materials. `Download NVIDIA Omniverse <https://www.nvidia.com/en-us/omniverse/>`_ to get started!
-
 .. _dash 3d:
 
 Visualizing with Kaolin Dash3D:
@@ -126,11 +117,11 @@ Visualizing with Kaolin Dash3D:
 
 .. image:: ../img/dash3d_viz.jpg
 
-Omniverse app requires local access to a GPU and to the saved checkpoints, which is not always possible.
+Viewing USD files locally requires local access to a GPU and to the saved checkpoints, which is not always possible.
 We are also developing a lightweight ``kaolin-dash3d`` visualizer,
 which allows visualizing local and remote checkpoints without specialized
-hardware or applications. This tool is bundled with the latest
-builds as a command-line utility
+hardware or applications. This tool is bundled with Kaolin
+as a command-line utility.
 
 To start Dash3D on the machine that stores the checkpoints, run::
 
@@ -146,4 +137,4 @@ See Dash3D in action by running it on our test samples and visiting `localhost:8
 
     kaolin-dash3d --logdir=$KAOLIN_ROOT/tests/samples/timelapse/notexture/ --port=8080
 
-.. Caution:: Dash3d is still an experimental feature under active development. It only supports **triangle meshes** and **pointclouds** and cannot yet visualize colors, ids or textures. The web client was tested the most on `Google Chrome <https://www.google.com/chrome/>`_. We welcome your early feedback on our `github <https://github.com/NVIDIAGameWorks/kaolin/issues>`_!
+.. Caution:: Dash3d is an experimental feature. It only supports **triangle meshes** and **pointclouds** and cannot visualize colors, ids or textures. The web client was tested the most on `Google Chrome <https://www.google.com/chrome/>`_.
