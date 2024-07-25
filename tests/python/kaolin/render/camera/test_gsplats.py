@@ -30,7 +30,7 @@ from kaolin.render.camera import kaolin_camera_to_gsplats, gsplats_camera_to_kao
 if torch.version.cuda == '12.5':
     pytest.skip("gsplats is not installable with CUDA 12.5", allow_module_level=True)
 
-ROOT_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'gsplats')
+ROOT_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'inria_gsplats')
 @pytest.fixture(scope="module")
 def gs_cam_cls():
     repo = Repo.clone_from(
@@ -47,7 +47,7 @@ def gs_cam_cls():
         sys.executable, "-m", "pip", "install",
         os.path.join(ROOT_DIR, "submodules", "simple-knn")
     ])
-    from .gsplats.scene.cameras import Camera as GSCamera
+    from scene.cameras import Camera as GSCamera
     
     yield GSCamera
     sys.path.remove(ROOT_DIR)

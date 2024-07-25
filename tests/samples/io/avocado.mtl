@@ -1,1 +1,14 @@
-../../../sample_data/meshes/avocado.mtl
+# Blender MTL File: 'None'
+# Material Count: 1
+
+newmtl 2256_Avocado_d
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Bump textures/Avocado_normal.png
+map_Kd textures/Avocado_baseColor.png
+map_Ns -imfchan g textures/Avocado_roughnessMetallic.png
+map_refl -imfchan b textures/Avocado_roughnessMetallic.png
