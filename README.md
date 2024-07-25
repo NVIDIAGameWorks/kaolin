@@ -27,8 +27,6 @@ In this version we added a [Physics section](https://kaolin.readthedocs.io/en/la
 
 In this new section we implemented [Simplicits](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.html) a geometry-agnostic method for elastic simulation. See more information in [the project page](https://research.nvidia.com/labs/toronto-ai/simplicits/).
 
-<a href="TODO"><img src="./assets/simplicit.png" alt="Simplicit" height="250" /></a>
-
 We've also added a [math section](https://kaolin.readthedocs.io/en/latest/modules/kaolin.math.html) with quaternions math features.
 
 Finally we've improved workflow, with an [easy rendering API](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.easy_render.html), for quickly visualizing a model.
