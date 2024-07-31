@@ -73,9 +73,9 @@ spec:
       if (currentBuild.getCurrentResult() != "FAILURE") {
         stage("Push wheels on volume") {
           powershell '''
-          $env:folderName = torch-"$env:torchVer"_cu"$env:cudaTag"
           New-Item -Path /mnt/whl/"$env:folderName"/ -ItemType "directory" -Force
           cp /kaolin/kaolin-*.whl /mnt/whl/"$env:folderName"/
+          Get-ChildItem -Recurse -Depth 2 '/mnt/whl/'
           '''
           
         }
