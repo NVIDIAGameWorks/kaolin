@@ -206,71 +206,71 @@ def windows_for_cuda_wheels_configs = [
         'cudaVer': '11.8', 'cudnnVer': '8',
         'torchVer': '2.0.1', 'archsToTest': ''
     ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.1.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.1.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.1.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.1.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.1.2', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.1.2', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.2.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.2.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.2.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.2.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.3.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.3.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.3.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.3.1', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '11.8', 'cudnnVer': '8',
+        'torchVer': '2.4.0', 'archsToTest': ''
+    ],
+    [
+        'cudaVer': '12.1', 'cudnnVer': '8',
+        'torchVer': '2.4.0', 'archsToTest': ''
+    ],
 */
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.1.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.1.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.1.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.1.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.1.2', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.1.2', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.2.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.2.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.2.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.2.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.3.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.3.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.3.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.3.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.4.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.4.0', 'archsToTest': ''
-    ],
     [
         'cudaVer': '12.4', 'cudnnVer': '',
         'torchVer': '2.4.0', 'archsToTest': ''
