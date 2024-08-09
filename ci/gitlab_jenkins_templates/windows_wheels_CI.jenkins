@@ -74,9 +74,8 @@ spec:
         stage("Push wheels on volume") {
           powershell '''
           New-Item -Path /mnt/whl/"$env:folderName"/ -ItemType "directory" -Force
-          '''
-          powershell '''
           cp /kaolin/kaolin-*.whl /mnt/whl/"$env:folderName"/
+          Get-ChildItem -Recurse -Depth 2 '/mnt/whl/'
           '''
           
         }

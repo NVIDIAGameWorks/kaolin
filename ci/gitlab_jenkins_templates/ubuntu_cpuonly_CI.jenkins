@@ -12,6 +12,10 @@ yaml:'''
 apiVersion: v1
 kind: Pod
 spec:
+  volumes:
+  - name: pvc-mount
+    persistentVolumeClaim:
+      claimName: 'kaolin-pvc'
   containers:
   - name: docker
     image: docker:20.10.23
@@ -19,6 +23,9 @@ spec:
     - sleep
     args:
     - 1d
+    volumeMounts:
+      - mountPath: /mnt
+        name: pvc-mount
     env:
       - name: DOCKER_HOST
         value: tcp://localhost:2375
@@ -103,8 +110,8 @@ spec:
           }
           stage("Push wheel to volume") {
           sh """
-            mkdir -p /mount_binaries/whl/torch-${torchVer}_cpu
-            cp ./${wheelName} /mount_binaries/whl/torch-${torchVer}_cpu/${wheelName}
+            mkdir -p /mnt/whl/torch-${torchVer}_cpu
+            cp ./${wheelName} /mnt/whl/torch-${torchVer}_cpu/${wheelName}
             """
           }
           stage("Push wheel to artifact") {
