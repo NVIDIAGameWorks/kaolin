@@ -69,11 +69,11 @@ def ubuntu_cpuonly_configs = [
 
 // Configs for building python wheels
 def ubuntu_for_cuda_wheels_configs = [
+/*
     [
         'cudaVer': '11.7.1', 'cudnnVer': '8',
         'torchVer': '2.0.0', 'archsToTest': 'MULTI',
     ],
-/*
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
         'torchVer': '2.0.0', 'archsToTest': 'MULTI'
@@ -150,11 +150,11 @@ def ubuntu_for_cuda_wheels_configs = [
         'cudaVer': '12.1.0', 'cudnnVer': '8',
         'torchVer': '2.4.0', 'archsToTest': 'MULTI'
     ],
+*/
     [
         'cudaVer': '12.4.1', 'cudnnVer': '',
         'torchVer': '2.4.0', 'archsToTest': 'MULTI'
     ]
-*/
 ]
 
 def ubuntu_for_cpu_wheels_configs = [
