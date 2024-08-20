@@ -31,6 +31,8 @@ if torch.version.cuda == '12.5':
     pytest.skip("gsplats is not installable with CUDA 12.5", allow_module_level=True)
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'inria_gsplats')
+
+
 @pytest.fixture(scope="module")
 def gs_cam_cls():
     repo = Repo.clone_from(
@@ -38,6 +40,9 @@ def gs_cam_cls():
         multi_options=['--recursive'],
         to_path=ROOT_DIR
     )
+    # Checks out previous commit (before cv2 dependency)
+    repo.git.checkout("472689c")
+
     sys.path.append(ROOT_DIR)
     subprocess.check_call([
         sys.executable, "-m", "pip", "install",
@@ -48,12 +53,11 @@ def gs_cam_cls():
         os.path.join(ROOT_DIR, "submodules", "simple-knn")
     ])
     from scene.cameras import Camera as GSCamera
-    
+
     yield GSCamera
     sys.path.remove(ROOT_DIR)
     shutil.rmtree(ROOT_DIR)
 
-    
 
 class TestGsplats:
     def test_cycle(self, gs_cam_cls):
@@ -67,20 +71,20 @@ class TestGsplats:
         gs_cam = kaolin_camera_to_gsplats(kal_cam, gs_cam_cls)
         out_cam = gsplats_camera_to_kaolin(gs_cam)
         assert torch.allclose(out_cam, kal_cam)
-    
+
     def test_kaolin_to_gsplats_regression(self, gs_cam_cls):
         kal_cam = Camera.from_args(
-            eye=torch.tensor([1., 2., 3.]), 
+            eye=torch.tensor([1., 2., 3.]),
             at=torch.tensor([0.3, 0.1, 0.2]),
             up=torch.tensor([0., 1., 0.]),
             fov=math.pi / 4,
             width=512, height=512,
         )
         gs_cam = kaolin_camera_to_gsplats(kal_cam, gs_cam_cls)
-        expected_R = np.array([[ 0.9701425,   0.13336042, -0.20257968],
-                               [ 0.,         -0.83525735, -0.5498591 ],
-                               [-0.24253562,  0.53344166, -0.8103187 ]])
-        expected_T = np.array([-0.24253559, -0.06317067,  3.733254  ])
+        expected_R = np.array([[0.9701425, 0.13336042, -0.20257968],
+                               [0., -0.83525735, -0.5498591],
+                               [-0.24253562, 0.53344166, -0.8103187]])
+        expected_T = np.array([-0.24253559, -0.06317067, 3.733254])
         expected_fovx = torch.tensor([0.7854])
         expected_fovy = torch.tensor([0.7854])
         assert np.allclose(expected_R, gs_cam.R)

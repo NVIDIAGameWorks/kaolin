@@ -19,9 +19,10 @@ __all__ = [
     'make_spd',
 ]
 
+
 def make_spd(H):
     r"""Makes a matrix symmetric positive definite. This tends to help with invertibility of the elastic energy's hessian matrix.
-        
+
     Args:
         H (torch.Tensor): Hessian matrix that is not SPD
 
@@ -29,5 +30,5 @@ def make_spd(H):
         torch.Tensor: Modified hessian matrix now SPD
     """
     L, V = torch.linalg.eigh(H)
-    L[L<0] = torch.abs(L[L<0])
-    return torch.bmm(V, torch.bmm(torch.diag_embed(L, dim1=-2, dim2=-1), torch.transpose(V, 1,2))) 
+    L[L < 0] = torch.abs(L[L < 0])
+    return torch.bmm(V, torch.bmm(torch.diag_embed(L, dim1=-2, dim2=-1), torch.transpose(V, 1, 2)))

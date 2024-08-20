@@ -19,6 +19,7 @@ __all__ = [
     'finite_diff_jac',
 ]
 
+
 def finite_diff_jac(fcn, x, eps=1e-7):
     r"""Computes the jacobian :math:`\frac{\partial fcn}{\partial x}` using finite diff 
 
@@ -40,6 +41,6 @@ def finite_diff_jac(fcn, x, eps=1e-7):
     jacobian = fcn(finite_diff_bounds)
     jacobian = jacobian.reshape(2, 3, -1, *jacobian.shape[1:])
     jacobian = jacobian[0] - jacobian[1]
-    jacobian = jacobian.permute(*range(1, jacobian.dim()), 0) # Move dim0 to the end, i.e: permute(1, 2, 3, 4, 0)
+    jacobian = jacobian.permute(*range(1, jacobian.dim()), 0)  # Move dim0 to the end, i.e: permute(1, 2, 3, 4, 0)
     jacobian /= (2.0 * delta)
     return jacobian

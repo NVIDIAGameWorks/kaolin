@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch 
+import torch
 import torch.nn as nn
 from functools import partial
 import kaolin.physics.materials.utils as material_utils
@@ -27,6 +27,7 @@ __all__ = [
     'loss_elastic',
 ]
 
+
 def loss_ortho(weights):
     r"""Calculate orthogonality of weights
 
@@ -38,7 +39,8 @@ def loss_ortho(weights):
     """
     return nn.MSELoss()(weights.T @ weights, torch.eye(weights.shape[1], device=weights.device))
 
-def loss_elastic(model, pts, yms, prs,  rhos, transforms, appx_vol, interp_step):
+
+def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step):
     r"""Calculate a version of simplicits elastic loss for training.
 
     Args:
@@ -56,21 +58,21 @@ def loss_elastic(model, pts, yms, prs,  rhos, transforms, appx_vol, interp_step)
     """
 
     mus, lams = material_utils.to_lame(yms, prs)
-    
-    partial_weight_fcn_lbs = partial(weight_function_lbs,  tfms = transforms, fcn = model)
+
+    partial_weight_fcn_lbs = partial(weight_function_lbs, tfms=transforms, fcn=model)
     pt_wise_Fs = finite_diff_jac(partial_weight_fcn_lbs, pts)
-    pt_wise_Fs = pt_wise_Fs[:,:,0]
-    
+    pt_wise_Fs = pt_wise_Fs[:, :, 0]
+
     # shape (N, B, 3, 3)
-    N,B = pt_wise_Fs.shape[0:2]
-    
+    N, B = pt_wise_Fs.shape[0:2]
+
     # shape (N, B, 1)
     mus = mus.expand(N, B).unsqueeze(-1)
     lams = lams.expand(N, B).unsqueeze(-1)
-    
+
     # ramps up from 100% linear elasticity to 100% neohookean elasticity
-    lin_elastic = (1-interp_step) * linear_elastic_material.linear_elastic_energy(mus, lams, pt_wise_Fs)
+    lin_elastic = (1 - interp_step) * linear_elastic_material.linear_elastic_energy(mus, lams, pt_wise_Fs)
     neo_elastic = (interp_step) * neohookean_elastic_material.neohookean_energy(mus, lams, pt_wise_Fs)
 
     # weighted average (since we uniformly sample, this is uniform for now)
-    return (appx_vol/pts.shape[0])*(torch.sum(lin_elastic + neo_elastic))
+    return (appx_vol / pts.shape[0]) * (torch.sum(lin_elastic + neo_elastic))

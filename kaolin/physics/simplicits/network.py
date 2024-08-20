@@ -13,12 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch 
+import torch
 import torch.nn as nn
 
 __all__ = [
     'SimplicitsMLP',
 ]
+
+
 class SimplicitsMLP(nn.Module):
     r"""This implements an MLP with ELU activations
 
@@ -27,11 +29,12 @@ class SimplicitsMLP(nn.Module):
           layer_width (int): layer width
           num_handles (int): number of handles
           num_layers (int): number of layers in MLP
-    
+
     """
+
     def __init__(self, spatial_dimensions, layer_width, num_handles, num_layers):
         super(SimplicitsMLP, self).__init__()
-        
+
         layers = []
         layers.append(nn.Linear(spatial_dimensions, layer_width))
         layers.append(nn.ELU())
@@ -39,14 +42,14 @@ class SimplicitsMLP(nn.Module):
         for n in range(0, num_layers):
             layers.append(nn.Linear(layer_width, layer_width))
             layers.append(nn.ELU())
-        
+
         layers.append(nn.Linear(layer_width, num_handles))
 
         self.linear_elu_stack = nn.Sequential(*layers)
 
     def forward(self, x):
         r""" Calls the network
-        
+
             Args:
                 x (torch.Tensor): Tensor of spatial points in R^dim, of shape :math:`(\text{batch_dim}, \text{dim})`
 
@@ -56,4 +59,3 @@ class SimplicitsMLP(nn.Module):
         """
         output = self.linear_elu_stack(x)
         return output
-    
