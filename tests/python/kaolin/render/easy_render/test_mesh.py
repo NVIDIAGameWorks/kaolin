@@ -130,7 +130,7 @@ class TestEasyRender:
         if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0' and backend == 'nvdiffrast':
             pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
 
-        camera = easy_render.default_camera(150).cuda()
+        camera = easy_render.default_camera(144).cuda()
 
         # full render
         mesh = import_mesh(render_data_path(f'{bname}.usd'), triangulate=True).cuda()
