@@ -36,6 +36,7 @@ _misc_attributes = [
     'specular_colorspace',
     'normals_colorspace',
     'displacement_colorspace',
+    'transmittance_colorspace',
     'is_specular_workflow'
 ]
 
@@ -50,6 +51,7 @@ _value_attributes = [
     'ior_value',
     'specular_color',
     'displacement_value',
+    'transmittance_value'
 ]
 
 _texture_attributes = [
@@ -62,7 +64,8 @@ _texture_attributes = [
     'ior_texture',
     'specular_texture',
     'normals_texture',
-    'displacement_texture'
+    'displacement_texture',
+    'transmittance_texture'
 ]
 
 # Seed for texture sampling
