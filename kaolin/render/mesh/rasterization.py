@@ -388,12 +388,17 @@ def rasterize(height,
     `Learning to Predict 3D Objects with an Interpolation-based Differentiable Renderer`_ NeurIPS 2019.
 
     .. note::
-       `nvdiffrast library`_ is relying on OpenGL and so can be faster especially
-       on larger mesh and resolution.
+       `nvdiffrast library`_ is relying on OpenGL or a custom CUDA depending on selected context
+       (see :ref:`nvdiffrast context <kaolin.render.mesh.nvdiffrast_context>`) 
+       and is usually faster especially on larger mesh and resolution.
 
     Args:
-        height (int): the size of rendered images.
-        width (int): the size of rendered images.
+        height (int):
+            The size of rendered images.
+            Should be multiple of 8 with nvdiffrast backend and CUDA context.
+        width (int):
+            the size of rendered images.
+            Should be multiple of 8 with nvdiffrast backend and CUDA context.
         face_vertices_z (torch.FloatTensor):
             3D points depth (z) value of the face vertices in camera coordinate,
             of shape :math:`(\text{batch_size}, \text{num_faces}, 3)`.

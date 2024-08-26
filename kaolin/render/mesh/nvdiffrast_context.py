@@ -25,7 +25,7 @@ _default_context_fn = lambda device: None
 try:
     import nvdiffrast.torch as nvdiff
     _has_nvdiffrast = True
-    _default_context_fn = partial(nvdiff.RasterizeGLContext, output_db=False)  # Faster than CUDA (~2x)
+    _default_context_fn = partial(nvdiff.RasterizeCudaContext)
 except ImportError:
     nvdiff = None
     logger.info("Cannot import nvdiffrast")
@@ -36,24 +36,36 @@ def _log_not_available():
 
 
 def nvdiffrast_is_available():
-    """ Returns True if nvdiffrast is available, False otherwise."""
+    """Returns True if nvdiffrast is available, False otherwise."""
     return _has_nvdiffrast
 
 
 def nvdiffrast_use_cuda():
-    """ Configures nvdiffrast back end to use `nvdiffrast.torch.RasterizeCudaContext` by default."""
+    """ Configures nvdiffrast back end to use `nvdiffrast.torch.RasterizeCudaContext` by default.
+
+    This reset the cached nvdiffrast contexts.
+
+    .. note::
+        nvdiffrast only support a resolution multiple of 8.
+    """
     global _default_context_fn
     if nvdiffrast_is_available():
         _default_context_fn = nvdiff.RasterizeCudaContext
+        _device2glctx.clear()
     else:
         _log_not_available()
 
 
 def nvdiffrast_use_opengl():
-    """ Configures nvdiffrast back end to use `nvdiffrast.torch.RasterizeGLContext` by default."""
+    """ Configures nvdiffrast back end to use `nvdiffrast.torch.RasterizeGLContext` by default.
+
+
+    This reset the cached nvdiffrast contexts.
+    """
     global _default_context_fn
     if nvdiffrast_is_available():
         _default_context_fn = partial(nvdiff.RasterizeGLContext, output_db=False)
+        _device2glctx.clear()
     else:
         _log_not_available()
 

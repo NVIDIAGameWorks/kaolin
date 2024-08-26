@@ -50,7 +50,7 @@ def out_dir():
 
 class TestRenderMeshMain:
     @pytest.mark.parametrize('bname', ['armchair', 'avocado'])
-    @pytest.mark.parametrize('resolution', [512, 300])
+    @pytest.mark.parametrize('resolution', [512, 296])
     @pytest.mark.parametrize('default_material', [None, '255,25,25'])
     def test_runs(self, bname, resolution, default_material, out_dir):
         assert len(os.listdir(out_dir)) == 0, f'Configure test to recreate dir every time'
