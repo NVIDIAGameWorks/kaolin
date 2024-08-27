@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch 
+import torch
 __all__ = [
     'generate_fcn_simplicits_scene_energy',
     'generate_fcn_simplicits_scene_gradient',
@@ -22,6 +22,7 @@ __all__ = [
     'generate_fcn_simplicits_material_gradient',
     'generate_fcn_simplicits_material_hessian'
 ]
+
 
 def generate_fcn_simplicits_scene_energy(wrapper_obj, B, coeff=1, integration_sampling=None):
     r"""Generates a function that calculates simplicits handle-wise energy
@@ -35,7 +36,8 @@ def generate_fcn_simplicits_scene_energy(wrapper_obj, B, coeff=1, integration_sa
     Returns:
         torch.Tensor: Energy, single value tensor
     """
-    return lambda x: coeff*wrapper_obj.energy(x, integration_weights=integration_sampling)
+    return lambda x: coeff * wrapper_obj.energy(x, integration_weights=integration_sampling)
+
 
 def generate_fcn_simplicits_scene_gradient(wrapper_obj, B, coeff=1, integration_sampling=None):
     r"""Generates a function that calculates simplicits handle-wise gradients
@@ -49,7 +51,8 @@ def generate_fcn_simplicits_scene_gradient(wrapper_obj, B, coeff=1, integration_
     Returns:
         torch.Tensor: Gradient vector, of shape :math:`(12*\text{num_handles})`
     """
-    return lambda x: coeff*B.transpose(0,1) @ wrapper_obj.gradient(x, integration_weights=integration_sampling).flatten().unsqueeze(-1)
+    return lambda x: coeff * B.transpose(0, 1) @ wrapper_obj.gradient(x, integration_weights=integration_sampling).flatten().unsqueeze(-1)
+
 
 def generate_fcn_simplicits_scene_hessian(wrapper_obj, B, coeff=1, integration_sampling=None):
     r"""Generates a function that calculates simplicits handle-wise hessian
@@ -63,7 +66,7 @@ def generate_fcn_simplicits_scene_hessian(wrapper_obj, B, coeff=1, integration_s
     Returns:
         torch.Tensor: Hessian matrix, of shape :math:`(12*num_handles, 12*\text{num_handles})`
     """
-    return lambda x: coeff*B.transpose(0,1) @ wrapper_obj.hessian(x, integration_weights=integration_sampling).transpose(1,2).reshape(B.shape[0], B.shape[0]) @ B
+    return lambda x: coeff * B.transpose(0, 1) @ wrapper_obj.hessian(x, integration_weights=integration_sampling).transpose(1, 2).reshape(B.shape[0], B.shape[0]) @ B
 
 
 def generate_fcn_simplicits_material_energy(wrapper_obj, J, coeff=1, integration_sampling=None):
@@ -80,6 +83,7 @@ def generate_fcn_simplicits_material_energy(wrapper_obj, J, coeff=1, integration
     """
     return lambda x: wrapper_obj.energy(x, integration_weights=integration_sampling)
 
+
 def generate_fcn_simplicits_material_gradient(wrapper_obj, J, coeff=1, integration_sampling=None):
     r"""Generates a function that calculates simplicits material handle-wise energy
 
@@ -92,7 +96,8 @@ def generate_fcn_simplicits_material_gradient(wrapper_obj, J, coeff=1, integrati
     Returns:
         torch.Tensor: Gradient vector, of shape :math:`(12*\text{num_handles})`
     """
-    return lambda x: torch.mv(J.transpose(0,1), wrapper_obj.gradient(x, integration_weights=integration_sampling).flatten()).unsqueeze(-1)
+    return lambda x: torch.mv(J.transpose(0, 1), wrapper_obj.gradient(x, integration_weights=integration_sampling).flatten()).unsqueeze(-1)
+
 
 def generate_fcn_simplicits_material_hessian(wrapper_obj, J, coeff=1, integration_sampling=None):
     r"""Generates a function that calculates simplicits material handle-wise energy
@@ -106,5 +111,4 @@ def generate_fcn_simplicits_material_hessian(wrapper_obj, J, coeff=1, integratio
     Returns:
         torch.Tensor: Hessian matrix, of shape :math:`(12*\text{num_handles}, 12*\text{num_handles})`
     """
-    return lambda x: torch.matmul(J.transpose(0,1), torch.bmm(wrapper_obj.hessian(x, integration_weights=integration_sampling).squeeze(), J.reshape(-1,9, J.shape[1])).reshape(-1, J.shape[1]))
-
+    return lambda x: torch.matmul(J.transpose(0, 1), torch.bmm(wrapper_obj.hessian(x, integration_weights=integration_sampling).squeeze(), J.reshape(-1, 9, J.shape[1])).reshape(-1, J.shape[1]))

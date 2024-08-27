@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch 
+import torch
 import torch.nn as nn
 
 from kaolin.physics.simplicits.losses import loss_elastic, loss_ortho
@@ -21,6 +21,7 @@ from kaolin.physics.simplicits.losses import loss_elastic, loss_ortho
 __all__ = [
     'train_step'
 ]
+
 
 def train_step(model, normalized_pts, yms, prs, rhos, en_interp, batch_size, num_handles, appx_vol, num_samples, le_coeff, lo_coeff):
     r""" Perform a step of the simplicits training process
@@ -42,24 +43,27 @@ def train_step(model, normalized_pts, yms, prs, rhos, en_interp, batch_size, num
     Returns:
         torch float, torch float: Returns the elastic and orthogonality losses
     """
-    batch_transforms = 0.1*torch.randn(batch_size, num_handles, 3, 4, dtype=normalized_pts.dtype, device=normalized_pts.device)
-    
+    batch_transforms = 0.1 * torch.randn(batch_size, num_handles, 3, 4,
+                                         dtype=normalized_pts.dtype, device=normalized_pts.device)
+
     # Select num_samples from all points
-    sample_indices = torch.randint(low=0, high=normalized_pts.shape[0], size=(num_samples,), device=normalized_pts.device)
-    
-    sample_pts = normalized_pts[sample_indices] 
+    sample_indices = torch.randint(low=0, high=normalized_pts.shape[0], size=(
+        num_samples,), device=normalized_pts.device)
+
+    sample_pts = normalized_pts[sample_indices]
     sample_yms = yms[sample_indices]
     sample_prs = prs[sample_indices]
     sample_rhos = rhos[sample_indices]
-    
-    #Get current skinning weights at sample pts
+
+    # Get current skinning weights at sample pts
     weights = model(sample_pts)
-    
+
     # Calculate elastic energy for the batch of transforms
     # loss_elastic(model, pts, yms, prs,  rhos, transforms, appx_vol, interp_step)
     # le = torch.tensor(0,device=sample_pts.device, dtype=sample_pts.dtype) #
-    le = le_coeff * loss_elastic(model, sample_pts, sample_yms, sample_prs, sample_rhos, batch_transforms, appx_vol, en_interp)
+    le = le_coeff * loss_elastic(model, sample_pts, sample_yms, sample_prs,
+                                 sample_rhos, batch_transforms, appx_vol, en_interp)
     # Calculate orthogonality of skinning weights
     lo = lo_coeff * loss_ortho(weights)
-    
+
     return le, lo

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch 
+import torch
 import logging
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ __all__ = [
     'line_search_1',
     'newtons_method'
 ]
+
 
 def line_search_0(func, x, direction, gradient, initial_step_size, alpha=1e-3, beta=0.6, max_steps=10):
     r"""Implements the simplest backtracking line search with the sufficient decrease Armijo condition
@@ -41,7 +42,7 @@ def line_search_0(func, x, direction, gradient, initial_step_size, alpha=1e-3, b
     """
     t = initial_step_size  # Initial step size
     f = func(x)
-    gTd = gradient.T@direction
+    gTd = gradient.T @ direction
 
     for __ in range(max_steps):
         x_new = x + t * direction
@@ -53,6 +54,7 @@ def line_search_0(func, x, direction, gradient, initial_step_size, alpha=1e-3, b
             t *= beta  # Reduce the step size
 
     return t  # Return the final step size if max_iters is reached
+
 
 def line_search_1(func, x, direction, gradient, initial_step_size, alpha=1e-3, beta=0.3, max_steps=10):
     r"""Implements a second version of line search where step size can also goes up once and then decrease until it satisfies the sufficient decrease Armijo condition
@@ -72,7 +74,7 @@ def line_search_1(func, x, direction, gradient, initial_step_size, alpha=1e-3, b
     """
     t = initial_step_size  # Initial step size
     f = func(x)
-    gTd = gradient.T@direction
+    gTd = gradient.T @ direction
     can_break = False
     for __ in range(max_steps):
         x_new = x + t * direction
@@ -80,13 +82,14 @@ def line_search_1(func, x, direction, gradient, initial_step_size, alpha=1e-3, b
         if f_new <= f + alpha * t * gTd:
             if (can_break == True):
                 return t
-            else: 
+            else:
                 can_break = True
-                t = t/beta  # Increase the step size
+                t = t / beta  # Increase the step size
         else:
             t *= beta  # Reduce the step size
 
     return t  # Return the final step size if max_iters is reached
+
 
 def newtons_method(x, energy_fcn, gradient_fcn, hessian_fcn, max_iters=10, conv_criteria=1):
     r"""Newtons method
@@ -104,27 +107,28 @@ def newtons_method(x, energy_fcn, gradient_fcn, hessian_fcn, max_iters=10, conv_
     """
     for iter in range(max_iters):
         # zero out the gradients of x
-        if(x.grad is not None):
+        if (x.grad is not None):
             x.grad.zero_()
         newton_E = energy_fcn(x)
-        newton_G = gradient_fcn(x) 
+        newton_G = gradient_fcn(x)
         newton_H = hessian_fcn(x)
 
         with torch.no_grad():
-            newton_G = newton_G 
+            newton_G = newton_G
             newton_H = newton_H
+
             dx = -torch.linalg.solve(newton_H, newton_G)
-            
+
             if conv_criteria == 0:
-                if (torch.norm(newton_G)<1e-3):
+                if (torch.norm(newton_G) < 1e-3):
                     break
             if conv_criteria == 1:
-                if (torch.abs(newton_G.t()@dx)<1e-3):
+                if (torch.abs(newton_G.t() @ dx) < 1e-3):
                     break
-                
+
             last_alpha = 10
             alpha = line_search_1(energy_fcn, x, dx, newton_G, last_alpha)
-            # Update positions 
-            x += alpha*dx
-    
+            # Update positions
+            x += alpha * dx
+
     return x

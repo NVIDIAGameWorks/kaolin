@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch 
+import torch
 
 __all__ = [
     'weight_function_lbs',
     'standard_lbs'
 ]
+
 
 def weight_function_lbs(x0, tfms, fcn):
     r"""Applies the linear blend skinning transform batched over all pts: x0 for a batch of transforms, given skinning weight function fcn. Differentiable over fcn.
@@ -34,16 +35,17 @@ def weight_function_lbs(x0, tfms, fcn):
     w_x0 = fcn(x0)
     return standard_lbs(x0, tfms, w_x0)
 
+
 def standard_lbs(x0, tfms, w_x0):
     r""" 
     Applies the linear blend skinning transform batched over all pts: x0 for a batch of transforms, given skinning weights w_x0
     x_i = sum(w_j(x0_i) * T_j [x0_i; 1] + x0_i, for j=1..n) 
-    
+
     Args:
         x0 (torch.Tensor): Rest state points, of shape :math:`(\text{num_pts}, \text{dim})`
         tfms (torch.Tensor): Tensor of affine handles, of shape :math:`(\text{batch_size}, \text{num_handles}, \text{dim}, \text{dim}+1)`
         w_x0 (torch.Tensor): Matrix of skinning weights, of shape :math:`(\text{num_pts}, \text{num_handles})` 
-    
+
     Returns:
         (torch.Tensor): Transformed points, of shape :math:`(\text{num_pts}, \text{dim})`
     """
@@ -54,7 +56,7 @@ def standard_lbs(x0, tfms, w_x0):
     # (N, 1, 3)
     x0_i = x0.unsqueeze(1)
     # (N, 4, 1)
-    x03 = torch.cat((x0_i, x0_i.new_ones(N, 1, 1)), dim=2).transpose(1,2)
+    x03 = torch.cat((x0_i, x0_i.new_ones(N, 1, 1)), dim=2).transpose(1, 2)
 
     # (N, BH, 3, 4)
     tfms_expanded = tfms.reshape(B * H, 3, 4)

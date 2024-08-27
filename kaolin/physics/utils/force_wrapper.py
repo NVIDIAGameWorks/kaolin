@@ -14,15 +14,17 @@
 # limitations under the License.
 
 import torch
-from abc import ABC, abstractmethod 
+from abc import ABC, abstractmethod
 
 __all__ = [
     'ForceWrapper',
 ]
+
+
 class ForceWrapper(ABC):
     def __init__(self):
-        pass 
-    
+        pass
+
     def energy(self, primitive, integration_weights=None):
         r"""Unbatched energy function.
 
@@ -36,7 +38,7 @@ class ForceWrapper(ABC):
         if integration_weights is not None:
             p_wise_en = integration_weights.reshape(-1, 1) * p_wise_en
         return torch.sum(p_wise_en)
-    
+
     def gradient(self, primitive, integration_weights=None):
         r"""Unbatched grad function.
 
@@ -48,9 +50,9 @@ class ForceWrapper(ABC):
         """
         p_wise_grad = self._gradient(primitive)
         if integration_weights is not None:
-            p_wise_grad = integration_weights.reshape(-1,1)*p_wise_grad
+            p_wise_grad = integration_weights.reshape(-1, 1) * p_wise_grad
         return p_wise_grad
-    
+
     def hessian(self, primitive, integration_weights=None):
         r"""Unbatched hessian function.
 
@@ -62,17 +64,17 @@ class ForceWrapper(ABC):
         """
         p_wise_hess = self._hessian(primitive)
         if integration_weights is not None:
-            p_wise_hess = integration_weights.reshape(-1,1)*p_wise_hess
+            p_wise_hess = integration_weights.reshape(-1, 1) * p_wise_hess
         return p_wise_hess
 
     @abstractmethod
     def _energy(self, primitive):
         pass
-    
+
     @abstractmethod
     def _gradient(self, primitive):
-        pass 
-    
+        pass
+
     @abstractmethod
     def _hessian(self, primitive):
-        pass 
+        pass

@@ -18,29 +18,29 @@ import pytest
 import torch
 from functools import partial
 
-from kaolin.physics.simplicits.precomputed import  lbs_matrix, jacobian_dF_dz,jacobian_dF_dz_const_handle
 import kaolin.physics.materials.neohookean_elastic_material as neohookean_elastic_material
-from kaolin.physics.utils.finite_diff import finite_diff_jac 
 import kaolin.physics.materials.utils as material_utils
+
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
 def test_neohookean_energy(device, dtype):
     N = 20
     B = 1
-    eps = 1e-8
-    F = torch.eye(3, device=device, dtype=dtype).expand(N,3,3) # + eps*torch.rand(N, B, 3,3, device=device, dtype=dtype)
-    
-    yms = 1e3*torch.ones(N, 1, 1, device=device)
-    prs = 0.4*torch.ones(N, 1, 1, device=device)
-    
+
+    F = torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+
+    yms = 1e3 * torch.ones(N, 1, 1, device=device)
+    prs = 0.4 * torch.ones(N, 1, 1, device=device)
+
     mus, lams = material_utils.to_lame(yms, prs)
-        
+
     E1 = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
-    
+
     E2 = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F.unsqueeze(1)))
     assert torch.allclose(E1, E2)
-    
+
+
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
 def test_neohookean_energy_complex_deformations(device, dtype):
@@ -48,74 +48,102 @@ def test_neohookean_energy_complex_deformations(device, dtype):
     B = 4
     C = 3
     eps = 1e-8
-    F = eps*torch.rand(N, B, C, 3, 3, device=device, dtype=dtype)
-    
-    yms = 1e3*torch.ones(N, B, C, 1, device=device)
-    prs = 0.4*torch.ones(N, B, C, 1, device=device)
-    
+    F = eps * torch.rand(N, B, C, 3, 3, device=device, dtype=dtype)
+
+    yms = 1e3 * torch.ones(N, B, C, 1, device=device)
+    prs = 0.4 * torch.ones(N, B, C, 1, device=device)
+
     mus, lams = material_utils.to_lame(yms, prs)
-    
 
     E1 = torch.tensor([0], device=device, dtype=dtype)
     for b in range(B):
         for c in range(C):
-            E1 += torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus[:,b,c,:], lams[:,b,c,:], F[:,b,c,:,:]))
+            E1 += torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(
+                mus[:, b, c, :], lams[:, b, c, :], F[:, b, c, :, :]))
 
     E2 = torch.sum(neohookean_elastic_material.neohookean_energy(mus, lams, F))
-    
+
     assert torch.allclose(E1, E2)
-    
-    
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float, torch.double])
+def test_neohookean_batched_gradients(device, dtype):
+    N = 20
+    B = 2
+    eps = 1e-8
+
+    F = torch.eye(3, device=device, dtype=dtype).expand(N, B, 3, 3)
+    + eps * torch.rand(N, B, 3, 3, device=device, dtype=dtype)
+
+    yms = 1e3 * torch.ones(N, B, 1, device=device)
+    prs = 0.4 * torch.ones(N, B, 1, device=device)
+
+    mus, lams = material_utils.to_lame(yms, prs)
+
+    neo_grad = neohookean_elastic_material.neohookean_gradient(mus, lams, F)
+    assert (neo_grad.shape[0] == N and neo_grad.shape[1] == B and neo_grad.shape[-2] == 3 and neo_grad.shape[-1] == 3)
+    neo_grad = neo_grad.flatten()
+
+    E0 = torch.sum(neohookean_elastic_material.neohookean_energy(mus, lams, F))
+
+    expected_grad = torch.zeros_like(F.flatten(), device=device)
+    row = 0
+
+    # Using Finite Diff to compute the expected gradients
+    for n1 in range(F.shape[0]):
+        for n2 in range(F.shape[1]):
+            for i in range(F.shape[2]):
+                for j in range(F.shape[3]):
+                    F[n1, n2, i, j] += eps
+                    El = torch.sum(neohookean_elastic_material.neohookean_energy(mus, lams, F))
+                    F[n1, n2, i, j] -= 2 * eps
+                    Er = torch.sum(neohookean_elastic_material.neohookean_energy(mus, lams, F))
+                    F[n1, n2, i, j] += eps
+                    expected_grad[row] = (El - Er) / (2 * eps)
+                    row += 1
+
+    assert torch.allclose(neo_grad, expected_grad, rtol=1e-2, atol=1e-2)
+
+
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
 def test_neohookean_gradients(device, dtype):
     N = 20
     B = 1
     eps = 1e-8
-    F = torch.eye(3, device=device, dtype=dtype).expand(N,3,3) # + eps*torch.rand(N, B, 3,3, device=device, dtype=dtype)
-    
-    yms = 1e3*torch.ones(N,1, device=device)
-    prs = 0.4*torch.ones(N,1, device=device)
-    
+
+    F = torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+    + eps * torch.rand(N, B, 3, 3, device=device, dtype=dtype)
+
+    yms = 1e3 * torch.ones(N, 1, device=device)
+    prs = 0.4 * torch.ones(N, 1, device=device)
+
     mus, lams = material_utils.to_lame(yms, prs)
-    
+
     neo_grad = neohookean_elastic_material.unbatched_neohookean_gradient(mus, lams, F)
-    assert(neo_grad.shape[0] == N and neo_grad.shape[1]==3 and neo_grad.shape[2] == 3)
+    assert (neo_grad.shape[0] == N and neo_grad.shape[1] == 3 and neo_grad.shape[2] == 3)
     neo_grad = neo_grad.flatten()
-    
+
     E0 = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
 
     expected_grad = torch.zeros_like(F.flatten(), device=device)
     row = 0
-    
-    #Using Finite Diff to compute the expected gradients
+
+    # Using Finite Diff to compute the expected gradients
     for n in range(F.shape[0]):
         for i in range(F.shape[1]):
             for j in range(F.shape[2]):
-                F[n,i,j] += eps 
+                F[n, i, j] += eps
                 El = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
-                F[n,i,j] -= 2*eps
+                F[n, i, j] -= 2 * eps
                 Er = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
-                F[n,i,j] += eps
-                expected_grad[row] = (El- Er)/(2*eps) 
-                row +=1
-                    
-    # for n in range(F.shape[0]):
-    #     for b in range(F.shape[1]):
-    #         for i in range(F.shape[2]):
-    #             for j in range(F.shape[3]):
-    #                 F[n,b,i,j] += eps 
-    #                 El = torch.sum(neohookean_elasticity.energy_alt(mus, lams, F))
-    #                 F[n,b,i,j] -= 2*eps
-    #                 Er = torch.sum(neohookean_elasticity.energy_alt(mus, lams, F))
-    #                 F[n,b,i,j] += eps
-    #                 expected_grad[row] = (El- Er)/(2*eps) 
-    #                 row +=1
-    
-    
+                F[n, i, j] += eps
+                expected_grad[row] = (El - Er) / (2 * eps)
+                row += 1
+
     assert torch.allclose(neo_grad, expected_grad, rtol=1e-2, atol=1e-2)
-    
-    
+
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
@@ -123,58 +151,62 @@ def test_neohookean_hessian_vs_fd(device, dtype):
     N = 5
     B = 1
     eps = 1e-3
-    F = torch.eye(3, device=device, dtype=dtype).expand(N,3,3) # + eps*torch.rand(N, B, 3,3, device=device, dtype=dtype)
-    
-    yms = 1e3*torch.ones(N,1, device=device)
-    prs = 0.4*torch.ones(N,1, device=device)
-    
+
+    F = torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+
+    yms = 1e3 * torch.ones(N, 1, device=device)
+    prs = 0.4 * torch.ones(N, 1, device=device)
+
     mus, lams = material_utils.to_lame(yms, prs)
 
     neo_hess = neohookean_elastic_material.unbatched_neohookean_hessian(mus, lams, F)
-    
-    expected_hess = torch.zeros(N, 9,9, device=device, dtype=dtype)
+
+    expected_hess = torch.zeros(N, 9, 9, device=device, dtype=dtype)
     row = 0
 
-    #Using Finite Diff to compute the expected hessian
+    # Using Finite Diff to compute the expected hessian
     for n in range(F.shape[0]):
         for i in range(F.shape[1]):
             for j in range(F.shape[2]):
-                F[n,i,j] += eps 
-                Gl = neohookean_elastic_material.unbatched_neohookean_gradient(mus[n].unsqueeze(0), lams[n].unsqueeze(0), F[n].unsqueeze(0)).flatten()
-                F[n,i,j] -= 2*eps
-                Gr = neohookean_elastic_material.unbatched_neohookean_gradient(mus[n].unsqueeze(0), lams[n].unsqueeze(0), F[n].unsqueeze(0)).flatten()
-                F[n,i,j] += eps
-                expected_hess[n, 3*i + j, :] = (Gl - Gr)/(2*eps) 
-                row +=1
-    
+                F[n, i, j] += eps
+                Gl = neohookean_elastic_material.unbatched_neohookean_gradient(
+                    mus[n].unsqueeze(0), lams[n].unsqueeze(0), F[n].unsqueeze(0)).flatten()
+                F[n, i, j] -= 2 * eps
+                Gr = neohookean_elastic_material.unbatched_neohookean_gradient(
+                    mus[n].unsqueeze(0), lams[n].unsqueeze(0), F[n].unsqueeze(0)).flatten()
+                F[n, i, j] += eps
+                expected_hess[n, 3 * i + j, :] = (Gl - Gr) / (2 * eps)
+                row += 1
+
     assert torch.allclose(neo_hess, expected_hess, rtol=1e-1, atol=1e-1)
-    
-    
+
+
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
 def test_neohookean_hessian_vs_autograd(device, dtype):
     N = 5
     B = 1
-    eps = 1e-3
-    F = torch.eye(3, device=device, dtype=dtype).expand(N,3,3) # + eps*torch.rand(N, B, 3,3, device=device, dtype=dtype)
-    
-    yms = 1e3*torch.ones(N,1, device=device)
-    prs = 0.4*torch.ones(N,1, device=device)
-    
+
+    F = torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+
+    yms = 1e3 * torch.ones(N, 1, device=device)
+    prs = 0.4 * torch.ones(N, 1, device=device)
+
     mus, lams = material_utils.to_lame(yms, prs)
 
-    # N x 9 x 9 (the block diags) 
+    # N x 9 x 9 (the block diags)
     neo_hess = neohookean_elastic_material.unbatched_neohookean_hessian(mus, lams, F)
-    
+
     # 9N x 9N (the full hessian with a bunch of zeros)
-    autograd_hessian = torch.autograd.functional.jacobian(lambda x: neohookean_elastic_material.unbatched_neohookean_gradient(mus, lams, x), F)
-    autograd_hessian = autograd_hessian.reshape(9*N, 9*N)
+    autograd_hessian = torch.autograd.functional.jacobian(
+        lambda x: neohookean_elastic_material.unbatched_neohookean_gradient(mus, lams, x), F)
+    autograd_hessian = autograd_hessian.reshape(9 * N, 9 * N)
 
     # Make sure the block diags match up
     for n in range(N):
-        assert torch.allclose(neo_hess[n], autograd_hessian[9*n:9*n+9, 9*n:9*n+9], rtol=1e-1, atol=1e-1)
-        #zero out the block 
-        autograd_hessian[9*n:9*n+9, 9*n:9*n+9] *= 0
-    
+        assert torch.allclose(neo_hess[n], autograd_hessian[9 * n:9 * n + 9, 9 * n:9 * n + 9], rtol=1e-1, atol=1e-1)
+        # zero out the block
+        autograd_hessian[9 * n:9 * n + 9, 9 * n:9 * n + 9] *= 0
+
     # Make sure the rest of the matrix is zeros
     assert torch.allclose(torch.zeros_like(autograd_hessian), autograd_hessian, rtol=1e-1, atol=1e-1)

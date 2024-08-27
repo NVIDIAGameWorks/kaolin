@@ -23,16 +23,16 @@ import kaolin.physics.materials.utils as material_utils
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
 def test_to_lame(device, dtype):
-    
+
     N = 20
-    
+
     yms = 1e6 * torch.ones(N, device=device, dtype=dtype)
     prs = 0.35 * torch.ones(N, device=device, dtype=dtype)
-    
+
     mus, lams = material_utils.to_lame(yms, prs)
-    
+
     expected_mus = yms / (2 * (1 + prs))
     expected_lams = yms * prs / ((1 + prs) * (1 - 2 * prs))
-    
+
     assert torch.allclose(mus, expected_mus)
     assert torch.allclose(lams, expected_lams)

@@ -13,12 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch 
+import torch
 
 __all__ = [
     'cauchy_strain',
-    'linear_elastic_energy'
+    'linear_elastic_energy',
+    'linear_elastic_gradient'
 ]
+
+
 def cauchy_strain(defo_grad):
     r"""Calculates cauchy strain
 
@@ -32,8 +35,10 @@ def cauchy_strain(defo_grad):
     batched_dims = dimensions[:-2]
     return 0.5 * (defo_grad.transpose(-2, -1) + defo_grad) - torch.eye(3, device=defo_grad.device)[None].expand(dimensions)
 
+
 def linear_elastic_energy(mu, lam, defo_grad):
-    r"""Implements a batched version of linear elastic energy. Calculate energy per-integration primitive.
+    r"""Implements a batched version of linear elastic energy. Calculate energy per-integration primitive. For more background information, refer to `Jernej Barbic's Siggraph Course Notes\
+    <https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf>`_ section 3.2.
 
     Args:
         mu (torch.Tensor): Batched lame parameter mu, of shape :math:`(\text{batch_dim}, 1)`
@@ -49,11 +54,37 @@ def linear_elastic_energy(mu, lam, defo_grad):
     # Cauchy strain matrix shape (batch_dim, 3, 3)
     Eps = cauchy_strain(defo_grad)
     batched_trace = torch.vmap(torch.trace)
-    
+
     # Trace of cauchy strain
     trace_eps = batched_trace(Eps.reshape(batched_dims.numel(), 3, 3)).reshape(batched_dims).unsqueeze(-1)
     Eps_outerprod = torch.matmul(Eps.transpose(-2, -1), Eps)
 
     AA = (lam / 2) * trace_eps * trace_eps
-    AB = mu*batched_trace(Eps_outerprod.reshape(batched_dims.numel(), 3, 3)).reshape(batched_dims).unsqueeze(-1) 
-    return mu*batched_trace(Eps_outerprod.reshape(batched_dims.numel(), 3, 3)).reshape(batched_dims).unsqueeze(-1) + (lam / 2) * trace_eps * trace_eps
+    AB = mu * batched_trace(Eps_outerprod.reshape(batched_dims.numel(), 3, 3)).reshape(batched_dims).unsqueeze(-1)
+    return mu * batched_trace(Eps_outerprod.reshape(batched_dims.numel(), 3, 3)).reshape(batched_dims).unsqueeze(-1) + (lam / 2) * trace_eps * trace_eps
+
+
+def linear_elastic_gradient(mu, lam, defo_grad):
+    """Implements a batched version of the jacobian of linear elastic energy. Calculates gradients per-integration primitive. For more background information, refer to `Jernej Barbic's Siggraph Course Notes\
+    <https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf>`_ section 3.2.
+
+    Args:
+        mu (torch.Tensor): Batched lame parameter mu, of shape :math:`(\text{batch_dim}, 1)`
+        lam (torch.Tensor): Batched lame parameter lambda, of shape :math:`(\text{batch_dim}, 1)`
+        defo_grad (torch.Tensor): Batched deformation gradients (denoted in literature as F) of any dimension where the last 2 dimensions are 3 x 3, of shape :math:`(\text{batch_dim}, 3, 3)`
+
+    Returns:
+        torch.Tensor: Vector of per-primitive jacobians of linear elastic energy w.r.t defo_grad values, of shape :math:`(\text{batch_dim}, 9)`
+    """
+    dimensions = defo_grad.shape
+    batched_dims = dimensions[:-2]
+    # I = expanded to be defo_grad shape
+    id_mat = torch.eye(3, device=mu.device).expand(batched_dims + (3, 3))
+    batched_trace = torch.vmap(torch.trace)
+
+    # F - I
+    F_m_I = (defo_grad - id_mat).reshape(batched_dims.numel(), 3, 3)
+    trace_F_m_I = batched_trace(F_m_I).reshape(batched_dims).unsqueeze(-1).unsqueeze(-1)
+    g2 = lam.unsqueeze(-1) * trace_F_m_I * id_mat
+    g1 = 2.0 * mu.unsqueeze(-1) * (defo_grad.transpose(-2, -1) + defo_grad - 2 * id_mat)
+    return g1 + g2

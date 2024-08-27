@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch 
+import torch
 from functools import partial
 
-from kaolin.physics.utils.finite_diff import finite_diff_jac 
+from kaolin.physics.utils.finite_diff import finite_diff_jac
 from kaolin.physics.simplicits.utils import standard_lbs, weight_function_lbs
 
 __all__ = [
@@ -26,6 +26,7 @@ __all__ = [
     'jacobian_dF_dz',
     'jacobian_dx_dz'
 ]
+
 
 def lumped_mass_matrix(rhos, total_volume, dim=3):
     r"""Calculate the lumped mass matrix of an object sampled via points with spatially uniform sampling, and potentially spatially varying density
@@ -40,11 +41,12 @@ def lumped_mass_matrix(rhos, total_volume, dim=3):
         torch.Tensor: Diagonal INVERSE mass matrix of size, of shape :math:`(3*num_samples, 3*num_samples)`
     """
     # Assumes uniform sample pt distributions over the object
-    # Does NOT assume uniform density 
+    # Does NOT assume uniform density
     vol_per_sample = total_volume / rhos.shape[0]
     pt_wise_mass = rhos * vol_per_sample
-    return torch.diag(pt_wise_mass.repeat_interleave(dim)), torch.diag(1.0/pt_wise_mass.repeat_interleave(dim))
-    
+    return torch.diag(pt_wise_mass.repeat_interleave(dim)), torch.diag(1.0 / pt_wise_mass.repeat_interleave(dim))
+
+
 def lbs_matrix(x0, w):
     r"""Encodes the lbs equation :math:`x_i = sum(w(x^0_i)_j * T_j * \begin{pmatrix}x^0_i\\1\end{pmatrix},\; \forall \; j=0...\|handles\|)` for all pts into matrix B such that flatten(x) = B(x0, w(x0))*flatten(T)
 
@@ -116,6 +118,7 @@ def lbs_matrix(x0, w):
     B = torch.mul(B_mask, w_x03reps)
     return B
 
+
 def jacobian_dF_dz_const_handle(model, x0, z):
     r"""Calculates dF/dz for the skinning weights model (network) and an extra dimension for the constant handle
 
@@ -128,14 +131,15 @@ def jacobian_dF_dz_const_handle(model, x0, z):
         torch.Tensor: Jacobian matrix, of shape :math:`(9*\text{num_samples}, 12*\text{num_handles})`
     """
     num_samples = x0.shape[0]
-    
+
     zeros_vec3_column = torch.zeros((num_samples, 1, 3), device=x0.device)
-    ones_col = torch.ones((num_samples,1), device=x0.device)
+    ones_col = torch.ones((num_samples, 1), device=x0.device)
     weights = model(x0)
-    weights = torch.cat((model(x0), ones_col), dim=1) 
+    weights = torch.cat((model(x0), ones_col), dim=1)
     grad_weights = finite_diff_jac(model, x=x0)
     grad_weights = torch.cat([grad_weights.squeeze(), zeros_vec3_column], dim=1)
-    x0_h = torch.cat((x0, torch.ones(x0.shape[0],1, device=x0.device, dtype=x0.dtype)), dim=1).detach()
+    x0_h = torch.cat((x0, torch.ones(x0.shape[0], 1, device=x0.device, dtype=x0.dtype)), dim=1).detach()
+
     def _compute_F(Ts):
         # W0_i, dW0_i: lazy, just avoiding neural net evaluations
         def defgrad(x0h, W0_i, dW0_i):
@@ -151,11 +155,11 @@ def jacobian_dF_dz_const_handle(model, x0, z):
         transforms = z_.reshape(-1, 3, 4)
         deformation_gradient = _compute_F(transforms)
         return deformation_gradient.reshape(9 * num_samples)
-    
-    
+
     dF_dz = torch.autograd.functional.jacobian(_reshape_and_compute_F, z).squeeze(-1)
-    
+
     return dF_dz
+
 
 def jacobian_dF_dz(model, x0, z):
     r"""Calculates jacobian dF/dz
@@ -169,15 +173,16 @@ def jacobian_dF_dz(model, x0, z):
         torch.Tensor: Jacobian matrix, of shape :math:`(9*\text{num_samples}, 12*\text{num_handles})`
     """
     num_samples = x0.shape[0]
-    
+
     def compute_defo_grad1(z):
-        partial_weight_fcn_lbs = partial(weight_function_lbs,  tfms = z.reshape(-1,3,4).unsqueeze(0), fcn = model)
+        partial_weight_fcn_lbs = partial(weight_function_lbs, tfms=z.reshape(-1, 3, 4).unsqueeze(0), fcn=model)
         # N x 3 x 3 Deformation gradients
         defo_grads = finite_diff_jac(partial_weight_fcn_lbs, x0, eps=1e-7)
         return defo_grads
-    
-    dF_dz = torch.autograd.functional.jacobian(lambda x: compute_defo_grad1(x).reshape(9*num_samples), z.flatten())
+
+    dF_dz = torch.autograd.functional.jacobian(lambda x: compute_defo_grad1(x).reshape(9 * num_samples), z.flatten())
     return dF_dz
+
 
 def jacobian_dx_dz(model, x0, z):
     r"""Calculates jacobian dx/dz
@@ -190,5 +195,6 @@ def jacobian_dx_dz(model, x0, z):
     Returns:
         torch.Tensor: Jacobian matrix, of shape :math:`(3*\text{num_samples}, 12*\text{num_handles})`
     """
-    dx_dz = torch.autograd.functional.jacobian(lambda x: weight_function_lbs(x0, tfms = x.reshape(-1,3,4).unsqueeze(0), fcn = model).flatten(), z.flatten())
+    dx_dz = torch.autograd.functional.jacobian(lambda x: weight_function_lbs(
+        x0, tfms=x.reshape(-1, 3, 4).unsqueeze(0), fcn=model).flatten(), z.flatten())
     return dx_dz

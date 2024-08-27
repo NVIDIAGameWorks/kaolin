@@ -14,34 +14,33 @@
 # limitations under the License.
 
 import os
-import torch 
-import numpy as np 
+import torch
+import numpy as np
 import logging
+from functools import partial
+
+from kaolin.physics.simplicits.train import train_step
+from kaolin.physics.simplicits.simplicits_scene_forces import *
+import kaolin.physics.utils.optimization as optimization
+import kaolin.physics.materials as materials
+import kaolin.physics.utils as phys_utils
+import kaolin.physics.simplicits.precomputed as precomputed
+import kaolin.physics.simplicits.utils as simplicits_utils
+from kaolin.physics.simplicits.network import SimplicitsMLP
+
 
 logger = logging.getLogger(__name__)
 
-from kaolin.physics.simplicits.network import SimplicitsMLP
-from kaolin.physics.simplicits.train import train_step 
-from functools import partial
-
-
-import kaolin.physics.simplicits as simplicits
-import kaolin.physics.simplicits.utils as simplicits_utils
-import kaolin.physics.simplicits.precomputed as precomputed
-import kaolin.physics.utils as phys_utils
-import kaolin.physics.materials.utils as material_utils
-import kaolin.physics.materials as materials
-import kaolin.physics.utils.optimization as optimization
-
-from kaolin.physics.simplicits.simplicits_scene_forces import *
 
 __all__ = [
     'SimplicitsObject',
     'SimplicitsScene',
 ]
+
+
 class SimplicitsObject:
-    def __init__(self, pts, yms, prs, rhos, appx_vol, num_handles=10, num_samples=1000, model_layers=6, 
-                training_batch_size=10):
+    def __init__(self, pts, yms, prs, rhos, appx_vol, num_handles=10, num_samples=1000, model_layers=6,
+                 training_batch_size=10, normalize_for_training=True):
         r""" Easy to use wrapper for initializing and training a simplicits object based on the paper https://research.nvidia.com/labs/toronto-ai/simplicits/
 
         Args:
@@ -58,46 +57,60 @@ class SimplicitsObject:
             training_batch_size (int, optional): Training parameter. Defaults to 10.
         """
         # TODO: allow to specify just floats, and this will create tensors
-        
+
         self.default_device = pts.device
         self.default_dtype = pts.dtype
 
         self.num_handles = num_handles
         self.pts = torch.as_tensor(pts, device=self.default_device, dtype=self.default_dtype)
-        self.yms = torch.as_tensor(yms, device=self.default_device, dtype=self.default_dtype).reshape(-1,1)
-        self.prs = torch.as_tensor(prs, device=self.default_device, dtype=self.default_dtype).reshape(-1,1)
-        self.rhos = torch.as_tensor(rhos, device=self.default_device, dtype=self.default_dtype).reshape(-1,1)
+        self.yms = torch.as_tensor(yms, device=self.default_device, dtype=self.default_dtype).reshape(-1, 1)
+        self.prs = torch.as_tensor(prs, device=self.default_device, dtype=self.default_dtype).reshape(-1, 1)
+        self.rhos = torch.as_tensor(rhos, device=self.default_device, dtype=self.default_dtype).reshape(-1, 1)
         self.appx_vol = torch.as_tensor(appx_vol, device=self.default_device, dtype=self.default_dtype)
 
-        
         self.bb_max = torch.max(self.pts, dim=0).values
         self.bb_min = torch.min(self.pts, dim=0).values
 
         # Normalize the appx vol of object
-        norm_bb_max = torch.max((self.pts - self.bb_min)/(self.bb_max - self.bb_min), dim=0).values # get the bb_max of the normalized pts
-        norm_bb_min = torch.min((self.pts - self.bb_min)/(self.bb_max - self.bb_min), dim=0).values # get the bb_min of the normalized pts
+        norm_bb_max = torch.max((self.pts - self.bb_min) / (self.bb_max - self.bb_min),
+                                dim=0).values  # get the bb_max of the normalized pts
+        norm_bb_min = torch.min((self.pts - self.bb_min) / (self.bb_max - self.bb_min),
+                                dim=0).values  # get the bb_min of the normalized pts
 
-        bb_vol = (self.bb_max[0] - self.bb_min[0]) * (self.bb_max[1] - self.bb_min[1]) * (self.bb_max[2] - self.bb_min[2])
-        norm_bb_vol = (norm_bb_max[0] - norm_bb_min[0]) * (norm_bb_max[1] - norm_bb_min[1]) * (norm_bb_max[2] - norm_bb_min[2])
+        bb_vol = (self.bb_max[0] - self.bb_min[0]) * (self.bb_max[1] -
+                                                      self.bb_min[1]) * (self.bb_max[2] - self.bb_min[2])
+        norm_bb_vol = (norm_bb_max[0] - norm_bb_min[0]) * (norm_bb_max[1] -
+                                                           norm_bb_min[1]) * (norm_bb_max[2] - norm_bb_min[2])
 
-        norm_appx_vol = self.appx_vol*(norm_bb_vol/bb_vol)
-        
-            
-        self.normalized_pts = self.pts#(self.pts - self.bb_min)/(self.bb_max - self.bb_min)
+        norm_appx_vol = self.appx_vol * (norm_bb_vol / bb_vol)
+
+        # If normalize_for_training, then
+        # Re-approximate the vol to fit the normalized object
+        self.normalize_for_training = normalize_for_training
+        self.normalized_pts = self.pts
+        if (self.normalize_for_training):
+            norm_appx_vol = self.appx_vol * (norm_bb_vol / bb_vol)
+        else:
+            norm_appx_vol = self.appx_vol
 
         self.num_samples = num_samples
         self.training_layers = model_layers
-        self.training_step = partial(train_step, 
-                                batch_size=training_batch_size, # TODO: maybe pass into train() below?
-                                num_handles=self.num_handles, 
-                                appx_vol=norm_appx_vol, 
-                                num_samples=self.num_samples)
+        self.training_step = partial(train_step,
+                                     batch_size=training_batch_size,  # TODO: maybe pass into train() below?
+                                     num_handles=self.num_handles,
+                                     appx_vol=norm_appx_vol,
+                                     num_samples=self.num_samples)
 
         self.model = None
         if self.num_handles == 0:
             self.model_plus_rigid = lambda pts: torch.ones((pts.shape[0], 1), device=self.default_device)
         else:
-            self.model_plus_rigid = lambda pts: torch.cat((self.model((pts-self.bb_min)/(self.bb_max-self.bb_min)), torch.ones((pts.shape[0], 1), device=self.default_device)), dim=1)
+            if (self.normalize_for_training):
+                self.model_plus_rigid = lambda pts: torch.cat((self.model(
+                    (pts - self.bb_min) / (self.bb_max - self.bb_min)), torch.ones((pts.shape[0], 1), device=self.default_device)), dim=1)
+            else:
+                self.model_plus_rigid = lambda pts: torch.cat(
+                    (self.model(pts), torch.ones((pts.shape[0], 1), device=self.default_device)), dim=1)
 
     def save_model(self, pth):
         r"""Saves the Simplicits network model (not including rigid mode)
@@ -117,9 +130,14 @@ class SimplicitsObject:
         if self.num_handles == 0:
             self.model_plus_rigid = lambda pts: torch.ones((pts.shape[0], 1), device=self.default_device)
         else:
-            self.model_plus_rigid = lambda pts: torch.cat((self.model((pts-self.bb_min)/(self.bb_max-self.bb_min)), torch.ones((pts.shape[0], 1), device=self.default_device)), dim=1)
+            if (self.normalize_for_training):
+                self.model_plus_rigid = lambda pts: torch.cat((self.model(
+                    (pts - self.bb_min) / (self.bb_max - self.bb_min)), torch.ones((pts.shape[0], 1), device=self.default_device)), dim=1)
+            else:
+                self.model_plus_rigid = lambda pts: torch.cat(
+                    (self.model(pts), torch.ones((pts.shape[0], 1), device=self.default_device)), dim=1)
 
-    def train(self, num_steps=10000, lr_start=1e-3, lr_end=1e-3, le_coeff=1e-1, lo_coeff=1e6):
+    def train(self, num_steps=10000, lr_start=1e-3, lr_end=1e-3, le_coeff=1e-1, lo_coeff=1e6, log_every=1000):
         r"""Trains object. If object has already been trained, calling this function will replace the previously trained results.
 
         Args:
@@ -128,11 +146,11 @@ class SimplicitsObject:
             lr_end (float, optional): Learning rate at end of training. Defaults to 1e-3.
             le_coeff (float, optional): Training parameter. Elasticity loss coefficient. Defaults to 1e-1.
             lo_coeff (float, optional): Training parameter. Orthogonality loss coefficient. Defaults to 1e6.
-        """        
+        """
         if self.num_handles == 0:
             # Rigid object, no training
             return
-        
+
         # create a new model at training time
         self.model = SimplicitsMLP(3, 64, self.num_handles, self.training_layers)
         self.model.to(self.default_device)
@@ -142,29 +160,29 @@ class SimplicitsObject:
 
         for i in range(num_steps):
             optimizer.zero_grad()
-            le, lo = self.training_step(self.model, self.normalized_pts, self.yms, self.prs, self.rhos, float(i/num_steps), le_coeff=le_coeff, lo_coeff=lo_coeff)
+            le, lo = self.training_step(self.model, self.normalized_pts, self.yms, self.prs,
+                                        self.rhos, float(i / num_steps), le_coeff=le_coeff, lo_coeff=lo_coeff)
             loss = le + lo
-            
+
             loss.backward()
             optimizer.step()
-            
+
             # Update learning rate. Linearly interpolate from lr_start to lr_end
             for grp in optimizer.param_groups:
-                grp['lr'] = lr_start + float(i/num_steps)*(lr_end - lr_start)
+                grp['lr'] = lr_start + float(i / num_steps) * (lr_end - lr_start)
 
-            #if i%100 == 0:
-                #print(f'Training step: {i}, le: {le.item()}, lo: {lo.item()}')
-                # logger.debug(f'Training step: {i}, le: {le.item()}, lo: {lo.item()}')
+            if i % log_every == 0:
+                logger.info(f'Training step: {i}, le: {le.item()}, lo: {lo.item()}')
 
         self.model.eval()
 
 
 # private utility class
 class SimulatedObject:
-    def __init__(self, obj:SimplicitsObject, num_cub_pts=1000, init_tfm=None):
+    def __init__(self, obj: SimplicitsObject, num_cub_pts=1000, init_tfm=None):
         r""" Initialize a simulated object from a simplicits object. Users should avoid direct access to this class. 
             Instead use the SimulatedObject's obj_idx in the getters/setters for its parameters, forces and materials in the Scene to update/modify this object.
-        
+
             Args:
                 obj (SimplicitsObject): Saves the Simplicits Object to be used in the sim by reference here
                 num_cub_pts (int, optional): Number of cubature points (integration primitives). Defaults to 1000
@@ -174,8 +192,6 @@ class SimulatedObject:
         self._sample_cubatures(num_cub_pts=num_cub_pts)
         self.reset_sim_state(init_tfm)
         self._set_sim_constants()
-        
-        
 
         r""" Structure the force_dict like this.
         force_dict = {
@@ -216,10 +232,10 @@ class SimulatedObject:
 
             }
         """
-        self.integration_sampling = (self.simplicits_object.appx_vol/self.sim_pts.shape[0]).to(dtype=self.sim_pts.dtype) # uniform integration sampling over vol
-        self.force_dict = {"pt_wise":{},
-                            "defo_grad_wise":{}}
-
+        self.integration_sampling = (self.simplicits_object.appx_vol /
+                                     self.sim_pts.shape[0]).to(dtype=self.sim_pts.dtype)  # uniform integration sampling over vol
+        self.force_dict = {"pt_wise": {},
+                           "defo_grad_wise": {}}
 
         self.set_materials(self.sim_yms, self.sim_prs)
 
@@ -243,7 +259,8 @@ class SimulatedObject:
         Args:
             num_cub_pts (int): Number of cubature points to sample over the mesh.
         """
-        self.sample_indices = torch.randint(low=0, high=self.simplicits_object.normalized_pts.shape[0], size=(num_cub_pts,), device=self.simplicits_object.default_device)
+        self.sample_indices = torch.randint(low=0, high=self.simplicits_object.normalized_pts.shape[0], size=(
+            num_cub_pts,), device=self.simplicits_object.default_device)
         self.sim_pts = self.simplicits_object.pts[self.sample_indices]
         self.sim_normalized_pts = self.simplicits_object.normalized_pts[self.sample_indices]
         self.sim_yms = self.simplicits_object.yms[self.sample_indices]
@@ -251,22 +268,25 @@ class SimulatedObject:
         self.sim_rhos = self.simplicits_object.rhos[self.sample_indices]
 
     def _set_sim_constants(self):
-        ## Simulation constants
+        # Simulation constants
         r""" Constants req for simulation. Computed once upfront. 
             must be updated when _resample_cubature() is called
         """
         self.x0_flat = self.sim_pts.flatten().unsqueeze(-1).detach()
-        self.weights = self.simplicits_object.model_plus_rigid(self.sim_normalized_pts) 
-        self.M, self.invM = precomputed.lumped_mass_matrix(self.sim_rhos, self.simplicits_object.appx_vol, dim = 3)
-        self.bigI = torch.tile(torch.eye(3, device=self.simplicits_object.default_device).flatten().unsqueeze(dim=1), (self.num_cub_pts,1)).detach()
+        self.weights = self.simplicits_object.model_plus_rigid(self.sim_normalized_pts)
+        self.M, self.invM = precomputed.lumped_mass_matrix(self.sim_rhos, self.simplicits_object.appx_vol, dim=3)
+        self.bigI = torch.tile(torch.eye(3, device=self.simplicits_object.default_device).flatten(
+        ).unsqueeze(dim=1), (self.num_cub_pts, 1)).detach()
 
-        self.dFdz = precomputed.jacobian_dF_dz(self.simplicits_object.model_plus_rigid, self.sim_normalized_pts, self.z).detach() 
-        self.B = precomputed.lbs_matrix(self.sim_pts, self.weights).detach() 
+        self.dFdz = precomputed.jacobian_dF_dz(self.simplicits_object.model_plus_rigid,
+                                               self.sim_normalized_pts, self.z).detach()
+        self.B = precomputed.lbs_matrix(self.sim_pts, self.weights).detach()
         self.BMB = (self.B.T @ self.M @ self.B).detach()
         self.BinvMB = (self.B.T @ self.invM @ self.B).detach()
 
     def reset_sim_state(self, init_tfm=None):
-        self.z = torch.zeros((self.simplicits_object.num_handles + 1)*12 , dtype=self.simplicits_object.default_dtype, device=self.simplicits_object.default_device).unsqueeze(-1)
+        self.z = torch.zeros((self.simplicits_object.num_handles + 1) * 12,
+                             dtype=self.simplicits_object.default_dtype, device=self.simplicits_object.default_device).unsqueeze(-1)
         if init_tfm is not None:
             self.z[-12:, 0] = init_tfm.flatten()
         self.z_prev = self.z.clone().detach()
@@ -285,14 +305,17 @@ class SimulatedObject:
         """
         bdry_cond = phys_utils.Boundary()
         bdry_indx = torch.nonzero(fcn(self.sim_pts), as_tuple=False).squeeze()
-        bdry_pos = self.sim_pts[bdry_indx,:]
+        bdry_pos = self.sim_pts[bdry_indx, :]
         bdry_cond.set_pinned_verts(bdry_indx, bdry_pos)
         self.force_dict["pt_wise"][name] = {}
         self.force_dict["pt_wise"][name]["force_object"] = bdry_cond
-        
-        partial_bdry_e = generate_fcn_simplicits_scene_energy(bdry_cond, self.B, coeff=bdry_penalty, integration_sampling=None)
-        partial_bdry_g = generate_fcn_simplicits_scene_gradient(bdry_cond, self.B, coeff=bdry_penalty, integration_sampling=None)
-        partial_bdry_h = generate_fcn_simplicits_scene_hessian(bdry_cond, self.B, coeff=bdry_penalty, integration_sampling=None)
+
+        partial_bdry_e = generate_fcn_simplicits_scene_energy(
+            bdry_cond, self.B, coeff=bdry_penalty, integration_sampling=None)
+        partial_bdry_g = generate_fcn_simplicits_scene_gradient(
+            bdry_cond, self.B, coeff=bdry_penalty, integration_sampling=None)
+        partial_bdry_h = generate_fcn_simplicits_scene_hessian(
+            bdry_cond, self.B, coeff=bdry_penalty, integration_sampling=None)
 
         self.force_dict["pt_wise"][name]["energy"] = partial_bdry_e
         self.force_dict["pt_wise"][name]["gradient"] = partial_bdry_g
@@ -308,21 +331,23 @@ class SimulatedObject:
             rhos (torch.Tensor, optional): Sets densities of simulated object. Pass in :math:`(n)` tensor or one value to get broadcasted. Defaults to None.
         """
         if yms is not None:
-            self.sim_yms = yms.reshape(-1,1) 
+            self.sim_yms = yms.reshape(-1, 1)
         if prs is not None:
-            self.sim_prs = prs.reshape(-1,1)
-            
+            self.sim_prs = prs.reshape(-1, 1)
+
         if rhos is not None:
-            self.sim_rhos = rhos.expand(self.sim_rhos.shape[0],1)
+            self.sim_rhos = rhos.expand(self.sim_rhos.shape[0], 1)
             self._set_sim_constants()
 
-        
         # Setup Material
         material_object = materials.NeohookeanMaterial(self.sim_yms, self.sim_prs)
 
-        partial_material_e = generate_fcn_simplicits_material_energy(material_object, self.dFdz, coeff=1, integration_sampling=self.integration_sampling)
-        partial_material_g = generate_fcn_simplicits_material_gradient(material_object, self.dFdz, coeff=1, integration_sampling=self.integration_sampling)
-        partial_material_h = generate_fcn_simplicits_material_hessian(material_object, self.dFdz, coeff=1, integration_sampling=self.integration_sampling)
+        partial_material_e = generate_fcn_simplicits_material_energy(
+            material_object, self.dFdz, coeff=1, integration_sampling=self.integration_sampling)
+        partial_material_g = generate_fcn_simplicits_material_gradient(
+            material_object, self.dFdz, coeff=1, integration_sampling=self.integration_sampling)
+        partial_material_h = generate_fcn_simplicits_material_hessian(
+            material_object, self.dFdz, coeff=1, integration_sampling=self.integration_sampling)
         self.force_dict["defo_grad_wise"]["material"] = {}
         self.force_dict["defo_grad_wise"]["material"]["energy"] = partial_material_e
         self.force_dict["defo_grad_wise"]["material"]["gradient"] = partial_material_g
@@ -336,13 +361,16 @@ class SimulatedObject:
         """
         gravity_object = phys_utils.Gravity(rhos=self.sim_rhos, acceleration=grav)
 
-        partial_grav_e = generate_fcn_simplicits_scene_energy(gravity_object, self.B, coeff=1, integration_sampling=self.integration_sampling) 
-        partial_grav_g = generate_fcn_simplicits_scene_gradient(gravity_object, self.B, coeff=1, integration_sampling=self.integration_sampling) 
-        partial_grav_h = generate_fcn_simplicits_scene_hessian(gravity_object, self.B, coeff=1, integration_sampling=self.integration_sampling) 
+        partial_grav_e = generate_fcn_simplicits_scene_energy(
+            gravity_object, self.B, coeff=1, integration_sampling=self.integration_sampling)
+        partial_grav_g = generate_fcn_simplicits_scene_gradient(
+            gravity_object, self.B, coeff=1, integration_sampling=self.integration_sampling)
+        partial_grav_h = generate_fcn_simplicits_scene_hessian(
+            gravity_object, self.B, coeff=1, integration_sampling=self.integration_sampling)
         self.force_dict["pt_wise"]["gravity"] = {}
         self.force_dict["pt_wise"]["gravity"]["energy"] = partial_grav_e
         self.force_dict["pt_wise"]["gravity"]["gradient"] = partial_grav_g
-        self.force_dict["pt_wise"]["gravity"]["hessian"] = partial_grav_h 
+        self.force_dict["pt_wise"]["gravity"]["hessian"] = partial_grav_h
 
     def set_floor(self, floor_height, floor_axis, floor_penalty, flip_floor):
         r"""Sets floor penalty energy, forces, hessian for object.
@@ -354,9 +382,12 @@ class SimulatedObject:
         """
         floor_object = phys_utils.Floor(floor_height=floor_height, floor_axis=floor_axis, flip_floor=flip_floor)
 
-        partial_floor_e = generate_fcn_simplicits_scene_energy(floor_object, self.B, coeff=floor_penalty, integration_sampling=None)
-        partial_floor_g = generate_fcn_simplicits_scene_gradient(floor_object, self.B, coeff=floor_penalty, integration_sampling=None)
-        partial_floor_h = generate_fcn_simplicits_scene_hessian(floor_object, self.B, coeff=floor_penalty, integration_sampling=None)
+        partial_floor_e = generate_fcn_simplicits_scene_energy(
+            floor_object, self.B, coeff=floor_penalty, integration_sampling=None)
+        partial_floor_g = generate_fcn_simplicits_scene_gradient(
+            floor_object, self.B, coeff=floor_penalty, integration_sampling=None)
+        partial_floor_h = generate_fcn_simplicits_scene_hessian(
+            floor_object, self.B, coeff=floor_penalty, integration_sampling=None)
         self.force_dict["pt_wise"]["floor"] = {}
         self.force_dict["pt_wise"]["floor"]["energy"] = partial_floor_e
         self.force_dict["pt_wise"]["floor"]["gradient"] = partial_floor_g
@@ -369,7 +400,7 @@ class SimulatedObject:
             name (string): Name of the force to remove.
         """
         # if force is removed on the scene, remove force on object
-        #check if its a pt-wise force
+        # check if its a pt-wise force
         if name in self.force_dict["pt_wise"]:
             del self.force_dict["pt_wise"][name]
         elif name in self.force_dict["defo_grad_wise"]:
@@ -394,11 +425,11 @@ class SimulatedObject:
 class SimplicitsScene:
 
     def __init__(self,
-        device='cuda', 
-        dtype=torch.float,
-        timestep=0.03, 
-        max_newton_steps=20, 
-        max_ls_steps=30):
+                 device='cuda',
+                 dtype=torch.float,
+                 timestep=0.03,
+                 max_newton_steps=20,
+                 max_ls_steps=30):
         r"""Initializes a simplicits scene. This is the entry point to Simplicits easy API. 
         SimplicitsObjects can be added to the scene. 
         Scene forces such as floor and gravity can be set on the scene
@@ -413,16 +444,16 @@ class SimplicitsScene:
         self.default_device = device
         self.default_dtype = dtype
 
-        self.timestep = timestep 
+        self.timestep = timestep
         self.current_sim_step = 0
-    
+
         self.max_newton_steps = max_newton_steps
         self.max_ls_steps = max_ls_steps
 
         self.current_id = 0
         self.sim_obj_dict = {}
 
-    def add_object(self, sim_object:SimplicitsObject, num_cub_pts = 1000, init_tfm=None):
+    def add_object(self, sim_object: SimplicitsObject, num_cub_pts=1000, init_tfm=None):
         r"""Adds a simplicits object to the scene as a SimulatedObject.
 
         Args:
@@ -435,7 +466,7 @@ class SimplicitsScene:
         """
         self.sim_obj_dict[self.current_id] = SimulatedObject(sim_object, num_cub_pts=num_cub_pts, init_tfm=init_tfm)
         self.current_id += 1
-        return self.current_id-1
+        return self.current_id - 1
 
     def remove_object(self, obj_idx):
         r"""Removes object from scene
@@ -466,7 +497,7 @@ class SimplicitsScene:
         """
         if obj_idx in self.sim_obj_dict:
             self.sim_obj_dict[obj_idx].reset_sim_state(init_tfm=init_tfm)
-    
+
     def remove_object_force(self, obj_idx, name):
         r"""Removes this force for this object.
 
@@ -474,8 +505,8 @@ class SimplicitsScene:
             obj_idx (int): Id of object
             name (str): Force to be removed from the scene
         """
-        self.sim_obj_dict[obj_idx].remove_force(name) 
-    
+        self.sim_obj_dict[obj_idx].remove_force(name)
+
     def get_object_boundary_condition(self, obj_idx, name):
         r"""Get boundary condition for object by name.
 
@@ -487,7 +518,7 @@ class SimplicitsScene:
             Boundary: Boundary condition object.
         """
         return self.sim_obj_dict[obj_idx]["pt_wise"][name]["force_object"]
-        
+
     def set_object_boundary_condition(self, obj_idx, name, fcn, bdry_penalty):
         r"""Sets boundary condition for object in scene
 
@@ -498,7 +529,7 @@ class SimplicitsScene:
             bdry_penalty (float): Boundary condition penalty coefficient.
         """
         self.sim_obj_dict[obj_idx].set_boundary_condition(name, fcn, bdry_penalty)
-        
+
     def set_object_materials(self, obj_idx, yms=None, prs=None, rhos=None):
         r"""Sets object's material properties
 
@@ -509,8 +540,7 @@ class SimplicitsScene:
             rhos (torch.Tensor, optional): Sets densities of simulated object. Pass in :math:`(n)` tensor or one value to get broadcasted. Defaults to None.
         """
         self.sim_obj_dict[obj_idx].set_materials(yms=yms, prs=prs, rhos=rhos)
-        
-    
+
     def get_object_deformed_pts(self, obj_idx, points=None):
         r"""Applies linear blend skinning using object's transformation to points provided. By default, points = sim_object.pts
 
@@ -523,9 +553,9 @@ class SimplicitsScene:
             torch.Tensor: Transformed points
         """
         obj = self.get_object(obj_idx)
-        if points==None:
+        if points == None:
             points = obj.simplicits_object.pts
-        return simplicits_utils.weight_function_lbs(points, tfms = obj.z.reshape(-1,3,4).unsqueeze(0), fcn = obj.simplicits_object.model_plus_rigid)
+        return simplicits_utils.weight_function_lbs(points, tfms=obj.z.reshape(-1, 3, 4).unsqueeze(0), fcn=obj.simplicits_object.model_plus_rigid)
 
     def get_object_deformation_gradient(self, obj_idx, points=None):
         r"""Gets the deformation gradients of the objects integration points
@@ -540,9 +570,10 @@ class SimplicitsScene:
         obj = self.get_object(obj_idx)
         # F_ele = torch.matmul(obj.dFdz, obj.z) + obj.bigI
         # return F_ele.reshape(-1, 3, 3)
-        if points==None:
+        if points == None:
             points = obj.simplicits_object.pts
-        fcn_get_x = partial(simplicits_utils.weight_function_lbs, tfms = obj.z.reshape(-1,3,4).unsqueeze(0), fcn = obj.simplicits_object.model_plus_rigid)
+        fcn_get_x = partial(simplicits_utils.weight_function_lbs, tfms=obj.z.reshape(-1,
+                            3, 4).unsqueeze(0), fcn=obj.simplicits_object.model_plus_rigid)
         Fs = phys_utils.finite_diff_jac(fcn_get_x, points, eps=1e-7)
         return Fs
 
@@ -585,10 +616,10 @@ class SimplicitsScene:
         """
         for idx in self.sim_obj_dict:
             o = self.sim_obj_dict[idx]
-            o.remove_force(name) 
-    
-    ####################Backwards Euler Functions###########################################################
-    def _potential_sum(self, output, z, z_dot, B, dFdz, x0_flat, bigI, defo_grad_fcns = [], pt_wise_fcns = []):
+            o.remove_force(name)
+
+    #################### Backwards Euler Functions###########################################################
+    def _potential_sum(self, output, z, z_dot, B, dFdz, x0_flat, bigI, defo_grad_fcns=[], pt_wise_fcns=[]):
         r"""Integrates various energies over the object. Pt-wise or deformation gradient-wise.
 
         Args:
@@ -607,13 +638,13 @@ class SimplicitsScene:
         # updates the quantity calculated in the output value
         F_ele = torch.matmul(dFdz, z) + bigI
         x_flat = B @ z + x0_flat
-        x = x_flat.reshape(-1,3)
+        x = x_flat.reshape(-1, 3)
         for e in defo_grad_fcns:
             output += e(F_ele)
         for e in pt_wise_fcns:
             output += e(x)
-            
-    def _newton_E(self, z, z_prev, z_dot, B, BMB, dt, x0_flat, dFdz, bigI, defo_grad_energies = [], pt_wise_energies = []):
+
+    def _newton_E(self, z, z_prev, z_dot, B, BMB, dt, x0_flat, dFdz, bigI, defo_grad_energies=[], pt_wise_energies=[]):
         r"""Backward's euler energy used in newton's method
 
         Args:
@@ -636,7 +667,7 @@ class SimplicitsScene:
         self._potential_sum(pe_sum, z, z_dot, B, dFdz, x0_flat, bigI, defo_grad_energies, pt_wise_energies)
         return 0.5 * z.T @ BMB @ z - z.T @ BMB @ z_prev - dt * z.T @ BMB @ z_dot + dt * dt * pe_sum
 
-    def _newton_G(self, z, z_prev, z_dot, B, BMB, dt, x0_flat, dFdz, bigI, defo_grad_gradients = [], pt_wise_gradients = []):
+    def _newton_G(self, z, z_prev, z_dot, B, BMB, dt, x0_flat, dFdz, bigI, defo_grad_gradients=[], pt_wise_gradients=[]):
         r"""Backward's euler gradient used in newton's method
 
         Args:
@@ -659,7 +690,7 @@ class SimplicitsScene:
         self._potential_sum(pe_grad_sum, z, z_dot, B, dFdz, x0_flat, bigI, defo_grad_gradients, pt_wise_gradients)
         return BMB @ z - BMB @ z_prev - dt * BMB @ z_dot + dt * dt * pe_grad_sum
 
-    def _newton_H(self, z, z_prev, z_dot, B, BMB, dt, x0_flat, dFdz, bigI, defo_grad_hessians = [], pt_wise_hessians = []):
+    def _newton_H(self, z, z_prev, z_dot, B, BMB, dt, x0_flat, dFdz, bigI, defo_grad_hessians=[], pt_wise_hessians=[]):
         r"""Backward's euler hessian used in newton's method
 
         Args:
@@ -680,22 +711,39 @@ class SimplicitsScene:
         """
         pe_hess_sum = torch.zeros(z.shape[0], z.shape[0], device=self.default_device, dtype=self.default_dtype)
         self._potential_sum(pe_hess_sum, z, z_dot, B, dFdz, x0_flat, bigI, defo_grad_hessians, pt_wise_hessians)
-        return BMB  + dt * dt * pe_hess_sum
+        return BMB + dt * dt * pe_hess_sum
     ###########################################################
 
     def run_sim_step(self):
         r"""Runs one simulation step
         """
+
+        # Get energies
         for idx in self.sim_obj_dict:
             o = self.sim_obj_dict[idx]
+            pt_names = list(o.force_dict["pt_wise"].keys())
+            pt_wise_energies = [o.force_dict["pt_wise"][name]["energy"] for name in pt_names]
+            defo_names = list(o.force_dict["defo_grad_wise"].keys())
+            defo_wise_energies = [o.force_dict["defo_grad_wise"][name]["energy"] for name in defo_names]
+
             o.z_prev = o.z.clone().detach()
-            more_partial__newton_E = partial(self._newton_E, z_prev=o.z_prev, z_dot=o.z_dot, B=o.B, BMB=o.BMB, dt=self.timestep, x0_flat=o.x0_flat, dFdz=o.dFdz, bigI=o.bigI, defo_grad_energies=o.get_all_force_fcns("defo_grad_wise", "energy"), pt_wise_energies=o.get_all_force_fcns("pt_wise", "energy"))
-            more_partial__newton_G = partial(self._newton_G, z_prev=o.z_prev, z_dot=o.z_dot, B=o.B, BMB=o.BMB, dt=self.timestep, x0_flat=o.x0_flat, dFdz=o.dFdz, bigI=o.bigI, defo_grad_gradients=o.get_all_force_fcns("defo_grad_wise", "gradient"), pt_wise_gradients=o.get_all_force_fcns("pt_wise", "gradient"))
-            more_partial__newton_H = partial(self._newton_H, z_prev=o.z_prev, z_dot=o.z_dot, B=o.B, BMB=o.BMB, dt=self.timestep, x0_flat=o.x0_flat, dFdz=o.dFdz, bigI=o.bigI, defo_grad_hessians=o.get_all_force_fcns("defo_grad_wise", "hessian"), pt_wise_hessians=o.get_all_force_fcns("pt_wise", "hessian"))
-            o.z = optimization.newtons_method(o.z, more_partial__newton_E, more_partial__newton_G, more_partial__newton_H, max_iters=self.max_newton_steps, conv_criteria=0)
+            more_partial__newton_E = partial(self._newton_E, z_prev=o.z_prev, z_dot=o.z_dot, B=o.B, BMB=o.BMB, dt=self.timestep, x0_flat=o.x0_flat, dFdz=o.dFdz,
+                                             bigI=o.bigI, defo_grad_energies=o.get_all_force_fcns("defo_grad_wise", "energy"), pt_wise_energies=o.get_all_force_fcns("pt_wise", "energy"))
+            more_partial__newton_G = partial(self._newton_G, z_prev=o.z_prev, z_dot=o.z_dot, B=o.B, BMB=o.BMB, dt=self.timestep, x0_flat=o.x0_flat, dFdz=o.dFdz,
+                                             bigI=o.bigI, defo_grad_gradients=o.get_all_force_fcns("defo_grad_wise", "gradient"), pt_wise_gradients=o.get_all_force_fcns("pt_wise", "gradient"))
+            more_partial__newton_H = partial(self._newton_H, z_prev=o.z_prev, z_dot=o.z_dot, B=o.B, BMB=o.BMB, dt=self.timestep, x0_flat=o.x0_flat, dFdz=o.dFdz,
+                                             bigI=o.bigI, defo_grad_hessians=o.get_all_force_fcns("defo_grad_wise", "hessian"), pt_wise_hessians=o.get_all_force_fcns("pt_wise", "hessian"))
+            o.z = optimization.newtons_method(o.z, more_partial__newton_E, more_partial__newton_G,
+                                              more_partial__newton_H, max_iters=self.max_newton_steps, conv_criteria=0)
+
+            F_ele = torch.matmul(o.dFdz, o.z) + o.bigI
+            x_flat = o.B @ o.z + o.x0_flat
+            x = x_flat.reshape(-1, 3)
+            newline = "\t"
+            logger.debug(f'\t{newline.join(f"pt-wise {name}: {en(x):8.3} " for name, en in zip(pt_names, pt_wise_energies))}' +
+                         f'\t\t{newline.join(f" F-wise {name}:{en(F_ele):8.3} " for name, en in zip(defo_names, defo_wise_energies))}')
 
             with torch.no_grad():
-                o.z_dot = (o.z - o.z_prev)/self.timestep
+                o.z_dot = (o.z - o.z_prev) / self.timestep
 
-
-        self.current_sim_step += 1 
+        self.current_sim_step += 1

@@ -13,21 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch 
+import torch
 
 from kaolin.physics.materials import neohookean_elastic_material
 from kaolin.physics.materials import linear_elastic_material
 from kaolin.physics.materials import muscle_material
 import kaolin.physics.materials.utils as material_utils
-import kaolin.physics.utils as physics_utils 
+import kaolin.physics.utils as physics_utils
 
 __all__ = [
     'NeohookeanMaterial',
     'MuscleMaterial',
 ]
+
+
 class NeohookeanMaterial(physics_utils.ForceWrapper):
-    r"""Wrapper for kaolin.physics.material.neohookean_elastic_material's energy, gradient hessian functions. Initialize with youngs modulus and poisson ratios.
+    r"""Wrapper for kaolin.physics.material.neohookean_elastic_material's energy, gradient hessian functions. Initialize with youngs modulus (stiffness value measure in Pascals) and poisson ratios (a measure of compressibility, unitless). 
+    For more background information, refer to `Ted Kim's Siggraph Course Notes\
+    <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_
     """
+
     def __init__(self, yms, prs):
         r"""Initializer
 
@@ -36,7 +41,7 @@ class NeohookeanMaterial(physics_utils.ForceWrapper):
             prs (_type_): Tensor of poisson ratio per primitive, of shape :math:`(\text{batch_dim}, 1)`
         """
         self.mus, self.lams = material_utils.to_lame(yms, prs)
-        
+
     def _energy(self, defo_grad):
         r"""Energy wrapper
 
@@ -47,7 +52,7 @@ class NeohookeanMaterial(physics_utils.ForceWrapper):
             torch.Tensor: Tensor of per-element energies, of shape :math:`(\text{batch_dim}, 1)`
         """
         return neohookean_elastic_material.unbatched_neohookean_energy(self.mus, self.lams, defo_grad)
-    
+
     def _gradient(self, defo_grad):
         r"""Gradient wrapper
 
@@ -58,7 +63,7 @@ class NeohookeanMaterial(physics_utils.ForceWrapper):
             torch.Tensor: Tensor of per-element gradients, of shape :math:`(\text{batch_dim}, 9)`
         """
         return neohookean_elastic_material.unbatched_neohookean_gradient(self.mus, self.lams, defo_grad)
-    
+
     def _hessian(self, defo_grad):
         r"""Hessian wrapper
 
@@ -69,9 +74,12 @@ class NeohookeanMaterial(physics_utils.ForceWrapper):
             torch.Tensor: Tensor of per-element hessians, of shape :math:`(\text{batch_dim}, 9,9)`
         """
         return neohookean_elastic_material.unbatched_neohookean_hessian(self.mus, self.lams, defo_grad)
+
+
 class MuscleMaterial(physics_utils.ForceWrapper):
-    r"""Wrapper for kaolin.physics.material.muscle_material's energy, gradient hessian functions. Initialize with fiber vectors of shape :math:`(\text{n}, 3)` for n integration points..
+    r"""Wrapper for kaolin.physics.material.muscle_material's energy, gradient hessian functions. Initialize with fiber vectors of shape :math:`(\text{n}, 3)` for n integration points.
     """
+
     def __init__(self, fiber_vecs):
         r"""Wrapper around muscle energy, gradients, hessian functions. Stores fibers and activation.
 
@@ -111,7 +119,7 @@ class MuscleMaterial(physics_utils.ForceWrapper):
             torch.Tensor: Tensor of per-element gradients, of shape :math:`(\text{batch_dim}, 9)`
         """
         return muscle_material.unbatched_muscle_gradient(self.activation, self.fiber_mat_blocks, defo_grad)
-    
+
     def _hessian(self, defo_grad):
         r"""Hessian wrapper
 
