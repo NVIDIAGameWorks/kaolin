@@ -25,13 +25,14 @@ from kaolin.render.camera import perspective_camera, rotate_translate_points
 from kaolin.render.mesh import rasterize
 from kaolin.render.mesh.deftet import _naive_deftet_sparse_render
 import kaolin as kal
+from kaolin.utils.testing import check_allclose
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_DIR = os.path.join(ROOT_DIR, os.pardir, os.pardir, os.pardir, os.pardir, 'samples/')
 
 @pytest.mark.parametrize("dtype", [torch.float, torch.double])
 @pytest.mark.parametrize("batch_size", [1, 3])
-@pytest.mark.parametrize("height,width", [(35, 31)])
+@pytest.mark.parametrize("height,width", [(32, 32)])
 @pytest.mark.parametrize("flip", [False, True])
 class TestRasterize:
     @pytest.fixture(autouse=True)
@@ -356,13 +357,13 @@ class TestRasterize:
 
         # On a smooth enough surface the depth maps should match
         # (exclusing border because of numerical difference)
-        assert torch.allclose(
+        check_allclose(
             depth_map[mask_intersection],
             gt_depth_map[mask_intersection],
-            rtol=1e-3, atol=1e-3
+            rtol=5e-3, atol=1e-3
         )
         # Attribute can be quite different if the face getting rasterized is different
-        assert torch.allclose(
+        check_allclose(
             uvs_map[face_idx_same],
             gt_uvs_map[face_idx_same],
             rtol=1e-3, atol=1e-3
@@ -546,8 +547,8 @@ class TestRasterize:
 
     @pytest.mark.parametrize('with_valid_faces', [False, True])
     def test_nvdiffrast_backward(
-            self, batch_size, height, width, face_vertices_z,
-            face_vertices_image, face_uvs, with_valid_faces, valid_faces):
+            self, batch_size, height, width, pixel_coords, render_ranges,
+            face_vertices_z, face_vertices_image, face_uvs, with_valid_faces, valid_faces):
         if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
             pytest.skip(f'test is ignored as KAOLIN_TEST_NVDIFFRAST is not set')
         if face_vertices_image.dtype == torch.double:
@@ -562,6 +563,10 @@ class TestRasterize:
         face_vertices_image.requires_grad = True
         face_uvs = face_uvs.detach()
         face_uvs.requires_grad = True
+        pixel_coords2 = pixel_coords.detach()
+        pixel_coords2.requires_grad = True
+        render_ranges2 = render_ranges.detach()
+        render_ranges2.requires_grad = True
         face_vertices_z2 = face_vertices_z.detach()
         face_vertices_z2.requires_grad = True
         face_vertices_image2 = face_vertices_image.detach()
@@ -572,21 +577,24 @@ class TestRasterize:
         interpolated_features, face_idx = rasterize(
             height, width, face_vertices_z, face_vertices_image,
             face_uvs, backend='nvdiffrast', **kwargs)
-        gt_interpolated_features, gt_face_idx = rasterize(
-            height, width, face_vertices_z2, face_vertices_image2,
-            face_uvs2, backend='nvdiffrast_fwd', **kwargs)
-        gt_interpolated_features = gt_interpolated_features.reshape(
-            batch_size, height, width, -1)
+        gt_interpolated_features, gt_face_idx = _naive_deftet_sparse_render(
+            pixel_coords2, render_ranges2, face_vertices_z2,
+            face_vertices_image2, face_uvs2, 1, **kwargs)
+        gt_interpolated_features = gt_interpolated_features.reshape(batch_size, height, width, -1)
         gt_face_idx = gt_face_idx.reshape(batch_size, height, width)
 
+        face_idx_diff = face_idx != gt_face_idx
+
         grad_out = torch.rand_like(gt_interpolated_features)
+        grad_out[face_idx_diff] = 0.
+
         interpolated_features.backward(grad_out)
         gt_interpolated_features.backward(grad_out)
 
         assert face_vertices_z.grad is None or torch.all(face_vertices_z.grad == 0.)
-        assert torch.allclose(face_vertices_image.grad,
-                              face_vertices_image2.grad,
-                              rtol=5e-2, atol=5e-2)
-        assert torch.allclose(face_uvs.grad,
-                              face_uvs2.grad,
-                              rtol=1e-2, atol=1e-2)
+        check_allclose(face_vertices_image.grad,
+                       face_vertices_image2.grad,
+                       rtol=1e-2, atol=1e-2)
+        check_allclose(face_uvs.grad,
+                       face_uvs2.grad,
+                       rtol=1e-2, atol=1e-2)

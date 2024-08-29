@@ -116,9 +116,14 @@ spec:
                   """)
             }
           }
-          
           stage("Push") {
             targetImage.push()
+          }
+          stage("Clean local images") {
+            powershell """
+                docker image rm -f ${targetImageTag}-base
+                docker image rm -f ${targetImageTag}
+            """
           }
         }
       }
