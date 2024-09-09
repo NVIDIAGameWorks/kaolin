@@ -275,7 +275,8 @@ spec:
           stage("SPC Convolution 3D Recipe") {
             sh 'cd /kaolin/examples/recipes/spc/ && python spc_conv3d_example.py'
           }
-        } try {
+        }
+        try {
           stage("Quaternions Recipe") {
             sh 'cd /kaolin/examples/recipes/math/ && python quaternions.py'
           }
