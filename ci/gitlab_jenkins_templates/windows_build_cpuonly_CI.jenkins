@@ -100,6 +100,12 @@ spec:
           stage("Push") {
             targetImage.push()
           }
+          stage("Clean local image") {
+            powershell """
+                docker image rm -f ${imageTag}-base
+                docker image rm -f ${imageTag}
+            """
+          }
         }
       }
     } catch (e) {

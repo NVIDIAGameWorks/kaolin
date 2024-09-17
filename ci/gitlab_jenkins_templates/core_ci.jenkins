@@ -29,11 +29,14 @@ def ubuntu_from_pytorch_configs = [
 
 // Configs for build from NGC pytorch docker images
 // (See: https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch/tags)
+// DEPRECATED: DROPPING SUPPORT AS IT'S TOO MUCH LOAD
 def ubuntu_from_nvcr_configs = [
+/*
     [
         'baseImageTag': '24.06-py3',
         'archsToTest': 'MULTI'
     ],
+*/
 ]
 
 // Configs for build from cuda container
@@ -278,6 +281,7 @@ def windows_for_cuda_wheels_configs = [
 ]
 
 def windows_for_cpu_wheels_configs = [
+/*
     [
         'torchVer': '2.0.0', 'archsToTest': ''
     ],
@@ -305,6 +309,7 @@ def windows_for_cpu_wheels_configs = [
     [
         'torchVer': '2.3.1', 'archsToTest': ''
     ],
+*/
     [
         'torchVer': '2.4.0', 'archsToTest': ''
     ]
@@ -316,11 +321,13 @@ def windows_from_server_configs = [
     //  see: https://gitlab-master.nvidia.com/ipp/cloud-infra/blossom/dev/windows-gpu-pods/-/tree/master/ContainerDriverSetup
     // test machines currently are the only option, named 'gpu_tester'
     //      two machines exist, only the TITAN RTX will pass tests
+/*
     [
         'cudaVer': '11.8',
         'pythonVer': '3.9', 'torchVer': '2.0.0',
         'archsToTest': 'gpu_tester' //'Tesla_V100_PCIE_32GB'
     ],
+*/
     [
         'cudaVer': '12.1',
         'pythonVer': '3.11', 'torchVer': '2.3.1',

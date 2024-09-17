@@ -37,6 +37,7 @@ class TestNvidiaContext:
         assert isinstance(ctx, nvdiffrast.torch.RasterizeCudaContext)
         # TODO(cfujitsang): is there a way to test for specific device?
 
+    @pytest.mark.skipif(os.getenv('KAOLIN_TEST_NVDIFFRAST_OPENGL', '0') == '0', reason='test is ignored as KAOLIN_TEST_NVDIFFRAST_OPENGL is not set')
     @pytest.mark.parametrize('device', ['cuda:0', 'cuda'])
     @pytest.mark.parametrize('raise_error', [True, False])
     def test_cuda_default_nvdiffrast_context(self, device, raise_error):
@@ -50,9 +51,10 @@ class TestNvidiaContext:
         ctx = kaolin.render.mesh.nvdiffrast_context.default_nvdiffrast_context(device, raise_error)
         assert isinstance(ctx, nvdiffrast.torch.RasterizeCudaContext)
 
+    @pytest.mark.skipif(os.getenv('KAOLIN_TEST_NVDIFFRAST_OPENGL', '0') == '0', reason='test is ignored as KAOLIN_TEST_NVDIFFRAST_OPENGL is not set')
     @pytest.mark.parametrize('device', ['cuda:0', 'cuda'])
     @pytest.mark.parametrize('raise_error', [True, False])
-    def test_cuda_default_nvdiffrast_context(self, device, raise_error):
+    def test_opengl_default_nvdiffrast_context(self, device, raise_error):
         import nvdiffrast.torch
         global kaolin
         kaolin = reload(kaolin)
