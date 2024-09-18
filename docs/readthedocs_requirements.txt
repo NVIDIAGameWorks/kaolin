@@ -1,5 +1,5 @@
 numpy==1.26.3
 scipy==1.14.0
--f https://download.pytorch.org/whl/cpu
+-i https://download.pytorch.org/whl/cpu
 torch==2.4.0+cpu
 torchvision==0.19.0+cpu
