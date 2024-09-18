@@ -275,12 +275,15 @@ spec:
           stage("SPC Convolution 3D Recipe") {
             sh 'cd /kaolin/examples/recipes/spc/ && python spc_conv3d_example.py'
           }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
         }
         try {
           stage("Quaternions Recipe") {
             sh 'cd /kaolin/examples/recipes/math/ && python quaternions.py'
           }
-        }catch(e) {
+        } catch(e) {
           build_passed = false
           echo e.toString()
         }
