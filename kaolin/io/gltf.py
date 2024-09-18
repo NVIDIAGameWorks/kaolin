@@ -346,11 +346,13 @@ def _get_meshes(gltf):
             output.append(SurfaceMesh.flatten(m_group))
     return output
 
-def import_mesh(path):
+def import_mesh(path, scene=None):
     """Import mesh from a gltf (.glb or .gltf) file.
 
     Arguments:
         path (str): path to the gltf file.
+        scene (int, optional): scene index, used to load animation specific frame.
+                               Default: default gltf scene (most of time frame 0).
 
     Returns:
         (kaolin.rep.SurfaceMesh): The imported mesh.
@@ -365,7 +367,10 @@ def import_mesh(path):
                 "wrapping mode is not support yet. Please make a github request if needed.",
                 UserWarning
             )
-    default_scene = gltf.scenes[gltf.scene]
+    if scene is None:
+        default_scene = gltf.scenes[gltf.scene]
+    else:
+        default_scene = gltf.scenes[scene]
     scene_meshes = []
 
     has_tangents = False

@@ -329,6 +329,8 @@ class CameraIntrinsics(ABC):
             self.params[:, param_idx] = val.unsqueeze(0).repeat(len(self), 1)    # TODO(operel): can just use broadcast
         elif val.ndim == 1:         # Each camera set with different value
             self.params[:, param_idx] = val
+        else:
+            raise ValueError('Val {type(val)} unsupported as intrinsic parameter')
 
     @abstractmethod
     def zoom(self, amount):
