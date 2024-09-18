@@ -2,10 +2,8 @@
 # The following snippet demonstrates how to use the quaternion representation transforms
 # ==============================================================================================================
 
-import math
 import torch
-import numpy as np
-from kaolin.ops import quat
+from kaolin.math import quat
 
 device = 'cuda'
 

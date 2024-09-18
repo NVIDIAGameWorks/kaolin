@@ -279,6 +279,14 @@ spec:
           build_passed = false
           echo e.toString()
         }
+        try {
+          stage("Quaternions Recipe") {
+            sh 'cd /kaolin/examples/recipes/math/ && python quaternions.py'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
         if (build_passed) {
           currentBuild.result = "SUCCESS"
         } else {
