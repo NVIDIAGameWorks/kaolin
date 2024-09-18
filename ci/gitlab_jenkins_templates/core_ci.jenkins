@@ -5,6 +5,7 @@ import groovy.transform.Field
 if (gitlabActionType == "MERGE" || gitlabSourceBranch == "master") {
 gitlabCommitStatus("launch all builds") {
 
+def defaultWheelsPythonVers = ['3.9', '3.10', '3.11', '3.12']
 
 // Configs for build from pytorch docker images
 // (See: https://hub.docker.com/r/pytorch/pytorch/tags)
@@ -71,7 +72,7 @@ def ubuntu_for_cuda_wheels_configs = [
 /*
     [
         'cudaVer': '11.7.1', 'cudnnVer': '8',
-        'torchVer': '2.0.0', 'archsToTest': 'MULTI'
+        'torchVer': '2.0.0', 'archsToTest': 'MULTI',
     ],
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
@@ -149,11 +150,11 @@ def ubuntu_for_cuda_wheels_configs = [
         'cudaVer': '12.1.0', 'cudnnVer': '8',
         'torchVer': '2.4.0', 'archsToTest': 'MULTI'
     ],
+*/
     [
         'cudaVer': '12.4.1', 'cudnnVer': '',
         'torchVer': '2.4.0', 'archsToTest': 'MULTI'
     ]
-*/
 ]
 
 def ubuntu_for_cpu_wheels_configs = [
@@ -313,6 +314,7 @@ def windows_for_cpu_wheels_configs = [
     [
         'torchVer': '2.4.0', 'archsToTest': ''
     ]
+*/
 ]
 // Configs for build from Windows server docker images
 // (See: https://hub.docker.com/_/microsoft-dotnet-framework-sdk)
@@ -362,7 +364,8 @@ node {
     if (gitlabActionType == "MERGE" &&
         gitlabMergeRequestTitle.contains("[for wheels]")) {
             for (config in ubuntu_for_cuda_wheels_configs) {
-                for (pythonVer in ['3.9', '3.10', '3.11']) {
+                pythonVers = config.containsKey('pythonVers') && config.containsKey != '' ? config['pythonVers'] : defaultWheelsPythonVers
+                for (pythonVer in pythonVers) {
                     def configName = "custom-wheels-torch${config['torchVer']}-" + \
                                      "cuda${config['cudaVer']}-" +
                                      "cudnn${config['cudnnVer']}-" +
@@ -379,7 +382,8 @@ node {
                 }
             }
             for (config in ubuntu_for_cpu_wheels_configs) {
-                for (pythonVer in ['3.9', '3.10', '3.11']) {
+                pythonVers = config.containsKey('pythonVers') && config.containsKey != '' ? config['pythonVers'] : defaultWheelsPythonVers
+                for (pythonVer in pythonVers) {
                     def configName = "custom-wheels-torch${config['torchVer']}-" + \
                                      "cpu-py${pythonVer}"
                     jobMap["${configName}"] = prepareUbuntuCPUOnlyJob(
@@ -391,7 +395,8 @@ node {
                 }
             }
             for (config in windows_for_cuda_wheels_configs) {
-                for (pythonVer in ['3.9', '3.10', '3.11']) {
+                pythonVers = config.containsKey('pythonVers') && config.containsKey != '' ? config['pythonVers'] : defaultWheelsPythonVers
+                for (pythonVer in pythonVers) {
                     def cudaVerLabel = config['cudaVer'].split('\\.').join('')
                     def torchVerLabel = config['torchVer'].split('\\.').join('')
                     def pythonVerLabel = pythonVer.split('\\.').join('')
@@ -407,7 +412,8 @@ node {
                 }
             }
             for (config in windows_for_cpu_wheels_configs) {
-                for (pythonVer in ['3.9', '3.10', '3.11']) {
+                pythonVers = config.containsKey('pythonVers') && config.containsKey != '' ? config['pythonVers'] : defaultWheelsPythonVers
+                for (pythonVer in pythonVers) {
                     def torchVerLabel = config['torchVer'].split('\\.').join('')
                     def pythonVerLabel = pythonVer.split('\\.').join('')
                     def configName = "windows-wheels-cpu-py${pythonVerLabel}-torch${torchVerLabel}"
