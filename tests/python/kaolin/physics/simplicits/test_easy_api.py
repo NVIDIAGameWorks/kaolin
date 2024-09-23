@@ -108,13 +108,13 @@ def test_easy_api_obj_training(device, dtype):
 
     # Train a model for 10 iterations, measure loss
     sim_obj.train(1)
-    start_le, start_lo = sim_obj.training_step(sim_obj.model, sim_obj.normalized_pts, sim_obj.yms, sim_obj.prs,
-                                               sim_obj.rhos, 1, le_coeff=0.1, lo_coeff=1e6)
+    start_le, start_lo = sim_obj.compute_losses(sim_obj.model, sim_obj.normalized_pts, sim_obj.yms, sim_obj.prs,
+                                                sim_obj.rhos, 1, le_coeff=0.1, lo_coeff=1e6)
 
     # Train a NEW model for 200 iterations, measure loss
     sim_obj.train(200)
-    end_le, end_lo = sim_obj.training_step(sim_obj.model, sim_obj.normalized_pts, sim_obj.yms, sim_obj.prs,
-                                           sim_obj.rhos, 1, le_coeff=0.1, lo_coeff=1e6)
+    end_le, end_lo = sim_obj.compute_losses(sim_obj.model, sim_obj.normalized_pts, sim_obj.yms, sim_obj.prs,
+                                            sim_obj.rhos, 1, le_coeff=0.1, lo_coeff=1e6)
 
     assert (start_le + start_lo > end_le + end_lo)
 

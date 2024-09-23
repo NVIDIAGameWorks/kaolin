@@ -13,20 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from kaolin.physics.simplicits.network import SimplicitsMLP
+import kaolin.physics.simplicits.utils as simplicits_utils
+import kaolin.physics.simplicits.precomputed as precomputed
+import kaolin.physics.utils as phys_utils
+import kaolin.physics.materials as materials
+import kaolin.physics.utils.optimization as optimization
+from kaolin.physics.simplicits.simplicits_scene_forces import *
+from kaolin.physics.simplicits.losses_warp import compute_losses_warp
+from kaolin.physics.simplicits.losses import compute_losses
+from kaolin.physics.simplicits.losses_warp import compute_losses_warp
+from kaolin.physics.simplicits.losses import compute_losses
 import os
 import torch
 import numpy as np
 import logging
 from functools import partial
-
-from kaolin.physics.simplicits.train import train_step
-from kaolin.physics.simplicits.simplicits_scene_forces import *
-import kaolin.physics.utils.optimization as optimization
-import kaolin.physics.materials as materials
-import kaolin.physics.utils as phys_utils
-import kaolin.physics.simplicits.precomputed as precomputed
-import kaolin.physics.simplicits.utils as simplicits_utils
-from kaolin.physics.simplicits.network import SimplicitsMLP
 
 
 logger = logging.getLogger(__name__)
@@ -40,7 +42,7 @@ __all__ = [
 
 class SimplicitsObject:
     def __init__(self, pts, yms, prs, rhos, appx_vol, num_handles=10, num_samples=1000, model_layers=6,
-                 training_batch_size=10, normalize_for_training=True):
+                 training_batch_size=10, normalize_for_training=True, warp_training=False):
         r""" Easy to use wrapper for initializing and training a simplicits object based on the paper https://research.nvidia.com/labs/toronto-ai/simplicits/
 
         Args:
@@ -95,11 +97,18 @@ class SimplicitsObject:
 
         self.num_samples = num_samples
         self.training_layers = model_layers
-        self.training_step = partial(train_step,
-                                     batch_size=training_batch_size,  # TODO: maybe pass into train() below?
-                                     num_handles=self.num_handles,
-                                     appx_vol=norm_appx_vol,
-                                     num_samples=self.num_samples)
+        if warp_training:
+            self.compute_losses = partial(compute_losses_warp,
+                                          batch_size=training_batch_size,  # TODO: maybe pass into train() below?
+                                          num_handles=self.num_handles,
+                                          appx_vol=norm_appx_vol,
+                                          num_samples=self.num_samples)
+        else:
+            self.compute_losses = partial(compute_losses,
+                                          batch_size=training_batch_size,  # TODO: maybe pass into train() below?
+                                          num_handles=self.num_handles,
+                                          appx_vol=norm_appx_vol,
+                                          num_samples=self.num_samples)
 
         self.model = None
         if self.num_handles == 0:
@@ -146,6 +155,11 @@ class SimplicitsObject:
             lr_end (float, optional): Learning rate at end of training. Defaults to 1e-3.
             le_coeff (float, optional): Training parameter. Elasticity loss coefficient. Defaults to 1e-1.
             lo_coeff (float, optional): Training parameter. Orthogonality loss coefficient. Defaults to 1e6.
+            log_every (int, optional): Number of steps after which to log the status of the training
+
+        Returns:
+            list, optional: List of pair-wise loss float values at each `log_every` number of steps (defaults to 1000)
+
         """
         if self.num_handles == 0:
             # Rigid object, no training
@@ -157,11 +171,11 @@ class SimplicitsObject:
         optimizer = torch.optim.Adam(self.model.parameters(), lr_start)
 
         self.model.train()
-
+        e_logs = []
         for i in range(num_steps):
             optimizer.zero_grad()
-            le, lo = self.training_step(self.model, self.normalized_pts, self.yms, self.prs,
-                                        self.rhos, float(i / num_steps), le_coeff=le_coeff, lo_coeff=lo_coeff)
+            le, lo = self.compute_losses(self.model, self.normalized_pts, self.yms, self.prs,
+                                         self.rhos, float(i / num_steps), le_coeff=le_coeff, lo_coeff=lo_coeff)
             loss = le + lo
 
             loss.backward()
@@ -173,8 +187,10 @@ class SimplicitsObject:
 
             if i % log_every == 0:
                 logger.info(f'Training step: {i}, le: {le.item()}, lo: {lo.item()}')
+                e_logs.append((le.item(), lo.item()))
 
         self.model.eval()
+        return e_logs
 
 
 # private utility class
