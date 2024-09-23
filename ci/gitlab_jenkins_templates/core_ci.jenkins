@@ -314,7 +314,6 @@ def windows_for_cpu_wheels_configs = [
     [
         'torchVer': '2.4.0', 'archsToTest': ''
     ]
-*/
 ]
 // Configs for build from Windows server docker images
 // (See: https://hub.docker.com/_/microsoft-dotnet-framework-sdk)
