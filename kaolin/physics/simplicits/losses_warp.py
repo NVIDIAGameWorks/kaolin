@@ -25,6 +25,7 @@ from kaolin.physics.simplicits.losses import loss_ortho
 
 
 wp.init()
+wp.config.quiet = False
 
 # Type defs
 mat34f = wp.types.matrix(shape=(3, 4), dtype=wp.float32)
@@ -297,8 +298,7 @@ def compute_losses_warp(model, normalized_pts, yms, prs, rhos, en_interp, batch_
     le = le_coeff * loss_elastic_warp(model, sample_pts, sample_yms, sample_prs,
                                       sample_rhos, batch_transforms, appx_vol, en_interp)
 
-    with torch.cuda.nvtx.range("warp.train_warp.loss_ortho"):
-        # Calculate orthogonality of skinning weights
-        lo = lo_coeff * loss_ortho(weights)
+    # Calculate orthogonality of skinning weights
+    lo = lo_coeff * loss_ortho(weights)
 
     return le, lo

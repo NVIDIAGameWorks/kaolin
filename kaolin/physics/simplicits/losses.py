@@ -41,7 +41,6 @@ def loss_ortho(weights):
     return nn.MSELoss()(weights.T @ weights, torch.eye(weights.shape[1], device=weights.device))
 
 
-@torch.cuda.nvtx.range("loss_elastic()")
 def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step):
     r"""Calculate a version of simplicits elastic loss for training.
 
