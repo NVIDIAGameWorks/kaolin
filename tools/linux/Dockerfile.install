@@ -44,6 +44,7 @@ RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-p
 	curl \
         cmake \
         xvfb \
+	wget \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
