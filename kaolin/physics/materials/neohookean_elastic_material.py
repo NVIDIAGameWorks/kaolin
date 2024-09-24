@@ -14,14 +14,38 @@
 # limitations under the License.
 
 import torch
+import warp as wp
 
 __all__ = [
+    'wp_neohookean_energy',
     'neohookean_energy',
     'neohookean_gradient',
     'unbatched_neohookean_energy',
     'unbatched_neohookean_gradient',
     'unbatched_neohookean_hessian'
 ]
+
+
+@wp.func
+def wp_neohookean_energy(mu: float, lam: float, F: wp.mat33) -> float:
+    r"""Implements a version of neohookean energy. Calculate energy per-integration primitive. For more background information, refer to `Ted Kim's Siggraph Course Notes\
+    <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_
+
+    Args:
+        mu (torch.Tensor): Batched lame parameter mu, of shape :math:`(\text{batch_dims}, 1)`
+        lam (torch.Tensor): Batched lame parameter lambda, of shape, :math:`(\text{batch_dims}, 1)` 
+        defo_grad (torch.Tensor): Batched deformation gradients (denoted in literature as F) of 3 or more dimensions, :math:`(\text{batch_dims}, 3, 3)`
+
+    Returns:
+        torch.Tensor: :math:`(\text{batch_dims}, 1)` vector of per defo-grad energy values
+    """
+    C1 = mu / 2.0
+    D1 = lam / 2.0
+    F_transpose = wp.transpose(F)
+    I1 = wp.trace(F_transpose @ F)
+    J = wp.determinant(F)
+    W = C1 * (I1 - 3.0) + D1 * (J - 1.0) * (J - 1.0) - mu * (J - 1.0)
+    return W
 
 
 def neohookean_energy(mu, lam, defo_grad):

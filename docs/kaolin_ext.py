@@ -16,6 +16,7 @@ import os
 
 KAOLIN_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir)
 
+
 def run_apidoc(_):
     # This is runnning sphinx-apidoc which is automatically generating
     # .rst files for each python file in kaolin
@@ -66,7 +67,7 @@ def run_apidoc(_):
             "kaolin/physics/simplicits/network.py",
             "kaolin/physics/simplicits/precomputed.py",
             "kaolin/physics/simplicits/simplicits_scene_forces.py",
-            "kaolin/physics/simplicits/train.py",
+            "kaolin/physics/simplicits/losses_warp.py",
             "kaolin/physics/simplicits/utils.py",
             "kaolin/physics/utils/finite_diff.py",
             "kaolin/physics/utils/force_wrapper.py",
@@ -116,6 +117,7 @@ def run_apidoc(_):
     ]
     apidoc.main(argv)
     os.remove(os.path.join(DOCS_MODULE_PATH, 'kaolin.rst'))
+
 
 def setup(app):
     app.connect("builder-inited", run_apidoc)

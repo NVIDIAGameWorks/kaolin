@@ -5,3 +5,4 @@ Pillow>=8.0.0
 tqdm>=4.51.0
 scipy
 pygltflib
+warp-lang

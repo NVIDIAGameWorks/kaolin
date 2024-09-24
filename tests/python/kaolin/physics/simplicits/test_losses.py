@@ -20,7 +20,7 @@ import torch
 import numpy as np
 
 from kaolin.physics.simplicits.network import SimplicitsMLP
-from kaolin.physics.simplicits.train import train_step
+from kaolin.physics.simplicits.losses import compute_losses
 from functools import partial
 
 # SDFs
@@ -63,7 +63,7 @@ def example_unit_cube_object(num_points=100000, yms=1e5, prs=0.45, rhos=1000):
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float])
-def test_train_step(device, dtype):
+def test_compute_losses(device, dtype):
     NUM_HANDLES = 10
     NUM_STEPS = 10
     LR_START = 1e-3
@@ -82,20 +82,19 @@ def test_train_step(device, dtype):
     so_normalized_pts = torch.tensor(so_normalized_pts, device=device, dtype=dtype)
     so_model.to(device=device, dtype=dtype)
 
-    # train_step(step, model, optim, normalized_pts, yms, prs, rhos, BATCH_SIZE, NUM_HANDLES, APPX_VOL, NUM_SAMPLES, LE_COEFF, LO_COEFF)
-    partial_train_step = partial(train_step,
-                                 batch_size=10,
-                                 num_handles=10,
-                                 appx_vol=so_appx_vol,
-                                 num_samples=NUM_SAMPLES,
-                                 le_coeff=1e-1,
-                                 lo_coeff=1e6)
+    partial_compute_losses = partial(compute_losses,
+                                     batch_size=10,
+                                     num_handles=10,
+                                     appx_vol=so_appx_vol,
+                                     num_samples=NUM_SAMPLES,
+                                     le_coeff=1e-1,
+                                     lo_coeff=1e6)
 
     so_model.train()
     list_of_en = []
     for i in range(NUM_STEPS):
         so_optimizer.zero_grad()
-        le, lo = partial_train_step(so_model, so_normalized_pts, so_yms, so_prs, so_rhos, float(i / NUM_STEPS))
+        le, lo = partial_compute_losses(so_model, so_normalized_pts, so_yms, so_prs, so_rhos, float(i / NUM_STEPS))
         loss = le + lo
         loss.backward()
         so_optimizer.step()
