@@ -198,6 +198,46 @@ spec:
           echo e.toString()
         }
         try {
+          stage("Physics - Simplicits Easy API") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_easy_api.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Simplicits INRIA Splatting") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_inria_splatting.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Simplicits Interactive") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_interactive.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Simplicits Low-Level API") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_low_level_api.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Simplicits Muscle Activation") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_muscle_activation.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
           stage("Spherical Gaussian lighting Tutorial") {
             sh 'cd /kaolin/examples/tutorial && ipython sg_specular_lighting.ipynb'
           }

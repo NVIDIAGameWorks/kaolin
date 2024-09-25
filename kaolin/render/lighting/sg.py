@@ -337,8 +337,8 @@ def sg_warp_specular_term(amplitude, direction, sharpness, normal,
     ndl = torch.clamp(_dot(normal, ndf_direction), min=0., max=1.)
     ndv = torch.clamp(_dot(normal, view), min=0., max=1.)
     h = ndf_direction + view
-    h /= torch.sqrt(_dot(h, h))
-    ldh = torch.clamp(_dot(ndf_direction, h), min=0., max=1.)
+    _h = h / torch.sqrt(_dot(h, h))
+    ldh = torch.clamp(_dot(ndf_direction, _h), min=0., max=1.)
     
     output = unbatched_reduced_sg_inner_product(
         ndf_amplitude, ndf_direction, ndf_sharpness,
