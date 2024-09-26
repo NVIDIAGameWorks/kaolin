@@ -9,7 +9,7 @@ WORKDIR /kaolin
 COPY . .
 
 # NOTE: pin setuptools to avoid directory copy bug
-RUN pip install --upgrade --no-cache-dir setuptools==58.0.0 certifi
+RUN pip install --upgrade --no-cache-dir certifi ninja
 RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org \
     --trusted-host files.pythonhosted.org -r tools/build_requirements.txt
 

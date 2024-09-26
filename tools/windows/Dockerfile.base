@@ -83,6 +83,6 @@ RUN Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Us
 # NOTE: update the install list (2 lines here) if SSL_CERTIFICATE errors crop up to pip install the related dependency
 RUN $Env:TORCH_STR = ${Env:PYTORCH_VERSION} + '+cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
     $Env:TORCH_URL='https://download.pytorch.org/whl/cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
-    pip install --no-cache-dir torch==${Env:TORCH_STR} ninja --extra-index-url ${Env:TORCH_URL};
+    pip install --no-cache-dir torch==${Env:TORCH_STR} torchvision --index-url ${Env:TORCH_URL};
 
 RUN pip install brotli

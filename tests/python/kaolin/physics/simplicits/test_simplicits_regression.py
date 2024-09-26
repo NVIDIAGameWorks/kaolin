@@ -33,10 +33,12 @@ torch.backends.cuda.matmul.allow_tf32 = False
 # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
 torch.backends.cudnn.allow_tf32 = False
 
+__test_dir = os.path.dirname(os.path.realpath(__file__))
+__samples_path = os.path.join(__test_dir, os.pardir, os.pardir, os.pardir, os.pardir, 'samples')
 
 def load_and_set_fox(device, dtype):
     # Import and triangulate to enable rasterization; move to GPU
-    mesh = kal.io.import_mesh(kal.__path__[0] + "/../sample_data/meshes/fox.obj", triangulate=True).to(device)
+    mesh = kal.io.import_mesh(os.path.join(__samples_path, "physics/fox.obj"), triangulate=True).to(device)
     mesh.vertices = kal.ops.pointcloud.center_points(mesh.vertices.unsqueeze(0), normalize=True).squeeze(0)
     orig_vertices = mesh.vertices.clone()  # Also save original undeformed vertices
 
@@ -62,7 +64,7 @@ def load_and_set_fox(device, dtype):
 
 def load_and_set_box(device, dtype):
     # Import and triangulate to enable rasterization; move to GPU
-    mesh = kal.io.import_mesh(kal.__path__[0] + "/../sample_data/meshes/fox.obj", triangulate=True).to(device)
+    mesh = kal.io.import_mesh(os.path.join(__samples_path, "physics/fox.obj"), triangulate=True).to(device)
     mesh.vertices = kal.ops.pointcloud.center_points(mesh.vertices.unsqueeze(0), normalize=True).squeeze(0)
     orig_vertices = mesh.vertices.clone()  # Also save original undeformed vertices
 

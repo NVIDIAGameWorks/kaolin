@@ -102,8 +102,8 @@ spec:
           }
           stage("Clean local image") {
             powershell """
-                docker image rm -f ${imageTag}-base
-                docker image rm -f ${imageTag}
+                docker image rm -f ${targetImageTag}-base
+                docker image rm -f ${targetImageTag}
             """
           }
         }
