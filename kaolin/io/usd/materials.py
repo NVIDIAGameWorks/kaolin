@@ -34,6 +34,7 @@ from .utils import _get_stage_from_maybe_file, get_scene_paths
 
 logging.getLogger("PIL.PngImagePlugin").propagate = False
 
+UNSUPPORTED_MATERIAL_INPUTS = ['transmittance']
 
 # TODO: ensure this can also work for absolute texture paths
 def import_material(file_path_or_stage, scene_path, texture_path=None, time=None) -> Material:
@@ -521,6 +522,13 @@ def write_usd_preview_surface(pbr_material: PBRMaterial, stage, scene_path, writ
 
     Returns: UsdShade.Material
     """
+
+    material_attributes = pbr_material.get_attributes(only_tensors=True)
+    for input_type in UNSUPPORTED_MATERIAL_INPUTS:
+        if (input_type + '_value') in material_attributes or (input_type + '_texture') in material_attributes:
+            warnings.warn(f'Warning: USD exporter does not support PBRMaterial input type: "{input_type}". '
+                          f'This specific material information will be discarded.', UserWarning)
+
     material = UsdShade.Material.Define(stage, scene_path)
 
     shader = UsdShade.Shader.Define(stage, f'{scene_path}/Shader')

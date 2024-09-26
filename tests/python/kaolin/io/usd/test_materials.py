@@ -62,12 +62,34 @@ def mesh():
 
 
 class TestUsdPreviewSurfaceIo:
+
+    def assert_unsupported_input_types(self, mat, record):
+        for unsupported_input in usd_materials.UNSUPPORTED_MATERIAL_INPUTS:
+            is_mat_contain_unsupported_input = \
+                getattr(mat, f'{unsupported_input}_value') is not None or \
+                getattr(mat, f'{unsupported_input}_texture') is not None
+            expected_msg = f'Warning: USD exporter does not support PBRMaterial input type: "{unsupported_input}"'
+            did_raise_warning = any([expected_msg in record[i].message.args[0] for i in range(len(record))])
+            assert not is_mat_contain_unsupported_input or did_raise_warning
+
+    def strip_unsupported_fields(self, mat):
+        for unsupported_input in usd_materials.UNSUPPORTED_MATERIAL_INPUTS:
+            if hasattr(mat, f"{unsupported_input}_value"):
+                setattr(mat, f"{unsupported_input}_value", None)
+            if hasattr(mat, f"{unsupported_input}_texture"):
+                setattr(mat, f"{unsupported_input}_texture", None)
+            if hasattr(mat, f"{unsupported_input}_colorspace"):
+                setattr(mat, f"{unsupported_input}_colorspace", 'auto')
+
     def test_export_import_defaults(self, out_dir):
         mat = kaolin.render.materials.PBRMaterial(
             **random_material_textures(), **random_material_values(), **random_material_colorspaces())
         mat2 = kaolin.render.materials.PBRMaterial(
             **random_material_textures(), **random_material_values(), **random_material_colorspaces())
+        self.strip_unsupported_fields(mat)
+        self.strip_unsupported_fields(mat2)
         file_path = os.path.join(out_dir, 'default_export.usda')
+
         scene_path, _ = usd_materials.export_material(mat, file_path)
         scene_path2, _ = usd_materials.export_material(mat2, file_path)
         assert scene_path != scene_path2
@@ -79,6 +101,32 @@ class TestUsdPreviewSurfaceIo:
         assert contained_torch_equal(mat, material_in, approximate=True, print_error_context='', rtol=1e-2, atol=1e-2)
         assert contained_torch_equal(mat2, material_in2, approximate=True, print_error_context='', rtol=1e-2, atol=1e-2)
 
+    def test_export_with_unsupported_fields(self, out_dir):
+        mat = kaolin.render.materials.PBRMaterial(
+            **random_material_textures(), **random_material_values(), **random_material_colorspaces())
+        mat2 = kaolin.render.materials.PBRMaterial(
+            **random_material_textures(), **random_material_values(), **random_material_colorspaces())
+        file_path = os.path.join(out_dir, 'default_export.usda')
+
+        with pytest.warns(UserWarning) as record:
+            scene_path, _ = usd_materials.export_material(mat, file_path)
+            self.assert_unsupported_input_types(mat, record)
+        with pytest.warns(UserWarning) as record2:
+            scene_path2, _ = usd_materials.export_material(mat2, file_path)
+            self.assert_unsupported_input_types(mat2, record2)
+        assert scene_path != scene_path2
+
+        material_in = usd_materials.import_material(file_path, scene_path)
+        material_in2 = usd_materials.import_material(file_path, scene_path2)
+        mat.material_name = scene_path
+        mat2.material_name = scene_path2
+
+        for unsupported_input in usd_materials.UNSUPPORTED_MATERIAL_INPUTS:
+            assert getattr(material_in, f"{unsupported_input}_value") is None
+            assert getattr(material_in, f"{unsupported_input}_texture") is None
+            assert getattr(material_in2, f"{unsupported_input}_value") is None
+            assert getattr(material_in2, f"{unsupported_input}_texture") is None
+
     @pytest.mark.parametrize("same_filepath", [True, False])
     def test_texture_no_overwrite(self, out_dir, same_filepath):
         # Note: it is important these textures are random every time, or we won't see an error with a constant fixture
@@ -87,6 +135,8 @@ class TestUsdPreviewSurfaceIo:
         mat1.material_name = '/World/Looks/pretty_material'
         mat2 = kaolin.render.materials.PBRMaterial(**random_material_textures(), **random_material_colorspaces())
         mat2.material_name = '/World/Looks2/pretty_material'
+        self.strip_unsupported_fields(mat1)
+        self.strip_unsupported_fields(mat2)
 
         file_path1 = os.path.join(out_dir, f'pretty_material_{same_filepath}.usda')
         file_path2 = os.path.join(out_dir, f'pretty_material2_{same_filepath}.usda')
@@ -107,6 +157,7 @@ class TestUsdPreviewSurfaceIo:
         mat = kaolin.render.materials.PBRMaterial(**random_material_textures(), **vals, **colorspaces)
         mat.material_name = '/World/Looks/pretty_material'
         file_path = os.path.join(out_dir, 'birches.usda')
+        self.strip_unsupported_fields(mat)
 
         usd_materials.export_material(mat, file_path, mat.material_name)
         material_in = usd_materials.import_material(file_path, mat.material_name)
@@ -118,6 +169,7 @@ class TestUsdPreviewSurfaceIo:
         # create and write a completely different material
         for overwrite_textures in [True, False]:
             mat2 = kaolin.render.materials.PBRMaterial(**random_material_textures(), **vals, **colorspaces)
+            self.strip_unsupported_fields(mat2)
             mat2.material_name = mat.material_name
             usd_materials.export_material(mat2, file_path, mat2.material_name, overwrite_textures=overwrite_textures)
             material_in = usd_materials.import_material(file_path, mat2.material_name)
@@ -139,6 +191,7 @@ class TestUsdPreviewSurfaceIo:
         colorspaces = random_material_colorspaces()
         mat = kaolin.render.materials.PBRMaterial(**material_values, **material_textures, **colorspaces)
         mat.material_name = scene_path
+        self.strip_unsupported_fields(mat)
         usd_materials.export_material(mat, file_path, scene_path, texture_path=texture_path)
 
         # The texture path is baked into the USD, so we don't need to pass it in
@@ -174,6 +227,7 @@ class TestUsdPreviewSurfaceIo:
             raise RuntimeError(f'Bug in the test')
 
         mat.material_name = scene_path
+        self.strip_unsupported_fields(mat)
         usd_materials.export_material(mat, file_path, scene_path)
         material_in = usd_materials.import_material(file_path, scene_path)
         assert contained_torch_equal(mat, material_in, approximate=True, print_error_context='', rtol=1e-2, atol=1e-2)
@@ -201,6 +255,7 @@ class TestUsdPreviewSurfaceIo:
         # Write random material to file
         mat = kaolin.render.materials.PBRMaterial(**random_material_values())
         mat.material_name = scene_path
+        self.strip_unsupported_fields(mat)
         usd_materials.export_material(mat, file_path, scene_path)
         material_in = usd_materials.import_material(file_path, scene_path)
         assert contained_torch_equal(mat, material_in, approximate=True, print_error_context='', rtol=1e-2, atol=1e-2)
@@ -209,6 +264,7 @@ class TestUsdPreviewSurfaceIo:
         mat2 = kaolin.render.materials.PBRMaterial(
             **random_material_values(), **random_material_textures(), **random_material_colorspaces())
         mat2.material_name = scene_path
+        self.strip_unsupported_fields(mat2)
         usd_materials.export_material(mat2, file_path, scene_path)
         material_in = usd_materials.import_material(file_path, scene_path)
         assert contained_torch_equal(mat2, material_in, approximate=True, print_error_context='', rtol=1e-2, atol=1e-2)

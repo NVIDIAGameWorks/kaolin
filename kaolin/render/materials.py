@@ -61,9 +61,12 @@ class PBRMaterial(Material):
         opacity_value (float):
             Opacity, with `1.0` fully opaque and `0.0` as transparent with values within this range
             defining a translucent surface. Default value is None.
-        opacity_treshold (float):
+        opacity_threshold (float):
             Used to create cutouts based on the `opacity_value`. Surfaces with an opacity
             smaller than the `opacity_threshold` will be fully transparent. Default value is None.
+            Note: The definition of `opacity` make conflict with the `transmission` field
+            due to different shader conventions.
+            Use either the one or the other according to your shader conventions.
         ior_value (float):
             Index of Refraction used with translucent objects and objects with specular components.
             Default value is None.
@@ -72,6 +75,11 @@ class PBRMaterial(Material):
             Default value is None.
         displacement_value (float):
             Displacement in the direction of the normal. Default is None
+        transmittance_value (float):
+            The percentage of light that is transmitted through the surface of the material. Default is None
+            Note: The definition of `transmission` make conflict with the `opacity` field
+            due to different shader conventions.
+            Use either the one or the other according to your shader conventions.
         diffuse_texture (torch.FloatTensor):
             Texture for diffuse parameter, of shape `(3, height, width)`.
         roughness_texture (torch.FloatTensor):
@@ -98,6 +106,9 @@ class PBRMaterial(Material):
             Tensor values must be in the range of `[(-1.0, -1.0, -1.0), (1.0, 1.0, 1.0)]`.
         displacement_texture (torch.FloatTensor):
             Texture for displacement in the direction of the normal `(1, height, width)`.
+        transmittance_texture (torch.FloatTensor):
+            Texture for the percentage of light that is transmitted through the surface of the material,
+            of shape `(1, height, width)`.
         is_specular_workflow (bool):
             Determines whether or not to use a specular workflow.
             Default is `False` (use a metallic workflow).
@@ -130,6 +141,9 @@ class PBRMaterial(Material):
         displacement_colorspace (string):
             Colorspace of texture, if provided. Select from [auto, raw].
             Default is 'auto'.
+        transmittance_colorspace (string):
+            Colorspace of texture, if provided. Select from [auto, raw].
+            Default is 'auto'.
         shaders (dict):
             Dictionary mapping a shader name to a reader and writer function.
             (Currently cannot be set).
@@ -145,7 +159,8 @@ class PBRMaterial(Material):
         'opacity_threshold',
         'ior_value',
         'specular_color',
-        'displacement_value'
+        'displacement_value',
+        'transmittance_value'
     ]
 
     __texture_attributes = [
@@ -158,7 +173,8 @@ class PBRMaterial(Material):
         'ior_texture',
         'specular_texture',
         'normals_texture',
-        'displacement_texture'
+        'displacement_texture',
+        'transmittance_texture'
     ]
 
     __colorspace_attributes = [
@@ -171,7 +187,8 @@ class PBRMaterial(Material):
         'ior_colorspace',
         'specular_colorspace',
         'normals_colorspace',
-        'displacement_colorspace'
+        'displacement_colorspace',
+        'transmittance_colorspace'
     ]
 
     __misc_attributes = [
@@ -198,6 +215,7 @@ class PBRMaterial(Material):
         ior_value=None,
         specular_color=None,
         displacement_value=None,
+        transmittance_value=None,
         diffuse_texture=None,
         roughness_texture=None,
         metallic_texture=None,
@@ -208,6 +226,7 @@ class PBRMaterial(Material):
         specular_texture=None,
         normals_texture=None,
         displacement_texture=None,
+        transmittance_texture=None,
         is_specular_workflow=False,
         diffuse_colorspace='auto',
         roughness_colorspace='auto',
@@ -219,6 +238,7 @@ class PBRMaterial(Material):
         specular_colorspace='auto',
         normals_colorspace='auto',
         displacement_colorspace='auto',
+        transmittance_colorspace='auto',
         material_name='',
         shader_name='UsdPreviewSurface'
     ):
@@ -247,6 +267,8 @@ class PBRMaterial(Material):
                 assert self.specular_color.shape == (3,)
         self.displacement_value = _to_1d_tensor(displacement_value)
         assert self.displacement_value is None or self.displacement_value.shape == (1,)
+        self.transmittance_value = _to_1d_tensor(transmittance_value)
+        assert self.transmittance_value is None or self.transmittance_value.shape == (1,)
         assert diffuse_texture is None or diffuse_texture.dim() == 3
         self.diffuse_texture = diffuse_texture
         assert roughness_texture is None or roughness_texture.dim() == 3
@@ -267,6 +289,8 @@ class PBRMaterial(Material):
         self.normals_texture = normals_texture
         assert displacement_texture is None or displacement_texture.dim() == 3
         self.displacement_texture = displacement_texture
+        assert transmittance_texture is None or transmittance_texture.dim() == 3
+        self.transmittance_texture = transmittance_texture
         assert diffuse_colorspace in ['auto', 'raw', 'sRGB']
         self.diffuse_colorspace = diffuse_colorspace
         assert roughness_colorspace in ['auto', 'raw']
@@ -286,6 +310,8 @@ class PBRMaterial(Material):
         assert normals_colorspace in ['auto', 'raw', 'sRGB']
         self.normals_colorspace = normals_colorspace
         self.displacement_colorspace = displacement_colorspace
+        assert transmittance_colorspace in ['auto', 'raw']
+        self.transmittance_colorspace = transmittance_colorspace
         self.is_specular_workflow = is_specular_workflow
 
     def write_to_usd(self, file_path, scene_path, bound_prims=None, time=None,
@@ -470,6 +496,7 @@ def random_material_values(device=None):
         'ior_value': random.random(),
         'specular_color':  (random.random(), random.random(), random.random()),
         'displacement_value': random.random(),
+        'transmittance_value': random.random(),
         'is_specular_workflow': True,
     }
     if device is not None:
@@ -490,6 +517,7 @@ def random_material_textures(device=None):
         'specular_texture': torch.rand((256, 256, 3)),
         'normals_texture': torch.rand((256, 256, 1)),
         'displacement_texture': torch.rand((256, 256, 3)),
+        'transmittance_texture': torch.rand((256, 256, 1)),
     }
     if device is not None:
         for k in res.keys():
@@ -507,4 +535,5 @@ def random_material_colorspaces():
             'ior_colorspace': ['auto', 'raw'][random.randint(0, 1)],
             'specular_colorspace': ['auto', 'raw'][random.randint(0, 1)],
             'normals_colorspace': ['auto', 'raw'][random.randint(0, 1)],
-            'displacement_colorspace': ['auto', 'raw'][random.randint(0, 1)]}
+            'displacement_colorspace': ['auto', 'raw'][random.randint(0, 1)],
+            'transmittance_colorspace': ['auto', 'raw'][random.randint(0, 1)]}

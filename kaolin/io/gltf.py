@@ -155,11 +155,13 @@ def _load_specular_workflow_material(gltf, mat):
         d['specular_color'] = torch.tensor(mat['specularFactor'])
     return d
 
-def _load_metallic_workflow_material(gltf, mat):
+def _load_metallic_workflow_material(gltf, mat, extensions=None):
     """Load metallic workflow material properties from
-    pbrMetallicRoughness
+    pbrMetallicRoughness and extensions
     """
     d = {'is_specular_workflow': False}
+    if extensions is None:
+        extensions = {}
     if mat.baseColorTexture is None:
         d['diffuse_color'] = torch.tensor(mat.baseColorFactor[:3])
     else:
@@ -193,6 +195,23 @@ def _load_metallic_workflow_material(gltf, mat):
         d['metallic_texture'] = (
             metallic_texture * (mat.metallicFactor / 255.)
         )
+    # Handle optional transmittance extension:
+    # https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_transmission
+    if 'KHR_materials_transmission' in extensions:
+        transmission_extension = extensions['KHR_materials_transmission']
+        transmittance_value = float(transmission_extension.get('transmissionFactor', 0.0))
+        if 'transmissionTexture' not in transmission_extension:
+            d['transmittance_value'] = torch.tensor(transmittance_value)
+        else:
+            transmittance_texture = _load_img(
+                gltf, transmission_extension['transmissionTexture']['index'], False)
+            if transmittance_texture.shape[-1] == 1:
+                transmittance_texture = transmittance_texture
+            elif transmittance_texture.shape[-1] == 3:
+                transmittance_texture = transmittance_texture[..., 0:1]
+            d['transmittance_texture'] = (
+                transmittance_texture * (transmittance_value / 255.)
+            )
     return d
 
 def _get_materials(gltf):
@@ -218,7 +237,7 @@ def _get_materials(gltf):
                 gltf, mat.extensions['KHR_materials_pbrSpecularGlossiness']))
         elif mat.pbrMetallicRoughness is not None:
             d.update(_load_metallic_workflow_material(
-                gltf, mat.pbrMetallicRoughness))
+                gltf, mat.pbrMetallicRoughness, mat.extensions))
         if mat.normalTexture is not None:
             d['normals_texture'] = (
                 _load_img(gltf, mat.normalTexture.index, False) * (2. / 255.) - 1.

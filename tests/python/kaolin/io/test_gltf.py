@@ -100,6 +100,10 @@ class TestAvocadoGLTF:
         assert torch.equal(mesh.material_assignments,
                            expected_material_assignments)
 
+        # Make sure transmittance extension isn't loaded
+        assert mesh.materials[0].transmittance_value is None
+        assert mesh.materials[0].transmittance_texture is None
+
 
 class TestDiverseInputs:
     @pytest.fixture(scope='class')
@@ -134,3 +138,43 @@ class TestDiverseInputs:
         for idx, m in enumerate(meshes):
             assert set(m.get_attributes(True)) == expected_attributes
             assert check_tensor_attribute_shapes(m, **expected_sizes[bname][idx])
+
+
+class TestTransmittanceExtensionGLTF:
+    """ Note: The asset used in this test has been modified from its original transmittance values.
+    Do not use original rendered values for comparison.
+    """
+
+    @pytest.fixture(autouse=True)
+    def expected_transmittance_texture(self):
+        img = Image.open(os.path.join(SAMPLE_DIR, 'textures', 'transmit_test_texture14184.jpg'))
+        img = torch.as_tensor(np.array(img)).float() * (1. / 255.)
+        return img[:,:,0:1]
+
+    def test_import_mesh(
+        self, expected_transmittance_texture
+    ):
+        mesh = gltf.import_mesh(os.path.join(
+            SAMPLE_DIR,
+            'transmission_test.gltf'
+        ))
+        assert mesh.materials[0].transmittance_value is None
+        assert mesh.materials[0].transmittance_texture is None
+
+        assert mesh.materials[1].transmittance_value is None
+        assert torch.equal(mesh.materials[1].transmittance_texture, expected_transmittance_texture)
+
+        assert torch.equal(mesh.materials[2].transmittance_value, torch.tensor([1.0]))
+        assert mesh.materials[2].transmittance_texture is None
+
+        assert mesh.materials[3].transmittance_value is None
+        assert torch.equal(mesh.materials[3].transmittance_texture, expected_transmittance_texture)
+
+        assert torch.equal(mesh.materials[4].transmittance_value, torch.tensor([0.83]))
+        assert mesh.materials[4].transmittance_texture is None
+
+        assert mesh.materials[5].transmittance_value is None
+        assert torch.equal(mesh.materials[5].transmittance_texture, 0.5 * expected_transmittance_texture)
+
+        assert torch.equal(mesh.materials[6].transmittance_value, torch.tensor([0.0]))
+        assert mesh.materials[6].transmittance_texture is None
