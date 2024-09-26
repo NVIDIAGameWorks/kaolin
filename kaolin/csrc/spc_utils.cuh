@@ -101,6 +101,57 @@ static inline __device__ void identify_multiscale(
     }
 }
 
+
+// version of 'identify' that understands empty space
+static inline __device__ int32_t identify(
+  const point_data 	k,
+  const uint32_t    Level,
+  const int32_t*    Exsum,
+  const uchar* 	    Oroot,
+  const uchar* 	    Eroot)
+{
+  int maxval = (0x1 << Level) - 1;
+  if (k.x < 0 || k.y < 0 || k.z < 0 || k.x > maxval || k.y > maxval || k.z > maxval)
+    return -1;
+
+  int ord = 0;
+  int prev = 0;
+  for (uint32_t l = 0; l < Level; l++)
+  {
+    uint32_t depth = Level - l - 1;
+    uint32_t mask = (0x1 << depth);
+    uint32_t child_idx = ((mask&k.x) << 2 | (mask&k.y) << 1 | (mask&k.z)) >> depth;
+    uint32_t bits = (uint32_t)Oroot[ord];
+    uint32_t mpty = (uint32_t)Eroot[ord];
+
+    // count set bits up to child - inclusive sum
+    uint32_t cnt = __popc(bits&((0x2 << child_idx) - 1));
+    ord = Exsum[prev];
+
+    // if bit set, keep going
+    if (bits&(0x1 << child_idx))
+    {
+      ord += cnt;
+
+      if (depth == 0)
+        return ord;
+    }
+    else
+    {
+      if (mpty&(0x1 << child_idx))
+        return -2 - static_cast<int32_t>(depth);
+      else
+        return -1;
+    }
+
+    prev = ord;
+  }
+
+  return ord; // only if called with Level=0
+}
+//
+
+
 /////////////////////////////////////////////
 /// Kernels
 /////////////////////////////////////////////

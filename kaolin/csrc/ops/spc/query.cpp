@@ -36,6 +36,14 @@ void query_multiscale_cuda_impl(
     at::Tensor pidx,
     uint32_t target_level);
 
+void query_cuda_impl_empty(
+    at::Tensor octree,
+    at::Tensor empty,
+    at::Tensor prefix_sum,
+    at::Tensor query_coords,
+    at::Tensor pidx,
+    uint32_t target_level);
+
 #endif // WITH_CUDA
 
 at::Tensor query_cuda(   
@@ -54,8 +62,9 @@ at::Tensor query_cuda(
   at::checkScalarTypes(__func__, query_coords_arg, {at::kHalf, at::kFloat, at::kDouble});
 
   int num_query = query_coords.size(0);
-  at::Tensor pidx = at::zeros({ num_query }, octree.options().dtype(at::kInt));
-  query_cuda_impl(octree, prefix_sum, query_coords, pidx, target_level);
+  at::Tensor pidx = at::full({ num_query }, -1, octree.options().dtype(at::kInt));
+  if (octree.numel() > 0)
+    query_cuda_impl(octree, prefix_sum, query_coords, pidx, target_level);
   return pidx;
 #else
   KAOLIN_NO_CUDA_ERROR(__func__);
@@ -79,8 +88,9 @@ at::Tensor query_multiscale_cuda(
   at::checkScalarTypes(__func__, query_coords_arg, {at::kHalf, at::kFloat, at::kDouble});
 
   int num_query = query_coords.size(0);
-  at::Tensor pidx = at::zeros({ num_query, target_level + 1 }, octree.options().dtype(at::kInt));
-  query_multiscale_cuda_impl(octree, prefix_sum, query_coords, pidx, target_level);
+  at::Tensor pidx = at::full({ num_query, target_level + 1 }, -1, octree.options().dtype(at::kInt));
+  if (octree.numel() > 0)
+    query_multiscale_cuda_impl(octree, prefix_sum, query_coords, pidx, target_level);
   return pidx;
 #else
   KAOLIN_NO_CUDA_ERROR(__func__);
@@ -88,6 +98,35 @@ at::Tensor query_multiscale_cuda(
 
 }
 
+// empty version
+at::Tensor query_cuda_empty(
+    at::Tensor octree,
+    at::Tensor empty,
+    at::Tensor prefix_sum,
+    at::Tensor query_coords,
+    uint32_t target_level) {
+#ifdef WITH_CUDA
+  at::TensorArg octree_arg{octree, "octree", 1};
+  at::TensorArg empty_arg{empty, "empty", 2};
+  at::TensorArg prefix_sum_arg{prefix_sum, "prefix_sum", 3};
+  at::TensorArg query_coords_arg{query_coords, "query_coords", 4};
+  at::checkAllSameGPU(__func__, {octree_arg, empty_arg, prefix_sum_arg, query_coords_arg});
+  at::checkAllContiguous(__func__,  {octree_arg, empty_arg, prefix_sum_arg, query_coords_arg});
+  at::checkScalarType(__func__, octree_arg, at::kByte);
+  at::checkScalarType(__func__, empty_arg, at::kByte);
+  at::checkScalarType(__func__, prefix_sum_arg, at::kInt);
+  at::checkScalarTypes(__func__, query_coords_arg, {at::kHalf, at::kFloat, at::kDouble});
+
+  int num_query = query_coords.size(0);
+  at::Tensor pidx = at::full({ num_query }, -1, octree.options().dtype(at::kInt));
+  if (octree.numel() > 0)
+    query_cuda_impl_empty(octree, empty, prefix_sum, query_coords, pidx, target_level);
+  return pidx;
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
+
+}
 
 } // namespace kaolin
 
