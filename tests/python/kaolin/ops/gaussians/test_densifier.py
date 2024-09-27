@@ -19,6 +19,7 @@ import wget
 import math
 import torch
 from pathlib import Path
+import kaolin
 from kaolin.ops.gaussian import sample_points_in_volume
 from kaolin.utils.testing import check_tensor
 
@@ -103,13 +104,19 @@ class TestVolumeDensifier:
         minimal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].min()
         maximal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].max()
 
+        # Points should not be equi-distanced
+        assert minimal_nearest_neighbor_distance != maximal_nearest_neighbor_distance
+
+        # Also check we don't perturb beyond cell boundary
+        output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
+                                         octree_level=octree_level, jitter=False, post_scale_factor=1.0,
+                                         clip_samples_to_input_bbox=True)
+        jittered_output = kaolin.ops.gaussian.densifier._jitter(output, octree_level)
         spc_cell_length = 2.0 / 2**octree_level
         spc_diagonal_length = spc_cell_length * math.sqrt(3.0)
         max_allowed_pts_distance = 2.0 * spc_diagonal_length # two spc diagonals
-        assert maximal_nearest_neighbor_distance <= max_allowed_pts_distance
-
-        # Points should not be equi-distanced
-        assert minimal_nearest_neighbor_distance != maximal_nearest_neighbor_distance
+        max_perturbation = torch.linalg.norm(jittered_output - output, dim=1).max()
+        assert max_perturbation <= max_allowed_pts_distance
 
     def test_sample_points_in_volume_no_jitter_for_density(self, gaussians, device, dtype):
         pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
