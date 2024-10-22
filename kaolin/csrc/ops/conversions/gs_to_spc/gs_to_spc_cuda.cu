@@ -1,18 +1,3 @@
-// Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
-// All rights reserved.
-
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//    http://www.apache.org/licenses/LICENSE-2.0
-
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #define CUB_NS_PREFIX namespace kaolin {
 #define CUB_NS_POSTFIX }
 #define CUB_NS_QUALIFIER ::kaolin::cub
@@ -123,7 +108,7 @@ compactify_cuda_kernel(
     const uint32_t num, 
     const uint64_t* __restrict__ morton_codes_in, 
     const uint64_t* __restrict__ triangle_id_in, 
-    uint64_t* __restrict__ morton_codes_out, 
+    uint6464_t* __restrict__ morton_codes_out, 
     uint64_t* __restrict__ triangle_id_out, 
     const uint32_t* __restrict__ occupancy,
     const uint32_t* __restrict__ prefix_sum) {
@@ -653,7 +638,7 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
         curr_cnt, 
         reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 
         reinterpret_cast<uint64_t*>(gaus_id[curr_buf].data_ptr<int64_t>()), 
-        reinterpret_cast<uint64_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
+        reinterpret_cast<uint6464_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
         reinterpret_cast<uint64_t*>(gaus_id[(curr_buf+1)%2].data_ptr<int64_t>()), 
         reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
         reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()));
@@ -715,7 +700,7 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
   d_Compactify << <(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>> (
     curr_cnt, 
     reinterpret_cast<uint64_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
-    reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 
+    reinterpret_cast<uint6464_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 
     reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
     reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()));
 
