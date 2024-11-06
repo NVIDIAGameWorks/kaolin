@@ -63,8 +63,8 @@ void oracleB_final_cuda(
   float2* mipmap, 
   int depth_height,
   int depth_width,
-  uint* occ, 
-  uint* estate, 
+  uint32_t* occ, 
+  uint32_t* estate, 
   float* out_probs,
   cudaTextureObject_t		ProfileCurve,
   float scale,
@@ -106,9 +106,9 @@ void merge_empty_cuda(
   uint32_t* estate);
 
 void bq_merge_cuda(
-  uint num, 
+  uint32_t num, 
   point_data* d_points, 
-  uint level, 
+  uint32_t level, 
   uchar* d_octree0, 
   uchar* d_octree1, 
   uchar* d_empty0, 
@@ -121,10 +121,10 @@ void bq_merge_cuda(
   float4* d_normals1,  
   int32_t* d_exsum0, 
   int32_t* d_exsum1, 
-  uint offset0,
-  uint offset1,
-  uint* occ,
-  uint* estate,
+  uint32_t offset0,
+  uint32_t offset1,
+  uint32_t* occ,
+  uint32_t* estate,
   float* d_out_probs,
   float3* d_out_colors,
   float4* d_out_normals);
@@ -275,7 +275,7 @@ std::vector<at::Tensor>  oracleB(
 
 std::vector<at::Tensor> oracleB_final(
   at::Tensor points,
-  uint level,
+  uint32_t level,
   float sigma,
   at::Tensor cam, 
   at::Tensor dmap, 
@@ -283,7 +283,7 @@ std::vector<at::Tensor> oracleB_final(
   int mip_levels)
 {
 #ifdef WITH_CUDA
-  uint num = points.size(0);
+  uint32_t num = points.size(0);
 
   int h = dmap.size(0);
   int w = dmap.size(1);
@@ -297,8 +297,8 @@ std::vector<at::Tensor> oracleB_final(
   at::Tensor empty_state = at::zeros({num}, points.options().dtype(at::kInt));
   at::Tensor out_probs = at::zeros({num}, points.options().dtype(at::kFloat));
 
-  uint* occ = reinterpret_cast<uint*>(occupancy.data_ptr<int>());
-  uint* estate = reinterpret_cast<uint*>(empty_state.data_ptr<int>());
+  uint32_t* occ = reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>());
+  uint32_t* estate = reinterpret_cast<uint32_t*>(empty_state.data_ptr<int>());
   float*  d_out_probs = out_probs.data_ptr<float>();
   point_data*  d_points = reinterpret_cast<point_data*>(points.data_ptr<short>());
   float* dmap_ptr = dmap.data_ptr<float>();  
@@ -370,14 +370,14 @@ std::vector<at::Tensor> process_final_voxels(
 
 std::vector<at::Tensor> colorsB_final(
   at::Tensor points,
-  uint level,
+  uint32_t level,
   at::Tensor cam, 
   at::Tensor im,
   at::Tensor dmap,
   float max_depth)
 {
 #ifdef WITH_CUDA
-  uint num = points.size(0);
+  uint32_t num = points.size(0);
 
   int h = dmap.size(0);
   int w = dmap.size(1);
@@ -469,13 +469,13 @@ std::vector<at::Tensor> bq_merge(
   at::Tensor exsum1)
 {
 #ifdef WITH_CUDA
-  uint num = points.size(0);
+  uint32_t num = points.size(0);
 
   at::Tensor occupancy = at::zeros({num}, points.options().dtype(at::kInt));
-  uint* occ = reinterpret_cast<uint*>(occupancy.data_ptr<int>());
+  uint32_t* occ = reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>());
 
   at::Tensor empty_state = at::zeros({num}, points.options().dtype(at::kInt));
-  uint* estate = reinterpret_cast<uint*>(empty_state.data_ptr<int>());
+  uint32_t* estate = reinterpret_cast<uint32_t*>(empty_state.data_ptr<int>());
 
   at::Tensor out_colors = at::zeros({num, 3}, points.options().dtype(at::kFloat));
   float3* d_out_colors = reinterpret_cast<float3*>(out_colors.data_ptr<float>());
@@ -492,7 +492,7 @@ std::vector<at::Tensor> bq_merge(
   uchar* d_empty0 = empty0.data_ptr<uchar>();
   int32_t* d_exsum0 = exsum0.data_ptr<int>();
   auto pyramid0_a = pyramid0.accessor<int, 3>();
-  uint offset0 = pyramid0_a[0][1][level];
+  uint32_t offset0 = pyramid0_a[0][1][level];
   float3*  d_colors0 = reinterpret_cast<float3*>(colors0.data_ptr<float>());
   float*  d_probs0 = probs0.data_ptr<float>();
   float4*  d_normals0 = reinterpret_cast<float4*>(normals0.data_ptr<float>());
@@ -501,7 +501,7 @@ std::vector<at::Tensor> bq_merge(
   uchar* d_empty1 = empty1.data_ptr<uchar>();
   int32_t* d_exsum1 = exsum1.data_ptr<int>();
   auto pyramid1_a = pyramid1.accessor<int, 3>();
-  uint offset1 = pyramid1_a[0][1][level];
+  uint32_t offset1 = pyramid1_a[0][1][level];
   float3*  d_colors1 = reinterpret_cast<float3*>(colors1.data_ptr<float>());
   float*  d_probs1 = probs1.data_ptr<float>();
   float4*  d_normals1 = reinterpret_cast<float4*>(normals1.data_ptr<float>());
@@ -575,7 +575,7 @@ std::vector<at::Tensor> bq_touch(
   uchar* d_octree = octree.data_ptr<uchar>();  
   uchar* d_empty = empty.data_ptr<uchar>();
 
-  bq_touch_cuda(num, d_octree+offset, d_empty+offset, occ, estate);
+  bq_touch_cuda(num, d_octree + offset, d_empty+offset, occ, estate);
 
   return { occupancy, empty_state };
 #else

@@ -30,33 +30,38 @@ from kaolin.render.camera import kaolin_camera_to_gsplats, gsplats_camera_to_kao
 if torch.version.cuda == '12.5':
     pytest.skip("gsplats is not installable with CUDA 12.5", allow_module_level=True)
 
-ROOT_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'inria_gsplats')
+LOCAL_GSPLATS_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'inria_gsplats')
 
 
 @pytest.fixture(scope="module")
 def gs_cam_cls():
-    repo = Repo.clone_from(
-        url='https://github.com/graphdeco-inria/gaussian-splatting',
-        multi_options=['--recursive'],
-        to_path=ROOT_DIR
-    )
-    # Checks out previous commit (before cv2 dependency)
-    repo.git.checkout("472689c")
+    if 'KAOLIN_TEST_GSPLATS_DIR' in os.environ:
+        shutil.copytree(os.environ['KAOLIN_TEST_GSPLATS_DIR'], LOCAL_GSPLATS_DIR,
+                        dirs_exist_ok=True)
+    else:
+        repo = Repo.clone_from(
+            url='https://github.com/graphdeco-inria/gaussian-splatting',
+            multi_options=['--recursive'],
+            to_path=LOCAL_GSPLATS_DIR
+        )
+        # Checks out previous commit (before cv2 dependency)
+        repo.git.checkout("472689c")
 
-    sys.path.append(ROOT_DIR)
+    sys.path.append(LOCAL_GSPLATS_DIR)
     subprocess.check_call([
         sys.executable, "-m", "pip", "install",
-        os.path.join(ROOT_DIR, "submodules", "diff-gaussian-rasterization")
+        os.path.join(LOCAL_GSPLATS_DIR, "submodules", "diff-gaussian-rasterization")
     ])
     subprocess.check_call([
         sys.executable, "-m", "pip", "install",
-        os.path.join(ROOT_DIR, "submodules", "simple-knn")
+        os.path.join(LOCAL_GSPLATS_DIR, "submodules", "simple-knn")
     ])
     from scene.cameras import Camera as GSCamera
 
     yield GSCamera
-    sys.path.remove(ROOT_DIR)
-    shutil.rmtree(ROOT_DIR)
+    sys.path.remove(LOCAL_GSPLATS_DIR)
+    if not 'KAOLIN_TEST_GSPLATS_DIR' in os.environ:
+        shutil.rmtree(LOCAL_GSPLATS_DIR)
 
 
 class TestGsplats:

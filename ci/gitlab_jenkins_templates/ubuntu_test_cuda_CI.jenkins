@@ -79,7 +79,7 @@ spec:
 """) {
   node(POD_LABEL) {
     container("docker") {
-      timeout(time: 60, unit: 'MINUTES') {
+      timeout(time: 90, unit: 'MINUTES') {
         stage("Install deps") {
           sh 'pip install -r /kaolin/tools/ci_requirements.txt'
           sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'
@@ -104,6 +104,7 @@ spec:
             export KAOLIN_TEST_SHAPENETV2_PATH=/mnt/data/ci_shapenetv2
             export KAOLIN_TEST_MODELNET_PATH=/mnt/data/ModelNet
             export KAOLIN_TEST_SHREC16_PATH=/mnt/data/ci_shrec16
+            export KAOLIN_TEST_GSPLATS_DIR=/mnt/gsplats
             pytest --durations=50 --import-mode=importlib -rs --cov=/kaolin/kaolin \
                 --log-disable=PIL.PngImagePlugin \
                 --log-disable=PIL.TiffImagePlugin \

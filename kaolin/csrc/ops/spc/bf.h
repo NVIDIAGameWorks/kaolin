@@ -20,14 +20,14 @@
 namespace kaolin {
 
 std::vector<at::Tensor> compactify_nodes(
-  uint num_nodes, 
+  uint32_t num_nodes, 
   at::Tensor sum, 
   at::Tensor occ_ptr, 
   at::Tensor emp_ptr);
 
 std::vector<at::Tensor> oracleB(
   at::Tensor Points, 
-  uint level, 
+  uint32_t level, 
   float sigma, 
   at::Tensor cam, 
   at::Tensor dmap, 
@@ -36,7 +36,7 @@ std::vector<at::Tensor> oracleB(
 
 std::vector<at::Tensor> oracleB_final(
   at::Tensor points,
-  uint level,
+  uint32_t level,
   float sigma,
   at::Tensor cam, 
   at::Tensor dmap, 
@@ -44,8 +44,8 @@ std::vector<at::Tensor> oracleB_final(
   int mip_levels);
 
 std::vector<at::Tensor> process_final_voxels(
-  uint num_nodes, 
-  uint total_nodes, 
+  uint32_t num_nodes, 
+  uint32_t total_nodes, 
   at::Tensor state, 
   at::Tensor nvsum, 
   at::Tensor occup, 
@@ -55,7 +55,7 @@ std::vector<at::Tensor> process_final_voxels(
 
 std::vector<at::Tensor> colorsB_final(
   at::Tensor points,
-  uint level,
+  uint32_t level,
   at::Tensor cam, 
   at::Tensor im,
   at::Tensor dmap,
@@ -63,7 +63,7 @@ std::vector<at::Tensor> colorsB_final(
 
 std::vector<at::Tensor> merge_empty(
   at::Tensor points,
-  uint level,
+  uint32_t level,
   at::Tensor octree0,
   at::Tensor octree1,  
   at::Tensor empty0,
@@ -75,7 +75,7 @@ std::vector<at::Tensor> merge_empty(
 
 std::vector<at::Tensor> bq_merge(
   at::Tensor points,
-  uint level,
+  uint32_t level,
   at::Tensor octree0,
   at::Tensor octree1,  
   at::Tensor empty0,
@@ -92,14 +92,14 @@ std::vector<at::Tensor> bq_merge(
   at::Tensor exsum1);
 
 void bq_touch_extract(
-  uint num_nodes, 
+  uint32_t num_nodes, 
   at::Tensor state, 
   at::Tensor nvsum, 
   at::Tensor prev_state);
 
 std::vector<at::Tensor> bq_extract(
   at::Tensor points,
-  uint level,
+  uint32_t level,
   at::Tensor octree, 
   at::Tensor empty,
   at::Tensor probs,
@@ -108,7 +108,7 @@ std::vector<at::Tensor> bq_extract(
 
 std::vector<at::Tensor> bq_touch(
   at::Tensor points,
-  uint level,
+  uint32_t level,
   at::Tensor octree, 
   at::Tensor empty,
   at::Tensor pyramid);

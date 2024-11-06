@@ -84,4 +84,4 @@ RUN cd /tmp && \
     cp ./docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json && \
     pip install .
 
-RUN python setup.py develop
+RUN export MAX_JOBS=1 && python setup.py develop
