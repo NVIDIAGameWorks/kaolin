@@ -14,34 +14,31 @@ Note that Kaolin library is part of the larger [NVIDIA Kaolin effort](https://de
 Starting with v0.12.0, Kaolin supports installation with wheels:
 ```
 # Replace TORCH_VERSION and CUDA_VERSION with your torch / cuda versions
-pip install kaolin==0.16.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
+pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
 ```
-For example, to install kaolin 0.16.0 over torch 2.0.0 and cuda 11.8:
+For example, to install kaolin 0.17.0 over torch 2.0.1 and cuda 11.8:
 ```
-pip install kaolin==0.16.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.0_cu118.html
+pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.1_cu118.html
 ```
 
-## About the Latest Release (0.16.0)
+## About the Latest Release (0.17.0)
 
-In this version we added a [Physics section](https://kaolin.readthedocs.io/en/latest/modules/physics.html).
+In this version we added [sample_points_in_volume](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.gaussian.html#kaolin.ops.gaussian.sample_points_in_volume) function used for "densifying" a gaussian splats, this can be used to improve [Physics simulation](https://kaolin.readthedocs.io/en/latest/modules/physics.html).
 
-In this new section we implemented [Simplicits](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.html) a geometry-agnostic method for elastic simulation. See more information in [the project page](https://research.nvidia.com/labs/toronto-ai/simplicits/).
+We further improved physics training and simulation using [NVIDIA Warp](https://github.com/NVIDIA/warp) on some of our functions. We also added support for transmittance in the GLTF loader.
 
-We've also added a [math section](https://kaolin.readthedocs.io/en/latest/modules/kaolin.math.html) with quaternions math features.
+![](assets/no_densifier_small.gif) | ![](assets/with_densifier_small.gif)
+:---------------------------------:|:------------------------------------:
+Without Densifier                  |  With Densifier
 
-Finally we've improved workflow, with an [easy rendering API](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.easy_render.html), for quickly visualizing a model.
+Check our updated tutorials:
+* [Use Simplicit's Easy API to Simulate a Mesh](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_easy_api.ipynb)
+* [Interact with a Physics Simulation](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_interactive.ipynb)
+* [Use Simplicit's Full-Feature API](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_low_level_api.ipynb)
+* [Simulate a Gaussian Splat](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin/-/blob/master/examples/tutorial/physics/simplicits_inria_splatting.ipynb)
+* [Simulate a Muscle Activation on a Musculoskeletal Mesh](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin/-/blob/master/examples/tutorial/physics/simplicits_muscle_activation.ipynb)
 
-Check our new tutorials:
-[Use Simplicit's Easy API to Simulate a Mesh](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_easy_api.ipynb) In this notebook we show how to use the high-level Simplicit API to simulate an imported Mesh.
-[Interact with a Physics Simulation](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_interactive.ipynb) In this notebook we show to interact with the simulation by moving objects.
-[Use Simplicit's Full-Feature API](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_low_level_api.ipynb) In this notebook we show how to use the low-level API to simulate a pointcloud.
-
-
-[Easy rendering of Meshes](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/easy_mesh_render.ipynb) Use our new high-level API to load a mesh, create a camera and lighting parameters and render interactively.
-
-<a href="https://github.com/NVIDIAGameWorks/kaolin/tree/master/examples/tutorial/physics"><img src="./assets/physics_bulldozer.gif" alt="physics documentation" height="250" /></a>
-
-See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.16.0) for details.
+See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.17.0) for details.
 
 ## Contributing
 
