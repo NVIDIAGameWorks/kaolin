@@ -13,9 +13,9 @@ Requirements
 ------------
 
 * Linux, Windows, or macOS (CPU-only)
-* Python >= 3.9, <= 3.11
+* Python >= 3.9, <= 3.12
 * `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ >= 10.0 (with 'nvcc' installed) See `CUDA Toolkit Archive <https://developer.nvidia.com/cuda-toolkit-archive>`_ to install older version.
-* torch >= 2.0, <= 2.4.0
+* torch >= 2.0, <= 2.5.1
 
 Quick Start (Linux, Windows)
 ----------------------------
@@ -24,7 +24,7 @@ Quick Start (Linux, Windows)
 
 .. code-block:: bash
 
-    $ pip install kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VER}_cu{CUDA_VER}.html
+    $ pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VER}_cu{CUDA_VER}.html
 
 .. Note::
     Replace *TORCH_VER* and *CUDA_VER* with any of the compatible options below.
@@ -35,6 +35,12 @@ Quick Start (Linux, Windows)
     +------------------+-----------+-----------+-----------+-----------+
     | **torch / CUDA** | **cu117** | **cu118** | **cu121** | **cu124** |
     +==================+===========+===========+===========+===========+
+    | **torch-2.5.1**  |           |     ✓     |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+
+    | **torch-2.5.0**  |           |     ✓     |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+
+    | **torch-2.4.1**  |           |     ✓     |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+
     | **torch-2.4.0**  |           |     ✓     |     ✓     |     ✓     |
     +------------------+-----------+-----------+-----------+-----------+
     | **torch-2.3.1**  |           |     ✓     |     ✓     |           |
@@ -55,14 +61,12 @@ Quick Start (Linux, Windows)
     +------------------+-----------+-----------+-----------+-----------+
     | **torch-2.0.1**  |     ✓     |     ✓     |           |           |
     +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.0.0**  |     ✓     |     ✓     |           |           |
-    +------------------+-----------+-----------+-----------+-----------+
    
 For example, to install kaolin for torch 2.0.0 and CUDA 11.8:
 
 .. code-block:: bash
 
-    $ pip install kaolin==0.16.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.0_cu118.html
+    $ pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.0_cu118.html
 
 You can check https://nvidia-kaolin.s3.us-east-2.amazonaws.com/index.html to see all the wheels available.
 
@@ -74,7 +78,7 @@ Installation from source
     
     .. code-block:: bash
     
-        $ conda create --name kaolin python=3.8
+        $ conda create --name kaolin python=3.9
         $ conda activate kaolin
 
 1. Clone Repository
@@ -86,7 +90,7 @@ Clone and optionally check out an `official release <https://github.com/NVIDIAGa
 
     $ git clone --recursive https://github.com/NVIDIAGameWorks/kaolin
     $ cd kaolin
-    $ git checkout v0.16.0 # optional
+    $ git checkout v0.17.0 # optional
 
 2. Install dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -111,14 +115,14 @@ You can verify that CUDA is properly installed at the desired version with nvcc 
 ^^^^^^^^^^^^^^^^^^
 
 Follow `official instructions <https://pytorch.org>`_ to install PyTorch of a supported version.
-Kaolin may be able to work with other PyTorch versions, but we only explicitly test within the version range 1.10.0 to 2.1.1.
+Kaolin may be able to work with other PyTorch versions, but we only explicitly test within the version range 2.0.1 to 2.5.1.
 See below for overriding PyTorch version check during install.
 
-Here is how to install the latest Pytorch version supported by Kaolin for cuda 11.8:
+Here is how to install the latest Pytorch version supported by Kaolin for cuda 12.4:
 
 .. code-block:: bash
 
-    $ pip install torch==2.1.1 --extra-index-url https://download.pytorch.org/whl/cu118
+    $ pip install torch==2.5.1 --extra-index-url https://download.pytorch.org/whl/cu124
 
 
 4. Optional Environment Variables
