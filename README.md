@@ -84,7 +84,7 @@ If you are using Kaolin library for your research, please cite:
 @software{KaolinLibrary,
       author = {Fuji Tsang, Clement and Shugrina, Maria and Lafleche, Jean Francois and Perel, Or and Loop, Charles and Takikawa, Towaki and Modi, Vismay and Zook, Alexander and Wang, Jiehan and Chen, Wenzheng and Shen, Tianchang and Gao, Jun and Jatavallabhula, Krishna Murthy and Smith, Edward and Rozantsev, Artem and Fidler, Sanja and State, Gavriel and Gorski, Jason and Xiang, Tommy and Li, Jianing and Li, Michael and Lebaredian, Rev},
       title = {Kaolin: A Pytorch Library for Accelerating 3D Deep Learning Research},
-      date = {2024-11-18},
+      date = {2024-11-20},
       version = {0.17.0},
       url={\url{https://github.com/NVIDIAGameWorks/kaolin}}
 }
