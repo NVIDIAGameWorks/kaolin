@@ -156,6 +156,7 @@ if [ $BUILD_DOCS -eq "1" ]; then
 
     echo " ...copying docs/ to build_docs/ to avoid git confusion" >> $DOCS_LOG 2>&1
     mkdir -p build_docs
+    rm -rf build_docs/*
     cp -r docs/* build_docs/.
     cd build_docs
     echo " ...replacing DOCS_MODULE_PATH in build_docs/kaolin_ext.py" >> $DOCS_LOG 2>&1
@@ -163,8 +164,10 @@ if [ $BUILD_DOCS -eq "1" ]; then
 
     echo " ...building docs in build_docs dir" >> $DOCS_LOG 2>&1
     CMDLINE="python -m sphinx -T -E -W --keep-going -b html -d _build/doctrees -D language=en . _build/html"
+    export PYTORCH_JIT=0
     $CMDLINE >> $DOCS_LOG 2>&1
     RES=$?
+    export PYTORCH_JIT=1
 
     cd $KAOLIN_ROOT
     DOCS_URL="build_docs/_build/html/index.html"

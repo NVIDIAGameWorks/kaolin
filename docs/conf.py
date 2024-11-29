@@ -18,8 +18,8 @@ sys.path.insert(1, os.path.abspath('.'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'Kaolin'
-copyright = '2020, NVIDIA'
+project = 'NVIDIA Kaolin Library'
+copyright = '2024, NVIDIA'
 author = 'NVIDIA'
 
 
@@ -43,7 +43,7 @@ autodoc_typehints = "description"
 intersphinx_mapping = {
     'python': ("https://docs.python.org/3", None),
     'numpy': ('https://numpy.org/doc/stable/', None),
-    'PyTorch': ('https://pytorch.org/docs/master/', None),
+    'PyTorch': ('https://pytorch.org/docs/main/', None),
 }
 
 master_doc = 'index'
@@ -75,4 +75,4 @@ html_theme_options = {
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = []
+html_static_path = ["static"]

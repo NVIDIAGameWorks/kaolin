@@ -22,21 +22,12 @@ from torch.autograd import Function
 
 from kaolin import _C
 
+from .nvdiffrast_context import default_nvdiffrast_context
+
 try:
     import nvdiffrast.torch as nvdiff
-    _has_nvdiffrast = True
-    _device2glctx = {}
 except ImportError:
-    _has_nvdiffrast = False
     nvdiff = None
-    logger = logging.getLogger(__name__)
-    logger.info("Cannot import nvdiffrast")
-
-def _get_nvdiff_glctx(device):
-    if device not in _device2glctx:
-        _device2glctx[device] = nvdiff.RasterizeGLContext(
-            output_db=False, device=device)
-    return _device2glctx[device]
 
 
 __all__ = [
@@ -126,11 +117,7 @@ def _nvdiff_rasterize(height,
           of shape :math:`(\text{batch_size}, \text{height}, \text{width})`.
     """
     device = face_vertices_z.device
-
-    if not _has_nvdiffrast:
-        raise ValueError("nvdiffrast must be installed to be used as backend, but failed to import. "
-                         "See https://nvlabs.github.io/nvdiffrast/#installation for installation instructions.")
-    glctx = _get_nvdiff_glctx(device)
+    glctx = default_nvdiffrast_context(device, raise_error=True)
     pos, tri = _legacy_to_opengl(face_vertices_image, face_vertices_z, valid_faces)
     
     rast = nvdiff.rasterize(glctx, pos, tri, (height, width), grad_db=False)
@@ -196,11 +183,7 @@ class NvdiffRasterizeFwdCudaBwd(Function):
                 valid_faces,
                 eps):
         device = face_vertices_z.device
-
-        if not _has_nvdiffrast:
-            raise ValueError("nvdiffrast must be installed to be used as backend, but failed to import. "
-                             "See https://nvlabs.github.io/nvdiffrast/#installation for installation instructions.")
-        glctx = _get_nvdiff_glctx(device)
+        glctx = default_nvdiffrast_context(device, raise_error=True)
         pos, tri = _legacy_to_opengl(face_vertices_image, face_vertices_z, valid_faces)
 
         rast = nvdiff.rasterize(glctx, pos, tri, (height, width), grad_db=False)
@@ -405,12 +388,17 @@ def rasterize(height,
     `Learning to Predict 3D Objects with an Interpolation-based Differentiable Renderer`_ NeurIPS 2019.
 
     .. note::
-       `nvdiffrast library`_ is relying on OpenGL and so can be faster especially
-       on larger mesh and resolution.
+       `nvdiffrast library`_ is relying on OpenGL or a custom CUDA depending on selected context
+       (see :ref:`nvdiffrast context <kaolin.render.mesh.nvdiffrast_context>`) 
+       and is usually faster especially on larger mesh and resolution.
 
     Args:
-        height (int): the size of rendered images.
-        width (int): the size of rendered images.
+        height (int):
+            The size of rendered images.
+            Should be multiple of 8 with nvdiffrast backend and CUDA context.
+        width (int):
+            the size of rendered images.
+            Should be multiple of 8 with nvdiffrast backend and CUDA context.
         face_vertices_z (torch.FloatTensor):
             3D points depth (z) value of the face vertices in camera coordinate,
             of shape :math:`(\text{batch_size}, \text{num_faces}, 3)`.

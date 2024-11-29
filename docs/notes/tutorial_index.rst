@@ -1,15 +1,27 @@
 .. _tutorial_index:
 
 Tutorial Index
-==============
+=====================
 
 Kaolin provides tutorials as ipython notebooks, docs pages and simple scripts. Note that the links
-point to master.
+point to the main branch and are not tied to the version. Here is a brief introduction to our tutorials and repository structure:
+
+.. raw:: html
+
+   <iframe width="560" height="315" src="https://www.youtube.com/embed/BsUIFg5bt6I?si=Kisus5430UT5CCy4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+   <div style="margin: 20px;"></div>
 
 
 Detailed Tutorials
 ------------------
 
+* Representation-Agnostic Physics Simulation with Simplicits:
+    * See :ref:`Physics Simulation for Points, Meshes, Splats and more <physics_simulation>`
+* Differentiable Rendering Docs Tutorials:
+    * See :ref:`Differentiable Rendering<diff_render>`
+    * See :ref:`Differentiable Camera <differentiable_camera>`
+    * See :ref:`Differentiable Lighting <differentiable_lighting>`
+    * See :ref:`Easy PBR Shader <pbr_shader>`
 * `Camera and Rasterization <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/camera_and_rasterization.ipynb>`_: Rasterize ShapeNet mesh with nvdiffrast and camera:
     * Load ShapeNet mesh
     * Preprocess mesh and materials
@@ -32,13 +44,6 @@ Detailed Tutorials
     * loading and constructing :class:`kaolin.rep.SurfaceMesh` objects
     * batching of meshes
     * auto-computing common attributes (like ``face_normals``)
-* `Deep Marching Tetrahedra <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/dmtet_tutorial.ipynb>`_: reconstructs a tetrahedral mesh from point clouds with `DMTet <https://nv-tlabs.github.io/DMTet/>`_, covering:
-    * generating data with Omniverse Kaolin App
-    * loading point clouds from a ``.usd`` file
-    * chamfer distance as a loss function
-    * differentiable marching tetrahedra
-    * using Timelapse API for 3D checkpoints
-    * visualizing 3D results of training
 * `Understanding Structured Point Clouds (SPCs) <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/understanding_spcs_tutorial.ipynb>`_: walks through SPC features, covering:
     * under-the-hood explanation of SPC, why it's useful and key ops
     * loading a mesh
@@ -98,4 +103,5 @@ Simple Recipes
     * `camera_init_simple.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_init_simple.py>`_: Making Camera objects with the flexible :func:`Camera.from_args()` constructor
     * `camera_init_explicit.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_init_explicit.py>`_: Making :class:`CameraIntrinsics` and :class:`CameraExtrinsics` with all the different constructors available
     * `camera_coordinate_systems.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_coordinate_systems.py>`_: Changing coordinate system in a :class:`Camera` object
-
+* Math:
+    * `quat/quat_transforms.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/quat/quat_transforms.py>`_: quaternion operations with PyTorch

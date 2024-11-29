@@ -16,6 +16,7 @@ import os
 
 KAOLIN_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir)
 
+
 def run_apidoc(_):
     # This is runnning sphinx-apidoc which is automatically generating
     # .rst files for each python file in kaolin
@@ -33,8 +34,16 @@ def run_apidoc(_):
             "kaolin/version.txt",
             "kaolin/io/usd/utils.py",
             "kaolin/io/usd/mesh.py",
+            "kaolin/io/usd/materials.py",
             "kaolin/io/usd/voxelgrid.py",
             "kaolin/io/usd/pointcloud.py",
+            "kaolin/math/quat/angle_axis.py",
+            "kaolin/math/quat/euclidean.py",
+            "kaolin/math/quat/matrix44.py",
+            "kaolin/math/quat/quaternion.py",
+            "kaolin/math/quat/rotation33.py",
+            "kaolin/math/quat/transform.py",
+            "kaolin/math/quat/util.py",
             "kaolin/ops/conversions/pointcloud.py",
             "kaolin/ops/conversions/sdf.py",
             "kaolin/ops/conversions/trianglemesh.py",
@@ -44,12 +53,34 @@ def run_apidoc(_):
             "kaolin/ops/mesh/mesh.py",
             "kaolin/ops/mesh/tetmesh.py",
             "kaolin/ops/mesh/trianglemesh.py",
+            "kaolin/ops/gaussian/densifier.py",
             "kaolin/ops/spc/spc.py",
             "kaolin/ops/spc/convolution.py",
             "kaolin/ops/spc/points.py",
             "kaolin/ops/spc/uint8.py",
+            "kaolin/ops/spc/raytraced_spc_dataset.py",
+            "kaolin/ops/spc/bf_recon.py",
+            "kaolin/physics/materials/linear_elastic_material.py",
+            "kaolin/physics/materials/material_forces.py",
+            "kaolin/physics/materials/muscle_material.py",
+            "kaolin/physics/materials/neohookean_elastic_material.py",
+            "kaolin/physics/materials/utils.py",
+            "kaolin/physics/simplicits/easy_api.py",
+            "kaolin/physics/simplicits/losses.py",
+            "kaolin/physics/simplicits/network.py",
+            "kaolin/physics/simplicits/precomputed.py",
+            "kaolin/physics/simplicits/simplicits_scene_forces.py",
+            "kaolin/physics/simplicits/losses_warp.py",
+            "kaolin/physics/simplicits/utils.py",
+            "kaolin/physics/utils/finite_diff.py",
+            "kaolin/physics/utils/force_wrapper.py",
+            "kaolin/physics/utils/misc.py",
+            "kaolin/physics/utils/optimization.py",
+            "kaolin/physics/utils/scene_forces.py",
             "kaolin/render/lighting/sg.py",
             "kaolin/render/lighting/sh.py",
+            "kaolin/render/easy_render/common.py",
+            "kaolin/render/easy_render/mesh.py",
             "kaolin/render/mesh/deftet.py",
             "kaolin/render/mesh/dibr.py",
             "kaolin/render/mesh/rasterization.py",
@@ -67,6 +98,8 @@ def run_apidoc(_):
             "kaolin/render/camera/intrinsics_pinhole.py",
             "kaolin/render/camera/intrinsics.py",
             "kaolin/render/camera/legacy.py",
+            "kaolin/render/camera/raygen.py",
+            "kaolin/render/camera/gsplats.py",
             "kaolin/non_commercial/flexicubes/",
             "kaolin/non_commercial/flexicubes/flexicubes.py",
             "kaolin/non_commercial/flexicubes/tables.py"
@@ -87,6 +120,7 @@ def run_apidoc(_):
     ]
     apidoc.main(argv)
     os.remove(os.path.join(DOCS_MODULE_PATH, 'kaolin.rst'))
+
 
 def setup(app):
     app.connect("builder-inited", run_apidoc)

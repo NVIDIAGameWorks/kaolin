@@ -1,0 +1,342 @@
+#!/usr/bin/env groovy
+
+docker_registry_server = ImageTag.split(':')[0..1].join(':')
+currentBuild.displayName = ImageTag.split(':')[2] + "-${arch}"
+currentBuild.description = sourceBranch + ": " + commitHash
+
+if (arch == "MULTI") {
+    gpu_list = """
+            - "A100_PCIE_40GB"
+            - "A100_PCIE_80GB"
+            - "A100_80GB_PCIE"
+            - "A100_PCIE_100GB"
+            - "A10"
+            - "A30"
+            - "A40"
+            - "GA100-E4720-HBM2"
+            - "GA100-E4720-DVT"
+            - "GA104-300-PG142-SKU10-TS3"
+            - "GeForce_RTX_4090"
+            - "H100_80GB_HBM3"
+            - "GH100_P1010_PCIE_CR"
+            - "Tesla_V100_PCIE_32GB"
+    """
+} else {
+    gpu_list = """
+            - "${arch}"
+    """
+}
+
+node_blacklist = """
+            - "a4u8g-0031.ipp1u1.colossus"
+"""
+
+gitlabCommitStatus("test-${configName}-${arch}") {
+
+podTemplate(
+cloud:'sc-ipp-blossom-prod',
+yaml:"""
+apiVersion: v1
+kind: Pod
+spec:
+  volumes:
+  - name: pvc-mount
+    persistentVolumeClaim:
+      claimName: 'kaolin-pvc'
+  containers:
+  - name: docker
+    image: ${imageTag}
+    command:
+    - cat
+    resources: 
+        requests:
+          nvidia.com/gpu: 1
+        limits:
+          nvidia.com/gpu: 1
+    tty: true
+    volumeMounts:
+      - mountPath: /mnt
+        name: pvc-mount
+  imagePullSecrets:
+  - name: gitlabcred
+  nodeSelector:
+    kubernetes.io/os: linux
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "nvidia.com/gpu_type"
+            operator: "In"
+            values:${gpu_list}
+          - key: "kubernetes.io/hostname"
+            operator: "NotIn"
+            values:${node_blacklist}
+          - key: "nvidia.com/driver_version"
+            operator: "NotIn"
+            values:
+            - "545.23"
+""") {
+  node(POD_LABEL) {
+    container("docker") {
+      timeout(time: 90, unit: 'MINUTES') {
+        stage("Install deps") {
+          sh 'pip install -r /kaolin/tools/ci_requirements.txt'
+          sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'
+        }
+        def build_passed = true
+        try {
+          stage('Disp info') {
+            sh 'nvidia-smi'
+            sh 'python --version'
+            sh 'lscpu'
+            sh 'free -h --si'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Pytest") {
+            sh '''
+            export KAOLIN_TEST_NVDIFFRAST=1
+            export KAOLIN_TEST_SHAPENETV1_PATH=/mnt/data/ci_shapenetv1
+            export KAOLIN_TEST_SHAPENETV2_PATH=/mnt/data/ci_shapenetv2
+            export KAOLIN_TEST_MODELNET_PATH=/mnt/data/ModelNet
+            export KAOLIN_TEST_SHREC16_PATH=/mnt/data/ci_shrec16
+            export KAOLIN_TEST_GSPLATS_DIR=/mnt/gsplats
+            pytest --durations=50 --import-mode=importlib -rs --cov=/kaolin/kaolin \
+                --log-disable=PIL.PngImagePlugin \
+                --log-disable=PIL.TiffImagePlugin \
+                --log-disable=kaolin.rep.surface_mesh \
+                /kaolin/tests/python/
+            '''
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Dash3D") {
+            sh '''
+            pytest -s --cov=/kaolin/kaolin /kaolin/tests/integration/
+            '''
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          if (arch == "TITAN_RTX") {
+            stage("Doc examples") {
+              // using wheel you don't have /kaolin/kaolin
+              sh '''
+              if [ -f "/kaolin/kaolin" ]; then
+                  pytest --doctest-modules --ignore=/kaolin/kaolin/experimental /kaolin/kaolin
+              fi
+              '''
+            }
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        // TUTORIALS
+        try {
+          stage("BBox Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython bbox_tutorial.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Camera and Rasterization Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython camera_and_rasterization.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("DIB-R Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython dibr_tutorial.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Diffuse lighting Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython diffuse_lighting.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("DMTet Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython dmtet_tutorial.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("GLTF Visualizer") {
+            sh 'cd /kaolin/examples/tutorial && ipython gltf_viz.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Interactive Visualizer") {
+            sh 'cd /kaolin/examples/tutorial && ipython interactive_visualizer.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Simplicits Easy API") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_easy_api.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Simplicits INRIA Splatting") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_inria_splatting.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Simplicits Interactive") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_interactive.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Simplicits Low-Level API") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_low_level_api.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Simplicits Muscle Activation") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_muscle_activation.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Spherical Gaussian lighting Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython sg_specular_lighting.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Understanding SPCs Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython understanding_spcs_tutorial.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Working with meshes Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython working_with_meshes.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+
+        // RECIPES
+        try {
+          stage("SPC from Pointcloud Recipe") {
+            sh 'cd /kaolin/examples/recipes/dataload/ && python spc_from_pointcloud.py'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("SPC Basics Recipe") {
+            sh 'cd /kaolin/examples/recipes/spc/ && python spc_basics.py'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Occupancy Sampling Recipe") {
+            sh 'cd /kaolin/examples/recipes/preprocess/ && python occupancy_sampling.py'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Fast Mesh Sampling Recipe") {
+            sh 'cd /kaolin/examples/recipes/preprocess/ && python fast_mesh_sampling.py --shapenet-dir=/mnt/data/ci_shapenetv2/'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("SPC Dual Octree Recipe") {
+            sh 'cd /kaolin/examples/recipes/spc/ && python spc_dual_octree.py'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("SPC Trilinear Interpolation Recipe") {
+            sh 'cd /kaolin/examples/recipes/spc/ && python spc_trilinear_interp.py'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("SPC Convolution 3D Recipe") {
+            sh 'cd /kaolin/examples/recipes/spc/ && python spc_conv3d_example.py'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Quaternions Recipe") {
+            sh 'cd /kaolin/examples/recipes/math/ && python quaternions.py'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        if (build_passed) {
+          currentBuild.result = "SUCCESS"
+        } else {
+          currentBuild.result = "FAILURE"
+          error "Build failed. See logs..."
+        }
+      }
+    }
+  }
+}
+
+}  // gitlabCommitStatus

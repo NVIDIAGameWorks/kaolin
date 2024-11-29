@@ -21,11 +21,12 @@ import kaolin
 
 from kaolin.utils.testing import tensor_info
 
+BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 @pytest.fixture(scope='module')
 def out_dir():
     # Create temporary output directory
-    out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '_viz_out')
+    out_dir = os.path.join(BASE_DIR, '_viz_out')
     os.makedirs(out_dir, exist_ok=True)
     yield out_dir
     shutil.rmtree(out_dir)  # Note: comment to keep output directory
@@ -33,8 +34,7 @@ def out_dir():
 
 @pytest.fixture(scope='module')
 def obj_paths():
-    cur_dir = os.path.dirname(os.path.realpath(__file__))
-    samples_dir = os.path.join(cur_dir, os.pardir, os.pardir, os.pardir, 'samples')
+    samples_dir = os.path.join(BASE_DIR, os.pardir, os.pardir, os.pardir, 'samples')
     return [os.path.join(samples_dir, 'rocket.obj'),
             os.path.join(samples_dir, 'model.obj')]
 
@@ -47,7 +47,9 @@ class TestVisualizeMain:
         # Note: to run and capture output do:
         # pytest --capture=tee-sys tests/python/examples/
         args = '--skip_normalization --test_objs={} --output_dir={}'.format(objs, out_dir)
-        os.system('python examples/tutorial/visualize_main.py {}'.format(args))
+        path = os.path.join(BASE_DIR, os.pardir, os.pardir, os.pardir, os.pardir,
+                            'examples', 'tutorial', 'visualize_main.py')
+        os.system(f'python {path} {args}')
 
         # Spot check one of the outputs
         for i in range(len(obj_paths)):

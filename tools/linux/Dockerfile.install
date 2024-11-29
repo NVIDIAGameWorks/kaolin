@@ -5,6 +5,9 @@ FROM ${BASE_IMAGE}
 ARG FORCE_CUDA=1
 ENV FORCE_CUDA=${FORCE_CUDA}
 
+ARG IGNORE_TORCH_VER=0
+ENV IGNORE_TORCH_VER=${IGNORE_TORCH_VER}
+
 RUN if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
         rm /etc/apt/sources.list.d/cuda.list; \
     fi \
@@ -41,6 +44,7 @@ RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-p
 	curl \
         cmake \
         xvfb \
+	wget \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -59,6 +63,7 @@ ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility,graphics
 
 ## Install Dash3D Requirements ###
+ENV NODE_OPTIONS=
 RUN curl -fsSL https://deb.nodesource.com/setup_16.x --insecure | bash - \
     && apt-get install -y nodejs
 
@@ -66,7 +71,7 @@ RUN npm install -g npm@8.5.4
 RUN npm install 
 
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir setuptools==58.0.0 ninja \
+    pip install --no-cache-dir ninja \
         imageio imageio-ffmpeg && \
     pip install --no-cache-dir \
         -r tools/viz_requirements.txt \
@@ -79,4 +84,4 @@ RUN cd /tmp && \
     cp ./docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json && \
     pip install .
 
-RUN python setup.py develop
+RUN export MAX_JOBS=1 && python setup.py develop

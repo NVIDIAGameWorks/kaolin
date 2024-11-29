@@ -20,5 +20,7 @@ from .intrinsics_pinhole import *
 from .intrinsics_ortho import *
 from .coordinates import *
 from .legacy import *
+from .raygen import *
+from .gsplats import *
 
 __all__ = [k for k in locals().keys() if not k.startswith('__')]

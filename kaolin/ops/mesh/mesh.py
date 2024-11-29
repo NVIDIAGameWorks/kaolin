@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019-24 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +16,40 @@
 import torch
 
 __all__ = [
+    'unindex_vertices_by_faces',
     'index_vertices_by_faces',
     'adjacency_matrix',
     'compute_vertex_normals',
     'uniform_laplacian',
+    'average_face_vertex_features'
 ]
+
+
+def unindex_vertices_by_faces(face_vertex_features):
+    r"""Given per-face per-vertex features, reshapes into flat indexed values and an index buffer
+    (necessary for some operations).
+
+    Args:
+        face_vertex_features (torch.Tensor): per-face per-vertex features of shape
+            :math:`(..., \text{num_faces}, \text{face_size}, \text{num_channels})`, with any number of preceding
+            batch dimensions.
+
+    Returns:
+        (torch.FloatTensor, torch.LongTensor) with shapes
+            :math:`(..., \text{num_faces} * \text{face_size}, \text{num_channels})`, and
+            :math:`(\text{num_faces}, \text{face_size})`
+    """
+    old_shape = list(face_vertex_features.shape)
+    nfaces, fsize, nchannels = old_shape[-3:]
+    other_dims = old_shape[:-3]
+    new_shape = other_dims + [nfaces * fsize] + [nchannels]
+    vertex_features = face_vertex_features.reshape(new_shape)
+    face_indices = torch.arange(
+        0, nfaces * fsize,
+        device=face_vertex_features.device,
+        dtype=torch.long).reshape((-1, fsize))
+    return vertex_features, face_indices
+
 
 def index_vertices_by_faces(vertices_features, faces):
     r"""Index vertex features to convert per vertex tensor to per vertex per face tensor.
@@ -137,25 +166,43 @@ def compute_vertex_normals(faces, face_normals, num_vertices=None):
     Return:
         (torch.FloatTensor): of shape (B, V, 3)
     """
+    return average_face_vertex_features(faces, face_normals, num_vertices=num_vertices)
+
+
+def average_face_vertex_features(faces, face_features, num_vertices=None):
+    r"""Given features assigned for every vertex of every face, computes per-vertex features by
+    averaging values across all faces incident each vertex.
+
+    Args:
+       faces (torch.LongTensor): vertex indices of faces of a fixed-topology mesh batch with
+            shape :math:`(\text{num_faces}, \text{face_size})`.
+       face_features (torch.FloatTensor): any features assigned for every vertex of every face, of shape
+            :math:`(\text{batch_size}, \text{num_faces}, \text{face_size}, N)`.
+       num_vertices (int, optional): number of vertices V (set to max index in faces, if not set)
+
+    Return:
+        (torch.FloatTensor): of shape (B, V, 3)
+    """
     if num_vertices is None:
         num_vertices = int(faces.max()) + 1
 
-    B = face_normals.shape[0]
+    B = face_features.shape[0]
     V = num_vertices
     F = faces.shape[0]
     FSz = faces.shape[1]
-    vertex_normals = torch.zeros((B, V, 3), dtype=face_normals.dtype, device=face_normals.device)
-    counts = torch.zeros((B, V), dtype=face_normals.dtype, device=face_normals.device)
+    Nfeat = face_features.shape[-1]
+    vertex_features = torch.zeros((B, V, Nfeat), dtype=face_features.dtype, device=face_features.device)
+    counts = torch.zeros((B, V), dtype=face_features.dtype, device=face_features.device)
 
     faces = faces.unsqueeze(0).repeat(B, 1, 1)
-    fake_counts = torch.ones((B, F), dtype=face_normals.dtype, device=face_normals.device)
+    fake_counts = torch.ones((B, F), dtype=face_features.dtype, device=face_features.device)
     #              B x F          B x F x 3
     # self[index[i][j][k]][j][k] += src[i][j][k]  # if dim == 0
     # self[i][index[i][j][k]][k] += src[i][j][k]  # if dim == 1
     for i in range(FSz):
-        vertex_normals.scatter_add_(1, faces[..., i:i + 1].repeat(1, 1, 3), face_normals[..., i, :])
+        vertex_features.scatter_add_(1, faces[..., i:i + 1].repeat(1, 1, Nfeat), face_features[..., i, :])
         counts.scatter_add_(1, faces[..., i], fake_counts)
 
     counts = counts.clip(min=1).unsqueeze(-1)
-    vertex_normals = vertex_normals / counts
+    vertex_normals = vertex_features / counts
     return vertex_normals

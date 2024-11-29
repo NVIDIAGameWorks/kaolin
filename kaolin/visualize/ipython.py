@@ -22,6 +22,7 @@ import warnings
 
 from PIL import Image as PILImage
 import torch
+import torchvision
 
 try:
     from ipyevents import Event
@@ -42,30 +43,46 @@ __all__ = [
     'IpyFirstPersonVisualizer',
 ]
 
-def update_canvas(canvas, image):
+def update_canvas(canvas, image, format='PNG', quality=100):
     assert isinstance(image, torch.Tensor) and image.dtype == torch.uint8, \
            "image must be a torch.Tensor of uint8 "
     assert isinstance(canvas, Canvas)
-    f = BytesIO()
-    PILImage.fromarray(image.cpu().numpy()).save(
-        f, "PNG", quality=100)
-    image = ImageWidget(value=f.getvalue())
+    if format.lower() == 'png' and image.shape[-1] in [1, 3]:
+        compression_level = int((100 - quality) * 9 / 100.)
+        pngimg = torchvision.io.image.encode_png(
+            image.permute(2, 0, 1).cpu(),
+            compression_level=compression_level
+        )
+        image = ImageWidget(value=pngimg.numpy().tobytes())
+    else:
+        f = BytesIO()
+        PILImage.fromarray(image.cpu().numpy()).save(
+            f, format, quality=quality)
+        image = ImageWidget(value=f.getvalue())
     with hold_canvas(canvas):
         canvas.clear_rect(0, 0, canvas.width, canvas.height)
         canvas.draw_image(image, 0, 0, canvas.width, canvas.height)
 
+def _get_tensor_pixel_info(canvas, item, x, y):
+    """helper function to get info of items produced by render"""
+    assert len(item.shape) in [2, 3], f"item is of shape {item.shape}"
+    item_height = item.shape[0]
+    item_width = item.shape[1]
+    if item_height == canvas.height and item_width == canvas.width:
+        return item[y, x], None
+    else:
+        scaled_x = int(x * item_width / canvas.width)
+        scaled_y = int(y * item_height / canvas.height)
+        return item[scaled_y, scaled_x], (scaled_x, scaled_y)
+
 def _print_item_pixel_info(canvas, item, x, y):
     """helper function to print info of items produced by render"""
     if torch.is_tensor(item):
-        assert len(item.shape) in [2, 3], f"item is of shape {item.shape}"
-        item_height = item.shape[0]
-        item_width = item.shape[1]
-        if item_height == canvas.height and item_width == canvas.width:
-            print(f"{item[y, x]}")
-        else:
-            scaled_x = int(x * item_width / canvas.width)
-            scaled_y = int(y * item_height / canvas.height)
-            print(f"{item[scaled_y, scaled_x]} (coords scaled to {scaled_x, scaled_y})")
+        val, scaled = _get_tensor_pixel_info(canvas, item, x, y)
+        str_out = f"{val}"
+        if scaled is not None:
+            str_out += f"(coords scaled to {scaled[0], scaled[1]})"
+        print(str_out)
     else:
         print(f"{item}")
 
@@ -114,13 +131,19 @@ class BaseIpyVisualizer(object):
              rendering shows on, pass this object here. Note that in case of ipycanvas.MultiCanvas,
              only the parent MultiCanvas object can process events. By default, the same canvas is used for
              events and drawing.
+        img_format (optional, str):
+             Format of the image provided to the canvas, change to 'JPEG' reduce latency.
+             Default: 'PNG'
+        img_quality (optional, int):
+             Quality of the image provided to the canvas, to reduce latency. 
+             Default: 100 (percent)
 
     .. _ipyevents main documentation: https://github.com/mwcraig/ipyevents/blob/main/docs/events.ipynb
     """
 
     def __init__(self, height, width, camera, render, fast_render=None,
-                 watched_events=None, max_fps=None,
-                 canvas=None, event_canvas=None):
+                 watched_events=None, max_fps=None, canvas=None, event_canvas=None,
+                 img_format='PNG', img_quality=100):
         #: (ipywidgets.Output): An output where error and prints are displayed.
         self.out = Output()
         assert len(camera) == 1, "only single camera supported for visualizer"
@@ -149,6 +172,14 @@ class BaseIpyVisualizer(object):
         #: (ipywidgets.DOMWidget): The widget used to handle the events.
         self.event_canvas = event_canvas
 
+        #: (str): format of the image provided to the canvas, change to 'JPEG' reduce latency.
+        #         Default: 'PNG'
+        self.img_format = img_format
+        
+        #: (int): quality of the image provided to the canvas, to reduce latency.
+        #         Default: 100 (percent)
+        self.img_quality = img_quality
+
         #: (Callable): The fast rendering function.
         self.fast_render = render if fast_render is None else fast_render
         self._max_fps = max_fps
@@ -167,7 +198,6 @@ class BaseIpyVisualizer(object):
         )
         self.event.on_dom_event(self._handle_event)
 
-
     def render_update(self):
         """Update the Canvas with :func:`render`"""
         with torch.no_grad():
@@ -178,7 +208,8 @@ class BaseIpyVisualizer(object):
                 self.current_output = {'img': output}
             else:
                 raise TypeError(f"render function output type ({type(output)}) unsupported")
-            update_canvas(self.canvas, self.current_output['img'])
+            update_canvas(self.canvas, self.current_output['img'],
+                          format=self.img_format, quality=self.img_quality)
 
     def fast_render_update(self):
         """Update the Canvas with :func:`fast_render`"""
@@ -188,26 +219,41 @@ class BaseIpyVisualizer(object):
                 output = output[0]
             elif isinstance(output, dict):
                 output = output['img']
-            update_canvas(self.canvas, output)
+            update_canvas(self.canvas, output,
+                          format=self.img_format, quality=self.img_quality)
 
     def show(self):
         """display the Canvas with interactive features"""
         self.render_update()
         display(self.canvas, self.out)
 
-    def _print_pixel_all_infos(self, event):
-        """print pixel all infos from event query"""
-        self.out.clear_output()
+    def _get_clamped_coords(self, event):
         scaled_x = int(event["relativeX"] * self.canvas.width / event["boundingRectWidth"])
         scaled_y = int(event["relativeY"] * self.canvas.height / event["boundingRectHeight"])
 
         clamped_x = min(max(scaled_x, 0), self.canvas.width - 1)
         clamped_y = min(max(scaled_y, 0), self.canvas.height - 1)
+        return clamped_x, clamped_y
+
+    def _print_pixel_all_infos(self, event):
+        """print pixel all infos from event query"""
+        self.out.clear_output()
+        clamped_x, clamped_y = self._get_clamped_coords(event)
         print(f'pixel coords: {clamped_x}, {clamped_y}')
         for key, item in self.current_output.items():
             print(key, end=': ')
             _print_item_pixel_info(self.canvas, item, clamped_x, clamped_y)
 
+    def get_values_under_cursor(self, event):
+        """returns output values under cursor provided by current event"""
+        clamped_x, clamped_y = self._get_clamped_coords(event)
+        res = {}
+        if self.current_output is None:
+            return res
+        for key, item in self.current_output.items():
+            if torch.is_tensor(item):
+                res[key] = _get_tensor_pixel_info(self.canvas, item, clamped_x, clamped_y)
+        return res
 
     @abstractmethod
     def _handle_event(self, event):
@@ -389,6 +435,12 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
              rendering shows on, pass this object here. Note that in case of ipycanvas.MultiCanvas,
              only the parent MultiCanvas object can process events. By default, the same canvas is used for
              events and drawing.
+        img_format (optional, str):
+             Format of the image provided to the canvas, change to 'JPEG' reduce latency.
+             Default: 'PNG'
+        img_quality (optional, int):
+             Quality of the image provided to the canvas, to reduce latency. 
+             Default: 100 (percent)
 
     Attributes:
         focus_at (torch.Tensor)
@@ -417,7 +469,9 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
                  additional_watched_events=None,
                  additional_event_handler=None,
                  canvas=None,
-                 event_canvas=None
+                 event_canvas=None,
+                 img_format='PNG',
+                 img_quality=100
                  ):
         with torch.no_grad():
             if focus_at is None:
@@ -460,7 +514,8 @@ class IpyTurntableVisualizer(BaseIpyVisualizer):
             self.additional_event_handler = additional_event_handler
 
             super().__init__(height, width, camera, render, fast_render, watched_events, max_fps,
-                             canvas=canvas, event_canvas=event_canvas)
+                             canvas=canvas, event_canvas=event_canvas,
+                             img_format=img_format, img_quality=img_quality)
 
     def _make_camera(self):
         if self.world_up_axis == 0:
@@ -659,6 +714,12 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
              rendering shows on, pass this object here. Note that in case of ipycanvas.MultiCanvas,
              only the parent MultiCanvas object can process events. By default, the same canvas is used for
              events and drawing.
+        img_format (optional, str):
+             Format of the image provided to the canvas, change to 'JPEG' reduce latency.
+             Default: 'PNG'
+        img_quality (optional, int):
+             Quality of the image provided to the canvas, to reduce latency. 
+             Default: 100 (percent)
 
     Attributes:
         world_up (torch.Tensor)
@@ -693,12 +754,15 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
                  additional_watched_events=None,
                  additional_event_handler=None,
                  canvas=None,
-                 event_canvas=None
+                 event_canvas=None,
+                 img_format='PNG',
+                 img_quality=100
                  ):
         self.position = None
 
         with torch.no_grad():
-            if world_up is None:
+            if world_up is None or torch.allclose(torch.dot(world_up.squeeze(), camera.cam_up().squeeze()),
+                                                  torch.ones((1,), device=world_up.device, dtype=world_up.dtype)):
                 self.world_up = torch.nn.functional.normalize(
                     camera.cam_up().clone().detach().squeeze(-1), dim=-1)
                 self.world_right = torch.nn.functional.normalize(
@@ -745,7 +809,8 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
         self.additional_event_handler = additional_event_handler
 
         super().__init__(height, width, camera, render, fast_render, watched_events, max_fps,
-                         canvas=canvas, event_canvas=event_canvas)
+                         canvas=canvas, event_canvas=event_canvas,
+                         img_format=img_format, img_quality=img_quality)
 
     def _safe_zoom(self, amount):
         r"""Applies a zoom on the camera by adjusting the lens.

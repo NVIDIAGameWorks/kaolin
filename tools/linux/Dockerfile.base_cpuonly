@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:22.04
 # used for cross-compilation in docker build
 #
 ARG PYTHON_VERSION=3.9
@@ -40,8 +40,8 @@ RUN curl -o ~/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest
 
 ENV PATH /opt/conda/bin:$PATH
 
-RUN pip install --no-cache-dir torch==${PYTORCH_VERSION}+cpu \
-    -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip install --no-cache-dir torch==${PYTORCH_VERSION}+cpu torchvision \
+    --index-url https://download.pytorch.org/whl/cpu
 
 WORKDIR /tmp
 

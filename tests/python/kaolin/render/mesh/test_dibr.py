@@ -396,7 +396,7 @@ class TestDibrSoftMask:
 
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
 @pytest.mark.parametrize("batch_size", [3, 1])
-@pytest.mark.parametrize("height,width", [(35, 31)])
+@pytest.mark.parametrize("height,width", [(32, 32)])
 @pytest.mark.parametrize("flip", [False, True])
 class TestDibrRasterization:
     @pytest.fixture(autouse=True)

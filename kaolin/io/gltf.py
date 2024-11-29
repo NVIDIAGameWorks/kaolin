@@ -25,7 +25,7 @@ import numpy as np
 from PIL import Image
 import base64
 from io import BytesIO
-from .materials import PBRMaterial
+from kaolin.render.materials import PBRMaterial
 from ..rep import SurfaceMesh
 
 __all__ = [
@@ -155,11 +155,13 @@ def _load_specular_workflow_material(gltf, mat):
         d['specular_color'] = torch.tensor(mat['specularFactor'])
     return d
 
-def _load_metallic_workflow_material(gltf, mat):
+def _load_metallic_workflow_material(gltf, mat, extensions=None):
     """Load metallic workflow material properties from
-    pbrMetallicRoughness
+    pbrMetallicRoughness and extensions
     """
     d = {'is_specular_workflow': False}
+    if extensions is None:
+        extensions = {}
     if mat.baseColorTexture is None:
         d['diffuse_color'] = torch.tensor(mat.baseColorFactor[:3])
     else:
@@ -193,6 +195,23 @@ def _load_metallic_workflow_material(gltf, mat):
         d['metallic_texture'] = (
             metallic_texture * (mat.metallicFactor / 255.)
         )
+    # Handle optional transmittance extension:
+    # https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_transmission
+    if 'KHR_materials_transmission' in extensions:
+        transmission_extension = extensions['KHR_materials_transmission']
+        transmittance_value = float(transmission_extension.get('transmissionFactor', 0.0))
+        if 'transmissionTexture' not in transmission_extension:
+            d['transmittance_value'] = torch.tensor(transmittance_value)
+        else:
+            transmittance_texture = _load_img(
+                gltf, transmission_extension['transmissionTexture']['index'], False)
+            if transmittance_texture.shape[-1] == 1:
+                transmittance_texture = transmittance_texture
+            elif transmittance_texture.shape[-1] == 3:
+                transmittance_texture = transmittance_texture[..., 0:1]
+            d['transmittance_texture'] = (
+                transmittance_texture * (transmittance_value / 255.)
+            )
     return d
 
 def _get_materials(gltf):
@@ -208,7 +227,7 @@ def _get_materials(gltf):
 
     materials = []
     for mat in gltf.materials:
-        d = {}
+        d = {'material_name': mat.name}
         # TODO(cfujitsang): add occlusion map
         # Prioritize the Kronos extension for specular-glossiness workflow
         # Some materials contains both metallic-roughness and specular-glossiness
@@ -218,7 +237,7 @@ def _get_materials(gltf):
                 gltf, mat.extensions['KHR_materials_pbrSpecularGlossiness']))
         elif mat.pbrMetallicRoughness is not None:
             d.update(_load_metallic_workflow_material(
-                gltf, mat.pbrMetallicRoughness))
+                gltf, mat.pbrMetallicRoughness, mat.extensions))
         if mat.normalTexture is not None:
             d['normals_texture'] = (
                 _load_img(gltf, mat.normalTexture.index, False) * (2. / 255.) - 1.
@@ -274,69 +293,6 @@ def _get_tensor(gltf, idx):
 
     return output
 
-def _join_meshes(meshes):
-    """"""
-    has_tangents = False
-    has_uvs = False
-    has_normals = False
-    # We need to checks all the meshes first to presence of
-    # tangents / uvs / normals to know if we want to
-    # compute the missing ones
-    for mesh in meshes:
-        if mesh.has_attribute('vertex_tangents'):
-            has_tangents = True
-        if mesh.has_attribute('uvs'):
-            has_uvs = True
-        if mesh.has_attribute('normals'):
-            has_normals = True
-
-    cur_num_vertices = 0
-    cur_num_uvs = 0
-    faces = []
-    vertices = []
-    face_uvs_idx = [] if has_uvs else None
-    uvs = [] if has_uvs else None
-    tangents = [] if has_tangents else None
-    normals = [] if has_normals else None
-    material_assignments = []
-
-    for mesh_idx, mesh in enumerate(meshes):
-        faces.append(mesh.faces + cur_num_vertices)
-        cur_num_vertices += mesh.vertices.shape[0]
-        vertices.append(mesh.vertices)
-        if has_uvs:
-            _face_uvs_idx = mesh.face_uvs_idx
-            if _face_uvs_idx is None:
-                _face_uvs_idx = torch.full_like(mesh.faces, -1)
-            face_uvs_idx.append(_face_uvs_idx + cur_num_uvs)
-            _uvs = mesh.uvs
-            if _uvs is None:
-                _uvs = torch.empty((0, 2))
-            cur_num_uvs += _uvs.shape[0]
-            uvs.append(_uvs)
-        if has_tangents:
-            _tangents = mesh.vertex_tangents
-            if _tangents is None:
-                _tangents = torch.zeros_like(mesh.vertices)
-            tangents.append(_tangents)
-        if has_normals:
-            normals.append(mesh.vertex_normals)
-        material_assignments.append(mesh.material_assignments)
-    faces = torch.cat(faces, dim=0)
-    vertices = torch.cat(vertices, dim=0)
-    if has_tangents:
-        tangents = torch.cat(tangents, dim=0)
-    if has_normals:
-        normals = torch.cat(normals, dim=0)
-    if has_uvs:
-        face_uvs_idx = torch.cat(face_uvs_idx, dim=0)
-        uvs = torch.cat(uvs, dim=0)
-    material_assignments = torch.cat(material_assignments, dim=0)
-    return SurfaceMesh(
-        faces=faces, vertices=vertices, vertex_tangents=tangents,
-        face_uvs_idx=face_uvs_idx, uvs=uvs, vertex_normals=normals,
-        material_assignments=material_assignments
-    )
    
 def _get_meshes(gltf):
     """get all meshes from a pygltflib.GLTF2
@@ -406,14 +362,16 @@ def _get_meshes(gltf):
         if m_group is None:
             output.append(None)
         else:
-            output.append(_join_meshes(m_group))
+            output.append(SurfaceMesh.flatten(m_group))
     return output
 
-def import_mesh(path):
+def import_mesh(path, scene=None):
     """Import mesh from a gltf (.glb or .gltf) file.
 
     Arguments:
         path (str): path to the gltf file.
+        scene (int, optional): scene index, used to load animation specific frame.
+                               Default: default gltf scene (most of time frame 0).
 
     Returns:
         (kaolin.rep.SurfaceMesh): The imported mesh.
@@ -428,7 +386,10 @@ def import_mesh(path):
                 "wrapping mode is not support yet. Please make a github request if needed.",
                 UserWarning
             )
-    default_scene = gltf.scenes[gltf.scene]
+    if scene is None:
+        default_scene = gltf.scenes[gltf.scene]
+    else:
+        default_scene = gltf.scenes[scene]
     scene_meshes = []
 
     has_tangents = False
@@ -439,7 +400,7 @@ def import_mesh(path):
             has_tangents = True
         if mesh.has_attribute('uvs'):
             has_uvs = True
-        if mesh.has_attribute('normals'):
+        if mesh.has_attribute('vertex_normals'):
             has_normals = True
 
     def _traverse_scene(node_idx, cur_transform):
@@ -497,7 +458,7 @@ def import_mesh(path):
             _traverse_scene(next_node_idx, cur_transform)
     for node_idx in default_scene.nodes:
         _traverse_scene(node_idx, torch.eye(4, dtype=torch.double))
-    outputs = _join_meshes(scene_meshes)
+    outputs = SurfaceMesh.flatten(scene_meshes)
     outputs.materials = materials
     return outputs
 

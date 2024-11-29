@@ -1,0 +1,51 @@
+# Note: Keep C:\Program Files (x86)\Microsoft Visual Studio\Installer directory.
+#       disutils/setuptools calls vswhere.exe from that location unconditionally.
+
+FROM mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2019
+
+# set up conda and python environment
+ARG PYTHON_VERSION=3.7
+ENV PYTHON_VERSION=${PYTHON_VERSION}
+ARG PYTORCH_VERSION=1.8
+ENV PYTORCH_VERSION=${PYTORCH_VERSION}
+ENV FORCE_CUDA=0
+
+#### BUILD TOOLS ####
+
+# pulling downloads to top to not repeat
+# download & install VS build tools 2019
+RUN Invoke-WebRequest "https://aka.ms/vs/16/release/vs_buildtools.exe" -OutFile vs_buildtools.exe -UseBasicParsing; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Workload.VCTools'; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Workload.MSBuildTools'; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.Component.VC.Runtime.UCRTSDK'; \
+    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Component.Windows10SDK.18362'; \
+    Remove-Item .\vs_buildtools.exe
+
+
+# The msvc version (subdir) has been shown to change over time.
+# The winsdk version (subdir) may change over time either through changes by MS or our own arguments to vs_buildtools.exe above.
+# Keeping that in mind, let's dynamically pick up the paths which get created.
+RUN setx /M PATH $('c:\buildtools\vc\tools\msvc\' + $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc' -Force -Directory | Select-Object -First 1).Name + '\bin\hostx64\x64;' \
+    + 'c:\buildtools\vc\tools\msvc\' + $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc' -Force -Directory | Select-Object -First 1).Name + '\lib\x64;' \
+    + 'c:\buildtools\vc\tools\msvc\' + $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc' -Force -Directory | Select-Object -First 1).Name + '\include;' \
+    + 'C:\Program Files (x86)\Windows Kits\10\bin\' + $(Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin\' -Force -Directory | Select-Object -First 1).Name + '\x64;' \
+    + 'C:\BuildTools\VC\Auxiliary\Build;' \
+    + $Env:PATH)
+
+#### ANACONDA ####
+RUN Invoke-WebRequest "https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe" -OutFile miniconda3.exe -UseBasicParsing;
+
+# install conda & python packages
+# PATH must be updated before attempting to run "conda" or it will error out strangely on web requests
+RUN setx /M PATH $('C:\Users\Administrator\miniconda3\Library\bin;C:\Users\Administrator\miniconda3\Scripts;C:\Users\Administrator\miniconda3;' + $Env:PATH)
+RUN Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Users\Administrator\miniconda3'; \
+    Remove-Item .\miniconda3.exe; \
+    conda install -y python=$Env:PYTHON_VERSION
+
+# NOTE: update the install list (2 lines here) if SSL_CERTIFICATE errors crop up to pip install the related dependency
+RUN $Env:TORCH_STR = ${Env:PYTORCH_VERSION} + '+cpu'; \
+    $Env:TORCH_URL='https://download.pytorch.org/whl/cpu'; \
+    pip install --no-cache-dir torch==${Env:TORCH_STR} torchvision ninja --extra-index-url ${Env:TORCH_URL};
+
+RUN pip install brotli

@@ -76,7 +76,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "sRGB"
-                asset inputs:file = @./diffuse.png@
+                asset inputs:file = @./Diffuse_diffuse.png@
                 float outputs:b
                 float outputs:g
                 float outputs:r
@@ -112,7 +112,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "raw"
-                asset inputs:file = @./roughness.png@
+                asset inputs:file = @./Roughness_roughness.png@
                 float outputs:r
             }
         }
@@ -145,7 +145,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "raw"
-                asset inputs:file = @./metallic.png@
+                asset inputs:file = @./Metallic_metallic.png@
                 float outputs:r
             }
         }
@@ -178,7 +178,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "auto"
-                asset inputs:file = @./clearcoat.png@
+                asset inputs:file = @./Clearcoat_clearcoat.png@
                 float outputs:r
             }
         }
@@ -211,7 +211,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "auto"
-                asset inputs:file = @./clearcoat_roughness.png@
+                asset inputs:file = @./ClearcoatRoughness_clearcoat_roughness.png@
                 float outputs:r
             }
         }
@@ -244,7 +244,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "raw"
-                asset inputs:file = @./opacity.png@
+                asset inputs:file = @./Opacity_opacity.png@
                 float outputs:r
             }
         }
@@ -277,7 +277,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "raw"
-                asset inputs:file = @./ior.png@
+                asset inputs:file = @./Ior_ior.png@
                 float outputs:r
             }
         }
@@ -310,7 +310,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "raw"
-                asset inputs:file = @./normals.png@
+                asset inputs:file = @./Normal_normals.png@
                 float outputs:b
                 float outputs:g
                 float outputs:r
@@ -346,7 +346,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "raw"
-                asset inputs:file = @./specular.png@
+                asset inputs:file = @./Specular_specular.png@
                 float outputs:b
                 float outputs:g
                 float outputs:r
@@ -382,7 +382,7 @@ def Xform "World"
             {
                 uniform token info:id = "UsdUVTexture"
                 token inputs:colorspace = "raw"
-                asset inputs:file = @./displacement.png@
+                asset inputs:file = @./Displacement_displacement.png@
                 float outputs:r
             }
         }

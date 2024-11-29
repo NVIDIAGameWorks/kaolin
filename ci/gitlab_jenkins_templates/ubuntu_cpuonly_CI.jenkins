@@ -12,6 +12,10 @@ yaml:'''
 apiVersion: v1
 kind: Pod
 spec:
+  volumes:
+  - name: pvc-mount
+    persistentVolumeClaim:
+      claimName: 'kaolin-pvc'
   containers:
   - name: docker
     image: docker:20.10.23
@@ -19,6 +23,9 @@ spec:
     - sleep
     args:
     - 1d
+    volumeMounts:
+      - mountPath: /mnt
+        name: pvc-mount
     env:
       - name: DOCKER_HOST
         value: tcp://localhost:2375
@@ -77,19 +84,72 @@ spec:
                  .
               """)
         }
-        
+        if (buildWheel.toBoolean()) {
+          stage("Build wheel") {
+            targetImage.inside() {
+              sh """
+              ls .
+              python setup.py bdist_wheel --dist-dir .
+              """
+            }
+            pythonVerTag = pythonVer.split('\\.').join('')
+            Integer MinorVal = pythonVer.split('\\.')[1].toInteger()
+            pythonVerAbiTag = (MinorVal < 8) ? pythonVerTag + 'm' : pythonVerTag
+            kaolinVer = sh(script: "cat ./version.txt", returnStdout: true).trim()
+            baseWheelName = "kaolin-${kaolinVer}-cp${pythonVerTag}-cp${pythonVerAbiTag}"
+            wheelName = "${baseWheelName}-linux_x86_64.whl"
+          }
+          stage("Reinstall from wheel") {
+            targetImage = docker.build(
+                "${targetImageTag}",
+                """--no-cache --network host -f ./tools/linux/Dockerfile.install_wheel \
+                   --build-arg BASE_IMAGE=${targetImageTag}-base \
+                   --build-arg WHEEL_NAME=${wheelName} \
+                   .
+                """)
+          }
+          stage("Push wheel to volume") {
+          sh """
+            mkdir -p /mnt/whl/torch-${torchVer}_cpu
+            cp ./${wheelName} /mnt/whl/torch-${torchVer}_cpu/${wheelName}
+            """
+          }
+          stage("Push wheel to artifact") {
+            archiveArtifacts artifacts: "${wheelName}"
+          }
+        }
+        stage("Push") {
+          docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
+            targetImage.push()
+          }
+        }
       } catch (e) {
         updateGitlabCommitStatus(name: "test-${configName}", state: 'canceled')
         throw e
       }
-      gitlabCommitStatus("test-${configName}") {
-        stage("Test") {
-          targetImage.inside {
-            // Don't know why but it doesn't work from /kaolin with docker plugin
-            sh 'cd /tmp && python -c "import kaolin"'
-          }
-        }
+      stage("Launch test") {
+        build job: "ubuntu_test_cpu_template_CI",
+        parameters: [
+          string(name: 'sourceBranch', value: "${sourceBranch}"),
+          string(name: 'configName', value: "${configName}"),
+          string(name: 'imageTag', value: "${targetImageTag}"),
+          string(name: 'commitHash', value: "${commitHash}")
+        ],
+        // This node doesn't need to be held while tests run.
+        wait: false,
+        // Success of this script depend only on successful build
+        // and launch of tests, not successful tests.
+        propagate: false
       }
+
+      //gitlabCommitStatus("test-${configName}") {
+      //  stage("Test") {
+      //    targetImage.inside {
+      //      // Don't know why but it doesn't work from /kaolin with docker plugin
+      //      sh 'cd /tmp && python -c "import kaolin"'
+      //    }
+      //  }
+      //}
     }
   }
 }

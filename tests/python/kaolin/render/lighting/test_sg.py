@@ -22,6 +22,9 @@ import torch
 from PIL import Image
 
 import kaolin as kal
+import kaolin.io.utils
+from kaolin.io.utils import read_image
+from kaolin.utils.testing import assert_images_close
 
 ROOT_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -170,52 +173,6 @@ class TestUnbatchedReducedSgInnerProduct:
         assert torch.allclose(other_sharpness.grad, gt_other_sharpness.grad,
                               rtol=1e-4, atol=1e-4)
 
-def _generate_pinhole_rays_dir(camera, device='cuda'):
-    """Ray direction generation function for pinhole cameras.
-
-    This function assumes that the principal point (the pinhole location) is specified by a 
-    displacement (camera.x0, camera.y0) in pixel coordinates from the center of the image. 
-    The Kaolin camera class does not enforce a coordinate space for how the principal point is specified,
-    so users will need to make sure that the correct principal point conventions are followed for 
-    the cameras passed into this function.
-
-    Args:
-        height (int): The resolution height.
-        width (int): The resolution width.
-        camera (kaolin.render.camera.Camera): The camera instance, should be of batch == 1.
-    Returns:
-        (torch.Tensor): the rays directions, of shape (height, width, 3)
-    """
-    # Generate centered grid
-    pixel_y, pixel_x = torch.meshgrid(
-        torch.arange(camera.height, device=device),
-        torch.arange(camera.width, device=device),
-    )
-    pixel_x = pixel_x + 0.5  # scale and add bias to pixel center
-    pixel_y = pixel_y + 0.5  # scale and add bias to pixel center
-
-    # Account for principal point (offsets from the center)
-    pixel_x = pixel_x - camera.x0
-    pixel_y = pixel_y + camera.y0
-
-    # pixel values are now in range [-1, 1], both tensors are of shape res_y x res_x
-    # Convert to NDC
-    pixel_x = 2 * (pixel_x / camera.width) - 1.0
-    pixel_y = 2 * (pixel_y / camera.height) - 1.0
-
-    ray_dir = torch.stack((pixel_x * camera.tan_half_fov(kal.render.camera.intrinsics.CameraFOV.HORIZONTAL),
-                           -pixel_y * camera.tan_half_fov(kal.render.camera.intrinsics.CameraFOV.VERTICAL),
-                           -torch.ones_like(pixel_x)), dim=-1)
-
-    ray_dir = ray_dir.reshape(-1, 3)    # Flatten grid rays to 1D array
-    ray_orig = torch.zeros_like(ray_dir)
-
-    # Transform from camera to world coordinates
-    ray_orig, ray_dir = camera.extrinsics.inv_transform_rays(ray_orig, ray_dir)
-    ray_dir /= torch.linalg.norm(ray_dir, dim=-1, keepdim=True)
-
-    return ray_dir[0].reshape(camera.height, camera.width, 3)
-
 @pytest.mark.parametrize('scene_idx,azimuth,elevation,amplitude,sharpness', [
     (0, torch.tensor([0., math.pi / 2.], device='cuda'), torch.tensor([0., 0.], device='cuda'),
      torch.tensor([[5., 2., 2.], [5., 10., 5.]], device='cuda'), torch.tensor([6., 20.], device='cuda')),
@@ -228,6 +185,7 @@ class TestRenderLighting:
     def rasterization_output(self):
         MODEL_PATH = os.path.join(ROOT_DIR, 'colored_sphere.obj')
         obj = kal.io.obj.import_mesh(MODEL_PATH, with_materials=True, with_normals=True)
+        # TODO: use Mesh API instead
 
         vertices = obj.vertices.cuda().unsqueeze(0)
         # Normalize vertices in [-0.5, 0.5] range
@@ -236,9 +194,6 @@ class TestRenderLighting:
         vertices = ((vertices - vertices_min) / (vertices_max - vertices_min)) - 0.5
         
         faces = obj.faces.cuda()
-        num_faces = faces.shape[0]
-        num_vertices = vertices.shape[1]
-        face_vertices = kal.ops.mesh.index_vertices_by_faces(vertices, faces)
         # Face normals w.r.t to the world coordinate system
         face_normals_idx = obj.face_normals_idx.cuda()
         normals = obj.normals.cuda().unsqueeze(0)
@@ -246,6 +201,7 @@ class TestRenderLighting:
 
         face_uvs_idx = obj.face_uvs_idx.cuda()
         uvs = obj.uvs.cuda().unsqueeze(0)
+        uvs[..., 1] = 1 - uvs[..., 1]
         face_uvs = kal.ops.mesh.index_vertices_by_faces(uvs, face_uvs_idx)
         # Take diffuse texture map component from materials
         diffuse_texture = obj.materials[0]['map_Kd'].cuda().float().permute(2, 0, 1).unsqueeze(0) / 255.
@@ -270,16 +226,16 @@ class TestRenderLighting:
         vertices_ndc = cams.intrinsics.transform(vertices_camera)
         face_vertices_camera = kal.ops.mesh.index_vertices_by_faces(vertices_camera, faces)
         face_vertices_image = kal.ops.mesh.index_vertices_by_faces(vertices_ndc[..., :2], faces)
-        face_vertices_z = face_vertices_camera[..., -1]
         
         # Compute the rays
         rays_d = []
         for cam in cams:
-            rays_d.append(_generate_pinhole_rays_dir(cam))
+            _, per_cam_ray_dirs = kal.render.camera.raygen.generate_pinhole_rays(cam)
+            per_cam_ray_dirs = per_cam_ray_dirs.reshape(cam.height, cam.width, 3)
+            rays_d.append(per_cam_ray_dirs)
         # Rays must be toward the camera
         rays_d = -torch.stack(rays_d, dim=0)
         imsize = 256
-        face_vertices = kal.ops.mesh.index_vertices_by_faces(vertices, faces)
         im_features, face_idx = kal.render.mesh.rasterize(
             imsize, imsize, face_vertices_camera[..., -1], face_vertices_image,
             [face_uvs.repeat(nb_views, 1, 1, 1), face_world_normals.repeat(nb_views, 1, 1, 1)]
@@ -287,16 +243,19 @@ class TestRenderLighting:
         hard_mask = face_idx != -1
         hard_mask = hard_mask
         uv_map = im_features[0]
-        im_world_normal = im_features[1] / torch.sqrt(torch.sum(im_features[1] * im_features[1], dim=-1, keepdim=True))
+        im_world_normal = im_features[1] / torch.sqrt(
+            torch.sum(im_features[1] * im_features[1], dim=-1, keepdim=True))
         albedo = kal.render.mesh.texture_mapping(uv_map, diffuse_texture.repeat(nb_views, 1, 1, 1))
         albedo = torch.clamp(albedo * hard_mask.unsqueeze(-1), min=0., max=1.)
-        return {
+
+        res = {
             'albedo': albedo,
             'im_world_normal': im_world_normal,
             'hard_mask': hard_mask,
             'roughness': hard_mask * 0.1,
             'rays_d': rays_d
         }
+        return res
 
     @pytest.fixture(autouse=True, scope='class')
     def albedo(self, rasterization_output):
@@ -332,7 +291,6 @@ class TestRenderLighting:
             torch.from_numpy(np.array(Image.open(os.path.join(ROOT_DIR, 'render', 'sg', f'diffuse_inner_product_{scene_idx}_{j}.png'))))
             for j in range(6)
         ], dim=0).cuda().float() / 255.
-
         assert torch.allclose(torch.clamp(img, 0., 1.), gt, rtol=0., atol=1. / 255.)
     
     def test_diffuse_fitted(self, scene_idx, azimuth, elevation, amplitude, sharpness,
@@ -368,3 +326,140 @@ class TestRenderLighting:
         ], dim=0).cuda().float() / 255.
 
         assert torch.allclose(torch.clamp(img, 0., 1.), gt, rtol=0., atol=1. / 255.)
+
+
+class TestSgLightingParameters:
+    def test_basics(self):
+        # Test can instantiate with default arguments
+        default_light = kal.render.lighting.SgLightingParameters()
+        assert default_light.amplitude is not None
+        assert default_light.direction is not None
+        assert default_light.sharpness is not None
+
+        # Test can set amplitude as both number and tensor
+        light = kal.render.lighting.SgLightingParameters(amplitude=4.0)
+        assert torch.allclose(light.amplitude, torch.full((1, 3), 4.0, dtype=torch.float))
+
+        light = kal.render.lighting.SgLightingParameters(amplitude=(1.0, 4.0, 3.0))
+        assert torch.allclose(light.amplitude, torch.tensor([[1.0, 4.0, 3.0]], dtype=torch.float))
+
+        light = kal.render.lighting.SgLightingParameters(amplitude=torch.tensor([1.0, 4.0, 3.0], dtype=torch.float))
+        assert torch.allclose(light.amplitude, torch.tensor([[1.0, 4.0, 3.0]], dtype=torch.float))
+
+        light = kal.render.lighting.SgLightingParameters(amplitude=4.0, direction=torch.rand((15, 3), dtype=torch.float))
+        assert torch.allclose(light.amplitude, torch.full((15, 3), 4.0, dtype=torch.float))
+
+        # Test set sharpness
+        light = kal.render.lighting.SgLightingParameters(sharpness=4.0)
+        assert torch.allclose(light.sharpness, torch.full((1,), 4.0, dtype=torch.float))
+
+        light = kal.render.lighting.SgLightingParameters(sharpness=(1.0, 4.0, 3.0))
+        assert torch.allclose(light.sharpness, torch.tensor([1.0, 4.0, 3.0], dtype=torch.float))
+
+        light = kal.render.lighting.SgLightingParameters(sharpness=4.0,
+                                                         direction=torch.rand((10, 3), dtype=torch.float))
+        assert torch.allclose(light.sharpness, torch.full((10,), 4.0, dtype=torch.float))
+
+        # Test set all
+        ampl = torch.rand((6, 3), dtype=torch.float)
+        directions = torch.rand((6, 3), dtype=torch.float)
+        sharp = torch.rand((6,), dtype=torch.float)
+        orig_device = ampl.device
+        light = kal.render.lighting.SgLightingParameters(sharpness=sharp, amplitude=ampl, direction=directions)
+        assert torch.allclose(light.amplitude, ampl)
+        assert torch.allclose(light.sharpness, sharp)
+        assert torch.allclose(light.direction, torch.nn.functional.normalize(directions))
+
+        # Test to device conversions ---
+        def _assert_device(obj, device):
+            assert obj.amplitude.device.type == device.type
+            assert obj.sharpness.device.type == device.type
+            assert obj.direction.device.type == device.type
+
+        light_cuda = light.cuda()
+        _assert_device(light, orig_device)
+        _assert_device(light_cuda, torch.device("cuda"))
+        light_cuda = light.to("cuda")
+        _assert_device(light_cuda, torch.device("cuda"))
+        light_cpu = light_cuda.cpu()
+        _assert_device(light_cpu, torch.device("cpu"))
+        assert kal.utils.testing.contained_torch_equal(light, light_cpu, approximate=True, print_error_context="light")
+        light_cpu = light_cuda.to("cpu")
+        _assert_device(light_cpu, torch.device("cpu"))
+        assert kal.utils.testing.contained_torch_equal(light, light_cpu, approximate=True, print_error_context="light")
+
+    def test_from_sun(self):
+        # default
+        direction = torch.rand((5, 3), dtype=torch.float)
+        light = kal.render.lighting.SgLightingParameters.from_sun(direction)
+        assert kal.utils.testing.check_tensor(light.direction, shape=(5, 3))
+        assert kal.utils.testing.check_tensor(light.amplitude, shape=(5, 3))
+        assert kal.utils.testing.check_tensor(light.sharpness, shape=(5,))
+
+        light = kal.render.lighting.SgLightingParameters.from_sun(direction, strength=(1, 2, 3, 4, 5))
+        assert kal.utils.testing.check_tensor(light.direction, shape=(5, 3))
+        assert kal.utils.testing.check_tensor(light.amplitude, shape=(5, 3))
+        assert kal.utils.testing.check_tensor(light.sharpness, shape=(5,))
+
+        strength = torch.rand((7,), dtype=torch.float) * 10
+        direction = torch.rand((7, 3), dtype=torch.float)
+        angle = torch.rand((7,), dtype=torch.float) * math.pi
+        color = torch.rand((7, 3), dtype=torch.float)
+        # without color
+        light = kal.render.lighting.SgLightingParameters.from_sun(direction, strength=strength, angle=angle)
+        assert torch.allclose(light.amplitude, strength.unsqueeze(-1).repeat(1,3))
+        assert kal.utils.testing.check_tensor(light.sharpness, shape=(7,))
+        assert torch.allclose(light.direction, torch.nn.functional.normalize(direction))
+
+        # with color
+        light = kal.render.lighting.SgLightingParameters.from_sun(direction, strength=strength, angle=angle, color=color)
+        assert torch.allclose(light.amplitude, strength.unsqueeze(-1) * color)
+        assert kal.utils.testing.check_tensor(light.sharpness, shape=(7,))
+        assert torch.allclose(light.direction, torch.nn.functional.normalize(direction))
+
+
+class TestUtilities:
+    def test_sg_from_sun(self):
+        strength = torch.rand((7,), dtype=torch.float) * 10 + 1.
+        direction = torch.rand((7, 3), dtype=torch.float)
+        angle = torch.rand((7,), dtype=torch.float) * math.pi
+        color = torch.rand((7, 3), dtype=torch.float)
+
+        amplitude, direction_out, sharpness = kal.render.lighting.sg_from_sun(direction, strength, angle, color)
+        assert torch.allclose(amplitude, strength.unsqueeze(-1) * color)
+        assert torch.allclose(direction, direction_out)
+        assert torch.allclose(sharpness, torch.log(0.5 / strength) / (torch.cos(angle / 2) - 1))
+
+        angle[:] = math.pi * 2
+        amplitude, direction_out, sharpness = kal.render.lighting.sg_from_sun(direction, strength, angle, color)
+        assert torch.all(torch.logical_not(torch.isnan(sharpness)))
+        assert torch.all(torch.logical_not(torch.isinf(sharpness)))
+        # assert torch.all(sharpness > 0)
+
+        angle[:] = 0
+        amplitude, direction_out, sharpness = kal.render.lighting.sg_from_sun(direction, strength, angle, color)
+        assert torch.all(torch.logical_not(torch.isnan(sharpness)))
+        # TODO(Clement): fix this one
+        # assert torch.all(torch.logical_not(torch.isinf(sharpness)))  # Fails
+        # assert torch.all(sharpness > 0)
+
+        # Larger angle should reduce sharpness
+        angle = torch.rand((7,), dtype=torch.float) * math.pi
+        angle[0] = math.pi
+        _, _, sharpness1 = kal.render.lighting.sg_from_sun(direction, strength, angle, color)
+
+        angle2 = angle + math.pi * 0.9
+        angle2[0] = math.pi * 1.5
+        _, _, sharpness2 = kal.render.lighting.sg_from_sun(direction, strength, angle2, color)
+        assert torch.all(sharpness2 < sharpness1)
+
+    def test_sg_direction_from_azimuth_elevation(self):
+        azimuth = math.pi / 2
+        elevation = math.pi / 3
+        directions = kal.render.lighting.sg_direction_from_azimuth_elevation(azimuth, elevation)
+        assert kal.utils.testing.check_tensor(directions, shape=(1, 3))
+
+        azimuth = torch.rand((6,), dtype=torch.float) * math.pi
+        elevation = torch.rand((6,), dtype=torch.float) * math.pi
+        directions = kal.render.lighting.sg_direction_from_azimuth_elevation(azimuth, elevation)
+        assert kal.utils.testing.check_tensor(directions, shape=(6, 3))

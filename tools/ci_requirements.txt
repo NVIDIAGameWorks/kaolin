@@ -7,3 +7,6 @@ pytest==7.3.0
 pytest-cov==3.0.0
 nbmake==1.4.1
 jupyter
+plyfile
+gitpython
+wget

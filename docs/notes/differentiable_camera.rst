@@ -3,6 +3,20 @@ Differentiable Camera
 
 .. _differentiable_camera:
 
+Tutorials
+=========
+
+Kaolin github includes a number of recipes for camera manipulation, including:
+    * `cameras_differentiable.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/cameras_differentiable.py>`_: optimize a camera position
+    * `camera_transforms.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_transforms.py>`_: using :func:`Camera.transform()` function
+    * `camera_ray_tracing.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_ray_tracing.py>`_: how to design a ray generating function using :class:`Camera` objects
+    * `camera_properties.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_properties.py>`_: exposing some the camera attributes and properties
+    * `camera_opengl_shaders.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_opengl_shaders.py>`_: Using the camera with glumpy
+    * `camera_movement.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_movement.py>`_: Manipulating a camera position and zoom
+    * `camera_init_simple.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_init_simple.py>`_: Making Camera objects with the flexible :func:`Camera.from_args()` constructor
+    * `camera_init_explicit.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_init_explicit.py>`_: Making :class:`CameraIntrinsics` and :class:`CameraExtrinsics` with all the different constructors available
+    * `camera_coordinate_systems.py <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/recipes/camera/camera_coordinate_systems.py>`_: Changing coordinate system in a :class:`Camera` object
+
 Camera class
 ============
 
@@ -229,6 +243,20 @@ CameraIntrinsics class
 
     currently there are two subclasses of intrinsics: :class:`kaolin.render.camera.OrthographicIntrinsics` and
     :class:`kaolin.render.camera.PinholeIntrinsics`.
+
+Ray Generation
+======================
+Starting with kaolin 0.16.0, :class:`kaolin.render.camera.Camera` supports ray generation of pinhole and
+orthographic cameras via
+:func:`generate_rays() <Camera.generate_rays()>`.
+
+The full functional api is included in the :ref:`raygen.py module<kaolin.render.camera>`,
+and allows for lower level operations such as :func:`generate_centered_custom_resolution_pixel_coords()`
+for creating a custom pixel-grid to guide ray-generation.
+This is useful for supporting ray-tracing with lower resolution image planes,
+or implementing more advanced effects like ray-jittering.
+
+.. image:: ../img/camera_raygen_grid.png
 
 API Documentation:
 ------------------

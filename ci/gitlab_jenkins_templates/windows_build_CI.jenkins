@@ -12,7 +12,8 @@ def cuda_version_url = [
     '11.6': 'https://developer.download.nvidia.com/compute/cuda/11.6.2/local_installers/cuda_11.6.2_511.65_windows.exe',
     '11.7': 'https://developer.download.nvidia.com/compute/cuda/11.7.1/local_installers/cuda_11.7.1_516.94_windows.exe',
     '11.8': 'https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe',
-    '12.1': 'https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_531.14_windows.exe'
+    '12.1': 'https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_531.14_windows.exe',
+    '12.4': 'https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_551.78_windows.exe'
 ]
 
 
@@ -115,9 +116,14 @@ spec:
                   """)
             }
           }
-          
           stage("Push") {
             targetImage.push()
+          }
+          stage("Clean local images") {
+            powershell """
+                docker image rm -f ${targetImageTag}-base
+                docker image rm -f ${targetImageTag}
+            """
           }
         }
       }
@@ -172,14 +178,16 @@ def prepareWindowsTestJob(arch) {
 def prepareWindowsWheelTestJob() {
   return {
     stage("Test") {
+      def cudaTag = cudaVer.split('\\.')[0..<2].join('')
       build job: "windows_wheels_template_CI",
       parameters: [
         string(name: 'sourceBranch', value: "${sourceBranch}"),
         string(name: 'configName', value: "${configName}"),
         string(name: 'imageTag', value: "${targetImageTag}"),
         string(name: 'commitHash', value: "${commitHash}"),
-        string(name: 'torchVer', value: "${torchVer}"),
-        string(name: 'cudaVer', value: "${cudaVer}"),
+        string(name: 'folderName', value: "torch-${torchVer}_cu${cudaTag}")
+        //string(name: 'torchVer', value: "${torchVer}"),
+        //string(name: 'cudaVer', value: "${cudaVer}"),
       ],
       // This node doesn't need to be held while tests run.
       wait: false,

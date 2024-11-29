@@ -37,7 +37,7 @@ echo "$DASH3D $FLAGS"
 $DASH3D $FLAGS &
 PID=$!
 
-sleep 2
+sleep 30
 set +e
 kill -0 $PID  # Check still runs
 if [ "$?" -ne "0" ]; then

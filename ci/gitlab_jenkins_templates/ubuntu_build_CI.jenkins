@@ -69,6 +69,7 @@ spec:
                 "${targetImageTag}",
                 """--no-cache --network host -f ./tools/linux/Dockerfile.install \
                    --build-arg BASE_IMAGE=${baseImageTag} \
+                   --build-arg IGNORE_TORCH_VER=1 \
                    .
                 """)
           }
@@ -99,7 +100,7 @@ spec:
 def prepareUbuntuTestJob(arch) {
   return {
     stage("Test ${arch}") {
-      build job: "ubuntu_test_template_CI",
+      build job: "ubuntu_test_cuda_template_CI",
       parameters: [
         string(name: 'sourceBranch', value: "${sourceBranch}"),
         string(name: 'configName', value: "${configName}"),

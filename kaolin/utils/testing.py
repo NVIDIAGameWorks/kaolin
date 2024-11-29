@@ -20,6 +20,12 @@ import logging
 import numpy as np
 import torch
 
+# Optional
+try:
+    import torchvision
+except Exception as e:
+    torchvision = None
+
 import kaolin.ops.random as random
 from kaolin.ops.spc.uint8 import uint8_bits_sum
 
@@ -262,6 +268,10 @@ def tensor_info(t, name='', print_stats=False, detailed=False):
     if t is None:
         return '%s: None' % name
 
+    if type(t) is dict:
+        return '\n'.join([tensor_info(v, name=f'{name}[{k}]:', print_stats=print_stats, detailed=detailed)
+                          for k, v in t.items()])
+
     shape_str = ''
     if hasattr(t, 'shape'):
         shape_str = '%s ' % str(list(t.shape))
@@ -312,6 +322,9 @@ def contained_torch_equal(elem, other, approximate=False, print_error_context=No
         return _maybe_print(False)
 
     def _tensor_compare(a, b):
+        if list(a.shape) != list(b.shape):
+            return False
+
         if not approximate:
             return torch.equal(a, b)
         else:
@@ -332,7 +345,8 @@ def contained_torch_equal(elem, other, approximate=False, print_error_context=No
     recursive_args['approximate'] = approximate
 
     if isinstance(elem, torch.Tensor):
-        return _maybe_print(_tensor_compare(elem, other))
+        return _maybe_print(_tensor_compare(elem, other),
+                            extra_context=f': {tensor_info(elem)} vs. {tensor_info(other)}')
     elif isinstance(elem, str):
         return _maybe_print(elem == other, extra_context=f': {elem} vs {other}')
     elif isinstance(elem, float):
@@ -342,7 +356,7 @@ def contained_torch_equal(elem, other, approximate=False, print_error_context=No
             return _maybe_print(False, f': {elem.keys()} vs {other.keys()}', 'Different keys for ')
         return all(contained_torch_equal(
             elem[key], other[key],
-            print_error_context=_recursive_error_context(f'[{key}]'), **recursive_args) for key in elem)
+            print_error_context=_recursive_error_context(f'[{key}]'), **recursive_args) for key in elem.keys())
     elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
         if set(elem._fields) != set(other._fields):
             return _maybe_print(False, f': {elem._fields} vs {other._fields}', 'Different fields for ')
@@ -359,7 +373,20 @@ def contained_torch_equal(elem, other, approximate=False, print_error_context=No
         return contained_torch_equal(_attrs_to_dict(elem, elem.__slots__), _attrs_to_dict(other, other.__slots__),
                                      print_error_context=print_error_context, **recursive_args)
     else:
-        return _maybe_print(elem == other)
+        return _maybe_print(elem == other, extra_context=f': {elem} vs {other}')
+
+def file_contents_equal(file1, file2, exclude_pattern=None):
+    def _get_lines(fname):
+        lines = [x.strip() for x in open(fname).readlines() if len(x.strip()) > 0]
+        if exclude_pattern is not None:
+            lines = [x for x in lines if exclude_pattern not in x]
+        return lines
+
+    lines1 = _get_lines(file1)
+    lines2 = _get_lines(file2)
+    if len(lines1) != len(lines2):
+        return False
+    return all(lines1[i] == lines2[i] for i in range(len(lines1)))
 
 def check_allclose(tensor, other, rtol=1e-5, atol=1e-8, equal_nan=False):
     if not torch.allclose(tensor, other, atol=atol, rtol=rtol, equal_nan=equal_nan):
@@ -430,3 +457,40 @@ def print_dict_attributes(in_dict, name='', prefix='', **tensor_info_kwargs):
         print(f'   {prefix}{k}: {tinfo}')
         if recurse:
             print_dict_attributes(v, prefix=f'  ')
+
+
+def assert_images_close(im0, im1, pixel_disagreement_threshold=0.03, max_percent_disagreeing_pixels=3,
+                        check_range=True, do_resize=True):
+    """Throws an error if images are not close to each other.
+
+    Args:
+        im0 (torch.FloatTensor): HxWxC image tensor; 0..1 range expected
+        im1 (torch.FloatTensor): H2xW2xC image tensor; 0..1 range expected
+        pixel_disagreement_threshold (float): L2 distance threshold between pixels that counts them as different
+        max_percent_disagreeing_pixels (float): maximum percent of pixels that are allowed to differ beyond the
+            provided threshold
+        check_range (bool): if True, will check that image values are not too far beyond 0..1 range (to avoid
+            e.g. passing in 0..256 images)
+        do_resize (bool): if True, will resize images to the same size before checking, else will assert that their
+            shapes are the same
+    """
+    assert len(im0.shape) == 3
+    assert im0.shape[-1] < im0.shape[0] and im0.shape[-1] < im0.shape[1]  # channel dimension
+    if check_range:
+        assert im0.max() <= 2.0
+        assert im1.max() <= 2.0  # allow some float point imprecision; ensure not 0...255 range
+    if not do_resize:
+        assert list(im0.shape) == list(im1.shape)
+    elif im0.shape != im1.shape:
+        if torchvision is None:
+            raise ValueError(f'Resize requested, but no torchvision in environment')
+        im1 = torchvision.transforms.Resize(im0.shape[:2], antialias=False)(im1.permute(2, 0, 1)).permute(1, 2, 0)
+    width = im0.shape[1]
+    height = im0.shape[0]
+
+    delta = torch.linalg.norm(im0 - im1, dim=-1)
+    disagreeing = delta > pixel_disagreement_threshold
+    num_disagree = torch.sum(disagreeing)
+    percent_disagree = num_disagree.float().item() / width / height * 100
+    assert percent_disagree < max_percent_disagreeing_pixels, \
+        f'{percent_disagree} pixels disagree; expected < {max_percent_disagreeing_pixels}'

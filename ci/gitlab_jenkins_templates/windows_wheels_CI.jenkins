@@ -49,24 +49,35 @@ spec:
 {
   node(POD_LABEL) {
     container("windows") {
+      stage("Install deps") {
+        powershell 'pip install -r /kaolin/tools/ci_requirements.txt'
+      }
+
       stage("Basic test") {
         powershell '''
           python --version
           python -c "import kaolin; print(kaolin.__version__)"
           python -c "import torch; print(torch.__version__)"
+          $env:KAOLIN_TEST_SHAPENETV1_PATH = '/mnt/data/ci_shapenetv1'
+          $env:KAOLIN_TEST_SHAPENETV2_PATH = '/mnt/data/ci_shapenetv2'
+          $env:KAOLIN_TEST_MODELNET_PATH = '/mnt/data/ModelNet'
+          $env:KAOLIN_TEST_SHREC16_PATH = '/mnt/data/ci_shrec16'
+          pytest --durations=50 --import-mode=importlib -rs \
+              --log-disable=PIL.PngImagePlugin \
+              --log-disable=PIL.TiffImagePlugin \
+              --log-disable=kaolin.rep.surface_mesh \
+              /kaolin/tests/python/kaolin/io/test_gltf.py \
+              /kaolin/tests/python/kaolin/io/test_obj.py
         '''
       }
       if (currentBuild.getCurrentResult() != "FAILURE") {
         stage("Push wheels on volume") {
-          def cudaTag = cudaVer.split('\\.')[0..<2].join('')
-          withEnv(["cudaTag=$cudaTag"]) {
-            powershell '''
-            New-Item -Path /mnt/whl/torch-"$env:torchVer"_cu"$env:cudaTag" -ItemType "directory" -Force
-            '''
-            powershell '''
-            cp /kaolin/kaolin-*.whl /mnt/whl/torch-"$env:torchVer"_cu"$env:cudaTag"/
-            '''
-          }
+          powershell '''
+          New-Item -Path /mnt/whl/"$env:folderName"/ -ItemType "directory" -Force
+          cp /kaolin/kaolin-*.whl /mnt/whl/"$env:folderName"/
+          Get-ChildItem -Recurse -Depth 2 '/mnt/whl/'
+          '''
+          
         }
         stage("Push wheels on artifacts") {
           // archiveArtifacts only take relative path, and the working directory doesn't work in jenkins

@@ -94,6 +94,7 @@ spec:
                 targetImage.inside() {
                   sh """
                   ls .
+                  export MAX_JOBS=1
                   python setup.py bdist_wheel --dist-dir .
                   """
                 }
@@ -149,7 +150,7 @@ spec:
 def prepareUbuntuTestJob(arch) {
   return {
     stage("Test ${arch}") {
-      build job: "ubuntu_test_template_CI",
+      build job: "ubuntu_test_cuda_template_CI",
       parameters: [
         string(name: 'sourceBranch', value: "${sourceBranch}"),
         string(name: 'configName', value: "${configName}"),

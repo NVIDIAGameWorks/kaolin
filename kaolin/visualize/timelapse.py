@@ -10,6 +10,7 @@ try:
 except ImportError:
     warnings.warn("Warning: module pxr not found", ImportWarning)
 
+from kaolin.render.materials import Material
 from kaolin import io
 
 logger = logging.getLogger(__name__)
@@ -196,7 +197,7 @@ class Timelapse:
             io.usd.add_mesh(stage, f'/{mesh_name}', vertices, faces, uvs,
                             face_uvs_idx, face_normals, time=iteration)
             if materials is not None:
-                if isinstance(materials, io.materials.Material):
+                if isinstance(materials, Material):
                     materials = {'0': materials}
                 if isinstance(materials, list):
                     materials = {str(i): v for i, v in enumerate(materials)}
@@ -205,12 +206,13 @@ class Timelapse:
                     vset.SetVariantSelection(material_name)
                     material.usd_root_path = meshes_path
                     with vset.GetVariantEditContext():
-                        material.write_to_usd(
-                            ind_out_path, f'/{mesh_name}/{material_name}',
+                        io.usd.export_material(
+                            material,
+                            ind_out_path, scene_path=f'/{mesh_name}/{material_name}',
                             time=iteration,
-                            texture_dir='textures',
-                            texture_file_prefix=f'{mesh_name}_{material_name}_{iteration}_',
-                            bound_prims=[mesh_prim])
+                            texture_path='textures', texture_file_prefix=f'{mesh_name}_{material_name}_{iteration}_',
+                            bound_prims=[mesh_prim],
+                            overwrite_textures=False)
             stage.Save()
 
 
