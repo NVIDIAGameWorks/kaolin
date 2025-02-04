@@ -20,7 +20,7 @@ import re
 import torch
 
 try:
-    from pxr import Usd, UsdGeom
+    from pxr import Usd, UsdGeom, Sdf
 except ImportError:
     pass
 
@@ -133,6 +133,13 @@ def create_stage(file_path, up_axis='Y'):
         <class 'pxr.Usd.Stage'>
     """
     assert os.path.exists(os.path.dirname(file_path)), f'Directory {os.path.dirname(file_path)} not found.'
+    layer = Sdf.Layer.Find(file_path)
+    print(dir(layer))
+    if layer:
+        layer.Clear()
+        #print("FOUND")
+        #stage = Usd.Stage.Open(layer)
+        #del stage
     stage = Usd.Stage.CreateNew(str(file_path))
     world = stage.DefinePrim('/World', 'Xform')
     stage.SetDefaultPrim(world)
