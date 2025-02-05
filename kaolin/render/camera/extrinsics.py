@@ -114,8 +114,7 @@ class CameraExtrinsics():
     DEFAULT_DIFFERENTIABLE_BACKEND = 'matrix_6dof_rotation'
 
     def __init__(self, backend: ExtrinsicsRep, shared_fields: dict = None):
-        """
-        Constructs the camera extrinsics with a representation backend.
+        """Constructs the camera extrinsics with a representation backend.
 
         .. warning::
 

@@ -712,8 +712,6 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
             correspond to.
         overwrite_textures (bool): set to True to overwrite existing image files when writing textures; if False
             (default) will add index to filename to avoid conflicts.
-    Returns:
-        (Usd.Stage)
 
     Example:
         >>> vertices = torch.rand(3, 3)
@@ -786,9 +784,6 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
             except Exception as e:
                 raise(e)
 
-    return usd_mesh.GetPrim()
-
-
 def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, faces=None,
                 uvs=None, face_uvs_idx=None, face_normals=None, material_assignments=None, materials=None,
                 up_axis='Y', time=None, overwrite_textures=False):
@@ -817,13 +812,10 @@ def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, fac
         overwrite_textures (bool): set to True to overwrite existing image files when writing textures; if False
             (default) will add index to filename to avoid conflicts.
 
-    Returns:
-       (Usd.Stage)
-
     Example:
         >>> vertices = torch.rand(3, 3)
         >>> faces = torch.tensor([[0, 1, 2]])
-        >>> stage = export_mesh('./new_stage.usd', vertices=vertices, faces=faces)
+        >>> export_mesh('./new_stage.usd', vertices=vertices, faces=faces)
     """
     assert isinstance(scene_path, str)
     if time is None:
@@ -836,9 +828,6 @@ def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, fac
     add_mesh(stage, scene_path, vertices, faces, uvs, face_uvs_idx,
              face_normals, material_assignments, materials, time=time, overwrite_textures=overwrite_textures)
     stage.Save()
-
-    return stage
-
 
 def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
                   uvs=None, face_uvs_idx=None, face_normals=None, material_assignments=None, materials=None,
@@ -868,19 +857,12 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
         overwrite_textures (bool): set to True to overwrite existing image files when writing textures; if False
             (default) will add index to filename to avoid conflicts.
 
-    Returns:
-        (Usd.Stage)
-
     Example:
         >>> vertices_list = [torch.rand(3, 3) for _ in range(3)]
         >>> faces_list = [torch.tensor([[0, 1, 2]]) for _ in range(3)]
-        >>> stage = export_meshes('./new_stage.usd', vertices=vertices_list, faces=faces_list)
+        >>> export_meshes('./new_stage.usd', vertices=vertices_list, faces=faces_list)
     """
-    if os.path.exists(file_path):
-        stage = Usd.Stage.Open(file_path)
-        UsdGeom.SetStageUpAxis(stage, up_axis)
-    else:
-        stage = create_stage(file_path, up_axis)
+    stage = create_stage(file_path, up_axis)
     num_meshes = -1
     # TODO: might want to consider sharing materials
     for param in [scene_paths, vertices, faces, uvs, face_uvs_idx,
@@ -913,5 +895,3 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
                  materials=None if materials is None else materials[i],
                  time=times[i], overwrite_textures=overwrite_textures)
     stage.Save()
-
-    return stage
