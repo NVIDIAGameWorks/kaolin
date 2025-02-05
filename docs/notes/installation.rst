@@ -62,11 +62,11 @@ Quick Start (Linux, Windows)
     | **torch-2.0.1**  |     ✓     |     ✓     |           |           |
     +------------------+-----------+-----------+-----------+-----------+
    
-For example, to install kaolin for torch 2.0.0 and CUDA 11.8:
+For example, to install kaolin for torch 2.0.1 and CUDA 11.8:
 
 .. code-block:: bash
 
-    $ pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.0_cu118.html
+    $ pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.1_cu118.html
 
 You can check https://nvidia-kaolin.s3.us-east-2.amazonaws.com/index.html to see all the wheels available.
 

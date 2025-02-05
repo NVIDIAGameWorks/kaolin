@@ -194,13 +194,11 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
             Please refer here for UsdGeomPoints:
             https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
             https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: 'point_instancer'.
-    Returns:
-        (Usd.Stage)
 
     Example:
         >>> stage = create_stage('./new_stage.usd')
         >>> points = torch.rand(100, 3)
-        >>> stage = add_pointcloud(stage, points, '/World/PointClouds/pointcloud_0')
+        >>> add_pointcloud(stage, points, '/World/PointClouds/pointcloud_0')
         >>> stage.Save()
     """
     scene_path = Sdf.Path(scene_path)
@@ -251,8 +249,6 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
         assert colors.shape == points.shape, 'Colors and points must have the same shape.'
         geom_points.GetDisplayColorAttr().Set(colors.numpy(), time=time)
 
-    return stage
-
 def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/pointcloud_0',
                       color=None, time=None, points_type='point_instancer'):
     r"""Export a single pointcloud to a USD scene.
@@ -273,16 +269,13 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
                 Please refer here for UsdGeomPoints:
                 https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
                 https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: 'point_instancer'.
-    Returns:
-        (Usd.Stage)
 
     Example:
         >>> points = torch.rand(100, 3)
-        >>> stage = export_pointcloud('./new_stage.usd', points)
+        >>> export_pointcloud('./new_stage.usd', points)
     """
-    stage = export_pointclouds(file_path, [pointcloud], [scene_path], colors=[color], times=[time],
-                               points_type=points_type)
-    return stage
+    export_pointclouds(file_path, [pointcloud], [scene_path], colors=[color], times=[time],
+                       points_type=points_type)
 
 def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, times=None,
                        points_type='point_instancer'):
@@ -304,12 +297,10 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, ti
             Please refer here for UsdGeomPoints:
             https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
             https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: 'point_instancer'.
-    Returns:
-        (Usd.Stage)
 
     Example:
         >>> points = torch.rand(100, 3)
-        >>> stage = export_pointcloud('./new_stage.usd', points)
+        >>> export_pointcloud('./new_stage.usd', points)
     """
     if scene_paths is None:
         scene_paths = [f'/World/PointClouds/pointcloud_{i}' for i in range(len(pointclouds))]
@@ -323,5 +314,3 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, ti
     for scene_path, points, color, time in zip(scene_paths, pointclouds, colors, times):
         add_pointcloud(stage, points, scene_path, color, time=time, points_type=points_type)
     stage.Save()
-
-    return stage
