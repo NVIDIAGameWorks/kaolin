@@ -194,6 +194,9 @@ def add_voxelgrid(stage, voxelgrid, scene_path, time=None):
     pv = UsdGeom.PrimvarsAPI(prim).CreatePrimvar('kaolin_type', Sdf.ValueTypeNames.String)
     pv.Set('VoxelGrid')
 
+    return stage
+
+
 def export_voxelgrid(file_path, voxelgrid, scene_path='/World/VoxelGrids/voxelgrid_0', time=None):
     r"""Export a single voxelgrid to a USD scene.
 
@@ -234,6 +237,8 @@ def export_voxelgrids(file_path, voxelgrids, scene_paths=None, times=None):
         scene_path (list of str, optional): Absolute path(s) of voxelgrid within the USD file scene.
             Must be a valid Sdf.Path. If no path is provided, a default path is used.
         times (list of int): Positive integers defining the time at which the supplied parameters correspond to.
+    Returns:
+        (Usd.Stage)
 
     Example:
         >>> voxelgrid_1 = torch.rand(32, 32, 32) > 0.5
@@ -249,3 +254,5 @@ def export_voxelgrids(file_path, voxelgrids, scene_paths=None, times=None):
     for scene_path, voxelgrid, time in zip(scene_paths, voxelgrids, times):
         add_voxelgrid(stage, voxelgrid, scene_path, time=time)
     stage.Save()
+
+    return stage

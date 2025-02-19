@@ -61,6 +61,8 @@ Please review our [contribution guidelines](CONTRIBUTING.md).
 * [Flexible Isosurface Extraction for Gradient-Based Mesh Optimization (FlexiCubes)
 ](https://github.com/nv-tlabs/FlexiCubes):
     * Use [Flexicube class](https://kaolin.readthedocs.io/en/latest/modules/kaolin.non_commercial.html#kaolin.non_commercial.FlexiCubes), [obj loader](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.obj.html), [turntable visualizer](https://kaolin.readthedocs.io/en/latest/modules/kaolin.visualize.html#kaolin.visualize.IpyTurntableVisualizer)
+* [SATR](https://github.com/Samir55/SATR):
+    * Use [Kaolin's rendering functions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.mesh.html#), [lighting functions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.lighting.html),  [camera functions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.render.camera.html), and [obj](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.obj.html#kaolin.io.obj.import_mesh)/[off](https://kaolin.readthedocs.io/en/latest/modules/kaolin.io.off.html#kaolin.io.off.import_mesh) importers.
 
 ## Licenses
 
