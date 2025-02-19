@@ -163,7 +163,7 @@ std::tuple<at::Tensor, int> Conv3d_forward(
   int Qlevel = level;
   int Plevel = Qlevel - jump;
   int Olevel = pyramid.size(2)-2;
-  assert(PLevel >= 0);
+  assert(Plevel >= 0);
 
   uint32_t psize = pyramid.index({ Slice(None), 0, Plevel }).sum().item<int>();
   int pmax = pyramid.index({ Slice(None), 0, Plevel }).max().item<int>();
@@ -360,7 +360,7 @@ std::tuple<at::Tensor, int> ConvTranspose3d_forward(
   int Qlevel = level;
   int Plevel = Qlevel + jump;
   int Olevel = pyramid.size(2)-2;
-  assert(PLevel <= Olevel);
+  assert(Plevel <= Olevel);
 
   uint32_t psize = pyramid.index({ Slice(None), 0, Plevel }).sum().item<int>();
   int pmax = pyramid.index({ Slice(None), 0, Plevel }).max().item<int>();
