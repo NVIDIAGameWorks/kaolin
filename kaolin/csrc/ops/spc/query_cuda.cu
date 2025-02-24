@@ -35,7 +35,7 @@ __global__ void query_cuda_kernel(
     int stride = blockDim.x*gridDim.x;
     if (idx > n) return;
         
-    float resolution = exp2f(static_cast<float>(level - 1));
+    float resolution = 0.5f*exp2f(static_cast<float>(level));
 
     for (int i=idx; i<n; i+=stride) {
         point_data point = make_point_data(
