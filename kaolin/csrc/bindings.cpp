@@ -27,6 +27,7 @@
 #include "./render/sg/unbatched_reduced_sg_inner_product.h"
 #include "./ops/conversions/mesh_to_spc/mesh_to_spc.h"
 #include "./ops/conversions/gs_to_spc/gs_to_spc.h"
+#include "./ops/mesh/triangle_hash.h"
 #include "./ops/spc/spc.h"
 #include "./ops/spc/feature_grids.h"
 #include "./render/spc/raytrace.h"
@@ -45,6 +46,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   ops.def("tile_to_packed_out_cuda", &tile_to_packed_out_cuda);
     py::module ops_mesh = ops.def_submodule("mesh");
     ops_mesh.def("unbatched_mesh_intersection_cuda", &unbatched_mesh_intersection_cuda);
+    py::class_<TriangleHash>(ops_mesh, "TriangleHash")
+      .def(py::init<torch::Tensor, int>(),
+           py::arg("triangles"), py::arg("resolution"))
+      .def("query", &TriangleHash::query, py::arg("points"));
     py::module ops_conversions = ops.def_submodule("conversions");
     ops_conversions.def("unbatched_mcube_forward_cuda", &unbatched_mcube_forward_cuda);
     ops_conversions.def("mesh_to_spc_cuda", &mesh_to_spc_cuda);
