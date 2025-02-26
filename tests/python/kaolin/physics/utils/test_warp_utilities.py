@@ -1,3 +1,18 @@
+# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import pytest
 
 import torch
@@ -5,10 +20,19 @@ import numpy as np
 import warp as wp
 import warp.sparse as wps
 import kaolin.physics as physics
-import kaolin.physics_sparse as physics_sparse
-from kaolin.physics.utils.warp_utilities import bsr_to_torch, wp_bsr_to_torch_bsr, wp_bsr_to_wp_triplets, block_diagonalize
+from kaolin.physics.utils.warp_utilities import _bsr_to_torch, _wp_bsr_to_torch_bsr, _wp_bsr_to_wp_triplets, _block_diagonalize
+from kaolin.utils.testing import check_allclose
 
 
+@pytest.fixture(autouse=True)
+def device(request):
+    return 'cuda'
+
+@pytest.fixture(autouse=True)
+def dtype(request):
+    return torch.float32
+
+@pytest.fixture
 def get_test_triplets(device, dtype):
     row_inds = torch.tensor([0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  1,  1,  2,  2,  2,  2,  3,  3,  3,  3,  4,  4,  4,  4,  5,  5,  5,  5,  6,  6,  6,  6,  7,  7,  7,  7,  8,  8,  8,  8,  9,  9,  9,  9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18, 19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 22, 22, 22, 22, 23, 23, 23, 23, 24, 24, 24, 24, 25, 25, 25, 25, 26, 26, 26, 26, 27, 27, 27,
                              27, 28, 28, 28, 28, 29, 29, 29, 29], device=device, dtype=torch.int32)
@@ -30,29 +54,26 @@ def get_test_triplets(device, dtype):
     return triplets
 
 
-@pytest.mark.parametrize('device', ['cuda'])
-@pytest.mark.parametrize('dtype', [torch.float32])
-def test_block_diagonalize(device, dtype):
+
+def test_block_diagonalize(get_test_triplets, device, dtype):
     num_points = 20
     num_handles = 2
     num_objects = 3
-    wp_sparse_stacked_B = [physics_sparse.simplicits_common.precomputed.sparse_lbs_matrix(torch.as_tensor(np.random.rand(
-        num_points, num_handles), device=device, dtype=dtype), torch.as_tensor(np.random.rand(num_points, 3), device=device, dtype=dtype)) for _ in range(num_objects)]
+    wp_sparse_stacked_B = [physics.simplicits.precomputed.sparse_lbs_matrix(torch.rand(
+        num_points, num_handles, device=device, dtype=dtype), torch.rand(num_points, 3, device=device, dtype=dtype)) for _ in range(num_objects)]
 
-    dense_B = wp_bsr_to_torch_bsr(block_diagonalize(
+    dense_B = _wp_bsr_to_torch_bsr(_block_diagonalize(
         wp_sparse_stacked_B)).to_dense()
 
     # Test Block diagonalization
-    torch_block_wise_B = torch.block_diag(*[wp_bsr_to_torch_bsr(
+    torch_block_wise_B = torch.block_diag(*[_wp_bsr_to_torch_bsr(
         wp_sparse_stacked_B[i]).to_dense() for i in range(num_objects)])
-    assert torch.allclose(torch_block_wise_B, dense_B)
+    check_allclose(torch_block_wise_B, dense_B)
 
 
-@pytest.mark.parametrize('device', ['cuda'])
-@pytest.mark.parametrize('dtype', [torch.float32])
-def test_warp_bsr_to_wp_triplets(device, dtype):
+def test_warp_bsr_to_wp_triplets(get_test_triplets, device, dtype):
 
-    triplets = get_test_triplets(device, dtype)
+    triplets = get_test_triplets
 
     # Create torch sparse tensor from triplets
     coo_test = torch.sparse_coo_tensor(torch.stack(
@@ -67,18 +88,17 @@ def test_warp_bsr_to_wp_triplets(device, dtype):
                               values=wp.from_torch(triplets[2], dtype=wp.float32))
 
     # Check that warp sets the correct sparse matrix
-    assert torch.allclose(coo_test.to_dense(),
-                          wp_bsr_to_torch_bsr(warp_test).to_dense())
+    check_allclose(coo_test.to_dense(),
+                          _wp_bsr_to_torch_bsr(warp_test).to_dense())
 
     # Now convert back to triplets and check that they are the same as the original triplets
-    wp_triplets = wp_bsr_to_wp_triplets(warp_test)
-    assert torch.allclose(triplets[0], wp.to_torch(wp_triplets[0]))
-    assert torch.allclose(triplets[1], wp.to_torch(wp_triplets[1]))
-    assert torch.allclose(triplets[2], wp.to_torch(wp_triplets[2]))
+    wp_triplets = _wp_bsr_to_wp_triplets(warp_test)
+    check_allclose(triplets[0], wp.to_torch(wp_triplets[0]))
+    check_allclose(triplets[1], wp.to_torch(wp_triplets[1]))
+    check_allclose(triplets[2], wp.to_torch(wp_triplets[2]))
 
 
-@pytest.mark.parametrize('device', ['cuda'])
-@pytest.mark.parametrize('dtype', [torch.float32])
+
 def test_wp_bsr_to_torch_bsr(device, dtype):
     # Given a warp bsr sparse matrix, test that the conversion to torch bsr sparse matrix is correct
     num_handles = 2
@@ -89,27 +109,27 @@ def test_wp_bsr_to_torch_bsr(device, dtype):
     m = num_handles * 12
 
     # get random points in numpy
-    sim_pts = np.random.rand(n, 3)
-    sim_weights = np.random.rand(n, m)
+    sim_pts = torch.rand(n, 3, device=device, dtype=dtype)
+    sim_weights = torch.rand(n, m, device=device, dtype=dtype)
 
     dense_mat = physics.simplicits.precomputed.lbs_matrix(
-        torch.tensor(sim_pts, device=device, dtype=dtype), torch.tensor(sim_weights, device=device, dtype=dtype)).to(dtype)
+        sim_pts, sim_weights).to(dtype)
 
     # Convert to torch BSR
-    warp_sparse_mat = physics_sparse.simplicits_common.precomputed.sparse_lbs_matrix(
-        torch.tensor(sim_weights, device=device, dtype=dtype), torch.tensor(sim_pts, device=device, dtype=dtype))
+    warp_sparse_mat = physics.simplicits.precomputed.sparse_lbs_matrix(
+        sim_weights, sim_pts)
 
     # Convert both to dense and compare
-    torchified_mat = wp_bsr_to_torch_bsr(warp_sparse_mat).to_dense().to(dtype)
+    torchified_mat = _wp_bsr_to_torch_bsr(warp_sparse_mat).to_dense().to(dtype)
 
     for i in range(n):
         for j in range(m):
-            assert torch.allclose(
+            check_allclose(
                 torchified_mat[i, j], dense_mat[i, j])
 
     # Also check that bsr_to_torch is correct
     # Test bsr to torch
-    assert torch.allclose(bsr_to_torch(
+    check_allclose(_bsr_to_torch(
         warp_sparse_mat).to_dense().to(dtype), dense_mat)
-    assert torch.allclose(bsr_to_torch(
+    check_allclose(_bsr_to_torch(
         warp_sparse_mat).to_dense().to(dtype), torchified_mat)

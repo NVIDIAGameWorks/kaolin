@@ -47,7 +47,7 @@ def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step, 
 
     Args:
         model (nn.Module): Simplicits object network
-        pts (torch.Tensor): Tensor of sample points in R^dim, for now dim=3, of shape :math:`(\text{num_samples}, \text{dim})`
+        pts (torch.Tensor): Tensor of sample points in :math:`\mathbb{R}^dim`, for now dim=3, of shape :math:`(\text{num_samples}, \text{dim})`
         yms (torch.Tensor): Length pt-wise youngs modulus, of shape :math:`(\text{num_samples})`
         prs (torch.Tensor): Length pt-wise poisson ratios, of shape :math:`(\text{num_samples})`
         rhos (torch.Tensor): Length pt-wise density, of shape :math:`(\text{num_samples})`
@@ -81,10 +81,10 @@ def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step, 
 
     # ramps up from 100% linear elasticity to 100% neohookean elasticity
     lin_elastic = (1 - interp_step) * \
-        linear_elastic_material.linear_elastic_energy(mus, lams, pt_wise_Fs)
+        linear_elastic_material._linear_elastic_energy(mus, lams, pt_wise_Fs)
     if elasticity_type == "neohookean":
         neo_elastic = (
-            interp_step) * neohookean_elastic_material.neohookean_energy(mus, lams, pt_wise_Fs)
+            interp_step) * neohookean_elastic_material._neohookean_energy(mus, lams, pt_wise_Fs)
     else:
         raise ValueError(f"Elasticity type {elasticity_type} not supported")
 

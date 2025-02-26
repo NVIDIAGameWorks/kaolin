@@ -22,31 +22,29 @@ import torch
 import warp.sparse as wps
 
 from kaolin.physics.utils import finite_diff_jac
-from kaolin.physics.utils.warp_utilities import warp_csr_from_torch_dense
-from kaolin.physics.simplicits import standard_lbs, weight_function_lbs
+from kaolin.physics.utils.warp_utilities import _warp_csr_from_torch_dense
+from kaolin.physics.simplicits import  weight_function_lbs
 
 __all__ = [
     "sparse_lbs_matrix", 
     "sparse_collision_jacobian_matrix", 
     "sparse_mass_matrix",
-    "sparse_dFdz_matrix", 
     "sparse_dFdz_matrix_from_dense",
     'lumped_mass_matrix',
     'lbs_matrix',
-    'jacobian_dF_dz_const_handle',
     'jacobian_dF_dz',
     'jacobian_dx_dz'
 ]
 
 
 @wp.kernel
-def _build_lbs_triplets(
+def _get_lbs_triplets_wp_kernel(
     sim_weights: wp.array2d(dtype=wp.float32),
     sim_pts: wp.array(dtype=wp.vec3),
     rows: wp.array(dtype=wp.int32),
     cols: wp.array(dtype=wp.int32),
     vals: wp.array3d(dtype=wp.float32),
-):
+):  # pragma: no cover
     # Get thread index
     p, k, i = wp.tid()
     idx = (p * sim_weights.shape[1] + k) * 3 + i
@@ -70,7 +68,7 @@ def _build_lbs_triplets(
     vals[idx, 0, 3] = weight
 
 @wp.kernel
-def _build_collision_jacobian_triplets(
+def _get_collision_jacobian_triplets_wp_kernel(
     indices: wp.array(dtype=wp.int32),
     pt_is_static: wp.array(dtype=wp.int32),
     sim_weights: wp.array2d(dtype=wp.float32),
@@ -79,7 +77,7 @@ def _build_collision_jacobian_triplets(
     cols: wp.array(dtype=wp.int32),
     vals: wp.array3d(dtype=wp.float32),
     count: wp.array(dtype=wp.int32)
-):
+):  # pragma: no cover
     # Get thread index
     t, k, i = wp.tid() # valid point index, handle index, row index
 
@@ -114,11 +112,11 @@ def _build_collision_jacobian_triplets(
 
 
 @wp.kernel
-def build_dFdz_triplets(sim_weights: wp.array2d(dtype=wp.float32),
+def _get_dFdz_triplets_wp_kernel(sim_weights: wp.array2d(dtype=wp.float32),
                         rows: wp.array(dtype=wp.int32),
                         cols: wp.array(dtype=wp.int32),
                         vals: wp.array(dtype=wp.float32),
-                        triplet_index: wp.array(dtype=wp.int32)):
+                                 triplet_index: wp.array(dtype=wp.int32)):  # pragma: no cover
 
     # Get thread index
     i = wp.tid()
@@ -162,7 +160,7 @@ def sparse_lbs_matrix(sim_weights, sim_pts):
         sim_pts (wp.array(dtype=wp.vec3)): Sample points.
 
     Returns:
-        wp.sparse.bsr_matrix: Sparse LBS matrix.
+        wp.sparse.bsr_matrix: Sparse LBS matrix of size :math:`(3 \text{num_samples}, 12 \text{num_handles})`
     """
     # Calculate number of non-zero entries
     # 3 entries per block. Each block is a 1x4 matrix. There are n x num_handles blocks
@@ -175,7 +173,7 @@ def sparse_lbs_matrix(sim_weights, sim_pts):
 
     # Launch kernel to build triplets
     wp.launch(
-        kernel=_build_lbs_triplets,
+        kernel=_get_lbs_triplets_wp_kernel,
         dim=(*sim_weights.shape, 3),
         inputs=[
             sim_weights,
@@ -190,6 +188,7 @@ def sparse_lbs_matrix(sim_weights, sim_pts):
     ncol = sim_weights.shape[1]*3
     return wps.bsr_from_triplets(nrow, ncol, rows, cols, vals)
 
+
 def sparse_collision_jacobian_matrix(sim_weights, sim_pts, indices, cp_is_static):
     r"""Creates a sparse collision Jacobian matrix from the global weights and points of the scene. 
     Indices holds to the indices of the sim_pts and sim_weights to include in the matrix. 
@@ -200,8 +199,9 @@ def sparse_collision_jacobian_matrix(sim_weights, sim_pts, indices, cp_is_static
         sim_pts (wp.array(dtype=wp.vec3)): Sample points.
         indices (wp.array(dtype=wp.int32)): Indices of the sim_pts and sim_weights to include in the matrix. 
         cp_is_static (wp.array(dtype=wp.int32)): 1 if the point is in a static object, 0 otherwise.
+    
     Returns:
-        wp.sparse.bsr_matrix: Sparse LBS matrix size (3*num_indices, 12*num_handles)
+        wp.sparse.bsr_matrix: Sparse LBS matrix size :math:`(3 \text{num_indices}, 12 \text{num_handles})`
     """    
     # Calculate number of non-zero entries
     # 3 entries per block. Each block is a 1x4 matrix. There are num_pts x num_handles blocks 
@@ -218,7 +218,7 @@ def sparse_collision_jacobian_matrix(sim_weights, sim_pts, indices, cp_is_static
 
     # Launch kernel to build triplets
     wp.launch(
-        kernel=_build_collision_jacobian_triplets,
+        kernel=_get_collision_jacobian_triplets_wp_kernel,
         dim=(indices.shape[0], sim_weights.shape[1], 3),
         inputs=[
             indices,
@@ -250,7 +250,7 @@ def sparse_dFdz_matrix_from_dense(enriched_weights_fcn, pts):
         pts (torch.Tensor): Sample points.
 
     Returns:
-        wp.sparse.bsr_matrix: Sparse Jacobian matrix.
+        wp.sparse.bsr_matrix: Sparse Jacobian matrix of size :math:`(9 \text{num_samples}, 12 \text{num_handles})`
     """
     weights = enriched_weights_fcn(pts)
     num_handles = weights.shape[1]
@@ -261,10 +261,18 @@ def sparse_dFdz_matrix_from_dense(enriched_weights_fcn, pts):
     dense_dFdz = jacobian_dF_dz(
         enriched_weights_fcn, pts, z)
 
-    return warp_csr_from_torch_dense(dense_dFdz)
+    return _warp_csr_from_torch_dense(dense_dFdz)
 
 
-def sparse_dFdz_matrix(sim_weights: np.ndarray):
+def _sparse_dFdz_matrix(sim_weights: np.ndarray):  # pragma: no cover
+    r"""Creates a sparse Jacobian matrix of the deformation gradient with respect to the sample points.
+
+    Args:
+        sim_weights (wp.array2d(dtype=wp.float32)): Skinning weights.
+
+    Returns:
+        wp.sparse.bsr_matrix: Sparse Jacobian matrix of size :math:`(9 \text{num_samples}, 12 \text{num_handles})`
+    """
     # TODO: UNUSED - only works for constant weights.
     # Debug if the dFdz_from_dense is becoming slow or remove this function.
 
@@ -279,7 +287,7 @@ def sparse_dFdz_matrix(sim_weights: np.ndarray):
     offset = wp.zeros(1, dtype=wp.int32)
 
     wp.launch(
-        kernel=build_dFdz_triplets,
+        kernel=_get_dFdz_triplets_wp_kernel,
         dim=num_samples,
         inputs=[wp.array(sim_weights, dtype=wp.float32),
                 rows,
@@ -298,14 +306,13 @@ def sparse_dFdz_matrix(sim_weights: np.ndarray):
 
 
 def sparse_mass_matrix(sim_rhos: np.ndarray):
-    # TODO: Maybe this isn't needed as a standalone function?
     r"""Creates a sparse mass matrix from a set of densities.
 
     Args:
         sim_rhos (np.ndarray): Densities.
 
     Returns:
-        wp.sparse.bsr_matrix: Sparse mass matrix.
+        wp.sparse.bsr_matrix: Sparse mass matrix of size :math:`(3 \text{num_samples}, 3 \text{num_samples})`
     """
 
     dim = 3  # dimension of the space
@@ -326,8 +333,8 @@ def lumped_mass_matrix(rhos, total_volume, dim=3):
         dim (int, optional): Spatial dimensions. Defaults to 3.
 
     Returns:
-        torch.Tensor: Diagonal mass matrix of size, of shape :math:`(3*num_samples, 3*num_samples)`
-        torch.Tensor: Diagonal INVERSE mass matrix of size, of shape :math:`(3*num_samples, 3*num_samples)`
+        torch.Tensor: Diagonal mass matrix of size :math:`(3 \text{num_samples}, 3 \text{num_samples})`
+        torch.Tensor: Diagonal INVERSE mass matrix of size :math:`(3 \text{num_samples}, 3 \text{num_samples})`
     """
     # Assumes uniform sample pt distributions over the object
     # Does NOT assume uniform density
@@ -344,7 +351,7 @@ def lbs_matrix(x0, w):
         w (torch.Tensor): Weights, of shape :math:`(\text{num_samples}, \text{num_handles})`
 
     Returns:
-        torch.Tensor: Matrix that encodes the lbs transformation, given a set of vertices and corresponding weights, shape :math:`(3*\text{num_samples}, 12*\text{num_handles})`
+        torch.Tensor: Matrix that encodes the lbs transformation, given a set of vertices and corresponding weights, shape :math:`(3 \text{num_samples}, 12 \text{num_handles})`
     """
     num_samples = x0.shape[0]  # N
     num_handles = w.shape[1]  # H
@@ -408,16 +415,16 @@ def lbs_matrix(x0, w):
     return B
 
 
-def jacobian_dF_dz_const_handle(model, x0, z):
+def _jacobian_dF_dz_const_handle(model, x0, z):  # pragma: no cover
     r"""Calculates dF/dz for the skinning weights model (network) and an extra dimension for the constant handle
 
     Args:
         model (nn.module): Simplicits object network without the constant handle
         x0 (torch.Tensor): Matrix of sample points, of shape :math:`(\text{num_samples}, 3)` 
-        z (torch.Tensor): Vector of flattened transforms, of shape :math:`(12*\text{num_samples})`
+        z (torch.Tensor): Vector of flattened transforms, of shape :math:`(12 \text{num_samples})`
 
     Returns:
-        torch.Tensor: Jacobian matrix, of shape :math:`(9*\text{num_samples}, 12*\text{num_handles})`
+        torch.Tensor: Jacobian matrix, of shape :math:`(9 \text{num_samples}, 12 \text{num_handles})`
     """
     num_samples = x0.shape[0]
 
@@ -459,10 +466,10 @@ def jacobian_dF_dz(model, x0, z):
     Args:
         model (nn.Module): Simplicits object network + constant handle
         x0 (torch.Tensor): Matrix of sample points, of shape :math:`(\text{num_samples}, 3)`
-        z (torch.Tensor): Vector of flattened transforms, of shape :math:`(12*\text{num_samples})`
+        z (torch.Tensor): Vector of flattened transforms, of shape :math:`(12 \text{num_samples})`
 
     Returns:
-        torch.Tensor: Jacobian matrix, of shape :math:`(9*\text{num_samples}, 12*\text{num_handles})`
+        torch.Tensor: Jacobian matrix, of shape :math:`(9 \text{num_samples}, 12 \text{num_handles})`
     """
     num_samples = x0.shape[0]
 
@@ -479,15 +486,15 @@ def jacobian_dF_dz(model, x0, z):
 
 
 def jacobian_dx_dz(model, x0, z):
-    r"""Calculates jacobian dx/dz
+    r"""Calculates jacobian :math:`\frac{\partial x}{\partial z}`
 
     Args:
         model (nn.Module): Simplicits object network + constant handle
         x0 (torch.Tensor): Matrix of sample points, of shape :math:`(\text{num_samples}, 3)`
-        z (torch.Tensor): Vector of flattened transforms, of shape :math:`(12*\text{num_samples})`
+        z (torch.Tensor): Vector of flattened transforms, of shape :math:`(12 \text{num_samples})`
 
     Returns:
-        torch.Tensor: Jacobian matrix, of shape :math:`(3*\text{num_samples}, 12*\text{num_handles})`
+        torch.Tensor: Jacobian matrix, of shape :math:`(3 \text{num_samples}, 12 \text{num_handles})`
     """
     dx_dz = torch.autograd.functional.jacobian(lambda x: weight_function_lbs(
         x0, tfms=x.reshape(-1, 3, 4).unsqueeze(0), fcn=model).flatten(), z.flatten())

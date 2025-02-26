@@ -23,11 +23,11 @@ __all__ = ['Gravity',
 
 
 @wp.func
-def gravity_energy(g: wp.vec3,
+def gravity_energy_wp_func(g: wp.vec3,
                    rho: wp.float32,
                    vol: wp.float32,
                    dx: wp.vec3,
-                   x0: wp.vec3):
+                           x0: wp.vec3):  # pragma: no cover
     r"""Returns gravitational potential energy at each integration primitive, :math:`mgh` where :math:`h=x_0+dx` and :math:`m=rho*vol`.
 
     Args:
@@ -44,11 +44,11 @@ def gravity_energy(g: wp.vec3,
 
 
 @wp.func
-def gravity_gradient(g: wp.vec3,
+def gravity_gradient_wp_func(g: wp.vec3,
                      rho: wp.float32,
                      vol: wp.float32,
                      dx: wp.vec3,
-                     x0: wp.vec3):
+                             x0: wp.vec3):  # pragma: no cover
     r"""Returns gravitational force at each integration primitive :math:`mg` where :math:`m=rho*vol`.
 
     Args:
@@ -65,11 +65,11 @@ def gravity_gradient(g: wp.vec3,
 
 
 @wp.func
-def gravity_hessian(g: wp.vec3,
+def gravity_hessian_wp_func(g: wp.vec3,
                     rho: wp.float32,
                     vol: wp.float32,
                     dx: wp.vec3,
-                    x0: wp.vec3):
+                            x0: wp.vec3):  # pragma: no cover
     r"""Returns gravity hessian matrix at each integration primitive which is 0.
 
     Args:
@@ -86,7 +86,7 @@ def gravity_hessian(g: wp.vec3,
 
 
 @wp.kernel
-def gravity_energy_kernel(
+def gravity_energy_wp_kernel(
     g: wp.vec3,                             # acceleration due to gravity
     rho: wp.array(dtype=wp.float32),        # density at each point
     vol: wp.array(dtype=wp.float32),        # volume at each point
@@ -94,15 +94,15 @@ def gravity_energy_kernel(
     x0: wp.array(dtype=wp.vec3),            # x0
     coeff: wp.float32,
     energy: wp.array(dtype=wp.float32)      # Array of size 1
-):
+):  # pragma: no cover
     # Get thread index
     tid = wp.tid()
-    wp.atomic_add(energy, 0, coeff * gravity_energy(
+    wp.atomic_add(energy, 0, coeff * gravity_energy_wp_func(
         g, rho[tid], vol[tid], dx[tid], x0[tid]))
 
 
 @wp.kernel
-def gravity_gradient_kernel(
+def gravity_gradient_wp_kernel(
     g: wp.vec3,                        # acceleration due to gravity
     rho: wp.array(dtype=wp.float32),   # density at each point
     vol: wp.array(dtype=wp.float32),   # volume at each point
@@ -110,7 +110,8 @@ def gravity_gradient_kernel(
     x0: wp.array(dtype=wp.vec3),       # x0
     coeff: wp.float32,
     f: wp.array(dtype=wp.vec3)         # output forces
-):
+):  # pragma: no cover
+    
     # Get thread index
     tid = wp.tid()
 
@@ -119,16 +120,16 @@ def gravity_gradient_kernel(
 
     # Compute gravitational force (F = mg)
     # Write force components to output array
-    f[tid] += coeff * gravity_gradient(g, rho[tid], vol[tid], dx[tid], x0[tid])
+    f[tid] += coeff * gravity_gradient_wp_func(g, rho[tid], vol[tid], dx[tid], x0[tid])
 
 
 @wp.func
-def floor_energy(floor_height: wp.float32,
+def floor_energy_wp_func(floor_height: wp.float32,
                  floor_axis: wp.int32,
                  flip_floor: wp.int32,
                  vol: wp.float32,
                  dx: wp.vec3,
-                 x0: wp.vec3):
+                         x0: wp.vec3):  # pragma: no cover
     r"""Return floor energy at each integration primitive.
 
     Args:
@@ -156,12 +157,12 @@ def floor_energy(floor_height: wp.float32,
 
 
 @wp.func
-def floor_gradient(floor_height: wp.float32,
+def floor_gradient_wp_func(floor_height: wp.float32,
                    floor_axis: wp.int32,
                    flip_floor: wp.int32,
                    vol: wp.float32,
                    dx: wp.vec3,
-                   x0: wp.vec3):
+                           x0: wp.vec3):  # pragma: no cover
     r"""Return floor gradient at each integration primitive.
 
     Args:
@@ -196,12 +197,12 @@ def floor_gradient(floor_height: wp.float32,
 
 
 @wp.func
-def floor_hessian(floor_height: wp.float32,
+def floor_hessian_wp_func(floor_height: wp.float32,
                   floor_axis: wp.int32,
                   flip_floor: wp.int32,
                   vol: wp.float32,
                   dx: wp.vec3,
-                  x0: wp.vec3):
+                          x0: wp.vec3):  # pragma: no cover
     r"""Return floor hessian at each integration primitive.
 
     Args:
@@ -235,7 +236,7 @@ def floor_hessian(floor_height: wp.float32,
 
 
 @wp.kernel
-def floor_energy_kernel(
+def floor_energy_wp_kernel(
         floor_height: wp.float32,
         floor_axis: wp.int32,
         flip_floor: wp.int32,
@@ -243,15 +244,15 @@ def floor_energy_kernel(
         dx: wp.array(dtype=wp.vec3),
         x0: wp.array(dtype=wp.vec3),
         coeff: wp.float32,
-        energy: wp.array(dtype=wp.float32)):
+        energy: wp.array(dtype=wp.float32)):  # pragma: no cover
 
     tid = wp.tid()
-    wp.atomic_add(energy, 0, coeff * floor_energy(
+    wp.atomic_add(energy, 0, coeff * floor_energy_wp_func(
         floor_height, floor_axis, flip_floor, vol[tid], dx[tid], x0[tid]))
 
 
 @wp.kernel
-def floor_gradient_kernel(
+def floor_gradient_wp_kernel(
         floor_height: wp.float32,
         floor_axis: wp.int32,
         flip_floor: wp.int32,
@@ -259,15 +260,15 @@ def floor_gradient_kernel(
         dx: wp.array(dtype=wp.vec3),
         x0: wp.array(dtype=wp.vec3),
         coeff: wp.float32,
-        f: wp.array(dtype=wp.vec3)):
+        f: wp.array(dtype=wp.vec3)):  # pragma: no cover
 
     tid = wp.tid()
-    f[tid] += coeff * floor_gradient(
+    f[tid] += coeff * floor_gradient_wp_func(
         floor_height, floor_axis, flip_floor, vol[tid], dx[tid], x0[tid])
 
 
 @wp.kernel
-def floor_hessian_kernel(
+def floor_hessian_wp_kernel(
         floor_height: wp.float32,
         floor_axis: wp.int32,
         flip_floor: wp.int32,
@@ -275,18 +276,18 @@ def floor_hessian_kernel(
         dx: wp.array(dtype=wp.vec3),
         x0: wp.array(dtype=wp.vec3),
         coeff: wp.float32,
-        H_blocks: wp.array(dtype=wp.mat33)):
+        H_blocks: wp.array(dtype=wp.mat33)):  # pragma: no cover
 
     tid = wp.tid()
-    H_blocks[tid] += coeff * floor_hessian(
+    H_blocks[tid] += coeff * floor_hessian_wp_func(
         floor_height, floor_axis, flip_floor, vol[tid], dx[tid], x0[tid])
 
 
 @wp.func
-def boundary_energy(pin_pos: wp.vec3,
+def boundary_energy_wp_func(pin_pos: wp.vec3,
                     vol: wp.float32,
                     dx: wp.vec3,
-                    x0: wp.vec3):
+                            x0: wp.vec3):  # pragma: no cover
     r"""Return boundary energy at each integration primitive.
 
     Args:
@@ -304,10 +305,10 @@ def boundary_energy(pin_pos: wp.vec3,
 
 
 @wp.func
-def boundary_gradient(pin_pos: wp.vec3,
+def boundary_gradient_wp_func(pin_pos: wp.vec3,
                       vol: wp.float32,
                       dx: wp.vec3,
-                      x0: wp.vec3):
+                              x0: wp.vec3):  # pragma: no cover
     r"""Return boundary gradient at each integration primitive.
 
     Args:
@@ -325,10 +326,10 @@ def boundary_gradient(pin_pos: wp.vec3,
 
 
 @wp.func
-def boundary_hessian(pin_pos: wp.vec3,
+def boundary_hessian_wp_func(pin_pos: wp.vec3,
                      vol: wp.float32,
                      dx: wp.vec3,
-                     x0: wp.vec3):
+                             x0: wp.vec3):  # pragma: no cover
     r"""Return boundary hessian at each integration primitive.
 
     Args:
@@ -345,7 +346,7 @@ def boundary_hessian(pin_pos: wp.vec3,
 
 
 @wp.kernel
-def boundary_energy_kernel(
+def boundary_energy_wp_kernel(
     pinned_vertices: wp.array(dtype=wp.vec3),
     pinned_indices: wp.array(dtype=wp.int32),
     vol: wp.array(dtype=wp.float32),
@@ -353,17 +354,17 @@ def boundary_energy_kernel(
     x0: wp.array(dtype=wp.vec3),
     coeff: wp.float32,
     energy: wp.array(dtype=wp.float32)
-):
+):  # pragma: no cover
     tid = wp.tid()  # pinned point index
     pid = pinned_indices[tid]  # global index of pinned point
 
     pinned_pos = pinned_vertices[tid]
-    wp.atomic_add(energy, 0, coeff * boundary_energy(
+    wp.atomic_add(energy, 0, coeff * boundary_energy_wp_func(
         pinned_pos, vol[pid], dx[pid], x0[pid]))
 
 
 @wp.kernel
-def boundary_gradient_kernel(
+def boundary_gradient_wp_kernel(
     pinned_vertices: wp.array(dtype=wp.vec3),
     pinned_indices: wp.array(dtype=wp.int32),
     vol: wp.array(dtype=wp.float32),
@@ -371,17 +372,17 @@ def boundary_gradient_kernel(
     x0: wp.array(dtype=wp.vec3),
     coeff: wp.float32,
     f: wp.array(dtype=wp.vec3)
-):
+):  # pragma: no cover
     tid = wp.tid()  # pinned point index
     pid = pinned_indices[tid]  # global index of pinned point
 
     pinned_pos = pinned_vertices[tid]
     f[pid] += coeff * \
-        boundary_gradient(pinned_pos, vol[pid], dx[pid], x0[pid])
+        boundary_gradient_wp_func(pinned_pos, vol[pid], dx[pid], x0[pid])
 
 
 @wp.kernel
-def boundary_hessian_kernel(
+def boundary_hessian_wp_kernel(
     pinned_vertices: wp.array(dtype=wp.vec3),
     pinned_indices: wp.array(dtype=wp.int32),
     vol: wp.array(dtype=wp.float32),
@@ -389,12 +390,12 @@ def boundary_hessian_kernel(
     x0: wp.array(dtype=wp.vec3),
     coeff: wp.float32,
     H_blocks: wp.array(dtype=wp.mat33)
-):
+):  # pragma: no cover
     tid = wp.tid()  # pinned point index
     pid = pinned_indices[tid]  # global index of pinned point
 
     pinned_pos = pinned_vertices[tid]
-    H_blocks[pid] += coeff * boundary_hessian(
+    H_blocks[pid] += coeff * boundary_hessian_wp_func(
         pinned_pos, vol[pid], dx[pid], x0[pid])
 
 
@@ -404,10 +405,11 @@ class Gravity:
 
     def __init__(self, g, integration_pt_density, integration_pt_volume):
         r""" Initializes a Gravity object.
+        
         Args:
             g (wp.vec3): Gravity acceleration (0, -9.81, 0)
-            integration_pt_density (wp.array): Density at each point
-            integration_pt_volume (wp.array): Volume at each point
+            integration_pt_density (wp.array): Density at each point of size :math:`(\text{num_pts})`
+            integration_pt_volume (wp.array): Volume at each point of size :math:`(\text{num_pts})`
         """
 
         # warp constant [x, y, z] acceleration due to gravity
@@ -424,19 +426,21 @@ class Gravity:
 
     def energy(self, dx, x0, coeff, energy=None):
         r""" Returns the gravity energy at each integration primitive.
+        
         Args:
-            dx (wp.array): Delta in position
-            x0 (wp.array): Rest position
+            dx (wp.array): Delta in position of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array): Rest position of size :math:`(\text{num_pts}, 3)`
             coeff (wp.float32): Coefficient
+        
         Returns:
-            wp.array(dtype=wp.float32): Gravity energy
+            wp.array(dtype=wp.float32): Gravity energy array of size :math:`1`
         """
 
         if energy is None:
             energy = wp.zeros(1, dtype=float)
 
         wp.launch(
-            kernel=gravity_energy_kernel,
+            kernel=gravity_energy_wp_kernel,
             dim=dx.shape[0],
             inputs=[self.g,  # [gx, gy, gz] Acceleration due to gravity
                     self.integration_pt_density,
@@ -452,17 +456,19 @@ class Gravity:
 
     def gradient(self, dx, x0, coeff, gradients):
         r""" Returns the gravity gradient at each integration primitive.
+        
         Args:
-            dx (wp.array): Delta in position
-            x0 (wp.array): Rest position
+            dx (wp.array): Delta in position of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array): Rest position of size :math:`(\text{num_pts}, 3)`
             coeff (wp.float32): Coefficient
+        
         Returns:
-            wp.array(dtype=wp.vec3): Gravity gradient
+            wp.array(dtype=wp.vec3): Gravity gradient of size :math:`(\text{num_pts}, 3)`
         """
         if gradients is None:
             gradients = wp.zeros_like(dx)
         wp.launch(
-            kernel=gravity_gradient_kernel,
+            kernel=gravity_gradient_wp_kernel,
             dim=dx.shape[0],
             inputs=[self.g,  # [gx, gy, gz] Acceleration due to gravity
                     self.integration_pt_density,
@@ -477,20 +483,16 @@ class Gravity:
 
     def hessian(self, dx, x0, coeff):
         r""" Returns the gravity hessian at each integration primitive.
+        
         Args:
-            dx (wp.array): Delta in position
-            x0 (wp.array): Rest position
-            coeff (wp.float32): Coefficient
+            dx (wp.array): Delta in position of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array): Rest position of size :math:`(\text{num_pts}, 3)`
+            coeff (wp.float32): Coefficient of hessian
+        
         Returns:
-            wps.bsr_matrix: Gravity hessian as a 3x3 block-wise sparse matrix.
+            wp.array(dtype=wp.mat33): Gravity hessian of size :math:`(\text{num_pts}, 3, 3)`
         """
         return self.hessians_blocks
-        # if self.sparse_hessian is None:
-        #     # [N, N] sparse zero hessian
-        #     self.sparse_hessian = wps.bsr_zeros(
-        #         dx.shape[0], dx.shape[0], block_type=wp.mat33)
-        # torch.cuda.synchronize()
-        # return self.sparse_hessian
 
 
 class Floor:
@@ -503,11 +505,12 @@ class Floor:
                  flip_floor,
                  integration_pt_volume):
         r""" Initializes a Floor object.
+        
         Args:
             floor_height (wp.float32): Floor height
             floor_axis (wp.int32): Floor axis (0-x, or 1-y, or 2-z)
             flip_floor (wp.int32): Flips the direction of the floor (0-False, 1-True)
-            integration_pt_volume (wp.array): Volume at each point
+            integration_pt_volume (wp.array): Volume at each point of size :math:`(\text{num_pts},)`
         """
 
         self.floor_height = floor_height
@@ -521,18 +524,20 @@ class Floor:
 
     def energy(self, dx, x0, coeff, energy=None):
         r""" Returns the floor energy at each integration primitive.
+        
         Args:
-            dx (wp.array): Delta in position
-            x0 (wp.array): Rest position
+            dx (wp.array): Delta in position of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array): Rest position of size :math:`(\text{num_pts}, 3)`
             coeff (wp.float32): Coefficient
+        
         Returns:
-            wp.array(dtype=wp.float32): Floor energy
+            wp.array(dtype=wp.float32): Floor energy array of size :math:`1`
         """
 
         if energy is None:
             energy = wp.zeros(1, dtype=float)
         wp.launch(
-            kernel=floor_energy_kernel,
+            kernel=floor_energy_wp_kernel,
             dim=dx.shape[0],
             inputs=[self.floor_height,
                     self.floor_axis,
@@ -548,17 +553,19 @@ class Floor:
 
     def gradient(self, dx, x0, coeff, gradients):
         r""" Returns the floor gradient at each integration primitive.
+        
         Args:
-            dx (wp.array): Delta in position
-            x0 (wp.array): Rest position
+            dx (wp.array): Delta in position of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array): Rest position of size :math:`(\text{num_pts}, 3)`
             coeff (wp.float32): Coefficient
+        
         Returns:
-            wp.array(dtype=wp.vec3): Floor gradient
+            wp.array(dtype=wp.vec3): Floor gradient of size :math:`(\text{num_pts}, 3)`
         """
         if gradients is None:
             gradients = wp.zeros_like(dx)
         wp.launch(
-            kernel=floor_gradient_kernel,
+            kernel=floor_gradient_wp_kernel,
             dim=dx.shape[0],
             inputs=[self.floor_height,
                     self.floor_axis,
@@ -574,16 +581,18 @@ class Floor:
 
     def hessian(self, dx, x0, coeff):
         r""" Returns the floor hessian at each integration primitive.
+        
         Args:
-            dx (wp.array): Delta in position
-            x0 (wp.array): Rest position
+            dx (wp.array): Delta in position of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array): Rest position of size :math:`(\text{num_pts}, 3)`
             coeff (wp.float32): Coefficient
+        
         Returns:
-            wps.bsr_matrix: Floor hessian as a 3x3 block-wise sparse matrix.
+            wp.array(dtype=wp.mat33): Floor hessian as an array of wp.mat33 block-wise matrices of size :math:`(\text{num_pts}, 3, 3)`
         """
         self.hessians_blocks.zero_()
         wp.launch(
-            kernel=floor_hessian_kernel,
+            kernel=floor_hessian_wp_kernel,
             dim=dx.shape[0],
             inputs=[self.floor_height,
                     self.floor_axis,
@@ -610,8 +619,9 @@ class Boundary:
 
     def __init__(self, integration_pt_volume):
         r""" Initializes a Boundary object.
+        
         Args:
-            integration_pt_volume (wp.array(dtype=wp.float32)): Volume distributed across each point
+            integration_pt_volume (wp.array(dtype=wp.float32)): Volume distributed across each point of size :math:`(\text{num_pts},)`
         """
 
         self.integration_pt_volume = integration_pt_volume
@@ -624,9 +634,10 @@ class Boundary:
 
     def set_pinned(self, indices, pinned_x):
         r""" Sets the pinned vertices and indices.
+        
         Args:
-            indices (wp.array(dtype=wp.int32)): Indices of the pinned vertices
-            pinned_x (wp.array(dtype=wp.vec3)): Pinned vertices
+            indices (wp.array(dtype=wp.int32)): Indices of the pinned vertices of size :math:`(\text{num_pinned_pts},)`
+            pinned_x (wp.array(dtype=wp.vec3)): Pinned vertices of size :math:`(\text{num_pinned_pts}, 3)`
         """
         assert pinned_x.shape[0] == indices.shape[0]
         self.pinned_indices = indices
@@ -634,19 +645,21 @@ class Boundary:
 
     def energy(self, dx, x0, coeff, energy=None):
         r""" Returns the boundary energy at each integration primitive.
+        
         Args:
-            dx (wp.array(dtype=wp.vec3)): Delta in position
-            x0 (wp.array(dtype=wp.vec3)): Rest position
+            dx (wp.array(dtype=wp.vec3)): Delta in position of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array(dtype=wp.vec3)): Rest position of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient
+            
         Returns:
-            wp.array(dtype=wp.float32): Boundary energy size [1]
+            wp.array(dtype=wp.float32): Boundary energy array of size :math:`1`
         """
 
         if energy is None:
             energy = wp.zeros(1, dtype=float)
 
         wp.launch(
-            kernel=boundary_energy_kernel,
+            kernel=boundary_energy_wp_kernel,
             dim=self.pinned_indices.shape[0],
             inputs=[self.pinned_vertices,
                     self.pinned_indices,
@@ -661,17 +674,19 @@ class Boundary:
 
     def gradient(self, dx, x0, coeff, gradients):
         r""" Returns the boundary gradient at each integration primitive.
+        
         Args:
-            dx (wp.array(dtype=wp.vec3)): Delta in position
-            x0 (wp.array(dtype=wp.vec3)): Rest position
+            dx (wp.array(dtype=wp.vec3)): Delta in position of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array(dtype=wp.vec3)): Rest position of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient
+        
         Returns:
-            wp.array(dtype=wp.vec3): Boundary gradient
+            wp.array(dtype=wp.vec3): Boundary gradient of size :math:`(\text{num_pts}, 3)`
         """
         if gradients is None:
             gradients = wp.zeros_like(dx)
         wp.launch(
-            kernel=boundary_gradient_kernel,
+            kernel=boundary_gradient_wp_kernel,
             dim=self.pinned_indices.shape[0],
             inputs=[self.pinned_vertices,
                     self.pinned_indices,
@@ -685,16 +700,18 @@ class Boundary:
 
     def hessian(self, dx, x0, coeff):
         r""" Returns the boundary hessian at each integration primitive.
+        
         Args:
-            dx (wp.array(dtype=wp.vec3)): Delta in position
-            x0 (wp.array(dtype=wp.vec3)): Rest position
+            dx (wp.array(dtype=wp.vec3)): Delta in position of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array(dtype=wp.vec3)): Rest position of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient
+        
         Returns:
-            wps.bsr_matrix: Boundary hessian as a 3x3 block-wise sparse matrix.
+            wp.array(dtype=wp.mat33): Boundary hessian as a wp.mat33 block-wise sparse matrix of size :math:`(\text{num_pts}, 3, 3)`
         """
         self.hessians_blocks.zero_()
         wp.launch(
-            kernel=boundary_hessian_kernel,
+            kernel=boundary_hessian_wp_kernel,
             dim=self.pinned_indices.shape[0],
             inputs=[self.pinned_vertices, self.pinned_indices,
                     self.integration_pt_volume, dx, x0, coeff],
@@ -702,8 +719,3 @@ class Boundary:
             adjoint=False)
 
         return self.hessians_blocks
-        # H = wps.bsr_zeros(
-        #     dx.shape[0]/3, dx.shape[0]/3, block_type=wp.mat33)
-        # wps.bsr_set_diag(H, self.hessians_blocks)
-        # torch.cuda.synchronize()
-        # return H

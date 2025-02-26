@@ -18,11 +18,13 @@ import pytest
 import torch
 from functools import partial
 
+import kaolin.physics
+import kaolin.physics.simplicits
 from kaolin.physics.utils.finite_diff import finite_diff_jac
-from kaolin.physics.simplicits.utils import standard_lbs, weight_function_lbs
+from kaolin.physics.simplicits.skinning import standard_lbs, weight_function_lbs
 from kaolin.physics.simplicits.network import SimplicitsMLP
 
-from kaolin.utils.testing import FLOAT_TYPES, with_seed
+from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_allclose
 
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
@@ -53,7 +55,7 @@ def test_finite_diff_jac_2(device, dtype):
     expected = torch.eye(3, device=device, dtype=dtype).repeat(N, 1, 1)
 
     # weird errors when type is half. rtol and atol does not match the expected device type
-    assert torch.allclose(expected, transformed_points_jac,
+    check_allclose(expected, transformed_points_jac,
                           rtol=rtol.item(), atol=atol.item())
 
 
@@ -85,5 +87,5 @@ def test_finite_diff_jac(device, dtype):
     expected = 2.0 * torch.eye(3, device=device, dtype=dtype).repeat(N, 1, 1)
 
     # weird errors when type is half. rtol and atol does not match the expected device type
-    assert torch.allclose(expected, transformed_points_jac,
+    check_allclose(expected, transformed_points_jac,
                           rtol=rtol.item(), atol=atol.item())

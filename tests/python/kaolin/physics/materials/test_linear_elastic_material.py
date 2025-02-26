@@ -19,7 +19,8 @@ import warp as wp
 from typing import Any
 
 import kaolin.physics.materials.linear_elastic_material as linear_elastic_material
-import SparseSimplicits.kaolin.kaolin.physics.materials.material_utils as material_utils
+import kaolin.physics.materials.material_utils as material_utils
+from kaolin.utils.testing import check_allclose
 
 wp.init()
 ###################################
@@ -44,7 +45,7 @@ def linear_elastic_gradient_equivalent(mu, lam, defo_grad):
     batched_trace = torch.vmap(torch.trace)
 
     # Cauchy strain matrix shape (batch_dim, 3, 3)
-    Eps = linear_elastic_material.cauchy_strain(defo_grad)
+    Eps = linear_elastic_material._cauchy_strain(defo_grad)
 
     # Reshape Eps into [-1, 3, 3] tensor
     batchedEps = Eps.reshape(batched_dims.numel(), 3, 3)
@@ -65,7 +66,7 @@ def elastic_kernel(mus: wp.array(dtype=Any, ndim=2),
     lam_ = lams[pt_idx, batch_idx]
     F_ = Fs[pt_idx, batch_idx]
 
-    E = linear_elastic_material.wp_linear_elastic_energy(mu_, lam_, F_)
+    E = linear_elastic_material._linear_elastic_energy_wp_func(mu_, lam_, F_)
     wp.atomic_add(wp_e, batch_idx, E)
 ############################
 
@@ -85,8 +86,8 @@ def test_linear_energy(device, dtype):
 
     E1 = torch.tensor(0, device=device, dtype=dtype)
 
-    E2 = torch.sum(linear_elastic_material.linear_elastic_energy(mus, lams, F))
-    assert torch.allclose(E1, E2)
+    E2 = torch.sum(linear_elastic_material._linear_elastic_energy(mus, lams, F))
+    check_allclose(E1, E2)
 
 
 @pytest.mark.parametrize('device', ['cuda'])
@@ -122,7 +123,7 @@ def test_wp_linear_energy(device, dtype):
         adjoint=False
     )
     E2 = wp.to_torch(wp_e).sum()
-    assert torch.allclose(E1, E2)
+    check_allclose(E1, E2)
 
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
@@ -139,14 +140,14 @@ def test_linear_gradients(device, dtype):
 
     mus, lams = material_utils.to_lame(yms, prs)
 
-    neo_grad = linear_elastic_material.linear_elastic_gradient(mus, lams, F)
+    neo_grad = linear_elastic_material._linear_elastic_gradient(mus, lams, F)
     neo_grad_equivalent = linear_elastic_gradient_equivalent(mus, lams, F)
-    assert torch.allclose(neo_grad_equivalent, neo_grad, rtol=1e-2, atol=1e-2)
+    check_allclose(neo_grad_equivalent, neo_grad, rtol=1e-2, atol=1e-2)
     assert (neo_grad.shape[0] == N and neo_grad.shape[1] ==
             B and neo_grad.shape[-2] == 3 and neo_grad.shape[-1] == 3)
     neo_grad = neo_grad.flatten()
 
-    E0 = torch.sum(linear_elastic_material.linear_elastic_energy(mus, lams, F))
+    E0 = torch.sum(linear_elastic_material._linear_elastic_energy(mus, lams, F))
 
     expected_grad = torch.zeros_like(F.flatten(), device=device)
     row = 0
@@ -157,15 +158,15 @@ def test_linear_gradients(device, dtype):
             for j in range(F.shape[2]):
                 F[n, i, j] += eps
                 El = torch.sum(
-                    linear_elastic_material.linear_elastic_energy(mus, lams, F))
+                    linear_elastic_material._linear_elastic_energy(mus, lams, F))
                 F[n, i, j] -= 2 * eps
                 Er = torch.sum(
-                    linear_elastic_material.linear_elastic_energy(mus, lams, F))
+                    linear_elastic_material._linear_elastic_energy(mus, lams, F))
                 F[n, i, j] += eps
                 expected_grad[row] = (El - Er) / (2 * eps)
                 row += 1
 
-    assert torch.allclose(neo_grad, expected_grad, rtol=1e-2, atol=1e-2)
+    check_allclose(neo_grad, expected_grad, rtol=1e-2, atol=1e-2)
 
 
 # @pytest.mark.parametrize('device', ['cuda', 'cpu'])
@@ -199,7 +200,7 @@ def test_linear_gradients(device, dtype):
 #                 expected_hess[n, 3*i + j, :] = (Gl - Gr)/(2*eps)
 #                 row +=1
 
-#     assert torch.allclose(neo_hess, expected_hess, rtol=1e-1, atol=1e-1)
+#     check_allclose(neo_hess, expected_hess, rtol=1e-1, atol=1e-1)
 
 
 # @pytest.mark.parametrize('device', ['cuda', 'cpu'])
@@ -225,9 +226,9 @@ def test_linear_gradients(device, dtype):
 
 #     # Make sure the block diags match up
 #     for n in range(N):
-#         assert torch.allclose(neo_hess[n], autograd_hessian[9*n:9*n+9, 9*n:9*n+9], rtol=1e-1, atol=1e-1)
+#         check_allclose(neo_hess[n], autograd_hessian[9*n:9*n+9, 9*n:9*n+9], rtol=1e-1, atol=1e-1)
 #         #zero out the block
 #         autograd_hessian[9*n:9*n+9, 9*n:9*n+9] *= 0
 
 #     # Make sure the rest of the matrix is zeros
-#     assert torch.allclose(torch.zeros_like(autograd_hessian), autograd_hessian, rtol=1e-1, atol=1e-1)
+#     check_allclose(torch.zeros_like(autograd_hessian), autograd_hessian, rtol=1e-1, atol=1e-1)

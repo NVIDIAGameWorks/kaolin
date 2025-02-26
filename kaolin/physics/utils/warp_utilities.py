@@ -25,9 +25,9 @@ from warp.fem.linalg import inverse_qr
 
 import kaolin.physics.utils.torch_utilities as torch_utilities
 
-__all__ = ["wp_bsr_to_torch_bsr",
-           "wp_bsr_to_wp_triplets",
-           "bsr_to_torch",
+__all__ = ["_wp_bsr_to_torch_bsr",
+           "_bsr_to_torch",
+           "_displacement_delta_kernel",
            "vec12",
            "mat1212",
            "mat312",
@@ -42,12 +42,42 @@ mat99 = wp.types.matrix(shape=(9, 9), dtype=wp.float32)
 
 
 @wp.kernel
-def bsr_mul_diag(
+def _displacement_delta_kernel(
+    dt: float,
+    z: wp.array(dtype=float),
+    z_prev: wp.array(dtype=float),
+    z_dot: wp.array(dtype=float),
+    delta_dz: wp.array(dtype=float),
+):  # pragma: no cover
+    r"""
+    Computes the displacement delta :math:`\delta z = z - z_{prev} - dt \dot{z}` for variational integrator.
+    
+    Args:
+        dt (float): The time step.
+        z (wp.array(dtype=float)): The current position as a warp array of shape :math:`(n,)`.
+        z_prev (wp.array(dtype=float)): The previous position as a warp array of shape :math:`(n,)`.
+        z_dot (wp.array(dtype=float)): The velocity as a warp array of shape :math:`(n,)`.
+        delta_dz (wp.array(dtype=float)): The output displacement delta as a warp array of shape :math:`(n,)`.
+    """
+    i = wp.tid()
+    delta_dz[i] = (z[i] - z_prev[i]) - dt*z_dot[i]
+
+@wp.kernel
+def _bsr_mul_diag_wp_kernel(
     Bt_values: wp.array3d(dtype=float),
     Bt_columns: wp.array(dtype=int),
     C_values: wp.array(dtype=Any),
     Output_values: wp.array3d(dtype=float),
-):
+):  # pragma: no cover
+    r"""
+    Performs the reduction :math:`B^T C B` where :math:`B` is a sparse matrix and :math:`C` is a diagonal matrix.
+    
+    Args:
+        Bt_values (wp.array3d(dtype=float)): The values of the sparse matrix :math:`B^T`.
+        Bt_columns (wp.array(dtype=int)): The columns of the sparse matrix :math:`B^T`.
+        C_values (wp.array(dtype=Any)): The values of the diagonal matrix :math:`C`.
+        Output_values (wp.array3d(dtype=float)): The output values of the sparse matrix :math:`B^T C B`.
+    """
     i, r = wp.tid()
     col = Bt_columns[i]
     C = C_values[col]
@@ -58,29 +88,34 @@ def bsr_mul_diag(
         Otr[k] = BtC[k]
 
 
-def hessian_reduction(Jt, H, J):
+def _hessian_reduction(Jt, H, J):  # pragma: no cover
+    r"""
+    Performs a reduction :math:`J^T H J` where :math:`H` is a block-wise diagonal matrix and :math:`J` is a Jacobian matrix.
+    
+    Args:
+        Jt (wps.BsrMatrix): The left Jacobian matrix of shape :math:`(m, n)`.
+        H (wps.BsrMatrix): The Hessian matrix of shape :math:`(n, n)`.
+        J (wps.BsrMatrix): The right Jacobian matrix of shape :math:`(n, m)`.
+    
+    Returns:
+        wps.BsrMatrix: The reduced Hessian matrix of shape :math:`(m, m)`.
+    """
     Output = wps.bsr_copy(Jt)
-    wp.launch(bsr_mul_diag,
+    wp.launch(_bsr_mul_diag_wp_kernel,
               dim=(Jt.nnz, Jt.block_shape[0]),
               inputs=[Jt.scalar_values, Jt.columns, H, Output.scalar_values]
               )
     return wps.bsr_mm(Output, J)
 
 
-def dofs_to_torch(dofs):
-    return wp.to_torch(wp.array(dofs, dtype=wp.float32)).flatten()
-
-
-def dofs_from_torch(tdofs):
-    return wp.array(wp.from_torch(tdofs.reshape((-1, 3))), dtype=wp.vec3)
-
-
-def sum_arrays(arr1, arr2):
-    return torch.cat((arr1, arr2), dim=0)
-
-
-def warp_csr_from_torch_dense(dense_mat):
+def _warp_csr_from_torch_dense(dense_mat):  # pragma: no cover
     r"""Converts a dense torch matrix to a sparse warp csr matrix.
+    
+    Args:
+        dense_mat (torch.Tensor): Dense torch matrix of shape :math:`(m, n)`.
+    
+    Returns:
+        wps.BsrMatrix: The converted sparse warp csr matrix of shape :math:`(m, n)`.
     """
     # Find indices of non-zero elements
     non_zero_indices = torch.nonzero(dense_mat, as_tuple=False)
@@ -88,18 +123,30 @@ def warp_csr_from_torch_dense(dense_mat):
     non_zero_values = dense_mat[non_zero_indices[:,
                                                  0], non_zero_indices[:, 1]]
     # Combine indices and values into triplets
-    rows = wp.from_torch(non_zero_indices[:, 0].int(), dtype=wp.int32)
-    cols = wp.from_torch(non_zero_indices[:, 1].int(), dtype=wp.int32)
-    vals = wp.from_torch(non_zero_values, dtype=wp.float32)
+    rows = wp.from_torch(non_zero_indices[:, 0].int().to(device=dense_mat.device, dtype=torch.int))
+    cols = wp.from_torch(non_zero_indices[:, 1].int().to(device=dense_mat.device, dtype=torch.int))
+    vals = wp.from_torch(non_zero_values.to(device=dense_mat.device, dtype=torch.float32))
 
     # Create sparse matrix from triplets
     csr_matrix = wps.bsr_zeros(
-        dense_mat.shape[0], dense_mat.shape[1], block_type=wp.float32)
+        dense_mat.shape[0], dense_mat.shape[1], block_type=wp.float32, device=rows.device)
     wps.bsr_set_from_triplets(csr_matrix, rows, cols, vals)
     return csr_matrix
 
 
-def assemble_global_hessian(hess_list, wp_obj_to_z_map, z, block_size=3):
+def _assemble_global_hessian(hess_list, wp_obj_to_z_map, z, block_size=3):  # pragma: no cover
+    r"""
+    Assembles the global Hessian matrix from a list of local Hessian matrices.
+    
+    Args:
+        hess_list (list): The list of local Hessian matrices.
+        wp_obj_to_z_map (dict): The mapping from object ids to z indices.
+        z (torch.Tensor): The vector of flattened transforms.
+        block_size (int): The block size of the Hessian matrices.
+    
+    Returns:
+        wps.BsrMatrix: The assembled global Hessian matrix.
+    """
     # From the list assemble the global hessian into wps.bsr_matrix
     # 1. For each tuple in the hess_list, get the obj.id of object i, and j.
     # 2. Map to the z indices of the object
@@ -151,43 +198,14 @@ def assemble_global_hessian(hess_list, wp_obj_to_z_map, z, block_size=3):
     return wp_H
 
 
-# TODO: Make this an efficient warp function
-def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None):
-    r""" This does Ja.T @ H @ Jb for a block-wise diagonal H matrix.
-    Args:
-        dense_Ja (torch.Tensor): The left Jacobian matrix
-        block_wise_H (torch.Tensor): 3D tensor of block-wise Hessian matrices
-        dense_Jb (torch.Tensor): The right Jacobian matrix. If not provided, will use Ja.T @ H @ Ja
-    Returns:
-        torch.Tensor: The reduced Hessian matrix
-    """
-
-    if dense_Jb is None:
-        dense_Jb = dense_Ja
-
-    # This does J.T @ H @ J
-    batch_size = block_wise_H.shape[0]
-    block_size = block_wise_H.shape[1]
-
-    # Reshape J to match dimensions for batch matrix multiply
-    Jb_reshaped = dense_Jb.reshape(-1, block_size, dense_Jb.shape[1])
-
-    # Batch matrix multiply H and J_reshaped
-    HJ = torch.bmm(block_wise_H, Jb_reshaped)
-
-    # Reshape result to 2D and multiply with J.T
-    # Final: (num_handles*12, num_handles*12)
-    return torch.matmul(dense_Ja.transpose(0, 1), HJ.reshape(-1, dense_Jb.shape[1]))
-
-
-def wp_bsr_to_torch_bsr(mat):
+def _wp_bsr_to_torch_bsr(mat):  # pragma: no cover
     r"""Converts a sparse warp BSR matrix (or CSR matrix) to a sparse torch matrix.
 
     Args:
-        mat (wps.BsrMatrix): A sparse warp BSR matrix
+        mat (wps.BsrMatrix): A sparse warp BSR matrix of shape :math:`(m, n)` with block shape :math:`(b, b)`.
 
     Returns:
-        torch.sparse_<b,c>sr_tensor: A sparse torch matrix
+        torch.sparse_bsr_tensor: A sparse torch matrix of shape :math:`(m, n)` with block shape :math:`(b, b)`.
     """
     mat.nnz_sync()
 
@@ -204,7 +222,7 @@ def wp_bsr_to_torch_bsr(mat):
     return torch_weights
 
 
-def wp_bsr_to_wp_triplets(mat):
+def _wp_bsr_to_wp_triplets(mat):  # pragma: no cover
     r"""Converts a sparse warp BSR matrix (or CSR matrix) to a sparse warp triplets.
 
     Args:
@@ -215,7 +233,7 @@ def wp_bsr_to_wp_triplets(mat):
     """
 
     # First convert to torch sparse tensor
-    torch_mat = wp_bsr_to_torch_bsr(mat)
+    torch_mat = _wp_bsr_to_torch_bsr(mat)
     row_indices, col_indices, values = torch_utilities.torch_bsr_to_torch_triplets(
         torch_mat)
 
@@ -227,21 +245,21 @@ def wp_bsr_to_wp_triplets(mat):
     return (wp.from_torch(row_indices, dtype=wp.dtype_from_torch(row_indices.dtype)), wp.from_torch(col_indices, dtype=wp.dtype_from_torch(col_indices.dtype)), wp.from_torch(values, dtype=wp.dtype_from_torch(values.dtype)))
 
 
-def bsr_to_torch(mat: wps.BsrMatrix):
+def _bsr_to_torch(mat: wps.BsrMatrix):  # pragma: no cover
     r"""Converts a sparse warp BSR matrix (or CSR matrix) to a sparse torch matrix.
 
     Args:
-        mat (wps.BsrMatrix): _description_
+        mat (wps.BsrMatrix): A sparse warp BSR matrix of shape :math:`(m, n)` with block shape :math:`(b, b)`.
 
     Returns:
-        _type_: _description_
+        torch.sparse_bsr_tensor: A sparse torch matrix of shape :math:`(m, n)` with block shape :math:`(b, b)`.
     """
     mat.nnz_sync()
-
     if mat.block_shape == (1, 1):
         ctor = torch.sparse_csr_tensor
     else:
         ctor = torch.sparse_bsr_tensor
+
     torch_weights = ctor(
         crow_indices=wp.to_torch(mat.offsets)[: mat.nrow + 1],
         col_indices=wp.to_torch(mat.columns)[: mat.nnz],
@@ -251,12 +269,12 @@ def bsr_to_torch(mat: wps.BsrMatrix):
     return torch_weights
 
 
-def block_diagonalize(list_of_matrices):
+def _block_diagonalize(list_of_matrices):  # pragma: no cover
     r"""
     Block-diagonalizes a list of matrices.
 
     Args:
-        list_of_matrices (list): A list of matrices
+        list_of_matrices (list(wps.BsrMatrix)): A list of 2D warp BSR matrices
 
     Returns:
         wps.BsrMatrix: A large block-diagonal csr matrix
@@ -272,12 +290,13 @@ def block_diagonalize(list_of_matrices):
     full_values = []
     for mat in list_of_matrices:
         nnz = mat.nnz_sync()
-        row_indices = wp.to_torch(mat.uncompress_rows())[:nnz]
-        col_indices = wp.to_torch(mat.columns)[:nnz]
-        values = wp.to_torch(mat.values)[:nnz]
-        full_row_indices.append(row_indices + current_row)
-        full_col_indices.append(col_indices + current_col)
-        full_values.append(values)
+        if nnz > 0:
+            row_indices = wp.to_torch(mat.uncompress_rows())[:nnz]
+            col_indices = wp.to_torch(mat.columns)[:nnz]
+            values = wp.to_torch(mat.values)[:nnz]
+            full_row_indices.append(row_indices + current_row)
+            full_col_indices.append(col_indices + current_col)
+            full_values.append(values)
 
         current_row += mat.nrow
         current_col += mat.ncol
@@ -294,8 +313,17 @@ def block_diagonalize(list_of_matrices):
 TILE_SIZE = 72
 
 
-def build_preconditioner(lhs: wps.BsrMatrix, p_reg: float = 0.0001):
-
+def _build_preconditioner(lhs: wps.BsrMatrix, p_reg: float = 0.0001):  # pragma: no cover
+    r"""
+    Builds a preconditioner for the linear system.
+    
+    Args:
+        lhs (wps.BsrMatrix): The left-hand side of the linear system.
+        p_reg (float): The regularization parameter.
+    
+    Returns:
+        wps.LinearOperator: The preconditioner.
+    """
     tile_size = TILE_SIZE
 
     # pad lhs with zero blocks so we get an integer number of tiles
@@ -329,8 +357,8 @@ def build_preconditioner(lhs: wps.BsrMatrix, p_reg: float = 0.0001):
     wps.bsr_assign(src=lhs_padded, dest=P_coarse, masked=True)
     P_coarse.nnz_sync()
 
-    tile_chol = eval_tiled_dense_cholesky_batched
-    tile_solve = solve_tiled_dense_cholesky_batched
+    tile_chol = _eval_tiled_dense_cholesky_batched_wp_kernel
+    tile_solve = _solve_tiled_dense_cholesky_batched_wp_kernel
 
     BLOCK_DIM = 256
 
@@ -358,24 +386,38 @@ def build_preconditioner(lhs: wps.BsrMatrix, p_reg: float = 0.0001):
 
 
 @wp.kernel(enable_backward=False)
-def eval_tiled_dense_cholesky_batched(A: wp.array3d(dtype=float), reg: float):
+def _eval_tiled_dense_cholesky_batched_wp_kernel(mat: wp.array3d(dtype=float), reg: float):  # pragma: no cover
+    r"""
+    Evaluates the tiled dense Cholesky decomposition of a matrix.
+    
+    Args:
+        mat (wp.array3d(dtype=float)): The matrix to decompose..
+        reg (float): The regularization parameter.
+    """
     block, _ = wp.tid()
 
     a = wp.tile_load(
-        A[block], shape=(TILE_SIZE, TILE_SIZE)
+        mat[block], shape=(TILE_SIZE, TILE_SIZE)
     )
     r = wp.tile_ones(dtype=float, shape=(TILE_SIZE)) * reg
     b = wp.tile_diag_add(a, r)
     l = wp.tile_cholesky(b)
-    wp.tile_store(A[block], l)
+    wp.tile_store(mat[block], l)
 
 
 @wp.kernel(enable_backward=False)
-def solve_tiled_dense_cholesky_batched(
-    L: wp.array3d(dtype=float),
-    X: wp.array1d(dtype=float),
-    Y: wp.array1d(dtype=float),
-):
+def _solve_tiled_dense_cholesky_batched_wp_kernel(
+        L: wp.array3d(dtype=float),
+        X: wp.array1d(dtype=float),
+        Y: wp.array1d(dtype=float)):  # pragma: no cover
+    r"""
+    Solves the tiled dense Cholesky decomposition of a matrix.
+    
+    Args:
+        L (wp.array3d(dtype=float)): The lower triangular matrix.
+        X (wp.array1d(dtype=float)): The right-hand side of the linear system.
+        Y (wp.array1d(dtype=float)): The solution of the linear system.
+    """
     block, _ = wp.tid()
 
     a = wp.tile_load(L[block], shape=(TILE_SIZE, TILE_SIZE))

@@ -31,7 +31,7 @@ import kaolin.physics.utils.torch_utilities as torch_utilities
 
 from kaolin.physics.common import Collision, Gravity, Floor, Boundary
 from kaolin.physics.materials import NeohookeanElasticMaterial
-from kaolin.physics.materials.material_utils import compute_defo_grad, to_lame
+from kaolin.physics.materials.material_utils import get_defo_grad, to_lame
 from kaolin.physics.common.optimization import newtons_method
 from kaolin.physics.simplicits.precomputed import sparse_lbs_matrix, sparse_dFdz_matrix_from_dense
 from kaolin.physics.simplicits.skinning import weight_function_lbs
@@ -46,6 +46,9 @@ __all__ = [
 ]
 
 class NormalizedSkinningWeightsFcn(torch.nn.Module):
+    r"""
+    A skinning weight function that normalizes the points to the unit cube and then applies the model, and appends a constant weight of 1.
+    """
     def __init__(self, model, bb_min, bb_max):
         super().__init__()
         self.model = model
@@ -59,6 +62,9 @@ class NormalizedSkinningWeightsFcn(torch.nn.Module):
         ], dim=1)
 
 class SkinningWeightsFcn(torch.nn.Module):
+    r"""
+    A skinning weight function that applies the model to the points directly and appends a constant weight of 1.
+    """
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -88,19 +94,24 @@ class SimplicitsObject:
         This method creates a SimplicitsObject by training a neural network to learn skinning weights
         that can be used for deformation. The network is trained to minimize a combination of
         local and global energy terms.
+        
+        Note:
+            If num_handles is set to 0, the object will be created as rigid instead of deformable.
+            The training process uses a combination of local and global energy terms to ensure
+            both local detail preservation and global shape maintenance.
 
         Args:
-            pts (torch.Tensor): Points tensor of shape (N, 3) representing the object's geometry
+            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry
             yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
-                - A tensor of shape (N,) for per-point values
+                - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
             prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
-                - A tensor of shape (N,) for per-point values
+                - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
             rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
-                - A tensor of shape (N,) for per-point values
+                - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
-            appx_vol (torch.Tensor): Approximate volume tensor of shape (1,)
+            appx_vol (torch.Tensor): Approximate volume tensor of shape :math:`(1,)`
             num_handles (int, optional): Number of control handles for deformation. Defaults to 10
             num_samples (int, optional): Number of samples used for training. Defaults to 1000
             model_layers (int, optional): Number of layers in the neural network. Defaults to 6
@@ -116,10 +127,6 @@ class SimplicitsObject:
         Returns:
             SimplicitsObject: A trained SimplicitsObject with learned skinning weights
 
-        Note:
-            If num_handles is set to 0, the object will be created as rigid instead of deformable.
-            The training process uses a combination of local and global energy terms to ensure
-            both local detail preservation and global shape maintenance.
         """
         if num_handles == 0:
             warnings.warn(
@@ -213,6 +220,7 @@ class SimplicitsObject:
         else:
             skinning_weight_function = SkinningWeightsFcn(model)
 
+        
         return SimplicitsObject(pts, yms, prs, rhos, appx_vol, skinning_weight_function)
 
     @staticmethod
@@ -224,18 +232,18 @@ class SimplicitsObject:
         the object will act as rigid.
 
         Args:
-            pts (torch.Tensor): Points tensor of shape (N, 3) representing the object's geometry
+            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry
             yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
-                - A tensor of shape (N,) for per-point values
+                - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
             prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
-                - A tensor of shape (N,) for per-point values
+                - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
             rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
-                - A tensor of shape (N,) for per-point values
+                - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
             appx_vol (Union[torch.Tensor, float], optional): Approximate volume. Can be either:
-                - A tensor of shape (1,)
+                - A tensor of shape :math:`(1,)`
                 - A float value. Defaults to 1
 
         Returns:
@@ -326,16 +334,17 @@ class SimplicitsObject:
         self.dtype = pts.dtype
 
 class SimulatedObject:
-    def __init__(self, obj: SimplicitsObject, id: int, num_qp, num_cp, init_transform, is_kinematic=False):
+    def __init__(self, obj: SimplicitsObject, id, num_qp, num_cp, init_transform, is_kinematic=False):
         r""" Initialize a simulated object from a simplicits object. Users should avoid direct access to this class.
             Instead object-wise getters/setters for its parameters, forces and materials in the Scene to update/modify this object.
 
             Args:
                 obj (SimplicitsObject): Saves the Simplicits Object to be used in the sim by reference here
                 id (int): Object id
-                num_qp (int, optional): Number of quadrature points (integration primitives). Defaults to 1000
-                num_cp (int, optional): Number of collision points. Defaults to 1000. TODO: Not used yet.
-                init_transform (torch.Tensor, optional): Initial transformation matrix of shape (12, 1). Defaults to None
+                num_qp (int): Number of quadrature points (integration primitives)
+                num_cp (int): Number of collision points. TODO: Not used yet.
+                init_transform (torch.Tensor): Initial transformation matrix of shape (12, 1).
+                is_kinematic (bool, optional): Whether the object is kinematic. Defaults to False.
         """
 
         self.simplicits_object = obj
@@ -403,8 +412,7 @@ class SimulatedObject:
         self.sample_masses = (self.simplicits_object.appx_vol /
                               self.num_qp) * self.sample_rhos
 
-        self.sample_skinning_weights = self.simplicits_object.skinning_weight_function(
-            self.sample_pts)
+        self.sample_skinning_weights = self.simplicits_object.skinning_weight_function(self.sample_pts)
 
     def _set_sim_constants(self):
         r""" Constants required for simulation. Computed upfront. Must be updated when _sample_cubature() is called
@@ -424,12 +432,19 @@ class SimulatedObject:
         else:
             self.sample_dFdz = sparse_dFdz_matrix_from_dense(
                 self.simplicits_object.skinning_weight_function, self.sample_pts)
+        
         self.sample_dFdz.nnz_sync()
         
-        self.sample_B_dense = warp_utilities.bsr_to_torch(
+        self.sample_B_dense = warp_utilities._bsr_to_torch(
             self.sample_B).to_dense()
-        self.sample_dFdz_dense = warp_utilities.bsr_to_torch(
-            self.sample_dFdz).to_dense()
+        
+        # Check if dFdz is zeros (for kinematic objects). 
+        # Bsr_to_torch sometimes fails when mat.values is all empty list.
+        if self.is_kinematic:
+            self.sample_dFdz_dense = torch.zeros(self.sample_dFdz.shape, device=self.sample_pts.device, dtype=self.sample_pts.dtype)
+        else:
+            self.sample_dFdz_dense = warp_utilities._bsr_to_torch(
+                self.sample_dFdz).to_dense()
 
     def reset_sim_state(self):
         r"""Reset the simulation state. Object's handle transforms are set back to initial deformations.  
@@ -448,15 +463,31 @@ class SimulatedObject:
 
 
 class SimplicitsScene:
-    def __init__(self, device='cuda', dtype=torch.float, timestep=0.03, max_newton_steps=5, max_ls_steps=10):
+    def __init__(self, device='cuda', 
+        dtype=torch.float, 
+        direct_solve=True, 
+        use_cuda_graphs=False,
+        timestep=0.03, 
+        max_newton_steps=5, 
+        max_ls_steps=10, 
+        newton_hessian_regularizer=1e-4,
+        cg_tol=1e-4, 
+        cg_iters=100, 
+        conv_tol=1e-4):
         r"""Initializes a simplicits scene. SimplicitsObjects can be added to the scene. Scene forces such as floor and gravity can be set on the scene
 
         Args:
             device (str, optional): Defaults to 'cuda'.
             dtype (torch.dtype, optional): Defaults to torch.float.
+            direct_solve (bool, optional): Whether to use direct solve for linear system. Defaults to True.
+            use_cuda_graphs (bool, optional): Whether to use cuda graphs. Defaults to False.
             timestep (float, optional): Sim time-step. Defaults to 0.03.
-            max_newton_steps (int, optional): Newton steps used in time integrator. Defaults to 20.
-            max_ls_steps (int, optional): Line search steps used in time integrator. Defaults to 30.
+            max_newton_steps (int, optional): Newton steps used in time integrator. Defaults to 5.
+            max_ls_steps (int, optional): Line search steps used in time integrator. Defaults to 10.
+            newton_hessian_regularizer (float, optional): Regularizer for hessian. Defaults to 1e-4.
+            cg_tol (float, optional): Tolerance for conjugate gradient. Defaults to 1e-4.
+            cg_iters (int, optional): Maximum number of conjugate gradient iterations. Defaults to 100.
+            conv_tol (float, optional): Newtons Method convergence tolerance. Defaults to 1e-4.
         """
 
         self.device = device
@@ -474,7 +505,6 @@ class SimplicitsScene:
         self.cg_tol = 1e-4
         self.cg_iters = 100
         self.conv_tol = 1e-4
-        self.conv_criteria = 1
 
         self.current_id = 0
         self.sim_obj_dict = {}
@@ -557,7 +587,7 @@ class SimplicitsScene:
         self._ready_for_forces = False
         self._ready_for_sim = False
 
-    def _compute_sim_constants(self):
+    def _compute_sim_constants(self):  # pragma: no cover
         _num_qp = []
         _num_cp = []
         _num_handles = []
@@ -669,7 +699,7 @@ class SimplicitsScene:
                     for kin_id in _kin_obj_list]
         # Pass in the total number of dofs and the list of kinematic dofs
         if len(kin_dofs) > 0:
-            temp_sim_Pt = warp_utilities.warp_csr_from_torch_dense(torch_utilities.create_projection_matrix(
+            temp_sim_Pt = warp_utilities._warp_csr_from_torch_dense(torch_utilities.create_projection_matrix(
                 12*sum(_num_handles), torch.cat(kin_dofs, dim=0)))
             self.sim_Pt = wps.bsr_copy(
                 temp_sim_Pt, block_shape=(1, self._dof_bs))
@@ -686,13 +716,13 @@ class SimplicitsScene:
         self.sim_M = wps.bsr_diag(wp.array(np_sim_masses, dtype=wp.float32))
 
         # LBS matrix and Simplicits mass matrix
-        temp_B = warp_utilities.block_diagonalize(_stacked_sparse_B)
+        temp_B = warp_utilities._block_diagonalize(_stacked_sparse_B)
         self.sim_B = wps.bsr_copy(temp_B, block_shape=(1, self._dof_bs))
 
         self.sim_BMB = wps.bsr_transposed(self.sim_B)@self.sim_M@self.sim_B
 
         # Scene dFdz Matrix
-        temp_dFdz = warp_utilities.block_diagonalize(
+        temp_dFdz = warp_utilities._block_diagonalize(
             _stacked_sparse_dFdz)
         self.sim_dFdz = wps.bsr_copy(temp_dFdz, block_shape=(9, self._dof_bs))
 
@@ -712,7 +742,7 @@ class SimplicitsScene:
         self.force_dict["defo_grad_wise"]["material"]["object"] = elastic_struct
         self.force_dict["defo_grad_wise"]["material"]["coeff"] = 1.0
 
-    def _create_sim_variables(self):
+    def _create_sim_variables(self):  # pragma: no cover
         self.reset_scene()
 
         self._energy_graph = None
@@ -726,13 +756,13 @@ class SimplicitsScene:
     def set_object_initial_transform(self, object_id, init_transform):
         r"""Sets the initial transform of an object.
 
-        .. note::
-           this method reset the scene
+        Note:
+           This method reset the scene
 
         Args:
             object_id (int): Id of the object to set the initial transform of
             init_transform (torch.Tensor):
-                3x4 torch tensor specifying object's initial skinning transform. 
+                4x4 torch tensor specifying object's initial skinning transform. 
                 This argument takes a standard transformation, not a delta. 
                 Subsequently, the Identity matrix is subtracted from it and the delta transform is saved.
         """
@@ -754,13 +784,13 @@ class SimplicitsScene:
 
     def get_object_transforms(self, object_id):
         """
-        Returns the current 4x4 padded standard transforms of the object's handles
+        Returns the current 4x4 padded *relative* transforms of the object's handles. Add identity to the result get standard transform.
         
         Args:
             object_id (int): Id of the object to get the transforms of
 
         Returns:
-            torch.tensor: num_handles x 4 x 4 torch tensor
+            torch.tensor: Torch tensor of size :math:`(\text{num_handles}, 4, 4)` for relative transforms.
         """
         tfms = None
         
@@ -783,18 +813,18 @@ class SimplicitsScene:
         padded_tfms = torch.cat([tfms, padding], dim=1)
         return padded_tfms
 
-    def add_object(self, sim_object: SimplicitsObject, num_qp=1000, num_cp=1000, init_transform = None, is_kinematic=False):
+    def add_object(self, sim_object: SimplicitsObject, num_qp=1000, init_transform = None, is_kinematic=False):
         r"""Adds a simplicits object to the scene as a SimulatedObject.
 
         Args:
             sim_object (SimplicitsObject): Simplicits object that will be wrapped into a SimulatedObject for this scene.
             num_qp (float): Number of quadrature points (sample points to integrate over)
-            num_cp (float): # TODO (Clement): REMOVED IN ANOTHER MR
             init_transform (torch.Tensor): 3x4 or 4x4 torch tensor specifying object's initial skinning transform. 
                                             This argument takes a standard transformation, not a delta. 
                                             Subsequently, the Identity matrix is subtracted from it and the delta transform is saved.
             is_kinematic (bool): Object is kinematic if it is not solved for during dynamics simulation.
         """
+        num_cp = num_qp # TODO: Make this a separate parameter
         if self._ready_for_forces:
             raise RuntimeError("Cannot object after a force is set, please create a new scene")
 
@@ -833,6 +863,12 @@ class SimplicitsScene:
         self.sim_z = wp.from_torch(t_sim_z)
 
     def set_scene_gravity(self, acc_gravity=torch.tensor([0, 9.8, 0]), gravity_coeff=1.0):
+        r"""Sets the gravity in the scene. Applies it to all objects in scene.
+
+        Args:
+            acc_gravity (torch.Tensor, optional): Gravity acceleration. Defaults to torch.tensor([0, 9.8, 0]) with acceleration due to gravity in the downward y direction.
+            gravity_coeff (float, optional): Gravity coefficient. Defaults to 1.0.
+        """
         if not self._ready_for_forces:
             self._get_scene_ready_for_forces()
         wp_g_vec = wp.vec3(acc_gravity[0], acc_gravity[1], acc_gravity[2])
@@ -855,6 +891,7 @@ class SimplicitsScene:
             floor_height (float, optional): Floor height. Defaults to 0.
             floor_axis (int, optional): Direction of floor. 0 is x, 1 is y, 2 is z. Defaults to 1.
             floor_penalty (float, optional): Stiffness of floor. Defaults to 10000.
+            flip_floor (bool, optional): Flips the direction of the floor. Defaults to False.
         """
         if not self._ready_for_forces:
             self._get_scene_ready_for_forces()
@@ -906,6 +943,7 @@ class SimplicitsScene:
             name (str): Boundary condition name
             fcn (Callable): Function that defines which indices the boundary condition applies to. fcn should return a boolean :math:`(n)` vector where bdry indices are 1.
             bdry_penalty (float): Boundary condition penalty coefficient.
+            pinned_x (torch.Tensor, optional): Pinned positions of the boundary condition. Used for setting the boundary to a specific position. Default: The pinned positions are set from the current object's positions.
         """
 
         if not self._ready_for_forces:
@@ -937,19 +975,18 @@ class SimplicitsScene:
     def enable_collisions(self, collision_particle_radius=0.1,
                             detection_ratio=1.5,
                             impenetrable_barrier_ratio=0.25,
-                            ignore_self_collision_ratio=100000.0, 
                             collision_penalty=1000.0, 
                             max_contact_pairs=10000,
                             friction=0.5):
         r"""Sets collision for object in scene
 
         Args:
-            collision_particle_radius (float): Radius of the collision particle at which penalty begins to apply.
-            detection_ratio (float): Collision detection radius described as a ratio relative to the collision_particle_radius.
-            impenetrable_barrier_ratio (float): Collision barrier radius described as a ratio relative to the collision_particle_radius.
-            ignore_self_collision_ratio (float): Collision immune radius described as a ratio relative to the collision_particle_radius.
-            collision_penalty: Controls the stiffness of the collision interaction.
-            max_contact_pairs: Maximum number of contact pairs to detect. If this is too low, some contacts may be missed. If this is too high, memory may run out/jacobian may be too large.
+            collision_particle_radius (float, optional): Scene-wide collision particle radius at which penalty begins to apply. Change this depending on the size of the object. Defaults: 0.1.
+            detection_ratio (float, optional): Collision detection radius described as a ratio relative to the collision_particle_radius. Defaults: 1.5 times the collision_particle_radius.
+            impenetrable_barrier_ratio (float, optional): Collision barrier radius described as a ratio relative to the collision_particle_radius. Defaults: 0.25 times the collision_particle_radius.
+            collision_penalty (float, optional): Controls the stiffness of the collision interaction. Defaults: 1000 times the collision_particle_radius.
+            max_contact_pairs (int, optional): Maximum number of contact pairs to detect. If this is too low, some contacts may be missed. If this is too high, memory may run out/jacobian may be too large. Defaults: 10000 contact pairs.
+            friction (float, optional): Friction coefficient. Defaults: 0.5.
         """
 
         if not self._ready_for_forces:
@@ -960,7 +997,6 @@ class SimplicitsScene:
             collision_particle_radius=collision_particle_radius,
             detection_ratio=detection_ratio,
             impenetrable_barrier_ratio=impenetrable_barrier_ratio,
-            ignore_self_collision_ratio=ignore_self_collision_ratio,
             collision_penalty_stiffness=collision_penalty,
             friction_regularization=0.1, # Don't expose to users, its fine
             friction_fluid=0.1, # Don't expose to users, its fine
@@ -973,10 +1009,19 @@ class SimplicitsScene:
         self.force_dict["collision"]["object"] = collision_struct
         self.force_dict["collision"]["coeff"] = collision_penalty
 
-        self.detect_collision(self.sim_z)
+        self._detect_collision(self.sim_z)
 
-    def detect_collision(self, z):
-        r"""Resets the collision jacobian when new contact pairs are found."""
+    def _detect_collision(self, z):  # pragma: no cover
+        r"""Resets the collision jacobian when new contact pairs are found.
+        
+        Args:
+            z (torch.Tensor): Current scene state.
+        
+        Note:
+            This method is called internally by the scene to detect collisions.
+            It is not meant to be called by the user.
+        """
+        
         assert z.shape[0] == self.sim_B.shape[1]
         # TODO (Clement): change this to ["special"]["collision"] upon merge
         if "collision" not in self.force_dict or self.force_dict["collision"]["object"] is None:
@@ -1001,13 +1046,13 @@ class SimplicitsScene:
                                            cp_is_static=None)
         
         # Builds collision jacobian    
-        collision_struct.build_jacobian(
+        collision_struct.get_jacobian(
             cp_w=self.sim_skinning_weights, cp_x0=self.sim_pts, cp_is_static=self.qp_is_kinematic)
 
-    def build_preconditioner(self, lhs):
-        return warp_utilities.build_preconditioner(lhs)
+    def _build_preconditioner(self, lhs):  # pragma: no cover
+        return warp_utilities._build_preconditioner(lhs)
 
-    def compute_collision_bounds(self, dz, z):
+    def _compute_collision_bounds(self, dz, z):  # pragma: no cover
         if "collision" not in self.force_dict or self.force_dict["collision"]["object"] is None:
             return None
 
@@ -1021,7 +1066,7 @@ class SimplicitsScene:
 
         delta_dx = wp.array((self.sim_B@dz), dtype=wp.vec3)
 
-        wp_bounds = collision_struct.compute_bounds(cp_delta_dx=delta_dx,  # B*z_k, z_k = z at nm step 0
+        wp_bounds = collision_struct.get_bounds(cp_delta_dx=delta_dx,  # B*z_k, z_k = z at nm step 0
                                                     cp_dx=dx,  # B*z
                                                     cp_x0=self.sim_pts)  # x0
 
@@ -1043,7 +1088,7 @@ class SimplicitsScene:
         self.sim_z_prev = wp.zeros_like(self.sim_z)
         self.sim_z_dot = wp.zeros_like(self.sim_z)
 
-    def _assemble_energies(self, z, delta_dz):
+    def _assemble_energies(self, z, delta_dz):  # pragma: no cover
         x0 = self.sim_pts
 
         # copy to fixed memory location so we can use in graph
@@ -1056,7 +1101,7 @@ class SimplicitsScene:
             defo_grad_names = list(self.force_dict["defo_grad_wise"].keys())
 
             # Get grad function input variables
-            F_ele = compute_defo_grad(
+            F_ele = get_defo_grad(
                 self._eval_z, self.sim_dFdz)  # wp.array((n,), dtype=wp.mat33)
 
             wps.bsr_mv(A=self.sim_B, x=self._eval_z, y=self._eval_dx)
@@ -1100,7 +1145,7 @@ class SimplicitsScene:
         ke = energies[1] * 0.5
         return pe_sum, ke
 
-    def _assemble_gradients(self, z):
+    def _assemble_gradients(self, z):  # pragma: no cover
         # Steps
         # 1. Get global gradients
         # 2. Loop through objects and do J.T * grad[obj_inds] in torch
@@ -1117,7 +1162,7 @@ class SimplicitsScene:
             defo_grad_names = list(self.force_dict["defo_grad_wise"].keys())
 
             # Get grad function input variables
-            F_ele = compute_defo_grad(
+            F_ele = get_defo_grad(
                 self._eval_z, self.sim_dFdz)  # wp.array((n,), dtype=wp.mat33)
 
             wps.bsr_mv(A=self.sim_B, x=self._eval_z, y=self._eval_dx)
@@ -1167,7 +1212,7 @@ class SimplicitsScene:
 
         return self._scene_gradient
 
-    def _assemble_hessians(self, z):
+    def _assemble_hessians(self, z):  # pragma: no cover
         # Steps
         # 1. Get global hessians
         # 2. Loop through objects and do J.T * hess[obj_inds] @ J in warp/torch
@@ -1180,7 +1225,7 @@ class SimplicitsScene:
         defo_grad_names = list(self.force_dict["defo_grad_wise"].keys())
 
         # Get grad function input variables
-        F_ele = compute_defo_grad(
+        F_ele = get_defo_grad(
             z, self.sim_dFdz)
         dx = wp.array(self.sim_B@wp.array(z, dtype=wp.vec3), dtype=wp.vec3)
         x0 = self.sim_pts
@@ -1214,7 +1259,7 @@ class SimplicitsScene:
             hess_list.append((obj.id, obj.id, H_ii))
 
         # this is a sparse matrix
-        # H = warp_utilities.assemble_global_hessian(
+        # H = warp_utilities._assemble_global_hessian(
         #     hess_list, self.object_to_z_map, z)
 
         #### COLLISIONS ####
@@ -1241,29 +1286,18 @@ class SimplicitsScene:
 
             # cJ = collision_struct.collision_J
             # cJt = collision_struct.collision_Jt
-            # cH = warp_utilities.wp_hessian_reduction(cJt, collision_hess, cJ)
+            # cH = warp_utilities._wp_hessian_reduction(cJt, collision_hess, cJ)
             # cH33 = wps.bsr_copy(cH, block_shape=(3, 3))
             # wps.bsr_axpy(cH33, H, alpha=1.0, beta=1.0)
 
         # this is a sparse matrix
-        H = warp_utilities.assemble_global_hessian(
+        H = warp_utilities._assemble_global_hessian(
             hess_list, self.object_to_z_map, z, block_size=self._dof_bs)
 
         return H
 
-    @wp.kernel
-    def _displacement_delta_kernel(
-        dt: float,
-        z: wp.array(dtype=float),
-        z_prev: wp.array(dtype=float),
-        z_dot: wp.array(dtype=float),
-        delta_dz: wp.array(dtype=float),
-    ):
-        i = wp.tid()
-        delta_dz[i] = (z[i] - z_prev[i]) - dt*z_dot[i]
-
     @staticmethod
-    def _displacement_delta(wp_z, wp_z_prev, wp_z_dot, dt):
+    def _displacement_delta(wp_z, wp_z_prev, wp_z_dot, dt):  # pragma: no cover
         r"""Timestep displacement update, to use in inertia computations
 
         Args:
@@ -1274,12 +1308,12 @@ class SimplicitsScene:
         """
 
         delta_dz = wp.empty_like(wp_z)
-        wp.launch(SimplicitsScene._displacement_delta_kernel, dim=delta_dz.shape, inputs=[
+        wp.launch(warp_utilities._displacement_delta_kernel, dim=delta_dz.shape, inputs=[
                   dt, wp_z, wp_z_prev, wp_z_dot], outputs=[delta_dz])
         return delta_dz
 
     def _newton_E(self, wp_z, wp_z_prev, wp_z_dot,
-                  wp_B, wp_BMB, dt, wp_dFdz, defo_grad_energies=None, pt_wise_energies=None):
+                  wp_B, wp_BMB, dt, wp_dFdz, defo_grad_energies=None, pt_wise_energies=None):  # pragma: no cover
         r"""Backward's euler energy used in newton's method
 
         Args:
@@ -1303,7 +1337,7 @@ class SimplicitsScene:
         wp_newton_energy = ke + dt*dt * pe_sum
         return wp_newton_energy
 
-    def _newton_G(self, wp_z, wp_z_prev, wp_z_dot, wp_B, wp_BMB, dt, wp_dFdz, defo_grad_gradients=None, pt_wise_gradients=None):
+    def _newton_G(self, wp_z, wp_z_prev, wp_z_dot, wp_B, wp_BMB, dt, wp_dFdz, defo_grad_gradients=None, pt_wise_gradients=None):  # pragma: no cover
         r"""Backward's euler gradient used in newton's method
 
         Args:
@@ -1330,7 +1364,7 @@ class SimplicitsScene:
 
         return newton_gradient
 
-    def _newton_H(self, wp_z, wp_z_prev, wp_z_dot, wp_B, wp_BMB, dt, wp_dFdz, defo_grad_hessians=None, pt_wise_hessians=None):
+    def _newton_H(self, wp_z, wp_z_prev, wp_z_dot, wp_B, wp_BMB, dt, wp_dFdz, defo_grad_hessians=None, pt_wise_hessians=None):  # pragma: no cover
         r"""Backward's euler hessian used in newton's method
 
         Args:
@@ -1392,7 +1426,7 @@ class SimplicitsScene:
 
         return weight_function_lbs(points, tfms.unsqueeze(0), obj.simplicits_object.skinning_weight_function).squeeze()
 
-    def get_object_deformation_gradient(self, obj_idx, points=None):
+    def _get_object_deformation_gradient(self, obj_idx, points=None):  # pragma: no cover
         r"""Applies linear blend skinning using object's transformation to points provided. By default, points = sim_object.pts
 
         Args:
@@ -1417,7 +1451,7 @@ class SimplicitsScene:
 
         return Fs
 
-    def _get_scene_ready_for_forces(self):
+    def _get_scene_ready_for_forces(self):  # pragma: no cover
         r"""Prepares the scene for simulation. Updates any forces that have changed, or objects that have been added/removed.
         """
         self._compute_sim_constants()
@@ -1430,7 +1464,7 @@ class SimplicitsScene:
         if not self._ready_for_forces:
             raise RuntimeError("Forces need to be set")
         #### Todo: Detect Collisions here? Or Maybe in NM like Gilles ? ####
-        self.detect_collision(self.sim_z)
+        self._detect_collision(self.sim_z)
         ###########################################################
 
         self.sim_z_prev = wp.clone(self.sim_z)
@@ -1452,8 +1486,8 @@ class SimplicitsScene:
             more_partial_newton_E,
             more_partial_newton_G,
             more_partial_newton_H,
-            bounds_fcn=self.compute_collision_bounds,
-            preconditioner_fcn= None, # TODO: Fix this cholesky preconditioner, sometimes you get Nans-> self.build_preconditioner,
+            bounds_fcn=self._compute_collision_bounds,
+            preconditioner_fcn= None, # TODO: Fix this cholesky preconditioner, sometimes you get Nans-> self._build_preconditioner,
             Pt=self.sim_Pt,
             P=self.sim_P,
             nm_max_iters=self.max_newton_steps,

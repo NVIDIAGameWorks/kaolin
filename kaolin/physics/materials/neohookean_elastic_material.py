@@ -14,22 +14,16 @@
 # limitations under the License.
 
 import warp as wp
-import warp.sparse as wps
 import torch
-from .material_utils import kron3
-from kaolin.physics.utils.warp_utilities import mat99, vec9
+from kaolin.physics.utils.warp_utilities import mat99
 
 __all__ = [
-    'wp_neohookean_energy',
-    'unbatched_neohookean_energy',
-    'unbatched_neohookean_gradient',
-    'unbatched_neohookean_hessian',
     'NeohookeanElasticMaterial'
 ]
 
 
 @wp.func
-def neohookean_elastic_energy(mu: wp.float32, lam: wp.float32, F: wp.mat33, vol: wp.float32) -> wp.float32:
+def _neohookean_elastic_energy_wp_func(mu: wp.float32, lam: wp.float32, F: wp.mat33, vol: wp.float32) -> wp.float32:  # pragma: no cover
     r"""Implements a version of neohookean energy. Calculate energy per-integration primitive. For more background information, refer to `Ted Kim's Siggraph Course Notes\
     <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_
 
@@ -52,7 +46,7 @@ def neohookean_elastic_energy(mu: wp.float32, lam: wp.float32, F: wp.mat33, vol:
 
 
 @wp.func
-def neohookean_elastic_gradient(mu: wp.float32, lam: wp.float32, F: wp.mat33, vol: wp.float32) -> wp.mat33:
+def _neohookean_elastic_gradient_wp_func(mu: wp.float32, lam: wp.float32, F: wp.mat33, vol: wp.float32) -> wp.mat33:  # pragma: no cover
     r"""Implements a version of neohookean gradient. Calculate gradient per-integration primitive. For more background information, refer to `Ted Kim's Siggraph Course Notes\
     <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_
 
@@ -95,7 +89,7 @@ def neohookean_elastic_gradient(mu: wp.float32, lam: wp.float32, F: wp.mat33, vo
 
 
 @wp.func
-def neohookean_elastic_hessian(mu: wp.float32, lam: wp.float32, F: wp.mat33, vol: wp.float32) -> mat99:
+def _neohookean_elastic_hessian_wp_func(mu: wp.float32, lam: wp.float32, F: wp.mat33, vol: wp.float32) -> mat99:  # pragma: no cover
     r"""Implements a version of neohookean hessian. Calculate hessian per-integration primitive. For more background information, refer to `Ted Kim's Siggraph Course Notes\
     <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_
 
@@ -130,8 +124,16 @@ def neohookean_elastic_hessian(mu: wp.float32, lam: wp.float32, F: wp.mat33, vol
     dgamma = gamma - lam*J*J
     H1 = mu*id_mat
     H2 = gamma*wp.outer(FinvT_flat, FinvT_flat)
-    H3 = -dgamma*wp.outer(FinvT_flat, FinvT_flat)
-    H = H1+H2+H3
+    H3 = wp.outer(FinvT_flat, FinvT_flat)
+    
+    # Reshape H3 from 9x9 to 3x3x3x3 and transpose last two dimensions
+    H3_reshaped = mat99(0.0)
+    for i in range(wp.static(3)):
+        for j in range(wp.static(3)):
+            for k in range(wp.static(3)):
+                for l in range(wp.static(3)):
+                    H3_reshaped[i*3 + k, j*3 + l] = H3[i*3 + l, j*3 + k]
+    H = H1 + H2 + -dgamma*H3_reshaped
     return vol*H
 
     # TODO: The following has math bugs
@@ -161,12 +163,12 @@ def neohookean_elastic_hessian(mu: wp.float32, lam: wp.float32, F: wp.mat33, vol
 
 
 @wp.kernel
-def neohookean_energy_kernel(mus: wp.array(dtype=wp.float32),
+def _neohookean_energy_wp_kernel(mus: wp.array(dtype=wp.float32),
                              lams: wp.array(dtype=wp.float32),
                              Fs: wp.array(dtype=wp.mat33),
                              vol: wp.array(dtype=wp.float32),
                              coeff: wp.float32,
-                             wp_e: wp.array(dtype=wp.float32)):
+                                 wp_e: wp.array(dtype=wp.float32)):  # pragma: no cover
     pt_idx = wp.tid()
 
     mu_ = mus[pt_idx]
@@ -175,17 +177,17 @@ def neohookean_energy_kernel(mus: wp.array(dtype=wp.float32),
     F_ = Fs[pt_idx]
 
     # E = nh_energy(F_, lame)
-    E = coeff * neohookean_elastic_energy(mu_, lam_, F_, vol[pt_idx])
+    E = coeff * _neohookean_elastic_energy_wp_func(mu_, lam_, F_, vol[pt_idx])
     wp.atomic_add(wp_e, 0, E)
 
 
 @wp.kernel
-def neohookean_gradient_kernel(mus: wp.array(dtype=wp.float32),
+def _neohookean_gradient_wp_kernel(mus: wp.array(dtype=wp.float32),
                                lams: wp.array(dtype=wp.float32),
                                Fs: wp.array(dtype=wp.mat33),
                                vol: wp.array(dtype=wp.float32),
                                coeff: wp.float32,
-                               dEdF: wp.array(dtype=wp.mat33)):
+                                   dEdF: wp.array(dtype=wp.mat33)):  # pragma: no cover
     pt_idx = wp.tid()
 
     mu_ = mus[pt_idx]
@@ -194,17 +196,17 @@ def neohookean_gradient_kernel(mus: wp.array(dtype=wp.float32),
     F_ = Fs[pt_idx]
 
     # grad = -wp.ddot(tau, snh_stress(F_, lame(s)))
-    grad = coeff * neohookean_elastic_gradient(mu_, lam_, F_, vol[pt_idx])
+    grad = coeff * _neohookean_elastic_gradient_wp_func(mu_, lam_, F_, vol[pt_idx])
     dEdF[pt_idx] += grad
 
 
 @wp.kernel
-def neohookean_hessian_kernel(mus: wp.array(dtype=wp.float32),
+def _neohookean_hessian_wp_kernel(mus: wp.array(dtype=wp.float32),
                               lams: wp.array(dtype=wp.float32),
                               Fs: wp.array(dtype=wp.mat33),
                               vol: wp.array(dtype=wp.float32),
                               coeff: wp.float32,
-                              d2EdF2: wp.array(dtype=mat99)):
+                                  d2EdF2: wp.array(dtype=mat99)):  # pragma: no cover
     pt_idx = wp.tid()
 
     mu_ = mus[pt_idx]
@@ -212,7 +214,7 @@ def neohookean_hessian_kernel(mus: wp.array(dtype=wp.float32),
 
     F_ = Fs[pt_idx]
 
-    hess = coeff * neohookean_elastic_hessian(mu_, lam_, F_, vol[pt_idx])
+    hess = coeff * _neohookean_elastic_hessian_wp_func(mu_, lam_, F_, vol[pt_idx])
 
     d2EdF2[pt_idx] = hess
 
@@ -246,18 +248,20 @@ class NeohookeanElasticMaterial:
 
     def energy(self, defo_grads, coeff=1.0, wp_energy=None):
         r""" Returns the neohookean elastic energy at each integration primitive.
+        
         Args:
-            defo_grads (wp.array(dtype=wp.mat33)): Deformation gradient
+            defo_grads (wp.array(dtype=wp.mat33)): Deformation gradient of size :math:`(\text{num_pts}, 3, 3)`
             coeff (float): Coefficient
+        
         Returns:
-            wp.array(dtype=wp.float32): Neohookean elastic energy size [1]
+            wp.array(dtype=wp.float32): Neohookean elastic energy.
         """
         if wp_energy is None:
             wp_energy = wp.zeros(1, dtype=wp.float32, device=defo_grads.device)
 
         # Launch kernel
         wp.launch(
-            kernel=neohookean_energy_kernel,
+            kernel=_neohookean_energy_wp_kernel,
             dim=defo_grads.shape[0],
             inputs=[self.mu, self.lam, defo_grads,
                     self.integration_pt_volume, coeff],
@@ -268,17 +272,19 @@ class NeohookeanElasticMaterial:
 
     def gradient(self, defo_grads, coeff=1.0, gradients=None):
         r""" Returns the neohookean elastic gradient at each integration primitive.
+        
         Args:
-            defo_grads (wp.array(dtype=wp.mat33)): Deformation gradient
+            defo_grads (wp.array(dtype=wp.mat33)): Deformation gradient of size :math:`(\text{num_pts}, 3, 3)`
             coeff (float): Coefficient
+        
         Returns:
-            wp.array(dtype=wp.mat33): Neohookean elastic gradient
+            wp.array(dtype=wp.mat33): Neohookean elastic gradient of size :math:`(\text{num_pts}, 9)`
         """
         # Launch kernel
         if gradients is None:
             gradients = wp.zeros_like(defo_grads)
         wp.launch(
-            kernel=neohookean_gradient_kernel,
+            kernel=_neohookean_gradient_wp_kernel,
             dim=defo_grads.shape[0],
             inputs=[self.mu, self.lam, defo_grads,
                     self.integration_pt_volume, coeff],
@@ -289,11 +295,13 @@ class NeohookeanElasticMaterial:
 
     def hessian(self, defo_grads, coeff=1.0):
         r""" Returns the neohookean elastic hessian at each integration primitive.
+        
         Args:
-            defo_grads (wp.array(dtype=wp.mat33)): Deformation gradient
+            defo_grads (wp.array(dtype=wp.mat33)): Deformation gradient of size :math:`(\text{num_pts}, 3, 3)`
             coeff (float): Coefficient
+        
         Returns:
-            wps.bsr_matrix: Neohookean elastic hessian as a 9x9 block-wise sparse matrix.
+            wps.bsr_matrix: Neohookean elastic hessian of size :math:`(\text{num_pts}, 9, 9)`.
         """
         n = defo_grads.shape[0]
 
@@ -301,7 +309,7 @@ class NeohookeanElasticMaterial:
         self.hessians_blocks.zero_()
 
         wp.launch(
-            kernel=neohookean_hessian_kernel,
+            kernel=_neohookean_hessian_wp_kernel,
             dim=defo_grads.shape[0],
             inputs=[self.mu, self.lam, defo_grads,
                     self.integration_pt_volume, coeff],
@@ -312,29 +320,7 @@ class NeohookeanElasticMaterial:
         return self.hessians_blocks
 
 
-@wp.func
-def wp_neohookean_energy(mu: float, lam: float, F: wp.mat33) -> float:
-    r"""Implements a version of neohookean energy. Calculate energy per-integration primitive. For more background information, refer to `Ted Kim's Siggraph Course Notes\
-    <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_
-
-    Args:
-        mu (torch.Tensor): Batched lame parameter mu, of shape :math:`(\text{batch_dims}, 1)`
-        lam (torch.Tensor): Batched lame parameter lambda, of shape, :math:`(\text{batch_dims}, 1)` 
-        defo_grad (torch.Tensor): Batched deformation gradients (denoted in literature as F) of 3 or more dimensions, :math:`(\text{batch_dims}, 3, 3)`
-
-    Returns:
-        torch.Tensor: :math:`(\text{batch_dims}, 1)` vector of per defo-grad energy values
-    """
-    C1 = mu / 2.0
-    D1 = lam / 2.0
-    F_transpose = wp.transpose(F)
-    I1 = wp.trace(F_transpose @ F)
-    J = wp.determinant(F)
-    W = C1 * (I1 - 3.0) + D1 * (J - 1.0) * (J - 1.0) - mu * (J - 1.0)
-    return W
-
-
-def neohookean_energy(mu, lam, defo_grad):
+def _neohookean_energy(mu, lam, defo_grad):  # pragma: no cover
     r"""Implements a version of neohookean energy. Calculate energy per-integration primitive. For more background information, refer to `Ted Kim's Siggraph Course Notes\
     <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_
 
@@ -376,7 +362,7 @@ def neohookean_energy(mu, lam, defo_grad):
     return W
 
 
-def neohookean_gradient(mu, lam, defo_grad):
+def _neohookean_gradient(mu, lam, defo_grad):  # pragma: no cover
     """Implements a batched version of the jacobian of neohookean elastic energy. Calculates gradients per-integration primitive. For more background information, refer to `Jernej Barbic's Siggraph Course Notes\
     <https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf>`_ section 3.2.
 
@@ -426,110 +412,3 @@ def neohookean_gradient(mu, lam, defo_grad):
 
     ggg = g1 + g2 + g3
     return ggg
-
-
-def unbatched_neohookean_energy(mu, lam, defo_grad):
-    r"""Implements an version of neohookean energy. Calculate energy per-integration primitive.
-
-    Args:
-        mu (torch.Tensor): Tensor of lame parameter mu, of shape :math:`(\text{batch_dim}, 1)`
-        lam (torch.Tensor): Tensor of lame parameter lambda, of shape :math:`(\text{batch_dim}, 1)`
-        defo_grad (torch.Tensor): Flattened 3d deformation gradients, of shape :math:`(\text{batch_dim}*3*3, 1)`
-
-    Returns:
-        torch.Tensor: Vector of per-primitive energy values, shape :math:`(\text{batch_dim}, 1)`
-    """
-    F = defo_grad.reshape(-1, 9)
-    F_0 = F[:, 0]
-    F_1 = F[:, 1]
-    F_2 = F[:, 2]
-    F_3 = F[:, 3]
-    F_4 = F[:, 4]
-    F_5 = F[:, 5]
-    F_6 = F[:, 6]
-    F_7 = F[:, 7]
-    F_8 = F[:, 8]
-
-    J = (F_0 * (F_4 * F_8 - F_5 * F_7)
-         - F_1 * (F_3 * F_8 - F_5 * F_6)
-         + F_2 * (F_3 * F_7 - F_4 * F_6)).unsqueeze(dim=1)
-
-    IC = (F_0 * F_0 + F_1 * F_1 + F_2 * F_2 +
-          F_3 * F_3 + F_4 * F_4 + F_5 * F_5 +
-          F_6 * F_6 + F_7 * F_7 + F_8 * F_8).unsqueeze(dim=1)
-
-    return 0.5 * mu * (IC - 3.0) + 0.5 * lam * (J - 1.) * (J - 1.) - mu * (J - 1.0)
-
-
-def unbatched_neohookean_gradient(mu, lam, defo_grad):
-    r"""Implements a version of neohookean gradients w.r.t deformation gradients. Calculate gradient per-integration primitive.
-
-    Args:
-        mu (torch.Tensor): Tensor of lame parameter mu, of shape :math:`(\text{batch_dim}, 1)`
-        lam (torch.Tensor): Tensor of lame parameter lambda, of shape :math:`(\text{batch_dim}, 1)`
-        defo_grad (torch.Tensor): Flattened 3d deformation gradients, of shape :math:`(\text{batch_dim}*3*3, 1)`
-
-    Returns:
-        torch.Tensor: Tensor of per-primitive neohookean gradient w.r.t defo_grad, flattened, shape :math:`(\text{batch_dim}, 9)`
-    """
-    F = defo_grad.reshape(-1, 9)
-    F_0 = F[:, 0]
-    F_1 = F[:, 1]
-    F_2 = F[:, 2]
-    F_3 = F[:, 3]
-    F_4 = F[:, 4]
-    F_5 = F[:, 5]
-    F_6 = F[:, 6]
-    F_7 = F[:, 7]
-    F_8 = F[:, 8]
-    # compute batch determinant of all F's
-    J = (F_0 * (F_4 * F_8 - F_5 * F_7)
-         - F_1 * (F_3 * F_8 - F_5 * F_6)
-         + F_2 * (F_3 * F_7 - F_4 * F_6)).unsqueeze(dim=1)
-
-    # a = 1.0 + mu/lam
-    FinvT = torch.inverse(defo_grad.reshape(-1, 3, 3)).transpose(1, 2)
-
-    return (mu[:, :, None] * defo_grad.reshape(-1, 3, 3) + (J * (lam * (J + (-1.0)) + (-mu))).unsqueeze(dim=2) * FinvT)
-
-
-def unbatched_neohookean_hessian(mu, lam, defo_grad):
-    r"""Implements a version of neohookean hessian w.r.t deformation gradients. Calculate per-integration primitive.
-
-    Args:
-        mu (torch.Tensor): Tensor of lame parameter mu, of shape :math:`(\text{batch_dim}, 1)`
-        lam (torch.Tensor): Tensor of lame parameter lambda, of shape :math:`(\text{batch_dim}, 1)`
-        defo_grad (torch.Tensor): Flattened 3d deformation gradients, of shape :math:`(\text{batch_dim}*3*3, 1)`
-
-    Returns:
-        torch.Tensor: Tensor of per-primitive neohookean hessian w.r.t defo_grad, flattened, shape :math:`(\text{batch_dim}, 9,9)`
-    """
-    F = defo_grad.reshape(-1, 9)
-    F_0 = F[:, 0]
-    F_1 = F[:, 1]
-    F_2 = F[:, 2]
-    F_3 = F[:, 3]
-    F_4 = F[:, 4]
-    F_5 = F[:, 5]
-    F_6 = F[:, 6]
-    F_7 = F[:, 7]
-    F_8 = F[:, 8]
-    id_mat = torch.eye(9, device=mu.device)
-
-    # can save more time by not recomputing this stuff
-    J = (F_0 * (F_4 * F_8 - F_5 * F_7)
-         - F_1 * (F_3 * F_8 - F_5 * F_6)
-         + F_2 * (F_3 * F_7 - F_4 * F_6)).unsqueeze(dim=1)
-
-    # a = 1.0 + mu/lam
-    FinvT = torch.inverse(defo_grad.reshape(-1, 3, 3)).transpose(1, 2)
-    gamma = J * (lam * (2.0 * J + (-1.0)) + (-mu))
-    dgamma = gamma - lam * J * J
-
-    FFinv = torch.bmm(FinvT.reshape(-1, 9, 1), FinvT.reshape(-1, 1, 9))
-    H1 = mu[:, :, None] * id_mat
-    H2 = gamma[:, :, None] * FFinv
-    H3 = -dgamma[:, :, None] * \
-        FFinv.reshape(-1, 3, 3, 3, 3).transpose(2, 4).reshape(-1, 9, 9)
-
-    return H3

@@ -51,7 +51,7 @@ class SimplicitsMLP(nn.Module):
         r""" Calls the network
 
             Args:
-                x (torch.Tensor): Tensor of spatial points in R^dim, of shape :math:`(\text{batch_dim}, \text{dim})`
+                x (torch.Tensor): Tensor of spatial points in :math:`\mathbb{R}^dim`, of shape :math:`(\text{batch_dim}, \text{dim})`
 
             Returns:
                 torch.Tensor: Skinning weights, of shape :math:`(\text{batch_dim}, \text{num_handles})`
