@@ -37,9 +37,11 @@ def sdBox(p):
 
 
 def example_unit_cube_object(num_points=100000, yms=1e5, prs=0.45, rhos=1000):
-    uniform_points = np.random.uniform([-1, -1, -1], [1, 1, 1], size=(num_points, 3))
+    uniform_points = np.random.uniform(
+        [-1, -1, -1], [1, 1, 1], size=(num_points, 3))
     sdf_vals = np.apply_along_axis(sdBox, 1, uniform_points)
-    keep_points = np.nonzero(sdf_vals <= 0)[0]  # keep points where sd is not positive
+    # keep points where sd is not positive
+    keep_points = np.nonzero(sdf_vals <= 0)[0]
     X0 = uniform_points[keep_points, :]
     X0_sdfval = sdf_vals[keep_points]
 
@@ -79,7 +81,8 @@ def test_compute_losses(device, dtype):
     so_yms = torch.tensor(so_yms, device=device, dtype=dtype).unsqueeze(-1)
     so_prs = torch.tensor(so_prs, device=device, dtype=dtype).unsqueeze(-1)
     so_rhos = torch.tensor(so_rhos, device=device, dtype=dtype).unsqueeze(-1)
-    so_normalized_pts = torch.tensor(so_normalized_pts, device=device, dtype=dtype)
+    so_normalized_pts = torch.tensor(
+        so_normalized_pts, device=device, dtype=dtype)
     so_model.to(device=device, dtype=dtype)
 
     partial_compute_losses = partial(compute_losses,
@@ -94,7 +97,8 @@ def test_compute_losses(device, dtype):
     list_of_en = []
     for i in range(NUM_STEPS):
         so_optimizer.zero_grad()
-        le, lo = partial_compute_losses(so_model, so_normalized_pts, so_yms, so_prs, so_rhos, float(i / NUM_STEPS))
+        le, lo = partial_compute_losses(
+            so_model, so_normalized_pts, so_yms, so_prs, so_rhos, float(i / NUM_STEPS))
         loss = le + lo
         loss.backward()
         so_optimizer.step()

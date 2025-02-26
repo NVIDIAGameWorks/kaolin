@@ -34,7 +34,7 @@ def generate_default_grid(width, height, device=None):
     """
     h_coords = torch.arange(height, device=device, dtype=torch.float)
     w_coords = torch.arange(width, device=device, dtype=torch.float)
-    return torch.meshgrid(h_coords, w_coords)  # return pixel_y, pixel_x
+    return torch.meshgrid(h_coords, w_coords, indexing='ij')  # return pixel_y, pixel_x
 
 
 def generate_centered_pixel_coords(img_width, img_height, device=None):

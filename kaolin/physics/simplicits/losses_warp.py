@@ -18,10 +18,13 @@ from functools import partial
 import warp as wp
 
 
-import kaolin.physics.materials.utils as material_utils
+import kaolin.physics.materials.material_utils as material_utils
 import kaolin.physics.materials.linear_elastic_material as linear_elastic_material
 import kaolin.physics.materials.neohookean_elastic_material as neohookean_elastic_material
 from kaolin.physics.simplicits.losses import loss_ortho
+
+wp.config.quiet = True
+wp.init()
 
 # Type defs
 mat34f = wp.types.matrix(shape=(3, 4), dtype=wp.float32)
@@ -36,8 +39,10 @@ __all__ = [
 @wp.func
 def _elastic_energy(F: wp.mat33f, mu: float, lam: float, interp_val: float) -> float:
     r""" Linearly blended elastic energy term of (linear elastic, neo-hookean) """
-    En = interp_val * neohookean_elastic_material.wp_neohookean_energy(mu, lam, F)
-    El = (1.0 - interp_val) * linear_elastic_material.wp_linear_elastic_energy(mu, lam, F)
+    En = interp_val * \
+        neohookean_elastic_material.wp_neohookean_energy(mu, lam, F)
+    El = (1.0 - interp_val) * \
+        linear_elastic_material.wp_linear_elastic_energy(mu, lam, F)
     return En + El
 
 
@@ -76,12 +81,18 @@ def _finite_difference_defo_grad(
     """Finite difference deformation gradient
     """
     delta = wp.sqrt(eps)
-    x0_plus_dx = _map_x(x0 + wp.vec3(delta, 0.0, 0.0), Ts, w, pt_idx, transform_idx, 0, H)
-    x0_minus_dx = _map_x(x0 - wp.vec3(delta, 0.0, 0.0), Ts, w, pt_idx, transform_idx, 3, H)
-    x0_plus_dy = _map_x(x0 + wp.vec3(0.0, delta, 0.0), Ts, w, pt_idx, transform_idx, 1, H)
-    x0_minus_dy = _map_x(x0 - wp.vec3(0.0, delta, 0.0), Ts, w, pt_idx, transform_idx, 4, H)
-    x0_plus_dz = _map_x(x0 + wp.vec3(0.0, 0.0, delta), Ts, w, pt_idx, transform_idx, 2, H)
-    x0_minus_dz = _map_x(x0 - wp.vec3(0.0, 0.0, delta), Ts, w, pt_idx, transform_idx, 5, H)
+    x0_plus_dx = _map_x(x0 + wp.vec3(delta, 0.0, 0.0), Ts,
+                        w, pt_idx, transform_idx, 0, H)
+    x0_minus_dx = _map_x(x0 - wp.vec3(delta, 0.0, 0.0),
+                         Ts, w, pt_idx, transform_idx, 3, H)
+    x0_plus_dy = _map_x(x0 + wp.vec3(0.0, delta, 0.0), Ts,
+                        w, pt_idx, transform_idx, 1, H)
+    x0_minus_dy = _map_x(x0 - wp.vec3(0.0, delta, 0.0),
+                         Ts, w, pt_idx, transform_idx, 4, H)
+    x0_plus_dz = _map_x(x0 + wp.vec3(0.0, 0.0, delta), Ts,
+                        w, pt_idx, transform_idx, 2, H)
+    x0_minus_dz = _map_x(x0 - wp.vec3(0.0, 0.0, delta),
+                         Ts, w, pt_idx, transform_idx, 5, H)
 
     x0_dx = x0_plus_dx - x0_minus_dx
     x0_dy = x0_plus_dy - x0_minus_dy
@@ -116,7 +127,8 @@ def _warp_elastic_loss(
     mu_ = mus[pt_idx, transform_idx]            # float
     lam_ = lams[pt_idx, transform_idx]          # float
 
-    F = _finite_difference_defo_grad(x0_, Ts, w, pt_idx, transform_idx, H, eps)    # wp.mat33
+    F = _finite_difference_defo_grad(
+        x0_, Ts, w, pt_idx, transform_idx, H, eps)    # wp.mat33
     E = _elastic_energy(F, mu_, lam_, interp_val)  # float
     wp.atomic_add(out_E, transform_idx, E)
 
@@ -179,7 +191,8 @@ class _EnergyPotential(torch.autograd.Function):
                 ctx.eps  # eps: float
             ],
             outputs=[ctx.out_e],  # out_e: wp.array(dtype=float)  ; shape (B,)
-            adj_inputs=[None, None, None, None, ctx.fd_ws.grad, ctx.H, ctx.interp_val, ctx.eps],
+            adj_inputs=[None, None, None, None, ctx.fd_ws.grad,
+                        ctx.H, ctx.interp_val, ctx.eps],
             adj_outputs=[ctx.out_e.grad],
             adjoint=True
         )
@@ -209,7 +222,8 @@ def _prepare_finite_diff_w_bounds(x, model):
     finite_diff_bounds[:, 4, 1] -= delta
     finite_diff_bounds[:, 5, 2] -= delta
 
-    batch_dims, coord_dims = finite_diff_bounds.shape[:-1], finite_diff_bounds.shape[-1]
+    batch_dims, coord_dims = finite_diff_bounds.shape[:-
+                                                      1], finite_diff_bounds.shape[-1]
     finite_diff_bounds = finite_diff_bounds.reshape(-1, coord_dims)
     fd_ws = model(finite_diff_bounds)
     fd_ws = fd_ws.reshape(*batch_dims, -1)

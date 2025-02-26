@@ -19,7 +19,7 @@ from typing import Any
 import warp as wp
 
 import kaolin.physics.materials.neohookean_elastic_material as neohookean_elastic_material
-import kaolin.physics.materials.utils as material_utils
+import SparseSimplicits.kaolin.kaolin.physics.materials.material_utils as material_utils
 
 wp.init()
 ##################################################
@@ -54,9 +54,11 @@ def test_neohookean_energy(device, dtype):
 
     mus, lams = material_utils.to_lame(yms, prs)
 
-    E1 = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
+    E1 = torch.sum(
+        neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
 
-    E2 = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F.unsqueeze(1)))
+    E2 = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(
+        mus, lams, F.unsqueeze(1)))
     assert torch.allclose(E1, E2)
 
 
@@ -78,7 +80,8 @@ def test_wp_neohookean_energy(device, dtype):
     wp_e = wp.zeros(B, dtype=wp.dtype_from_torch(dtype))
     wp_F = wp.from_torch(F.contiguous(), dtype=wp.mat33)
     wp_mus = wp.from_torch(mus.contiguous(), dtype=wp.dtype_from_torch(dtype))
-    wp_lams = wp.from_torch(lams.contiguous(), dtype=wp.dtype_from_torch(dtype))
+    wp_lams = wp.from_torch(
+        lams.contiguous(), dtype=wp.dtype_from_torch(dtype))
 
     wp.launch(
         kernel=elastic_kernel,
@@ -136,7 +139,8 @@ def test_neohookean_batched_gradients(device, dtype):
     mus, lams = material_utils.to_lame(yms, prs)
 
     neo_grad = neohookean_elastic_material.neohookean_gradient(mus, lams, F)
-    assert (neo_grad.shape[0] == N and neo_grad.shape[1] == B and neo_grad.shape[-2] == 3 and neo_grad.shape[-1] == 3)
+    assert (neo_grad.shape[0] == N and neo_grad.shape[1] ==
+            B and neo_grad.shape[-2] == 3 and neo_grad.shape[-1] == 3)
     neo_grad = neo_grad.flatten()
 
     E0 = torch.sum(neohookean_elastic_material.neohookean_energy(mus, lams, F))
@@ -150,9 +154,11 @@ def test_neohookean_batched_gradients(device, dtype):
             for i in range(F.shape[2]):
                 for j in range(F.shape[3]):
                     F[n1, n2, i, j] += eps
-                    El = torch.sum(neohookean_elastic_material.neohookean_energy(mus, lams, F))
+                    El = torch.sum(
+                        neohookean_elastic_material.neohookean_energy(mus, lams, F))
                     F[n1, n2, i, j] -= 2 * eps
-                    Er = torch.sum(neohookean_elastic_material.neohookean_energy(mus, lams, F))
+                    Er = torch.sum(
+                        neohookean_elastic_material.neohookean_energy(mus, lams, F))
                     F[n1, n2, i, j] += eps
                     expected_grad[row] = (El - Er) / (2 * eps)
                     row += 1
@@ -175,11 +181,14 @@ def test_neohookean_gradients(device, dtype):
 
     mus, lams = material_utils.to_lame(yms, prs)
 
-    neo_grad = neohookean_elastic_material.unbatched_neohookean_gradient(mus, lams, F)
-    assert (neo_grad.shape[0] == N and neo_grad.shape[1] == 3 and neo_grad.shape[2] == 3)
+    neo_grad = neohookean_elastic_material.unbatched_neohookean_gradient(
+        mus, lams, F)
+    assert (neo_grad.shape[0] == N and neo_grad.shape[1]
+            == 3 and neo_grad.shape[2] == 3)
     neo_grad = neo_grad.flatten()
 
-    E0 = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
+    E0 = torch.sum(
+        neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
 
     expected_grad = torch.zeros_like(F.flatten(), device=device)
     row = 0
@@ -189,9 +198,11 @@ def test_neohookean_gradients(device, dtype):
         for i in range(F.shape[1]):
             for j in range(F.shape[2]):
                 F[n, i, j] += eps
-                El = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
+                El = torch.sum(
+                    neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
                 F[n, i, j] -= 2 * eps
-                Er = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
+                Er = torch.sum(
+                    neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
                 F[n, i, j] += eps
                 expected_grad[row] = (El - Er) / (2 * eps)
                 row += 1
@@ -213,7 +224,8 @@ def test_neohookean_hessian_vs_fd(device, dtype):
 
     mus, lams = material_utils.to_lame(yms, prs)
 
-    neo_hess = neohookean_elastic_material.unbatched_neohookean_hessian(mus, lams, F)
+    neo_hess = neohookean_elastic_material.unbatched_neohookean_hessian(
+        mus, lams, F)
 
     expected_hess = torch.zeros(N, 9, 9, device=device, dtype=dtype)
     row = 0
@@ -241,7 +253,7 @@ def test_neohookean_hessian_vs_autograd(device, dtype):
     N = 5
     B = 1
 
-    F = torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+    F = 2*torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
 
     yms = 1e3 * torch.ones(N, 1, device=device)
     prs = 0.4 * torch.ones(N, 1, device=device)
@@ -249,7 +261,8 @@ def test_neohookean_hessian_vs_autograd(device, dtype):
     mus, lams = material_utils.to_lame(yms, prs)
 
     # N x 9 x 9 (the block diags)
-    neo_hess = neohookean_elastic_material.unbatched_neohookean_hessian(mus, lams, F)
+    neo_hess = neohookean_elastic_material.unbatched_neohookean_hessian(
+        mus, lams, F)
 
     # 9N x 9N (the full hessian with a bunch of zeros)
     autograd_hessian = torch.autograd.functional.jacobian(
@@ -258,9 +271,11 @@ def test_neohookean_hessian_vs_autograd(device, dtype):
 
     # Make sure the block diags match up
     for n in range(N):
-        assert torch.allclose(neo_hess[n], autograd_hessian[9 * n:9 * n + 9, 9 * n:9 * n + 9], rtol=1e-1, atol=1e-1)
+        assert torch.allclose(
+            neo_hess[n], autograd_hessian[9 * n:9 * n + 9, 9 * n:9 * n + 9], rtol=1e-1, atol=1e-1)
         # zero out the block
         autograd_hessian[9 * n:9 * n + 9, 9 * n:9 * n + 9] *= 0
 
     # Make sure the rest of the matrix is zeros
-    assert torch.allclose(torch.zeros_like(autograd_hessian), autograd_hessian, rtol=1e-1, atol=1e-1)
+    assert torch.allclose(torch.zeros_like(autograd_hessian),
+                          autograd_hessian, rtol=1e-1, atol=1e-1)

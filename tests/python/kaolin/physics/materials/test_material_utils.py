@@ -17,7 +17,7 @@ import os
 import pytest
 import torch
 
-import kaolin.physics.materials.utils as material_utils
+import SparseSimplicits.kaolin.kaolin.physics.materials.material_utils as material_utils
 
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
