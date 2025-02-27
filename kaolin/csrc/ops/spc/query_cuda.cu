@@ -35,13 +35,13 @@ __global__ void query_cuda_kernel(
     int stride = blockDim.x*gridDim.x;
     if (idx > n) return;
         
-    int32_t resolution = 1 << level;
+    float resolution = 0.5f*exp2f(static_cast<float>(level));
 
     for (int i=idx; i<n; i+=stride) {
         point_data point = make_point_data(
-            floor(resolution * (query_coords[i*3 + 0] * 0.5 + 0.5)),
-            floor(resolution * (query_coords[i*3 + 1] * 0.5 + 0.5)),
-            floor(resolution * (query_coords[i*3 + 2] * 0.5 + 0.5))
+            floor(resolution * (query_coords[i*3 + 0] + 1.0f)),
+            floor(resolution * (query_coords[i*3 + 1] + 1.0f)),
+            floor(resolution * (query_coords[i*3 + 2] + 1.0f))
         );
         pidx[i] = identify(point, level, prefix_sum, octree);
     }

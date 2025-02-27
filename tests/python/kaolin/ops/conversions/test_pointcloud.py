@@ -17,6 +17,7 @@ import pytest
 import torch
 
 from kaolin.ops.conversions import pointclouds_to_voxelgrids, unbatched_pointcloud_to_spc
+from kaolin.ops.spc import unbatched_query
 from kaolin.utils.testing import FLOAT_TYPES, BOOL_DTYPES, INT_DTYPES, FLOAT_DTYPES, ALL_DTYPES, check_spc_octrees
 
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
@@ -295,3 +296,12 @@ class TestUnbatchedPointcloudToSpc:
         expected_features_arg = expected_fp_features(device, fptype, level)
         output_spc = unbatched_pointcloud_to_spc(pointcloud, level, features_arg)
         assert torch.allclose(output_spc.features, expected_features_arg)
+
+    def test_consistent_query(self):
+        pos = torch.tensor([
+            [-4.2789e-01, -3.6873e-01, -1.1282e-08],
+            [-4.2789e-01, -5.5366e-01, -1.1282e-08]
+        ], device='cuda:0')
+        spc = unbatched_pointcloud_to_spc(pos, 7)
+        query_idx = unbatched_query(spc.octrees, spc.exsum, pos, level=7)
+        assert torch.equal(query_idx, torch.tensor([13, 12], dtype=torch.long, device='cuda'))
