@@ -23,10 +23,6 @@ import kaolin.physics.materials.linear_elastic_material as linear_elastic_materi
 import kaolin.physics.materials.neohookean_elastic_material as neohookean_elastic_material
 from kaolin.physics.simplicits.losses import loss_ortho
 
-
-wp.init()
-wp.config.quiet = False
-
 # Type defs
 mat34f = wp.types.matrix(shape=(3, 4), dtype=wp.float32)
 mat34 = mat34f
