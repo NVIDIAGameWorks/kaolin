@@ -54,25 +54,36 @@ def processFrame(batch, level, sigma):
         Nvs.append(torch.arange(num, dtype=torch.int32, device=device))
         vcnt[l] = num
 
-    for l in range(start_level, level+1):
+    for l in range(start_level, level):
         vcnt[l] = points.size(0)
         occupancies, empty_state = _C.ops.spc.oracleB(points, l, sigma, camera, depth_map, mips, mip_levels)
+
+        s = occupancies.sum()
+
         insum = _C.ops.spc.inclusive_sum(occupancies)
         if insum[-1].item() == 0:
             raise BFReconstructionTerminatedException()
 
-        if l == level:
-            points, nvsum = _C.ops.spc.compactify(points, insum)
-        else:
-            points, nvsum = _C.ops.spc.subdivide(points, insum)
+        points, nvsum = _C.ops.spc.subdivide(points, insum)
 
         Occ.append(occupancies)
         Sta.append(empty_state)
         Nvs.append(nvsum)
 
-    occupancies, empty_state, probabilities = _C.ops.spc.oracleB_final(points, level, sigma, camera, depth_map, mips, mip_levels)
-    colors, normals = _C.ops.spc.colorsB_final(points, level, camera, image, depth_map, max_depth)
-   
+    vcnt[level] = points.size(0)
+
+    occupancies, empty_state, probabilities = _C.ops.spc.oracleB_final(points, level, sigma, camera, depth_map)
+    insum = _C.ops.spc.inclusive_sum(occupancies)
+    if insum[-1].item() == 0:
+        raise BFReconstructionTerminatedException()
+    points, nvsum = _C.ops.spc.compactify(points, insum)
+    probabilities = probabilities[nvsum[:]]
+
+    colors, normals = _C.ops.spc.colorsB_final(points, level, camera, sigma, image, depth_map, probabilities)   
+
+    Occ.append(occupancies)
+    Sta.append(empty_state)
+
     # process final voxels
     init_size = vcnt[1:].sum().item() >> 3
     octree = torch.zeros((init_size), dtype=torch.uint8, device=device)
@@ -94,27 +105,34 @@ def processFrame(batch, level, sigma):
         total_nodes += num_nodes
 
     insum = _C.ops.spc.inclusive_sum(occupancies)
+    if insum[-1].item() == 0:
+        raise BFReconstructionTerminatedException()
+
     octree, empty = _C.ops.spc.compactify_nodes(total_nodes, insum, octree, empty)
 
-    return octree, empty, probabilities, colors, normals
+    length = torch.tensor([len(octree)], dtype=torch.int)
+    level, pyramid, exsum = spc.scan_octrees(octree, length)
+
+    return {
+        'octree' : octree,
+        'empty' : empty,
+        'level' : level,
+        'pyramid' : pyramid,
+        'exsum' : exsum,
+        'probabilities' : probabilities,
+        'colors' : colors,
+        'normals' : normals
+    }
 
 
-def fuseBF(
-    level,
-    octree0, octree1,
-    empty0, empty1,
-    probs0, probs1,
-    colors0, colors1,
-    normals0, normals1,
-    pyramid0, pyramid1,
-    exsum0, exsum1
-):
-    device = octree0.device
+def fuseBF(spc0, spc1):
+    device = spc0['octree'].device
 
     # start at level 
     start_level = 4
-
     points = spc.morton_to_points(torch.arange(pow(8, start_level)).to(device))
+
+    level = spc0['level']
 
     # list for intermediate tensors
     Sta = []
@@ -133,7 +151,10 @@ def fuseBF(
     for l in range(start_level, level):
         vcnt[l] = points.size(0)
         occupancies, empty_state = \
-            _C.ops.spc.merge_empty(points, l, octree0, octree1, empty0, empty1, pyramid0, pyramid1, exsum0, exsum1)
+            _C.ops.spc.merge_empty(points, l, 
+                                   spc0['octree'], spc1['octree'], 
+                                   spc0['empty'], spc1['empty'], 
+                                   spc0['exsum'], spc1['exsum'])
         if occupancies.max().item() == 0:
             raise BFReconstructionTerminatedException()
         insum = _C.ops.spc.inclusive_sum(occupancies)
@@ -143,21 +164,22 @@ def fuseBF(
         Nvs.append(nvsum)
 
     vcnt[level] = points.size(0)
-    occupancies, empty_state, occ_prob, colors, normals = _C.ops.spc.bq_merge(points, level,
-            octree0, octree1, 
-            empty0, empty1, 
-            probs0, probs1, 
-            colors0, colors1, 
-            normals0, normals1,
-            pyramid0, pyramid1, 
-            exsum0, exsum1)
+    occupancies, empty_state, probabilities, colors, normals = _C.ops.spc.bq_merge(
+        points, level, 
+        spc0['octree'], spc1['octree'], 
+        spc0['empty'], spc1['empty'], 
+        spc0['pyramid'], spc1['pyramid'], 
+        spc0['probabilities'], spc1['probabilities'], 
+        spc0['colors'], spc1['colors'], 
+        spc0['normals'], spc1['normals'],
+        spc0['exsum'], spc1['exsum'])
 
     if occupancies.max().item() == 0:
         raise BFReconstructionTerminatedException()
     insum = _C.ops.spc.inclusive_sum(occupancies)
     points, nvsum = _C.ops.spc.compactify(points, insum)
 
-    occ_prob = occ_prob[nvsum[:]]
+    probabilities = probabilities[nvsum[:]]
     colors = colors[nvsum[:]]
     normals = normals[nvsum[:]]
 
@@ -192,13 +214,31 @@ def fuseBF(
         raise BFReconstructionTerminatedException()
     octree, empty = _C.ops.spc.compactify_nodes(total_nodes, insum, octree, empty)
 
-    return octree, empty, occ_prob, colors, normals
+    length = torch.tensor([len(octree)], dtype=torch.int)
+    level, pyramid, exsum = spc.scan_octrees(octree, length)
 
+    return {
+        'octree' : octree,
+        'empty' : empty,
+        'level' : level,
+        'pyramid' : pyramid,
+        'exsum' : exsum,
+        'probabilities' : probabilities,
+        'colors' : colors,
+        'normals' : normals
+    }
 
-def extractBQ(octree, empty, probs, colors, normals):
+def extractBQ(spcd):
+    octree = spcd['octree']
+    empty = spcd['empty']
+    probs = spcd['probabilities']
+    colors = spcd['colors']
+    normals = spcd['normals']
+    level = spcd['level']
+    pyramid = spcd['pyramid']
+    exsum = spcd['exsum']
+
     device = octree.device
-    lengths = torch.tensor([len(octree)], dtype=torch.int)
-    level, pyramid, exsum = spc.scan_octrees(octree, lengths)
 
     # number of points tested each level
     vcnt = np.zeros((level+1), dtype=np.uint32)
@@ -307,8 +347,7 @@ def bf_recon(input_dataset, final_level, sigma):
     """
     try:
         first_frame_processed = False
-        octree0, empty0, probs0, colors0, normals0, pyramid0, exsum0, weights = \
-            None, None, None, None, None, None, None, None
+        spc0 = {'octree' : None}
 
         # Iterate over calibrated rgbd data
         for batch in input_dataset:
@@ -317,36 +356,28 @@ def bf_recon(input_dataset, final_level, sigma):
                 continue
             if not first_frame_processed:
                 # create SPC model corresponding to a single image
-                octree0, empty0, probs0, colors0, normals0 = processFrame(batch, final_level, sigma)
-                lengths = torch.tensor([len(octree0)], dtype=torch.int)
-                level, pyramid0, exsum0 = spc.scan_octrees(octree0, lengths)
-            else :
+                spc0 = processFrame(batch, final_level, sigma)
+            else:
                 # create SPC model corresponding to a single image
-                octree1, empty1, probs1, colors1, normals1 = processFrame(batch, final_level, sigma)
-                lengths = torch.tensor([len(octree1)], dtype=torch.int)
-                level, pyramid1, exsum1 = spc.scan_octrees(octree1, lengths)
+                spc1 = processFrame(batch, final_level, sigma)
+
                 # fuse new single frame SPC into existing cummulative SPC model
-                octree0, empty0, probs0, colors0, normals0 = fuseBF(level,
-                                                                    octree0, octree1,
-                                                                    empty0, empty1,
-                                                                    probs0, probs1,
-                                                                    colors0, colors1,
-                                                                    normals0, normals1,
-                                                                    pyramid0, pyramid1,
-                                                                    exsum0, exsum1)
-                lengths = torch.tensor([len(octree0)], dtype=torch.int)
-                level, pyramid0, exsum0 = spc.scan_octrees(octree0, lengths)
+                spc0 = fuseBF(spc0, spc1)
 
             first_frame_processed = True
 
         # extract iso surface from over voxelized model
-        octree, empty, colors, normals = extractBQ(octree0, empty0, probs0, colors0, normals0)
+        # octree, empty, colors, normals = extractBQ(spc0)
 
-        weights = normals[:,3].reshape(-1,1)
+        octree = spc0['octree']
+        empty = spc0['empty']
+        colors = spc0['colors']
+        normals = spc0['normals']
 
-        normals = torch.nn.functional.normalize(normals[:,:3]/weights)
-        colors = (255.0*colors/weights).to(torch.uint8)
-        colors = torch.cat((colors, torch.zeros((colors.size(0),1), dtype=torch.uint8, device='cuda')), dim=1)
+        # weights = normals[:,3].reshape(-1,1)
+        # normals = torch.nn.functional.normalize(normals[:,:3]/weights)
+        # colors = (255.0*colors/weights).to(torch.uint8)
+        # colors = torch.cat((colors, torch.zeros((colors.size(0),1), dtype=torch.uint8, device='cuda')), dim=1)
 
         return octree, empty, colors, normals
     except BFReconstructionTerminatedException:

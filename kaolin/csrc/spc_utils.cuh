@@ -215,12 +215,13 @@ static uint64_t get_cub_storage_bytes(
     void* temp_storage, 
     uint* info, 
     uint* prefix_sum,
-    uint  max_total_points) {
+    uint  max_total_points,
+    cudaStream_t stream = 0) {
     
   uint64_t temp_storage_bytes = 0;
   CubDebugExit(cub::DeviceScan::InclusiveSum(
       temp_storage, temp_storage_bytes, info,
-      prefix_sum, max_total_points));
+      prefix_sum, max_total_points, stream));
   return temp_storage_bytes;
 }
 

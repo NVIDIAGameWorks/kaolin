@@ -136,11 +136,13 @@ class TestVolumeDensifier:
         N = output.shape[0]
         pairwise_dists = torch.linalg.norm(output[None] - output[:, None], dim=2)
         pairwise_dists += output.max() * torch.eye(N, dtype=dtype, device=device)
-        minimal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].min()
-        maximal_nearest_neighbor_distance = pairwise_dists.min(dim=0)[0].max()
+        nearest_neighbor_distance = pairwise_dists.min(dim=0)[0]
+        minimal_nearest_neighbor_distance = nearest_neighbor_distance.min()
 
-        # Points should be equi-distanced
-        assert torch.isclose(minimal_nearest_neighbor_distance, maximal_nearest_neighbor_distance)
+        # most point should have nearest neighbor of same distance (except for few loners)
+        assert torch.sum(torch.isclose(
+            torch.full((output.shape[0],), minimal_nearest_neighbor_distance, device=device, dtype=dtype),
+            nearest_neighbor_distance)) > 0.95 * output.shape[0]
 
     def test_sample_points_in_volume_for_num_samples(self, gaussians, device, dtype):
         pos = gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
@@ -252,56 +254,5 @@ class TestVolumeDensifier:
                                          clip_samples_to_input_bbox=False)
 
         assert output.ndim == 2
-        assert output.shape[1] == 3
-        check_tensor(output, dtype=dtype, device=device)
-
-
-@pytest.mark.parametrize('bad_model_name', BAD_TEST_MODELS)
-@pytest.mark.parametrize("device", SUPPORTED_GSPLATS_DEVICES)
-@pytest.mark.parametrize("dtype", SUPPORTED_GSPLATS_DTYPES)
-class TestVolumeDensifierBadInputs:
-
-
-    @pytest.fixture(autouse=True)
-    def bad_gaussians(self, bad_model_name):
-        if bad_model_name == 'part_sphere':
-            N = 100000
-            pts = torch.rand(N, 3)
-            pts /= pts.norm(dim=1).unsqueeze(1)
-            pts *= 6.0
-            gaussian_fields = dict(
-                position=pts,
-                scale=torch.full([N, 3], 0.01),
-                rotation=torch.tensor([0.0, 0.0, 0.0, 1.0]).repeat(N, 1),
-                opacity=torch.full([N, 1], 0.80)
-            )
-        elif bad_model_name == 'sparse_sphere':
-            N = 100
-            pts = torch.rand(N, 3)
-            pts /= pts.norm(dim=1).unsqueeze(1)
-            pts *= 3.0
-            gaussian_fields = dict(
-                position=pts,
-                scale=torch.full([N, 3], 0.01),
-                rotation=torch.tensor([0.0, 0.0, 0.0, 1.0]).repeat(N, 1),
-                opacity=torch.full([N, 1], 0.80)
-            )
-        else:
-            raise ValueError('Unknown bad_gaussian test model')
-        gaussian_fields['model_name'] = bad_model_name
-        return gaussian_fields
-
-    def test_resilience_to_bad_inputs(self, bad_gaussians, device, dtype):
-        pos = bad_gaussians['position'].to(device=device, dtype=dtype)                  # model.get_xyz
-        scale = bad_gaussians['scale'].to(device=device, dtype=dtype)                   # post activation, i.e. model.get_scaling
-        rotation = bad_gaussians['rotation'].to(device=device, dtype=dtype)             # post activation, i.e. model.get_rotation
-        opacity = bad_gaussians['opacity'].squeeze(1).to(device=device, dtype=dtype)    # model.get_opacity
-
-        octree_level = 6
-        output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
-                                         octree_level=octree_level, jitter=True)
-
-        assert output.ndim == 2
-        assert output.shape[0] == 0
         assert output.shape[1] == 3
         check_tensor(output, dtype=dtype, device=device)

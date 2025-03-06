@@ -132,13 +132,14 @@ __global__ void d_OracleB(
 	const point_data* points, 
 	const float4x4 T,  
   const float sigma,
-        float2* mip,
-  const int32_t depth_height,
-  const int32_t depth_width,
-  const int32_t num_levels,
+  const float* dimg,
+  const int depth_height,
+  const int depth_width,
+  const int num_levels,	
+  float2* mip,
   const int32_t hw,
-	      uint32_t* occupied, 
-	      uint32_t* state)
+	uint32_t* occupied, 
+	uint32_t* state)
 {
 	uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -159,7 +160,7 @@ __global__ void d_OracleB(
       // compute mip level
       uint32_t miplevel = max(ceil(log2(max(maxExtent.x - minExtent.x, maxExtent.y - minExtent.y))), 0.0);
 
-      if (miplevel < num_levels)
+      if (miplevel <= num_levels)
       {
         float v0 = minExtent.z;
         float v1 = maxExtent.z;
@@ -176,16 +177,29 @@ __global__ void d_OracleB(
 
         float z0, z1;
 
-        uint64_t offset = (uint64_t)(hw*(pow(4, num_levels-miplevel-1)-1)/3);
-        float2* dmap = mip + offset;
+        if (miplevel > 0)
+        {
+          uint64_t offset = (uint64_t)(hw*(pow(4, num_levels-miplevel)-1)/3);
+          float2* dmap = mip + offset;
 
-        float2 d00 = dmap[ymin*stride + xmin];
-        float2 d10 = dmap[ymin*stride + xmax];
-        float2 d01 = dmap[ymax*stride + xmin];
-        float2 d11 = dmap[ymax*stride + xmax];
+          float2 d00 = dmap[ymin*stride + xmin];
+          float2 d10 = dmap[ymin*stride + xmax];
+          float2 d01 = dmap[ymax*stride + xmin];
+          float2 d11 = dmap[ymax*stride + xmax];
 
-        z0 = fmin(fmin(d00.x, d10.x), fmin(d01.x, d11.x)) - sigma;
-        z1 = fmax(fmax(d00.y, d10.y), fmax(d01.y, d11.y)) + 2.0f*sigma;
+          z0 = fmin(fmin(d00.x, d10.x), fmin(d01.x, d11.x)) - sigma;
+          z1 = fmax(fmax(d00.y, d10.y), fmax(d01.y, d11.y)) + 2.0f*sigma;
+        }
+        else
+        {
+          float d00 = dimg[ymin*stride + xmin];
+          float d10 = dimg[ymin*stride + xmax];
+          float d01 = dimg[ymax*stride + xmin];
+          float d11 = dimg[ymax*stride + xmax];
+
+          z0 = fmin(fmin(d00, d10), fmin(d01, d11)) - sigma;
+          z1 = fmax(fmax(d00, d10), fmax(d01, d11)) + 2.0f*sigma;
+        }
 
         result = z0 <= v1 && v0 <= z1 ? 1 : 0;
 
@@ -227,17 +241,18 @@ void oracleB_cuda(uint32_t num,
                   point_data* points, 
                   float4x4 T, 
                   float sigma, 
-                  float2* mip, 
+                  float* Dmap, 
                   int32_t depth_height,
                   int32_t depth_width,
                   int32_t mip_levels,
+                  float2* mip, 
                   int32_t hw,
                   uint32_t* occ, 
                   uint32_t* estate)
 {
     if (num == 0) return;
 
-	  d_OracleB << <(num + 1023) / 1024, 1024 >> > (num, points, T, sigma, mip, depth_height, depth_width, mip_levels, hw, occ, estate);
+	  d_OracleB << <(num + 1023) / 1024, 1024 >> > (num, points, T, sigma, Dmap, depth_height, depth_width, mip_levels, mip, hw, occ, estate);
 
     AT_CUDA_CHECK(cudaGetLastError());
 }
@@ -248,102 +263,84 @@ __global__ void d_OracleBFinal(
 	const point_data* __restrict__ points, 
 	const float4x4 T,  
   const float one_over_sigma,
-  const float* __restrict__ dmap, 
-  float2* __restrict__ mipmap, 
+  const float* __restrict__ Dmap, 
   const int32_t depth_height,
   const int32_t depth_width,
   uint32_t* __restrict__ occupied, 
   uint32_t* __restrict__ state, 
   float* __restrict__ out_probs,
-  const cudaTextureObject_t		ProfileCurve,
-  const float scale,
-  const int32_t num_levels,
-  const int32_t hw)
+  const cudaTextureObject_t		ProfileCurve)
 {
 	uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
 	if (tidx < num)
 	{
     point_data V = points[tidx];
-    float prob = 0.5f;
 
-    // x,y coordinates in pixel space
-    float3 minExtent, maxExtent;
-    voxel_extent(V, T, &minExtent, &maxExtent);
+    float4 P[8];
+    transform_corners(V, T, P);
 
-    // frustum cull
-    if ((minExtent.x >= 0.0f) && (maxExtent.x < depth_width) && (minExtent.y >= 0.0f) && (maxExtent.y < depth_height) && minExtent.z > NEAR_CLIPPING)
+    float pmin = 1.0f;
+    float pmax = -1.0f;
+    for (uint32_t idx = 0; idx < 8; idx++)
     {
-      // compute mip level
-      uint32_t miplevel = max(ceil(log2(max(maxExtent.x - minExtent.x, maxExtent.y - minExtent.y))), 0.0);
+      float3 q = make_float3(P[idx].x / P[idx].z, P[idx].y / P[idx].z, P[idx].z);
+      float prob = 0.5f;
 
-      if (miplevel < num_levels)
+      if ((q.x >= 0.0f) && (q.x < depth_width) && 
+          (q.y >= 0.0f) && (q.y < depth_height) && q.z > NEAR_CLIPPING)
       {
-        float4 P = make_float4((float)V.x, (float)V.y, (float)V.z, 1.0f) * T;
-        float3 q = make_float3(P.x / P.z, P.y / P.z, P.z);
+        uint32_t x = (uint32_t)q.x;
+        uint32_t y = (uint32_t)q.y;
 
-        uint32_t x = (uint32_t)floorf(q.x);
-        uint32_t y = (uint32_t)floorf(q.y);
-
-        float d = dmap[y*depth_width + x];
-
-        // scale according to miplevel
-        float adaptInv = 1.0f / pow(2, miplevel);
-
-        uint32_t xmin = (uint32_t)(adaptInv*minExtent.x);
-        uint32_t ymin = (uint32_t)(adaptInv*minExtent.y);
-        uint32_t xmax = (uint32_t)(adaptInv*maxExtent.x);
-        uint32_t ymax = (uint32_t)(adaptInv*maxExtent.y);
-
-        uint32_t stride = (uint32_t)(adaptInv*depth_width);
-        uint64_t offset = (uint64_t)(hw*(pow(4, num_levels-miplevel-1)-1)/3);
-        float2* mmmap = mipmap + offset;
-
-        float2 d00 = mmmap[ymin*stride + xmin];
-        float2 d10 = mmmap[ymin*stride + xmax];
-        float2 d01 = mmmap[ymax*stride + xmin];
-        float2 d11 = mmmap[ymax*stride + xmax];
-
-        float z0 = fmin(fmin(d00.x, d10.x), fmin(d01.x, d11.x));
-        float z1 = fmax(fmax(d00.y, d10.y), fmax(d01.y, d11.y));
-
-        if (z1-z0 < 10*scale)
-          prob = BQ(ProfileCurve, one_over_sigma*(q.z-d));
-
+        float d = Dmap[y*depth_width + x];
+        prob = BQ(ProfileCurve, one_over_sigma*(q.z-d));
       }
-      else //too high up the pyramid
-      {
-        // this should not happen
-      }
+
+      pmin = fmin(pmin, prob);
+      pmax = fmax(pmax, prob);
+      if (idx == 0) out_probs[tidx] = prob;
     }
 
-    out_probs[tidx] = prob;
-  }
-}
-  
+    if (pmax == 0.0f)  //empty
+    {
+      occupied[tidx] = 0;
+      state[tidx] = 0;
+    }
+    else if (pmin == 0.5f && pmax == 0.5f) // unseen
+    {
+      occupied[tidx] = 0;
+      state[tidx] = 1;
+    }
+    else // occupied
+    {
+      occupied[tidx] = 1;
+      state[tidx] = 2;
+    }
 
+  }
+
+} 
+
+  
 void oracleB_final_cuda(
   int32_t num, 
   point_data* points, 
   float4x4 T, 
   float one_over_sigma,
   float* dmap, 
-  float2* mipmap, 
   int32_t depth_height,
   int32_t depth_width,
   uint32_t* occ, 
   uint32_t* estate, 
   float* out_probs,
-  cudaTextureObject_t		ProfileCurve,
-  float scale,
-  int32_t mip_levels,
-  int32_t hw)
+  cudaTextureObject_t		ProfileCurve)
 {
 	if (num == 0) return;
 
 	d_OracleBFinal << <(num + 1023) / 1024, 1024 >> > (
-    num, points, T, one_over_sigma, dmap, mipmap, depth_height, depth_width, 
-    occ, estate, out_probs, ProfileCurve, scale, mip_levels, hw);
+    num, points, T, one_over_sigma, dmap, depth_height, depth_width, 
+    occ, estate, out_probs, ProfileCurve);
 
   AT_CUDA_CHECK(cudaGetLastError());
 }
@@ -412,24 +409,23 @@ __global__ void d_ColorsBFinal(
 	const uint32_t num, 
 	const point_data* points, 
 	const float4x4 T,  
+  const float one_over_sigma,
   const float3* image, 
   const float* Dmap, 
-  const float max_depth,
   const int32_t depth_height,
   const int32_t depth_width,
-  float3* out_colors,
-  float4* out_normals)
+  const float* probs,
+  uchar4* out_colors,
+  float3* out_normals,
+  cudaTextureObject_t		ProfileCurve)
 {
 	uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
 	if (tidx < num)
 	{
-    out_colors[tidx] = make_float3(0.0f, 0.0f, 0.0f);
-    out_normals[tidx] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
-
     point_data V = points[tidx];
 
-    float4 Q = make_float4((float)V.x+0.5f, (float)V.y+0.5f, (float)V.z+0.5f, 1.0f) * T; // voxel center
+    float4 Q = make_float4((float)V.x, (float)V.y, (float)V.z, 1.0f) * T;
     float3 q = make_float3(Q.x / Q.z, Q.y / Q.z, Q.z);
 
     uint32_t x = (uint32_t)q.x;
@@ -437,37 +433,64 @@ __global__ void d_ColorsBFinal(
 
     if ((x > 0) && (x < depth_width-1) && (y > 0) && (y < depth_height-1) && q.z > NEAR_CLIPPING) //inbounds
     {
-      float3 color = image[y*depth_width + x];
 
-      // gradient
-      uint32_t imx = max(x - 1, 0);
-      uint32_t imy = max(y - 1, 0);
-      uint32_t ipx = min(x + 1, depth_width);
-      uint32_t ipy = min(y + 1, depth_height);
-      
-      // float d00 = Dmap[y*depth_width + x];
-      float dp0 = Dmap[y*depth_width + ipx];
-      float dm0 = Dmap[y*depth_width + imx];
-      float d0p = Dmap[ipy*depth_width + x];
-      float d0m = Dmap[imy*depth_width + x];
-
-      if (dp0 != max_depth && dm0 != max_depth && d0p != max_depth && d0m != max_depth)
+      float prob = probs[tidx];
+      if (prob == 0.0f)
       {
-          float du = 0.5f*(dp0 - dm0);
-          float dv = 0.5f*(d0p - d0m);
-
-          float4 h = make_float4(-du, -dv, 1.0f, 0.0f);
-
-          float z = powf(rsqrt(du*du + dv*dv + 1.0f), 4.0); // z component of normal in camera space
-
-          // gradient in VC
-          float4 f = T * h;
-          float3 normal = normalize(make_float3(f.x, f.y, f.z));
-
-          out_normals[tidx] = make_float4(z*normal.x, z*normal.y, z*normal.z, z); 
-          // out_colors[tidx] = z*color;
-          out_colors[tidx] = make_float3(z*color.z, z*color.y, z*color.x); 
+        out_colors[tidx] = make_uchar4(0, 0, 0, 0);
+        out_normals[tidx] = make_float3(0.0f, 0.0f, 0.0f);
       }
+      else if (prob == 0.5f)
+      {
+        out_colors[tidx] = make_uchar4(64, 64, 64, 64);
+        out_normals[tidx] = make_float3(0.0f, 0.0f, 0.0f);
+      }
+      else
+      {
+        float3 color = image[y*depth_width + x];
+        uchar r = (uchar)(255*color.x);
+        uchar g = (uchar)(255*color.y);
+        uchar b = (uchar)(255*color.z);
+        out_colors[tidx] = make_uchar4(b, g, r, 0);
+
+        // gradient
+        uint32_t imx = max(x - 1, 0);
+        uint32_t imy = max(y - 1, 0);
+        uint32_t ipx = min(x + 1, depth_width);
+        uint32_t ipy = min(y + 1, depth_height);
+        
+        float d00 = Dmap[y*depth_width + x];
+        float dp0 = Dmap[y*depth_width + ipx];
+        float dm0 = Dmap[y*depth_width + imx];
+        float d0p = Dmap[ipy*depth_width + x];
+        float d0m = Dmap[imy*depth_width + x];
+
+        float du = 0.5f*(dp0 - dm0);
+        float dv = 0.5f*(d0p - d0m);
+
+        float dprob = DBQ(ProfileCurve, one_over_sigma*(Q.z-d00));
+
+        float zi = 1.0f/Q.z;
+        float w = one_over_sigma*dprob*zi;
+
+        float4 h;
+        h.z = w*zi*(Q.z*Q.z + Q.x*du + Q.y*dv);
+        h.x = -w * du;
+        h.y = -w * dv;
+        h.w = 0.0;
+
+        // gradient in VC
+        float4 f = T * h;
+        float3 grad = make_float3(f.x, f.y, f.z);
+        float3 normal = normalize(grad);
+        out_normals[tidx] = normal;
+
+      }
+    }
+    else
+    {
+        out_colors[tidx] = make_uchar4(64, 64, 64, 64);
+        out_normals[tidx] = make_float3(0.0f, 0.0f, 0.0f);
     }
   }
 }
@@ -477,13 +500,15 @@ void colorsB_final_cuda(
   const int32_t num, 
   const point_data* points, 
   const float4x4 T, 
+  const float one_over_sigma,
   const float3* image, 
-  const float* Dmap, 
-  const float max_depth,
+  const float* dmap, 
   const int32_t depth_height,
   const int32_t depth_width,
-  float3* out_colors,
-  float4* out_normals)
+  const float* probs,
+  uchar4* out_colors,
+  float3* out_normals,
+  cudaTextureObject_t		ProfileCurve)
 {
 	if (num == 0) return;
 
@@ -491,13 +516,15 @@ void colorsB_final_cuda(
     num, 
     points, 
     T, 
+    one_over_sigma,
     image, 
-    Dmap, 
-    max_depth,
+    dmap, 
     depth_height, 
     depth_width, 
+    probs,
     out_colors, 
-    out_normals);
+    out_normals,
+    ProfileCurve);
 
   AT_CUDA_CHECK(cudaGetLastError());
 }
@@ -570,25 +597,24 @@ __global__ void d_BQMerge(
   const uint32_t num, 
   const point_data* d_points, 
   const uint32_t  level,
-  const uint8_t* d_octree0, 
+  const uchar* d_octree0, 
   const uint8_t* d_octree1, 
   const uint8_t* d_empty0, 
   const uint8_t* d_empty1, 
-  const float* d_probs0,
-  const float* d_probs1,
-  const float3* d_colors0,
-  const float3* d_colors1,  
-  const float4* d_normals0,
-  const float4* d_normals1,  
-  const int32_t* d_exsum0, 
-  const int32_t* d_exsum1, 
   const uint32_t offset0,
   const uint32_t offset1,
+  const float* d_probs0,
+  const float* d_probs1,
+  const uchar4* d_colors0,
+  const uchar4* d_colors1,  
+  const float3* d_normals0,
+  const float3* d_normals1,  
+  const int32_t* d_exsum0, 
+  const int32_t* d_exsum1, 
 	uint32_t* occupied, 
 	uint32_t* state,
   float* d_out_probs,
-  float3* d_out_colors,
-  float4* d_out_normals)
+  uchar4* d_out_colors)
 {
   uint32_t tidx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -598,6 +624,11 @@ __global__ void d_BQMerge(
 
     int32_t id0 = identify(V, level, d_exsum0, d_octree0, d_empty0);
     int32_t id1 = identify(V, level, d_exsum1, d_octree1, d_empty1);
+
+    float p0 = id0 >= 0 ? d_probs0[id0-offset0] : id0 < -1 ? 0.5f : 0.0f;
+    float p1 = id1 >= 0 ? d_probs1[id1-offset1] : id1 < -1 ? 0.5f : 0.0f;   
+
+    float p = p0*p1 / (p0*p1 + (1.0f-p0)*(1.0f-p1));
 
     if (id0 == -1 || id1 == -1) // empty 
     {
@@ -613,70 +644,72 @@ __global__ void d_BQMerge(
     {
       occupied[tidx] = 1;
       state[tidx] = 2;     
-
-      int32_t idx0 = id0 - offset0;
-      int32_t idx1 = id1 - offset1;
-
-      if (id0 < -1) // input 1 must be good
-      {
-        d_out_probs[tidx] = d_probs1[idx1];
-        d_out_colors[tidx] = d_colors1[idx1];
-        d_out_normals[tidx] = d_normals1[idx1];
-      }
-      else if (id1 < -1) // input 0 must be good
-      {
-        d_out_probs[tidx] = d_probs0[idx0];
-        d_out_colors[tidx] = d_colors0[idx0];
-        d_out_normals[tidx] = d_normals0[idx0];
-      }
-      else // both inputs are good, blend
-      {
-        float p0 = d_probs0[idx0];
-        float p1 = d_probs1[idx1];
-        float pn = p0*p1;
-        float pd = (p0*p1 + (1.0f-p0)*(1.0f-p1));
-
-        d_out_probs[tidx] = pn/pd;  
-
-        d_out_colors[tidx] = d_colors0[idx0] + d_colors1[idx1];
-        d_out_normals[tidx] = d_normals0[idx0] + d_normals1[idx1];
-      }
+      d_out_colors[tidx] = id0 >= 0 ? d_colors0[id0-offset0] : d_colors1[id1-offset1];
+      d_out_probs[tidx] = p;  
     }
   }
 }
 
 
-void bq_merge_cuda(
-  uint32_t num, 
-  point_data* d_points, 
-  uint32_t level, 
-  uint8_t* d_octree0, 
-  uint8_t* d_octree1, 
-  uint8_t* d_empty0, 
-  uint8_t* d_empty1, 
-  float* d_probs0,
-  float* d_probs1,
-  float3* d_color0,
-  float3* d_color1,
-  float4* d_normals0,
-  float4* d_normals1,  
-  int32_t* d_exsum0, 
-  int32_t* d_exsum1, 
-  uint32_t offset0,
-  uint32_t offset1,
-  uint32_t* occ,
-  uint32_t* estate,
-  float* d_out_probs,
-  float3* d_out_colors,
-  float4* d_out_normals)
+std::vector<at::Tensor>  bq_merge_cuda(
+  at::Tensor points,
+  uint32_t level,
+  at::Tensor octree0,
+  at::Tensor octree1,  
+  at::Tensor empty0,
+  at::Tensor empty1,
+  at::Tensor pyramid0,
+  at::Tensor pyramid1,
+  at::Tensor probs0,
+  at::Tensor probs1,  
+  at::Tensor colors0,
+  at::Tensor colors1,
+  at::Tensor normals0,
+  at::Tensor normals1,
+  at::Tensor exsum0,
+  at::Tensor exsum1)
 {
-	if (num == 0) return;
+  uint32_t num = points.size(0);
 
-	d_BQMerge << <(num + 1023) / 1024, 1024 >> > (num, d_points, level, d_octree0, d_octree1, d_empty0, d_empty1, 
-                                                d_probs0, d_probs1, d_color0, d_color1, d_normals0, d_normals1, 
-                                                d_exsum0, d_exsum1, offset0, offset1, occ, estate, d_out_probs, 
-                                                d_out_colors, d_out_normals);
+  at::Tensor occupancy = at::zeros({num}, points.options().dtype(at::kInt));
+  at::Tensor empty_state = at::zeros({num}, points.options().dtype(at::kInt));
+  at::Tensor out_colors = at::zeros({num, 4}, points.options().dtype(at::kByte));
+  at::Tensor out_probs = at::zeros({num}, points.options().dtype(at::kFloat));
+  at::Tensor out_normals = at::zeros({num, 3}, points.options().dtype(at::kFloat));
+
+  auto pyramid0_a = pyramid0.accessor<int32_t, 3>();
+  uint32_t offset0 = pyramid0_a[0][1][level];
+
+  auto pyramid1_a = pyramid1.accessor<int32_t, 3>();
+  uint32_t offset1 = pyramid1_a[0][1][level];
+ 
+  if (num > 0)
+    d_BQMerge << <(num + 1023) / 1024, 1024 >> > (
+      num, 
+      reinterpret_cast<point_data*>(points.data_ptr<short>()), 
+      level, 
+      octree0.data_ptr<uchar>(), 
+      octree1.data_ptr<uchar>(), 
+      empty0.data_ptr<uchar>(), 
+      empty1.data_ptr<uchar>(), 
+      offset0, offset1, 
+      probs0.data_ptr<float>(), 
+      probs1.data_ptr<float>(), 
+      reinterpret_cast<uchar4*>(colors0.data_ptr<uchar>()), 
+      reinterpret_cast<uchar4*>(colors1.data_ptr<uchar>()), 
+      reinterpret_cast<float3*>(normals0.data_ptr<float>()),
+      reinterpret_cast<float3*>(normals1.data_ptr<float>()), 
+      exsum0.data_ptr<int32_t>(), 
+      exsum1.data_ptr<int32_t>(), 
+      reinterpret_cast<uint32_t*>(occupancy.data_ptr<int32_t>()), 
+      reinterpret_cast<uint32_t*>(empty_state.data_ptr<int32_t>()), 
+      out_probs.data_ptr<float>(), 
+      reinterpret_cast<uchar4*>(out_colors.data_ptr<uchar>()));
+
   AT_CUDA_CHECK(cudaGetLastError());
+
+  return { occupancy, empty_state, out_probs, out_colors, out_normals };
+
 }
 
 
@@ -694,8 +727,6 @@ __global__ void d_TouchExtract(
   out_state[up_index] = in_state[index];
 
 }
-
-
 void touch_extract_cuda(uint32_t num, uint32_t* state, uint32_t* nvsum, uint32_t* prev_state)
 {
 	if (num == 0) return;

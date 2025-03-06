@@ -347,6 +347,25 @@ sum_reduce_cuda_kernel(
   }
 }
 
+template<typename scalar_t>
+__global__ void
+prod_reduce_cuda_kernel(
+    const int64_t num_feats, 
+    const int64_t feat_dim, 
+    const scalar_t* __restrict__ feats_in, 
+    scalar_t* __restrict__ feats_out, 
+    const int32_t* __restrict__ inclusive_sum) {
+
+  int tidx = blockDim.x * blockIdx.x + threadIdx.x;
+  if (tidx < num_feats) {
+    for (int i=0; i<feat_dim; ++i) {
+      int idx = (inclusive_sum[tidx] - 1) * feat_dim + i;
+      gpuAtomicMul(feats_out + idx, feats_in[tidx * feat_dim + i]); 
+    }
+  }
+}
+
+
 // This kernel is the same as sum_reduce but avoids atomic add by packing the ops. 
 // It however will cause thread divergence.
 template<typename scalar_t>
@@ -674,6 +693,30 @@ int sum_reduce_cuda_impl(
       auto stream = at::cuda::getCurrentCUDAStream();
       cudaMemcpyAsync(&cnt, inclusive_sum_ptr + num_feats - 1, sizeof(int), cudaMemcpyDeviceToHost, stream);
       sum_reduce_cuda_kernel<scalar_t><<<(num_feats+num_threads-1)/num_threads, num_threads, 0, stream>>>(
+          num_feats, feat_dim, 
+          feats_in.data_ptr<scalar_t>(), 
+          feats_out.data_ptr<scalar_t>(), 
+          inclusive_sum_ptr);
+  }));
+  return cnt;
+}
+
+int prod_reduce_cuda_impl(
+    int64_t num_feats,
+    int64_t feat_dim,
+    at::Tensor feats_in,
+    at::Tensor feats_out,
+    at::Tensor inclusive_sum) {
+
+  int* inclusive_sum_ptr = inclusive_sum.data_ptr<int>();
+  int cnt;
+
+  const int num_threads = 1024;
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "prod_reduce_cuda", ([&] {
+      const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
+      auto stream = at::cuda::getCurrentCUDAStream();
+      cudaMemcpyAsync(&cnt, inclusive_sum_ptr + num_feats - 1, sizeof(int), cudaMemcpyDeviceToHost, stream);
+      prod_reduce_cuda_kernel<scalar_t><<<(num_feats+num_threads-1)/num_threads, num_threads, 0, stream>>>(
           num_feats, feat_dim, 
           feats_in.data_ptr<scalar_t>(), 
           feats_out.data_ptr<scalar_t>(), 
