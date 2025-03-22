@@ -13,6 +13,8 @@ from pkg_resources import parse_version
 import warnings
 import logging
 import glob
+import sys
+import subprocess  # Added import
 
 # Define version constraints
 TORCH_MIN_VER = '1.6.0'
