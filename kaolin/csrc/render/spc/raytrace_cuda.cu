@@ -610,7 +610,7 @@ void mark_pack_boundaries_cuda_impl(
     at::Tensor pack_ids,
     at::Tensor boundaries) {
     int64_t num = pack_ids.size(0);
-    AT_DISPATCH_INTEGRAL_TYPES(pack_ids.type(), "mark_pack_boundaries_cuda", ([&] {
+    AT_DISPATCH_INTEGRAL_TYPES(pack_ids.scalar_type(), "mark_pack_boundaries_cuda", ([&] {
         const at::cuda::OptionalCUDAGuard device_guard(at::device_of(boundaries));
         auto stream = at::cuda::getCurrentCUDAStream();
         mark_pack_boundaries_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS, 0, stream>>>(
@@ -630,7 +630,7 @@ void diff_cuda_impl(
     
     int64_t* pack_indices_ptr = pack_indices.data_ptr<int64_t>();
     const int num_threads = 256;
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "diff_cuda", ([&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.scalar_type(), "diff_cuda", ([&] {
         const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
         auto stream = at::cuda::getCurrentCUDAStream();
         diff_cuda_kernel<scalar_t><<<(num_packs+num_threads-1)/num_threads, num_threads, 0, stream>>>(
@@ -669,7 +669,7 @@ int sum_reduce_cuda_impl(
   int cnt;
 
   const int num_threads = 1024;
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "sum_reduce_cuda", ([&] {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.scalar_type(), "sum_reduce_cuda", ([&] {
       const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
       auto stream = at::cuda::getCurrentCUDAStream();
       cudaMemcpyAsync(&cnt, inclusive_sum_ptr + num_feats - 1, sizeof(int), cudaMemcpyDeviceToHost, stream);
@@ -698,7 +698,7 @@ void cumsum_cuda_impl(
     
     const int num_threads = 256;
     if (reverse) {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "cumsum_cuda", ([&] {
+        AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.scalar_type(), "cumsum_cuda", ([&] {
             const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
             auto stream = at::cuda::getCurrentCUDAStream();
             cumsum_reverse_cuda_kernel<scalar_t><<<(num_packs+num_threads) / num_threads, num_threads, 0, stream>>>(
@@ -708,7 +708,7 @@ void cumsum_cuda_impl(
                 pack_indices_ptr, offset);
         }));
     } else {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "cumsum_cuda", ([&] {
+        AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.scalar_type(), "cumsum_cuda", ([&] {
             const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
             auto stream = at::cuda::getCurrentCUDAStream();
             cumsum_cuda_kernel<scalar_t><<<(num_packs+num_threads) / num_threads, num_threads, 0, stream>>>(
@@ -736,7 +736,7 @@ void cumprod_cuda_impl(
     
     const int num_threads = 256;
     if (reverse) {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "cumprod_reverse_cuda", ([&] {
+        AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.scalar_type(), "cumprod_reverse_cuda", ([&] {
             const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
             auto stream = at::cuda::getCurrentCUDAStream();
             cumprod_reverse_cuda_kernel<scalar_t><<<(num_packs+num_threads) / num_threads, num_threads, 0, stream>>>(
@@ -746,7 +746,7 @@ void cumprod_cuda_impl(
                 pack_indices_ptr, offset);
         }));
     } else {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "cumprod_cuda", ([&] {
+        AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.scalar_type(), "cumprod_cuda", ([&] {
             const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
             auto stream = at::cuda::getCurrentCUDAStream();
             cumprod_cuda_kernel<scalar_t><<<(num_packs+num_threads) / num_threads, num_threads, 0, stream>>>(
