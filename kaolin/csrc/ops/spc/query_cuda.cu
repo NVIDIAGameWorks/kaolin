@@ -83,7 +83,7 @@ void query_cuda_impl(
     
     const int threads = 256;
     const int blocks = (num_query + threads - 1) / threads;
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(query_coords.type(), "query_cuda", ([&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(query_coords.scalar_type(), "query_cuda", ([&] {
         const at::cuda::OptionalCUDAGuard device_guard(at::device_of(pidx));
         auto stream = at::cuda::getCurrentCUDAStream();
         query_cuda_kernel<<<blocks, threads, 0, stream>>>(
@@ -108,7 +108,7 @@ void query_multiscale_cuda_impl(
     
     const int threads = 256;
     const int blocks = (num_query + threads - 1) / threads;
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(query_coords.type(), "query_multiscale_cuda", ([&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(query_coords.scalar_type(), "query_multiscale_cuda", ([&] {
         const at::cuda::OptionalCUDAGuard device_guard(at::device_of(pidx));
         auto stream = at::cuda::getCurrentCUDAStream();
         query_multiscale_cuda_kernel<<<blocks, threads, 0, stream>>>(
@@ -161,7 +161,7 @@ void query_cuda_impl_empty(
 
     const int threads = 256;
     const int blocks = (num_query + threads - 1) / threads;
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(query_coords.type(), "query_cuda", ([&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(query_coords.scalar_type(), "query_cuda", ([&] {
         const at::cuda::OptionalCUDAGuard device_guard(at::device_of(pidx));
         auto stream = at::cuda::getCurrentCUDAStream();
         query_cuda_kernel_empty<<<blocks, threads, 0, stream>>>(

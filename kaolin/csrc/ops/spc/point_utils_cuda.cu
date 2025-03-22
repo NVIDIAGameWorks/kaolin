@@ -203,7 +203,7 @@ void interpolate_trilinear_cuda_impl(
     int32_t resolution = 1 << level;
 
     int num_threads = 128;
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "interpolate_trilinear_cuda", ([&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.scalar_type(), "interpolate_trilinear_cuda", ([&] {
         const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
         auto stream = at::cuda::getCurrentCUDAStream();
         interpolate_trilinear_cuda_kernel<scalar_t><<<(num + num_threads - 1) / num_threads, num_threads, 0, stream>>>(
@@ -228,7 +228,7 @@ void coords_to_trilinear_cuda_impl(
     at::Tensor coeffs
 ) {
     int64_t num_coords = coords.size(0);
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(coeffs.type(), "coords_to_trilinear_cuda", ([&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(coeffs.scalar_type(), "coords_to_trilinear_cuda", ([&] {
         const at::cuda::OptionalCUDAGuard device_guard(at::device_of(coeffs));
         auto stream = at::cuda::getCurrentCUDAStream();
         coords_to_trilinear_cuda_kernel<scalar_t><<<(num_coords + 1023) / 1024, 1024, 0, stream>>>(
