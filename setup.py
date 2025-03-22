@@ -243,5 +243,5 @@ if __name__ == '__main__':
         install_requires=get_requirements(),
         zip_safe=False,
         ext_modules=get_extensions(),
-        'build_ext': BuildExtension
+        cmdclass={'build_ext': BuildExtension}
     )
