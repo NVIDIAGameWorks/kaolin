@@ -243,5 +243,5 @@ if __name__ == '__main__':
         install_requires=get_requirements(),
         zip_safe=False,
         ext_modules=get_extensions(),
-        cmdclass={'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)}
+        'build_ext': BuildExtension
     )
