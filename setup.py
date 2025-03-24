@@ -18,10 +18,12 @@ import subprocess  # Added import
 
 # Define version constraints
 TORCH_MIN_VER = '1.6.0'
-TORCH_MAX_VER = '2.7.0'  # Updated to support newer PyTorch versions
+TORCH_MAX_VER = '2.6.0'  # Updated to support newer PyTorch versions
 CYTHON_MIN_VER = '0.29.37'
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
 
+# Module required before installation
+# trying to install it ahead turned out to be too unstable
 # Check for PyTorch
 torch_spec = importlib.util.find_spec("torch")
 if torch_spec is None:
@@ -88,7 +90,7 @@ if not torch.cuda.is_available() and os.getenv('FORCE_CUDA', '0') == '1':
     logging.warning(
         "Torch did not find available GPUs. Assuming cross-compilation.\n"
         "Default architectures: Pascal (6.0, 6.1, 6.2), Volta (7.0), Turing (7.5),\n"
-        "Ampere (8.0) if CUDA >= 11.0, Hopper (9.0) if CUDA >= 11.8.\n"
+        "Ampere (8.0) if CUDA >= 11.0, Hopper (9.0) if CUDA >= 11.8, Blackwell (12.0) if CUDA >= 12.8\n"
         "Set TORCH_CUDA_ARCH_LIST for specific architectures."
     )
     if os.getenv("TORCH_CUDA_ARCH_LIST") is None:
@@ -102,7 +104,10 @@ if not torch.cuda.is_available() and os.getenv('FORCE_CUDA', '0') == '1':
             else:
                 os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;8.9;9.0"
         elif major == 12:
-            os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0"
+            if minor <= 6:
+                os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0"
+            else:
+                os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0;12.0"
         else:
             os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5"
         print(f'TORCH_CUDA_ARCH_LIST: {os.environ["TORCH_CUDA_ARCH_LIST"]}')
@@ -161,8 +166,9 @@ def get_extensions():
     define_macros = []
     include_dirs = []
     sources = glob.glob('kaolin/csrc/**/*.cpp', recursive=True)
+    # FORCE_CUDA is for cross-compilation in docker build
     is_cuda = torch.cuda.is_available() or os.getenv('FORCE_CUDA', '0') == '1'
-    
+
     if is_cuda:
         define_macros += [("WITH_CUDA", None), ("THRUST_IGNORE_CUB_VERSION_CHECK", None)]
         sources += glob.glob('kaolin/csrc/**/*.cu', recursive=True)
@@ -243,5 +249,5 @@ if __name__ == '__main__':
         install_requires=get_requirements(),
         zip_safe=False,
         ext_modules=get_extensions(),
-        cmdclass={'build_ext': BuildExtension}
+        cmdclass={'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)}
     )
