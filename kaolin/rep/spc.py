@@ -19,7 +19,7 @@ __all__ = [
 ]
 
 import torch
-from ..ops.batch import list_to_packed
+import kaolin
 
 class Spc(object):
     """Data class holding all :ref:`Structured Point Cloud (SPC)<spc>` information.
@@ -238,7 +238,7 @@ class Spc(object):
         Return:
             (kaolin.rep.Spc): a new ``Spc``.
         """
-        octrees, lengths = list_to_packed(
+        octrees, lengths = kaolin.ops.batch.list_to_packed(
             [octree.reshape(-1, 1) for octree in octrees_list])
         return cls(octrees.reshape(-1).contiguous(), lengths.reshape(-1).int())
 

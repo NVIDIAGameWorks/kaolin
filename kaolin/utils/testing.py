@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21-22 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019,20-21-22-25 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,17 +17,19 @@ import copy
 import collections
 import functools
 import logging
+import random
 import numpy as np
 import torch
+
+from .uint8 import uint8_bits_sum
+from . import random
+
 
 # Optional
 try:
     import torchvision
 except Exception as e:
     torchvision = None
-
-import kaolin.ops.random as random
-from kaolin.ops.spc.uint8 import uint8_bits_sum
 
 BOOL_DTYPES = [torch.bool]
 INT_DTYPES = [torch.uint8, torch.short, torch.int, torch.long]

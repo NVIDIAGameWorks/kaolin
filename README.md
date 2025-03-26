@@ -66,7 +66,7 @@ Please review our [contribution guidelines](CONTRIBUTING.md).
 
 ## Licenses
 
-Most of Kaolin's repository is under [Apache v2.0 license](LICENSE), except under [kaolin/non_commercial](kaolin/non_commercial/) which is under [NSCL license](LICENSE.NSCL) restricted to non commercial usage for research and evaluation purposes. For example, FlexiCubes method is included under [non_commercial](kaolin/non_commercial/flexicubes/flexicubes.py).
+Most of Kaolin's repository is under [Apache v2.0 license](LICENSE), except under [kaolin/non_commercial](kaolin/non_commercial/) which is under [NSCL license](LICENSE.NSCL) restricted to non commercial usage for research and evaluation purposes.
 
 Default `kaolin` import includes Apache-licensed components:
 ```
@@ -77,6 +77,11 @@ The non-commercial components need to be explicitly imported as:
 ```
 import kaolin.non_commercial
 ```
+
+### Update
+
+FlexiCubes is now under Apache-v2 [here](https://github.com/NVIDIAGameWorks/kaolin/tree/master/kaolin/ops/conversions/flexicubes/flexicubes.py),
+the [old version](https://github.com/NVIDIAGameWorks/kaolin/tree/master/kaolin/non_commercial/flexicubes/flexicubes.py) is maintained for backward compatibility
 
 ## Citation
 
