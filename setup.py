@@ -18,7 +18,7 @@ import subprocess  # Added import
 
 # Define version constraints
 TORCH_MIN_VER = '1.6.0'
-TORCH_MAX_VER = '2.6.0'  # Updated to support newer PyTorch versions
+TORCH_MAX_VER = '2.8.0'  # Updated to support newer PyTorch versions
 CYTHON_MIN_VER = '0.29.37'
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
 
