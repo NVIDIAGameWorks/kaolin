@@ -49,6 +49,7 @@ def run_apidoc(_):
             "kaolin/ops/conversions/trianglemesh.py",
             "kaolin/ops/conversions/voxelgrid.py",
             "kaolin/ops/conversions/tetmesh.py",
+            "kaolin/ops/conversions/flexicubes/*.py",
             "kaolin/ops/mesh/check_sign.py",
             "kaolin/ops/mesh/mesh.py",
             "kaolin/ops/mesh/tetmesh.py",
