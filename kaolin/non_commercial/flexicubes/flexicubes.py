@@ -26,7 +26,7 @@ class FlexiCubes:
     PyTorch tensors on the specified device.
 
     .. deprecated::
-       Due to license changes, FlexiCubes has been moved to :module:`kaolin.ops.conversions.FlexiCubes`
+       Due to license changes, FlexiCubes has been moved to :class:`kaolin.ops.conversions.FlexiCubes`
 
     .. image:: ../img/flexicubes.png
         :width: 600
