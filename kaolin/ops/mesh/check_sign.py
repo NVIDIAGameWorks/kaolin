@@ -36,7 +36,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
 # SOFTWARE.
 
-import numpy as np
 import torch
 
 from kaolin import _C
@@ -228,8 +227,6 @@ class _UnbatchedMeshIntersector:
 
         v1 = t3 - t1
         v2 = t2 - t1
-        # v1 = v1 / np.linalg.norm(v1, axis=-1, keepdims=True)
-        # v2 = v2 / np.linalg.norm(v2, axis=-1, keepdims=True)
 
         normals = torch.cross(v1, v2)
         alpha = torch.sum(normals[:, :2] * (t1[:, :2] - points[:, :2]), dim=1)
