@@ -16,8 +16,8 @@
 import pytest
 
 import torch
-from kaolin.non_commercial import FlexiCubes
-
+from kaolin.ops.conversions import FlexiCubes
+from kaolin.utils.testing import check_allclose
 
 def cube_sdf(x_nx3):
     sdf_values = 0.5 - torch.abs(x_nx3)
@@ -26,7 +26,6 @@ def cube_sdf(x_nx3):
     sdf_values = -1.0 * sdf_values
 
     return sdf_values.view(-1)
-
 
 def cube_sdf_gradient(x_nx3):
     gradients = []
@@ -100,7 +99,17 @@ class TestFlexiCubes:
                                        [4, 7, 5]],
                                       dtype=torch.long,
                                       device=device)
-        return expected_vertices, expected_faces
+        expected_features = torch.tensor([
+            [0.4333, 0.4333, 0.4333],
+            [0.4333, 0.4333, 0.5667],
+            [0.4333, 0.5667, 0.4333],
+            [0.4333, 0.5667, 0.5667],
+            [0.5667, 0.4333, 0.4333],
+            [0.5667, 0.4333, 0.5667],
+            [0.5667, 0.5667, 0.4333],
+            [0.5667, 0.5667, 0.5667]
+        ], device=device)
+        return expected_vertices, expected_faces, None, expected_features
 
     @pytest.fixture(autouse=True)
     def expected_tetmesh_output(self, device):
@@ -241,9 +250,36 @@ class TestFlexiCubes:
         tri_11 = torch.sort(quad[:, [1, 2, 3]], dim=1)[0]
         return tri_00, tri_01, tri_10, tri_11
 
-    def test_deprecatedwarning(self, device):
-        with pytest.deprecated_call():
-            fc = FlexiCubes(device)
+    @pytest.fixture(autouse=True)
+    def expected_qef_features(self, device):
+        return torch.tensor([
+            [0.2222, 0.2222, 0.2222],
+            [0.1667, 0.1667, 0.5000],
+            [0.2222, 0.2222, 0.7778],
+            [0.1667, 0.5000, 0.1667],
+            [0.0000, 0.5000, 0.5000],
+            [0.1667, 0.5000, 0.8333],
+            [0.2222, 0.7778, 0.2222],
+            [0.1667, 0.8333, 0.5000],
+            [0.2222, 0.7778, 0.7778],
+            [0.5000, 0.1667, 0.1667],
+            [0.5000, 0.0000, 0.5000],
+            [0.5000, 0.1667, 0.8333],
+            [0.5000, 0.5000, 0.0000],
+            [0.5000, 0.5000, 1.0000],
+            [0.5000, 0.8333, 0.1667],
+            [0.5000, 1.0000, 0.5000],
+            [0.5000, 0.8333, 0.8333],
+            [0.7778, 0.2222, 0.2222],
+            [0.8333, 0.1667, 0.5000],
+            [0.7778, 0.2222, 0.7778],
+            [0.8333, 0.5000, 0.1667],
+            [1.0000, 0.5000, 0.5000],
+            [0.8333, 0.5000, 0.8333],
+            [0.7778, 0.7778, 0.2222],
+            [0.8333, 0.8333, 0.5000],
+            [0.7778, 0.7778, 0.7778]
+        ], device=device)
 
     def test_grid_construction(self, expected_grid, device):
         fc = FlexiCubes(device)
@@ -256,8 +292,19 @@ class TestFlexiCubes:
         x_nx3, cube_fx8 = fc.construct_voxel_grid(4)
         output = fc(x_nx3, input_data, cube_fx8, 4)
 
+        assert len(output) == 3
         assert torch.allclose(output[0], expected_trimesh_output[0], atol=1e-4)
         assert torch.equal(output[1], expected_trimesh_output[1])
+
+    def test_trimesh_extraction_with_colors(self, input_data, expected_trimesh_output, device):
+        fc = FlexiCubes(device)
+        x_nx3, cube_fx8 = fc.construct_voxel_grid(4)
+        output = fc(x_nx3, input_data, cube_fx8, 4, voxelgrid_features=x_nx3 + 0.5)
+
+        assert len(output) == 4
+        assert torch.allclose(output[0], expected_trimesh_output[0], atol=1e-4)
+        assert torch.equal(output[1], expected_trimesh_output[1])
+        check_allclose(output[3], expected_trimesh_output[3], rtol=1e-4, atol=1e-4)
 
     def test_tetmesh_extraction(self, input_data, expected_tetmesh_output, device):
         fc = FlexiCubes(device)
@@ -267,8 +314,8 @@ class TestFlexiCubes:
         assert torch.allclose(output[0], expected_tetmesh_output[0], atol=1e-4)
         assert torch.equal(output[1], expected_tetmesh_output[1])
 
-    def test_qef_extraction_grad_func(self, expected_qef_vertices,
-                                      expected_qef_possible_tri, device):
+    def test_qef_extraction_grad_func(self, expected_qef_vertices, expected_qef_possible_tri,
+                                      expected_qef_features, device):
         fc = FlexiCubes(device)
         x_nx3, cube_fx8 = fc.construct_voxel_grid(3)
         sdf_n = cube_sdf(x_nx3)

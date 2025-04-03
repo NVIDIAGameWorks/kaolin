@@ -1,22 +1,30 @@
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
-# NVIDIA CORPORATION & AFFILIATES and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION & AFFILIATES is strictly prohibited.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-import warnings
 import torch
 from .tables import *
-import kaolin.utils.testing
+from ....utils.testing import check_tensor
 
 __all__ = [
     'FlexiCubes'
 ]
 
 class FlexiCubes:
-    """This class implements the FlexiCubes method for extracting meshes from scalar fields. 
+    """
+
+    This class implements the FlexiCubes method for extracting meshes from scalar fields. 
     It maintains a series of lookup tables and indices to support the mesh extraction process. 
     FlexiCubes, a differentiable variant of the Dual Marching Cubes (DMC) scheme, enhances 
     the geometric fidelity and mesh quality of reconstructed meshes by dynamically adjusting 
@@ -24,9 +32,6 @@ class FlexiCubes:
 
     During instantiation, the class loads DMC tables from a file and transforms them into 
     PyTorch tensors on the specified device.
-
-    .. deprecated::
-       Due to license changes, FlexiCubes has been moved to :class:`kaolin.ops.conversions.FlexiCubes`
 
     .. image:: ../img/flexicubes.png
         :width: 600
@@ -78,9 +83,6 @@ class FlexiCubes:
     """
 
     def __init__(self, device="cuda"):
-        warnings.warn(
-            "Due change of license, flexicube has been moved to kaolin.ops.conversions",
-            DeprecationWarning, stacklevel=2)
 
         self.device = device
         self.dmc_table = torch.tensor(dmc_table, dtype=torch.long, device=device, requires_grad=False)
@@ -132,7 +134,7 @@ class FlexiCubes:
                 - The indices into vertices for each voxel,
                   of shape :math:`(\text{res}, 8)`.
         """
-        base_cube_f = torch.arange(8).to(self.device)
+        base_cube_f = torch.arange(8, device=self.device)
         if isinstance(resolution, int):
             resolution = (resolution, resolution, resolution)
         voxel_grid_template = torch.ones(resolution, device=self.device)
@@ -151,7 +153,7 @@ class FlexiCubes:
 
     def __call__(self, voxelgrid_vertices, scalar_field, cube_idx, resolution, qef_reg_scale=1e-3,
                  weight_scale=0.99, beta=None, alpha=None, gamma_f=None, training=False,
-                 output_tetmesh=False, grad_func=None):
+                 output_tetmesh=False, grad_func=None, voxelgrid_features=None):
         r"""
         Main function for mesh extraction from scalar field using FlexiCubes. This function converts 
         discrete signed distance fields, encoded on voxel grids and additional per-cube parameters, 
@@ -216,16 +218,21 @@ class FlexiCubes:
                 A function to compute the surface gradient at specified 3D positions
                 (input: Nx3 positions). The function should return gradients as an Nx3 tensor.
                 If None, the original FlexiCubes algorithm is utilized. Defaults to None.
+            voxelgrid_features (torch.Tensor, optional):
+                Features per voxelgrid vertices, of shape :math:`(\text{num_vertices}, \text{num_channels})`.
+                This is not supported with ``output_tetmesh`` or ``grad_func``.
 
         Return:
-            (torch.Tensor, torch.LongTensor, torch.Tensor):
+            Tuple of tensors containing
 
-                - Vertices for the extracted triangular/tetrahedral mesh,
+                - vertices (torch.Tensor): Vertices for the extracted triangular/tetrahedral mesh,
                   of shape :math:`(\text{num_vertices},  3)`.
-                - Faces for the extracted triangular/tetrahedral mesh,
+                - faces (torch.LongTensor): Faces for the extracted triangular/tetrahedral mesh,
                   of shape :math:`(\text{num_faces}, 3)`/:math:`(\text{num_faces}, 4)`.
-                - Regularizer L_dev, computed per dual vertex,
+                - l_dev (torch.Tensor): Regularizer L_dev, computed per dual vertex,
                   of shape :math:`(\text{num_dual_vertices},)`.
+                - vertex_features (optional, torch.Tensor): if ``voxelgrid_features`` is provided
+                  there will be an additional returned tensor, of the interpolated features to the vertices.
 
         .. _Flexible Isosurface Extraction for Gradient-Based Mesh Optimization:
             https://research.nvidia.com/labs/toronto-ai/flexicubes/
@@ -233,37 +240,51 @@ class FlexiCubes:
             https://people.engr.tamu.edu/schaefer/research/dualsimp_tvcg.pdf
         """
         assert torch.is_tensor(voxelgrid_vertices) and \
-            kaolin.utils.testing.check_tensor(voxelgrid_vertices, (None, 3), throw=False), \
+            check_tensor(voxelgrid_vertices, (None, 3), throw=False), \
             "'voxelgrid_vertices' should be a tensor of shape (num_vertices, 3)"
         num_vertices = voxelgrid_vertices.shape[0]
         assert torch.is_tensor(scalar_field) and \
-            kaolin.utils.testing.check_tensor(scalar_field, (num_vertices,), throw=False), \
+            check_tensor(scalar_field, (num_vertices,), throw=False), \
             "'scalar_field' should be a tensor of shape (num_vertices,)"
         assert torch.is_tensor(cube_idx) and \
-            kaolin.utils.testing.check_tensor(cube_idx, (None, 8), throw=False), \
+            check_tensor(cube_idx, (None, 8), throw=False), \
             "'cube_idx' should be a tensor of shape (num_cubes, 8)"
         num_cubes = cube_idx.shape[0]
         assert beta is None or (
             torch.is_tensor(beta) and
-            kaolin.utils.testing.check_tensor(beta, (num_cubes, 12), throw=False)
+            check_tensor(beta, (num_cubes, 12), throw=False)
         ), "'beta' should be a tensor of shape (num_cubes, 12)"
         assert alpha is None or (
             torch.is_tensor(alpha) and
-            kaolin.utils.testing.check_tensor(alpha, (num_cubes, 8), throw=False)
+            check_tensor(alpha, (num_cubes, 8), throw=False)
         ), "'alpha' should be a tensor of shape (num_cubes, 8)"
         assert gamma_f is None or (
             torch.is_tensor(gamma_f) and
-            ckaolin.utils.testing.heck_tensor(gamma_f, (num_cubes,), throw=False)
+            check_tensor(gamma_f, (num_cubes,), throw=False)
         ), "'gamma_f' should be a tensor of shape (num_cubes,)"
+        assert voxelgrid_features is None or (
+            torch.is_tensor(voxelgrid_features) and
+            check_tensor(voxelgrid_features, (num_vertices, None), throw=False)
+        ), f"'voxelgrid_features' should be a tensor of shape (num_cubes, num_features)"
+        assert voxelgrid_features is None or not (output_tetmesh or grad_func is not None), \
+            "'voxelgrid_features' is not supported with 'output_tetmesh' or 'grad_func'"
 
         surf_cubes, occ_fx8 = self._identify_surf_cubes(scalar_field, cube_idx)
         if surf_cubes.sum() == 0:
-            return (
-                torch.zeros((0, 3), device=self.device),
-                torch.zeros((0, 4), dtype=torch.long, device=self.device) if output_tetmesh else
-                torch.zeros((0, 3), dtype=torch.long, device=self.device),
-                torch.zeros((0), device=self.device)
-            )
+            if voxelgrid_features is None:
+                return (
+                    torch.zeros((0, 3), device=self.device),
+                    torch.zeros((0, 4), dtype=torch.long, device=self.device) if output_tetmesh else
+                    torch.zeros((0, 3), dtype=torch.long, device=self.device),
+                    torch.zeros((0), device=self.device),
+                )
+            else:
+                return (
+                    torch.zeros((0, 3), device=self.device),
+                    torch.zeros((0, 3), dtype=torch.long, device=self.device),
+                    torch.zeros((0), device=self.device),
+                    torch.zeros((0, voxelgrid_features.shape[-1]), device=self.device)
+                )
         beta, alpha, gamma_f = self._normalize_weights(
             beta, alpha, gamma_f, surf_cubes, weight_scale)
 
@@ -273,21 +294,23 @@ class FlexiCubes:
             scalar_field, cube_idx, surf_cubes
         )
 
-        vd, L_dev, vd_gamma, vd_idx_map = self._compute_vd(
+        vd, L_dev, vd_gamma, vd_idx_map, vd_features = self._compute_vd(
             voxelgrid_vertices, cube_idx[surf_cubes], surf_edges, scalar_field,
-            case_ids, beta, alpha, gamma_f, idx_map, grad_func, qef_reg_scale
+            case_ids, beta, alpha, gamma_f, idx_map, grad_func, qef_reg_scale, voxelgrid_features
         )
-        vertices, faces, s_edges, edge_indices = self._triangulate(
+        vertices, faces, s_edges, edge_indices, vertices_features = self._triangulate(
             scalar_field, surf_edges, vd, vd_gamma, edge_counts, idx_map,
-            vd_idx_map, surf_edges_mask, training, grad_func
+            vd_idx_map, surf_edges_mask, training, grad_func, vd_features
         )
-        if not output_tetmesh:
-            return vertices, faces, L_dev
-        else:
+        if output_tetmesh:
             vertices, tets = self._tetrahedralize(
                 voxelgrid_vertices, scalar_field, cube_idx, vertices, faces, surf_edges, s_edges, vd_idx_map, case_ids, edge_indices,
                 surf_cubes, training)
             return vertices, tets, L_dev
+        elif voxelgrid_features is None:
+            return vertices, faces, L_dev
+        else:
+            return vertices, faces, L_dev, vertices_features
 
     def _compute_reg_loss(self, vd, ue, edge_group_to_vd, vd_num_edges):
         """
@@ -430,14 +453,17 @@ class FlexiCubes:
         return dual_verts
 
     def _compute_vd(self, voxelgrid_vertices, surf_cubes_fx8, surf_edges, scalar_field,
-                    case_ids, beta, alpha, gamma_f, idx_map, grad_func, qef_reg_scale):
-        """
-        Computes the location of dual vertices as described in Section 4.2
-        """
+                    case_ids, beta, alpha, gamma_f, idx_map, grad_func, qef_reg_scale, voxelgrid_features):
+        """Computes the location of dual vertices as described in Section 4.2"""
         alpha_nx12x2 = torch.index_select(input=alpha, index=self.cube_edges, dim=1).reshape(-1, 12, 2)
         surf_edges_x = torch.index_select(input=voxelgrid_vertices, index=surf_edges.reshape(-1), dim=0).reshape(-1, 2, 3)
         surf_edges_s = torch.index_select(input=scalar_field, index=surf_edges.reshape(-1), dim=0).reshape(-1, 2, 1)
         zero_crossing = self._linear_interp(surf_edges_s, surf_edges_x)
+
+        if voxelgrid_features is not None:
+            num_features = voxelgrid_features.shape[-1]
+            surf_edges_f = torch.index_select(
+                input=voxelgrid_features, index=surf_edges.reshape(-1), dim=0).reshape(-1, 2, num_features)
 
         idx_map = idx_map.reshape(-1, 12)
         num_vd = torch.index_select(input=self.num_vd_table, index=case_ids, dim=0)
@@ -489,7 +515,7 @@ class FlexiCubes:
         edge_group_to_cube = torch.cat(edge_group_to_cube)
         vd_num_edges = torch.cat(vd_num_edges)
         vd_gamma = torch.cat(vd_gamma)
-
+        vd_features = None
         if grad_func is not None:
             vd = torch.cat(vd)
             L_dev = torch.zeros([1], device=self.device)
@@ -515,14 +541,20 @@ class FlexiCubes:
             vd = vd.index_add_(0, index=edge_group_to_vd, source=ue_group * beta_group) / beta_sum
             L_dev = self._compute_reg_loss(vd, zero_crossing_group, edge_group_to_vd, vd_num_edges)
 
+            if voxelgrid_features is not None:
+                vd_features = torch.zeros((total_num_vd, num_features), device=self.device)
+                f_group = torch.index_select(input=surf_edges_f, index=idx_group.reshape(-1), dim=0).reshape(-1, 2, num_features)
+                uf_group = self._linear_interp(s_group * alpha_group, f_group)
+                vd_features = vd_features.index_add_(0, index=edge_group_to_vd, source=uf_group * beta_group) / beta_sum
+
         v_idx = torch.arange(vd.shape[0], device=self.device)  # + total_num_vd
 
         vd_idx_map = (vd_idx_map.reshape(-1)).scatter(dim=0, index=edge_group_to_cube *
                                                       12 + edge_group, src=v_idx[edge_group_to_vd])
 
-        return vd, L_dev, vd_gamma, vd_idx_map
+        return vd, L_dev, vd_gamma, vd_idx_map, vd_features
 
-    def _triangulate(self, scalar_field, surf_edges, vd, vd_gamma, edge_counts, idx_map, vd_idx_map, surf_edges_mask, training, grad_func):
+    def _triangulate(self, scalar_field, surf_edges, vd, vd_gamma, edge_counts, idx_map, vd_idx_map, surf_edges_mask, training, grad_func, vd_features):
         """
         Connects four neighboring dual vertices to form a quadrilateral. The quadrilaterals are then split into 
         triangles based on the gamma parameter, as described in Section 4.3.
@@ -569,11 +601,20 @@ class FlexiCubes:
             weight_sum = (gamma_02 + gamma_13) + 1e-8
             vd_center = ((vd_02 * gamma_02.unsqueeze(-1) + vd_13 * gamma_13.unsqueeze(-1)) /
                          weight_sum.unsqueeze(-1)).squeeze(1)
+
+            if vd_features is not None:
+                features_quad = torch.index_select(
+                    input=vd_features, index=quad_vd_idx.reshape(-1), dim=0).reshape(-1, 4, vd_features.shape[-1])
+                features_02 = (features_quad[:, 0] + features_quad[:, 2]) / 2
+                features_13 = (features_quad[:, 1] + features_quad[:, 3]) / 2
+                features_center = (features_02 * gamma_02.unsqueeze(-1) + features_13 * gamma_13.unsqueeze(-1)) / weight_sum.unsqueeze(-1)
+                vd_features = torch.cat([vd_features, features_center])
+
             vd_center_idx = torch.arange(vd_center.shape[0], device=self.device) + vd.shape[0]
             vd = torch.cat([vd, vd_center])
             faces = quad_vd_idx[:, self.quad_split_train].reshape(-1, 4, 2)
             faces = torch.cat([faces, vd_center_idx.reshape(-1, 1, 1).repeat(1, 4, 1)], -1).reshape(-1, 3)
-        return vd, faces, s_edges, edge_indices
+        return vd, faces, s_edges, edge_indices, vd_features
 
     def _tetrahedralize(
             self, voxelgrid_vertices, scalar_field, cube_idx, vertices, faces, surf_edges, s_edges, vd_idx_map, case_ids, edge_indices,
