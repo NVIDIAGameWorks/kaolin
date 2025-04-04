@@ -8,7 +8,7 @@ Kaolin Library integrates research modules for volumetric mesh optimization, inc
 :ref:`DefTet <deftet>`, :ref:`DMTet <dmtet>` and :ref:`FlexiCubes <flexi_cubes>`. These modules can be used for one-off optimization or become
 differentiable modules in AI workflows.
 
-For docs related to tetrahedral meshes, see :py:mod:`kaolin.ops.mesh` and :py:mod:`kaolin.metrics.tetmesh`, as well as dedicated modules linked below such as :any:`kaolin.render.mesh.deftet_sparse_render` and :any:`kaolin.non_commercial.FlexiCubes`.
+For docs related to tetrahedral meshes, see :py:mod:`kaolin.ops.mesh` and :py:mod:`kaolin.metrics.tetmesh`, as well as dedicated modules linked below such as :any:`kaolin.render.mesh.deftet_sparse_render` and :any:`kaolin.ops.conversions.FlexiCubes`.
 
 .. _flexi_cubes:
 
@@ -21,7 +21,7 @@ FlexiCubes
 
 The original publication for this method is: `"Flexible Isosurface Extraction for Gradient-Based Mesh Optimization." <https://research.nvidia.com/labs/toronto-ai/flexicubes/>`_ Shen, Tianchang, Jacob Munkberg, Jon Hasselgren, Kangxue Yin, Zian Wang, Wenzheng Chen, Zan Gojcic, Sanja Fidler, Nicholas Sharp, and Jun Gao.  SIGGRAPH (TOG) 2023.
 
-Kaolin ships :class:`kaolin.non_commercial.FlexiCubes` module, the official maintained version of the FlexiCubes
+Kaolin ships :class:`kaolin.ops.conversions.FlexiCubes` module, the official maintained version of the FlexiCubes
 academic paper.
 
 See **Kaolin FlexiCubes Tutorial** in `the original flexicubes repository <https://github.com/nv-tlabs/FlexiCubes/blob/main/examples/optimization.ipynb>`_, with a walk through video above.
