@@ -6,7 +6,7 @@ kaolin.ops.conversions
 API
 ---
 
-.. autoclass:: kaolin.non_commercial.FlexiCubes
+.. autoclass:: kaolin.ops.conversions.FlexiCubes
    :members:
    :special-members: __call__
 

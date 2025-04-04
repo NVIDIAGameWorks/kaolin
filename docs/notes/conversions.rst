@@ -45,4 +45,4 @@ Hybrid Representations
 ======================
 
 * SDF and voxelgrid to tetrahedral mesh:
-   * :any:`kaolin.non_commercial.FlexiCubes` (See also :ref:`Volumetric Mesh Optimization <volumetric_meshes>`)
+   * :any:`kaolin.ops.conversions.FlexiCubes` (See also :ref:`Volumetric Mesh Optimization <volumetric_meshes>`)
