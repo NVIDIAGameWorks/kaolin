@@ -197,11 +197,6 @@ def get_extensions():
     ext_suffix = '.pyx' if use_cython else '.cpp'
     cython_extensions = [
         CppExtension(
-            'kaolin.ops.mesh.triangle_hash',
-            sources=[f'kaolin/cython/ops/mesh/triangle_hash{ext_suffix}'],
-            include_dirs=[numpy.get_include()],
-        ),
-        CppExtension(
             'kaolin.ops.conversions.mise',
             sources=[f'kaolin/cython/ops/conversions/mise{ext_suffix}'],
         ),
