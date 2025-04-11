@@ -79,4 +79,3 @@ def get_state():
         >>> set_state(torch_state, random_state, numpy_state)
     """
     return torch.get_rng_state(), random.getstate(), np.random.get_state()
-

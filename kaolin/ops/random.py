@@ -20,63 +20,6 @@ import numpy as np
 import torch
 from .spc.uint8 import uint8_to_bits
 
-def manual_seed(torch_seed, random_seed=None, numpy_seed=None):
-    """Set the seed for random and torch modules.
-
-    Args:
-        torch_seed (int): The desired seed for torch module.
-        random_seed (int): The desired seed for random module. Default: ``torch_seed`` value.
-        numpy_seed (int): The desired seed for numpy module. Default: ``torch_seed`` value.
-    """
-    if random_seed is None:
-        random_seed = torch_seed
-    if numpy_seed is None:
-        numpy_seed = torch_seed
-    random.seed(random_seed)
-    torch.manual_seed(torch_seed)
-    np.random.seed(numpy_seed)
-
-def set_state(torch_state, random_state, numpy_state):
-    """Set the generator states for generating random numbers.
-
-    Mostly used in pair with :func:`get_state`
-
-    Args:
-        torch_state (torch.ByteTensor): the state of torch module.
-        random_state (tuple): the state of random module.
-        numpy_state (tuple): the state of numpy module.
-
-    Example:
-        >>> torch_state, random_state, numpy_state = get_state()
-        >>> s = torch.randn((1, 3))
-        >>> set_state(torch_state, random_state, numpy_state)
-    """
-    torch.set_rng_state(torch_state)
-    random.setstate(random_state)
-    np.random.set_state(numpy_state)
-
-def get_state():
-    """Returns the generator states for generating random numbers.
-
-    Mostly used in pair with :func:`set_state`.
-
-    See also:
-
-    * https://pytorch.org/docs/stable/generated/torch.get_rng_state.html#torch.get_rng_state
-    * https://docs.python.org/3/library/random.html#random.getstate
-    * https://numpy.org/doc/stable/reference/random/generated/numpy.random.set_state.html#numpy.random.set_state
-
-    Returns:
-       (torch.ByteTensor, tuple, tuple):
-           the states for the corresponding modules (torch, random, numpy).
-
-    Example:
-        >>> torch_state, random_state, numpy_state = get_state()
-        >>> s = torch.randn((1, 3))
-        >>> set_state(torch_state, random_state, numpy_state)
-    """
-    return torch.get_rng_state(), random.getstate(), np.random.get_state()
-
 def random_shape_per_tensor(batch_size, min_shape=None, max_shape=None):
     """Generate random :attr:`shape_per_tensor`.
 

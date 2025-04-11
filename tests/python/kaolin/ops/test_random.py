@@ -40,17 +40,17 @@ def test_random_shape_per_tensor(batch_size, min_shape, max_shape):
 @pytest.mark.parametrize("min_shape,max_shape", [((5, 5, 5), (30, 30, 30))])
 def test_random_shape_per_tensor_seed(batch_size, min_shape, max_shape):
     threshold = batch_size * len(max_shape) * 0.9
-    kal.ops.random.manual_seed(0)
+    kal.utils.random.manual_seed(0)
     shape_per_tensor1 = kal.ops.random.random_shape_per_tensor(batch_size, min_shape,
                                                 max_shape)
     shape_per_tensor2 = kal.ops.random.random_shape_per_tensor(batch_size, min_shape,
                                                 max_shape)
     assert torch.sum(shape_per_tensor1 != shape_per_tensor2) > threshold
-    kal.ops.random.manual_seed(0)
+    kal.utils.random.manual_seed(0)
     shape_per_tensor3 = kal.ops.random.random_shape_per_tensor(batch_size, min_shape,
                                                 max_shape)
     assert torch.equal(shape_per_tensor1, shape_per_tensor3)
-    kal.ops.random.manual_seed(1)
+    kal.utils.random.manual_seed(1)
     shape_per_tensor4 = kal.ops.random.random_shape_per_tensor(batch_size, min_shape,
                                                 max_shape)
     assert torch.sum(shape_per_tensor1 != shape_per_tensor4) > threshold
@@ -80,14 +80,14 @@ def test_random_tensor(low, high, shape, dtype, device):
 @pytest.mark.parametrize("shape", [(10, 10)])
 def test_random_tensor_seed(low, high, shape):
     threshold = shape[0] * shape[1] * 0.9
-    kal.ops.random.manual_seed(0)
+    kal.utils.random.manual_seed(0)
     tensor1 = kal.ops.random.random_tensor(low, high, shape)
     tensor2 = kal.ops.random.random_tensor(low, high, shape)
     assert torch.sum(tensor1 != tensor2) > threshold
-    kal.ops.random.manual_seed(0)
+    kal.utils.random.manual_seed(0)
     tensor3 = kal.ops.random.random_tensor(low, high, shape)
     assert torch.equal(tensor1, tensor3)
-    kal.ops.random.manual_seed(1)
+    kal.utils.random.manual_seed(1)
     tensor4 = kal.ops.random.random_tensor(low, high, shape)
     assert torch.sum(tensor1 != tensor4) > threshold
 

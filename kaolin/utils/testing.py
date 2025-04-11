@@ -21,7 +21,7 @@ import random
 import numpy as np
 import torch
 
-from .uint8 import uint8_bits_sum
+import kaolin.ops.spc.uint8 as uint8_ops
 from . import random
 
 
@@ -213,7 +213,7 @@ def check_spc_octrees(octrees, lengths, batch_size=None, level=None,
             cur_level += 1
             cur_level_nodes = octree[cur_node_idx:cur_node_idx + cur_num_nodes]
             cur_node_idx += cur_num_nodes
-            cur_num_nodes = int(torch.sum(uint8_bits_sum(cur_level_nodes).long()))
+            cur_num_nodes = int(torch.sum(uint8_ops.uint8_bits_sum(cur_level_nodes).long()))
         if cur_node_idx > length:
             if throw:
                 raise ValueError(f"lengths at {i} is {length}, "
