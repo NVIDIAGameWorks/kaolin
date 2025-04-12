@@ -28,7 +28,7 @@ import torch
 from torch.multiprocessing import Pool
 from torch.utils.data import Dataset
 
-from  ..utils.testing import contained_torch_equal
+import kaolin.utils.testing as testing
 
 def _parallel_save_task(args):
     torch.set_num_threads(1)
@@ -113,7 +113,7 @@ def _get_saving_actions(dataset, cache_dir, save_on_disk=False,
                     path_str = path.resolve().as_posix()
                     if path.exists(): # There is already a file for a given key 
                         # Is the value stored the same than the one from the data?
-                        assert ignore_diff_error or contained_torch_equal(v, torch.load(path)), \
+                        assert ignore_diff_error or testing.contained_torch_equal(v, torch.load(path)), \
                             f"file '{path_str}' is different than " \
                             "its matching field from the input dataset, set 'force_overwriting' " \
                             "to True to overwrite the files cached."

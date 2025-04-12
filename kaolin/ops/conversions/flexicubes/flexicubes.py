@@ -15,7 +15,7 @@
 
 import torch
 from .tables import *
-from ....utils.testing import check_tensor
+import kaolin.utils.testing as testing
 
 __all__ = [
     'FlexiCubes'
@@ -240,31 +240,31 @@ class FlexiCubes:
             https://people.engr.tamu.edu/schaefer/research/dualsimp_tvcg.pdf
         """
         assert torch.is_tensor(voxelgrid_vertices) and \
-            check_tensor(voxelgrid_vertices, (None, 3), throw=False), \
+            testing.check_tensor(voxelgrid_vertices, (None, 3), throw=False), \
             "'voxelgrid_vertices' should be a tensor of shape (num_vertices, 3)"
         num_vertices = voxelgrid_vertices.shape[0]
         assert torch.is_tensor(scalar_field) and \
-            check_tensor(scalar_field, (num_vertices,), throw=False), \
+            testing.check_tensor(scalar_field, (num_vertices,), throw=False), \
             "'scalar_field' should be a tensor of shape (num_vertices,)"
         assert torch.is_tensor(cube_idx) and \
-            check_tensor(cube_idx, (None, 8), throw=False), \
+            testing.check_tensor(cube_idx, (None, 8), throw=False), \
             "'cube_idx' should be a tensor of shape (num_cubes, 8)"
         num_cubes = cube_idx.shape[0]
         assert beta is None or (
             torch.is_tensor(beta) and
-            check_tensor(beta, (num_cubes, 12), throw=False)
+            testing.check_tensor(beta, (num_cubes, 12), throw=False)
         ), "'beta' should be a tensor of shape (num_cubes, 12)"
         assert alpha is None or (
             torch.is_tensor(alpha) and
-            check_tensor(alpha, (num_cubes, 8), throw=False)
+            testing.check_tensor(alpha, (num_cubes, 8), throw=False)
         ), "'alpha' should be a tensor of shape (num_cubes, 8)"
         assert gamma_f is None or (
             torch.is_tensor(gamma_f) and
-            check_tensor(gamma_f, (num_cubes,), throw=False)
+            testing.check_tensor(gamma_f, (num_cubes,), throw=False)
         ), "'gamma_f' should be a tensor of shape (num_cubes,)"
         assert voxelgrid_features is None or (
             torch.is_tensor(voxelgrid_features) and
-            check_tensor(voxelgrid_features, (num_vertices, None), throw=False)
+            testing.check_tensor(voxelgrid_features, (num_vertices, None), throw=False)
         ), f"'voxelgrid_features' should be a tensor of shape (num_cubes, num_features)"
         assert voxelgrid_features is None or not (output_tetmesh or grad_func is not None), \
             "'voxelgrid_features' is not supported with 'output_tetmesh' or 'grad_func'"
