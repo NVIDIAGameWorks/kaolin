@@ -22,7 +22,7 @@ import numpy as np
 import torch
 
 import kaolin.ops.spc.uint8 as uint8_ops
-from . import random
+import kaolin.ops.random as random
 
 
 # Optional
