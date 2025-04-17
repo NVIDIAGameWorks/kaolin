@@ -10,6 +10,7 @@ def defaultWheelsPythonVers = ['3.9', '3.10', '3.11', '3.12']
 // Configs for build from pytorch docker images
 // (See: https://hub.docker.com/r/pytorch/pytorch/tags)
 def ubuntu_from_pytorch_configs = [
+/*
     [
         // python: 3.10
         'cudaVer': '11.7', 'cudnnVer': '8', 'torchVer': '2.0.1',
@@ -25,7 +26,7 @@ def ubuntu_from_pytorch_configs = [
         'cudaVer': '11.8', 'cudnnVer': '8', 'torchVer': '2.3.1',
         'archsToTest': 'MULTI'
     ]
-
+*/
 ]
 
 // Configs for build from NGC pytorch docker images
@@ -44,6 +45,7 @@ def ubuntu_from_nvcr_configs = [
 // with custom installation of all the dependencies like PyTorch
 // (See: https://hub.docker.com/r/nvidia/cuda/tags)
 def ubuntu_from_cuda_configs = [
+/*
     [
         'cudaVer': '11.7.1', 'cudnnVer': '8',
         'pythonVer': '3.9', 'torchVer': '2.0.1',
@@ -59,17 +61,20 @@ def ubuntu_from_cuda_configs = [
         'pythonVer': '3.11', 'torchVer': '2.3.1',
         'archsToTest': 'MULTI'
     ],
+*/
 ]
 
 // Configs for build for cpu only
 // (Use docker image ubuntu:18.04 as a base)
 def ubuntu_cpuonly_configs = [
+/*
     [
         'pythonVer': '3.9', 'torchVer': '2.1.2',
     ],
     [
         'pythonVer': '3.11', 'torchVer': '2.3.1',
     ]
+*/
 ]
 
 // Configs for building python wheels
@@ -131,8 +136,6 @@ def ubuntu_for_cuda_wheels_configs = [
         'cudaVer': '12.1.0', 'cudnnVer': '8',
         'torchVer': '2.2.1', 'archsToTest': 'MULTI'
     ],
-*/
-/*
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
         'torchVer': '2.3.0', 'archsToTest': 'MULTI'
@@ -185,7 +188,6 @@ def ubuntu_for_cuda_wheels_configs = [
         'cudaVer': '12.4.1', 'cudnnVer': '',
         'torchVer': '2.5.0', 'archsToTest': 'MULTI'
     ],
-*/
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
         'torchVer': '2.5.1', 'archsToTest': 'MULTI'
@@ -197,7 +199,8 @@ def ubuntu_for_cuda_wheels_configs = [
     [
         'cudaVer': '12.4.1', 'cudnnVer': '',
         'torchVer': '2.5.1', 'archsToTest': 'MULTI'
-    ]   
+    ]
+*/
 ]
 
 def ubuntu_for_cpu_wheels_configs = [
@@ -239,10 +242,10 @@ def ubuntu_for_cpu_wheels_configs = [
     [
         'torchVer': '2.5.0'
     ],
-*/
     [
         'torchVer': '2.5.1'
     ]
+*/
 ]
 
 def windows_for_cuda_wheels_configs = [
@@ -303,8 +306,6 @@ def windows_for_cuda_wheels_configs = [
         'cudaVer': '12.1', 'cudnnVer': '8',
         'torchVer': '2.2.1', 'archsToTest': ''
     ],
-*/
-/*
     [
         'cudaVer': '11.8', 'cudnnVer': '8',
         'torchVer': '2.3.0', 'archsToTest': ''
@@ -357,7 +358,6 @@ def windows_for_cuda_wheels_configs = [
         'cudaVer': '12.4', 'cudnnVer': '',
         'torchVer': '2.5.0', 'archsToTest': ''
     ]
-*/
     [
         'cudaVer': '11.8', 'cudnnVer': '8',
         'torchVer': '2.5.1', 'archsToTest': ''
@@ -366,6 +366,7 @@ def windows_for_cuda_wheels_configs = [
         'cudaVer': '12.1', 'cudnnVer': '8',
         'torchVer': '2.5.1', 'archsToTest': ''
     ],
+*/
     [
         'cudaVer': '12.4', 'cudnnVer': '',
         'torchVer': '2.5.1', 'archsToTest': ''

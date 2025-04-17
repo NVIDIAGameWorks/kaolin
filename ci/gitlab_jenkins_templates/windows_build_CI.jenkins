@@ -16,164 +16,274 @@ def cuda_version_url = [
     '12.4': 'https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_551.78_windows.exe'
 ]
 
-
 docker_registry_server = targetImageTag.split(':')[0..1].join(':')
 // This will be the "RUN" displayed on Blue Ocean
 currentBuild.displayName = targetImageTag.split(':')[2]
 // This will be the "MESSAGE" displayed on Blue Ocean
-currentBuild.description = sourceBranch + ": " + commitHash
+currentBuild.description = sourceBranch + ': ' + commitHash
 
 gitlabCommitStatus("build-${configName}") {
 
+def VM_LABEL = ''
+def JENKINS_INSTANCE = 'https://prod.blsm.nvidia.com/kaolin-gitlab-ci'
 podTemplate(
-cloud:'sc-ipp-blossom-116',
-envVars:[envVar(key:"JENKINS_URL", value:"${env.JENKINS_URL}")],
-yaml:'''
+  cloud:'nvks-prod',  // Note: different cloud? we had 'sc-ipp-blossom-116'
+  envVars:[envVar(key:'JENKINS_URL', value:"${env.JENKINS_URL}")],  // needed? Vishal didn't have this
+  yaml: '''
 apiVersion: v1
 kind: Pod
+metadata:
+  name: windows-vm-pod
 spec:
-  volumes:
-  - name: pvc-mount
-    persistentVolumeClaim:
-      claimName: 'kaolin-pvc'
-  containers:
-  - name: jnlp
-    image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/jnlp-agent:jdk11-windows
-    env: 
-    - name: JENKINS_AGENT_WORKDIR
-      value: C:/Jenkins/agent
-    - name: DOCKER_HOST
-      value: "win-docker-proxy.blossom-system.svc.cluster.local"
-    - name: DOCKER_TLS_CERTDIR
-      value: ""
-    volumeMounts:
-      - mountPath: c:/mnt
-        name: pvc-mount
-    resources:
+  restartPolicy: Never
+  initContainers:
+    - name: vm-disk
+      image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/colossus-win-2019-vm:v1
+      imagePullPolicy: IfNotPresent
+      args:
+        - /bin/busybox
+        - cp
+        - -r
+        - /disk/
+        - /tmp/disk/
+      resources:
         requests:
-          memory: 32Gi
+          memory: "8Gi"
         limits:
-          memory: 32Gi
-  imagePullSecrets:
-  - name: gitlabcred
+          memory: "16Gi"
+      volumeMounts:
+        - name: busybox
+          mountPath: /bin/busybox
+        - name: shared-data
+          mountPath: /tmp/disk
+  containers:
+    - name: vm-cleaner
+      image: maven:3.6.3-jdk-11
+      command: ["sh", "-c", "sleep infinity"]
+      resources:
+        requests:
+          memory: "2Gi"
+        limits:
+          memory: "4Gi"
+    - name: vm-runner
+      image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/windows-vm-runner:v6
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: POD_LABEL
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['jenkins/label']
+        - name: POD_MEMORY_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: ""
+              resource: limits.memory
+        - name: POD_CPU_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: ""
+              resource: limits.cpu
+        - name: NODE_LABEL
+          value: $(POD_LABEL)-VM
+        - name: JENKINS_INSTANCE
+          value: "https://prod.blsm.nvidia.com/kaolin-gitlab-ci"
+        - name: MOUNT_PATH
+          value: "/etc/data/"
+      resources:
+        requests:
+          memory: "32Gi"
+          ephemeral-storage: "100Gi"
+          cpu: "12"
+        limits:
+          memory: "32Gi"
+          cpu: "16"
+          ephemeral-storage: "100Gi"
+      volumeMounts:
+        - name: secret-volume
+          mountPath: /etc/credentials
+          readOnly: true
+        - name: shared-data
+          mountPath: /disk/
+        - name: user-pvc
+          mountPath: /etc/data/pvc
+      securityContext:
+        privileged: true
+  volumes:
+    - hostPath:
+        path: /usr/bin/busybox
+      name: busybox
+    - name: shared-data
+      emptyDir: {}
+    - name: secret-volume
+      secret:
+        secretName: windows-vm-secret
+    - name: user-pvc
+      persistentVolumeClaim:
+        claimName: kaolin-pvc
   nodeSelector:
-    kubernetes.io/os: windows
-''') 
-{
+    "kubernetes.io/os": linux
+    "nvidia.com/node_type": "builder"
+
+''') {
   node(POD_LABEL) {
-    try {
-      timeout(time: 300, unit: 'MINUTES') {
-        stage("Checkout") {
-          checkout([
-              $class: 'GitSCM',
-              branches: [[name: "${commitHash}"]],
-              // We need submodules
-              extensions: [[
-                  $class: 'SubmoduleOption',
-                  disableSubmodules: false,
-                  parentCredentials: false,
-                  recursiveSubmodules: true,
-                  reference: '',
-                  trackingSubmodules: false
-              ]],
-              userRemoteConfigs: [[
-                  credentialsId: 'kaolin-gitlab-access-token-as-password',
-                  url: "${repoUrl}"
-              ]]
-          ])
-        }
-        docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
-          stage("Build base") {
-            cudaUrl = cuda_version_url[cudaVer]
-            baseImage = docker.build(
-                "${targetImageTag}-base",
-                """-m 32g --no-cache -f ./tools/windows/Dockerfile.base \
-                    --build-arg CUDA_VERSION=${cudaVer} \
-                    --build-arg CUDA_URL=${cudaUrl} \
-                    --build-arg PYTHON_VERSION=${pythonVer} \
-                    --build-arg PYTORCH_VERSION=${torchVer} \
-                    .
-                """)
-          }
-
-          if (buildWheel.toBoolean()) {
-            stage("Build with wheel") {
-              targetImage = docker.build(
-                  "${targetImageTag}",
-                  """-m 32g --no-cache -f ./tools/windows/Dockerfile.install_wheel \
-                     --build-arg BASE_IMAGE=${targetImageTag}-base \
-                     .
-                  """
-              )
+    stage('Wait for VM node') {
+      script {
+          VM_LABEL = "${POD_LABEL}-VM"
+          echo "Waiting for node with label ${VM_LABEL} to become available"
+          try {
+              timeout(time: 30, unit: 'MINUTES') { // Set the timeout duration as needed
+            waitUntil {
+              def node = Jenkins.instance.nodes.find { it.nodeName == VM_LABEL }
+              echo "${node}"
+              node != null && Jenkins.instance.computers.find { it.displayName == node.nodeName }?.online
             }
-          } else {
-            stage("Build") {
-              targetImage = docker.build(
-                  "${targetImageTag}",
-                  """-m 32g --no-cache -f ./tools/windows/Dockerfile.install \
-                      --build-arg BASE_IMAGE=${targetImageTag}-base \
-                      .
-                  """)
-            }
+              }
+              echo "Node ${VM_LABEL} is now online"
+          } catch (e) {
+              echo "Timed out waiting for node ${VM_LABEL} to become available"
+              // Handle the timeout situation (e.g., fail the build, retry, etc.)
+              error("Terminating the job due to timeout while waiting for node ${VM_LABEL}, please check vm-runner container logs for details")
           }
-          stage("Push") {
-            targetImage.push()
-          }
-          stage("Clean local images") {
-            powershell """
-                docker image rm -f ${targetImageTag}-base
-                docker image rm -f ${targetImageTag}
-            """
-          }
-        }
       }
-    } catch (e) {
-        // In case of build failure, we need to update the following tests as we won't run them.
-        if (buildWheel.toBoolean()) {
-          updateGitlabCommitStatus(name: "test-${configName}", state: 'canceled')
-        } else {
-          for (arch in archsToTest.split(';')) {
-            updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: 'canceled')
+    }
+
+    node(VM_LABEL) {
+        // Let's check we can connect with everything important
+        stage('DNS Check') {
+          // About powershell: https://learn.microsoft.com/en-us/powershell/scripting/powershell-commands
+
+            powershell 'Get-ChildItem Env: | Sort Name' // ?
+            powershell 'python -V'
+            powershell 'git --version'
+            powershell 'docker --version'
+
+            powershell '''
+                    $env:PATH -split ';'
+                '''
+
+            powershell 'Get-ChildItem -path Z:/'
+            result = powershell(returnStdout: true, script: "nslookup google.com 2>&1 | %{ \"\$_\" }")
+            println result; if (result.contains('timed-out')) { error('DNS failed ') }
+
+            result = powershell(returnStdout: true, script: "nslookup urm.nvidia.com 2>&1 | %{ \"\$_\" }")
+            println result; if (result.contains('timed-out')) { error('URM DNS failed ') }
+
+            result = powershell(returnStdout: true, script: "nslookup gitlab-master.nvidia.com 2>&1 | %{ \"\$_\" }")
+            println result; if (result.contains('timed-out')) { error('Gitlab DNS failed ') }
+
+            result = powershell(returnStdout: true, script: "nslookup ${docker_registry_server} 2>&1 | %{ \"\$_\" }")
+            println result; if (result.contains('timed-out')) { error('Docker Registry DNS failed ') }
+
+            powershell('Get-PSDrive')  // Needed?
+        }
+
+        try {  // Tries the Build and times out if not successful
+          timeout(time: 300, unit: 'MINUTES') {
+            stage('Checkout') {
+              checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "${commitHash}"]],
+                        // We need submodules
+                        extensions: [[
+                            $class: 'SubmoduleOption',
+                            disableSubmodules: false,
+                            parentCredentials: false,
+                            recursiveSubmodules: true,
+                            reference: '',
+                            trackingSubmodules: false
+                        ]],
+                        userRemoteConfigs: [[
+                            credentialsId: 'kaolin-gitlab-access-token-as-password',
+                            url: "${repoUrl}"
+                        ]]
+                    ])
+            }
+            docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
+              stage('Build base') {
+                cudaUrl = cuda_version_url[cudaVer]
+                baseImage = docker.build(
+                            "${targetImageTag}-base",
+                            """-m 32g --no-cache -f ./tools/windows/Dockerfile.base \
+                                --build-arg CUDA_VERSION=${cudaVer} \
+                                --build-arg CUDA_URL=${cudaUrl} \
+                                --build-arg PYTHON_VERSION=${pythonVer} \
+                                --build-arg PYTORCH_VERSION=${torchVer} \
+                                .
+                            """)
+              }
+
+              if (buildWheel.toBoolean()) {
+                stage('Build with wheel') {
+                  targetImage = docker.build(
+                              "${targetImageTag}",
+                              """-m 32g --no-cache -f ./tools/windows/Dockerfile.install_wheel \
+                                --build-arg BASE_IMAGE=${targetImageTag}-base \
+                                .
+                              """
+                          )
+                }
+              } else {
+                stage('Build') {
+                  targetImage = docker.build(
+                              "${targetImageTag}",
+                              """-m 32g --no-cache -f ./tools/windows/Dockerfile.install \
+                                  --build-arg BASE_IMAGE=${targetImageTag}-base \
+                                  .
+                              """)
+                }
+              }
+              stage('Push') {
+                targetImage.push()
+              }
+              stage('Clean local images') {
+                powershell """
+                            docker image rm -f ${targetImageTag}-base
+                            docker image rm -f ${targetImageTag}
+                        """
+              }
+            }  // Docker withRegistry
+          } // Timeout
+        } catch (e) {
+          // In case of build failure, we need to update the following tests as we won't run them.
+          if (buildWheel.toBoolean()) {
+            updateGitlabCommitStatus(name: "test-${configName}", state: 'canceled')
+          } else {
+            for (arch in archsToTest.split(';')) {
+              updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: 'canceled')
+            }
+          }
+          throw e
+        } // Try/Catch
+
+        stage('Launch tests') {
+          jobMap = [:]
+          if (buildWheel.toBoolean()) {
+            jobMap['test'] = prepareWindowsWheelTestJob()
+                } //else {
+            //  for (arch in archsToTest.split(';')) {
+            //    jobMap["${arch}"] = prepareWindowsTestJob(arch)
+            //  }
+            parallel jobMap
           }
         }
-        throw e
-    }
-    stage("Launch tests") {
-      jobMap = [:]
-      if (buildWheel.toBoolean()) {
-        jobMap["test"] = prepareWindowsWheelTestJob()
-      } //else { 
-      //  for (arch in archsToTest.split(';')) {
-      //    jobMap["${arch}"] = prepareWindowsTestJob(arch)
-      //  }
-      parallel jobMap
+
+        stage('cleanup') {
+          container('vm-cleaner') {
+            script {
+              def jenkinsUrl = "${JENKINS_INSTANCE}"
+              def jenkinsCliJarUrl = "${jenkinsUrl}/jnlpJars/jenkins-cli.jar"
+              sh "curl -O ${jenkinsCliJarUrl} > /dev/null 2>&1"
+              withCredentials([usernamePassword(credentialsId: 'svc-blossom-creds', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                sh "echo 'Running command with password ********'"
+
+                sh "java -jar jenkins-cli.jar -s ${jenkinsUrl} -auth ${USERNAME}:${PASSWORD} delete-node ${VM_LABEL}"
+              }
+            }
+          }
+        }
     }
   }
 }
-
-}  // gitlabCommitStatus
-
-/*
-def prepareWindowsTestJob(arch) {
-  return {
-    stage("Test ${arch}") {
-      build job: "windows_test_template_CI",
-      parameters: [
-        string(name: 'sourceBranch', value: "${sourceBranch}"),
-        string(name: 'configName', value: "${configName}"),
-        string(name: 'imageTag', value: "${targetImageTag}"),
-        string(name: 'arch', value: "${arch}"),
-        string(name: 'commitHash', value: "${commitHash}"),
-      ],
-      // This node doesn't need to be held while tests run.
-      wait: false,
-      // Success of this script depends only on successful build
-      // and launch of tests, not successful tests.
-      propagate: false
-    }
-  }
-}
-*/
 
 def prepareWindowsWheelTestJob() {
   return {

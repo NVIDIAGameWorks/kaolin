@@ -16,80 +16,278 @@ currentBuild.description = sourceBranch + ": " + commitHash
 
 gitlabCommitStatus("test-${configName}") {
 
-podTemplate(cloud:'sc-ipp-blossom-116',
+def VM_LABEL = ""
+def JENKINS_INSTANCE = "https://prod.blsm.nvidia.com/kaolin-gitlab-ci"
+podTemplate(cloud:'nvks-prod',
 slaveConnectTimeout: 4000,
-yaml: """
+yaml: '''
 apiVersion: v1
 kind: Pod
+metadata:
+  name: windows-vm-pod
 spec:
-  volumes:
-  - name: pvc-mount
-    persistentVolumeClaim:
-      claimName: 'kaolin-pvc'
+  restartPolicy: Never
+  initContainers:
+    - name: vm-disk
+      image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/colossus-qemu-551.52-desktop-win10-win11-64bit:v1
+      imagePullPolicy: IfNotPresent
+      args:
+        - /bin/busybox
+        - cp
+        - -r
+        - /disk/
+        - /tmp/disk/
+      resources:
+        requests:
+          memory: "2Gi" 
+          nvidia.com/pgpu: "1"
+        limits:
+          memory: "8Gi"
+          nvidia.com/pgpu: "1"
+      volumeMounts:
+        - name: busybox
+          mountPath: /bin/busybox
+        - name: shared-data
+          mountPath: /tmp/disk
   containers:
-  - name: jnlp
-    image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/jnlp-agent:jdk11-windows
-    env:
-    - name: JENKINS_AGENT_WORKDIR
-      value: C:/Jenkins/agent
-  - name: windows
-    image: ${imageTag}
-    restartPolicy: Never
-    backoffLimit: 4
-    tty: true
-    volumeMounts:
-      - mountPath: c:/mnt
-        name: pvc-mount
-  imagePullSecrets:
-  - name: gitlabcred
-  nodeSelector:
-    kubernetes.io/os: windows
-"""
-) 
-{
-  node(POD_LABEL) {
-    container("windows") {
-      stage("Install deps") {
-        powershell 'pip install -r /kaolin/tools/ci_requirements.txt'
-      }
 
-      stage("Basic test") {
-        powershell '''
-          python --version
-          python -c "import kaolin; print(kaolin.__version__)"
-          python -c "import torch; print(torch.__version__)"
-          $env:KAOLIN_TEST_SHAPENETV1_PATH = '/mnt/data/ci_shapenetv1'
-          $env:KAOLIN_TEST_SHAPENETV2_PATH = '/mnt/data/ci_shapenetv2'
-          $env:KAOLIN_TEST_MODELNET_PATH = '/mnt/data/ModelNet'
-          $env:KAOLIN_TEST_SHREC16_PATH = '/mnt/data/ci_shrec16'
-          pytest --durations=50 --import-mode=importlib -rs \
-              --log-disable=PIL.PngImagePlugin \
-              --log-disable=PIL.TiffImagePlugin \
-              --log-disable=kaolin.rep.surface_mesh \
-              /kaolin/tests/python/kaolin/io/test_gltf.py \
-              /kaolin/tests/python/kaolin/io/test_obj.py
-        '''
-      }
-      if (currentBuild.getCurrentResult() != "FAILURE") {
-        stage("Push wheels on volume") {
-          powershell '''
-          New-Item -Path /mnt/whl/"$env:folderName"/ -ItemType "directory" -Force
-          cp /kaolin/kaolin-*.whl /mnt/whl/"$env:folderName"/
-          Get-ChildItem -Recurse -Depth 2 '/mnt/whl/'
-          '''
-          
+
+    - name: vm-runner
+      image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/windows-vm-runner:v6
+      imagePullPolicy: Always
+      env:
+        - name: POD_LABEL
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['jenkins/label']
+        - name: POD_MEMORY_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: ""
+              resource: limits.memory
+        - name: POD_CPU_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: ""
+              resource: limits.cpu
+        - name: NODE_LABEL
+          value: $(POD_LABEL)-VM
+        - name: JENKINS_INSTANCE
+          value: "https://prod.blsm.nvidia.com/kaolin-gitlab-ci"
+        - name: MOUNT_PATH
+          value: "/etc/data/"
+      resources:
+        requests:
+          memory: "12Gi"
+          cpu: "12"
+          ephemeral-storage: "100Gi"
+        limits:
+          memory: "32Gi"
+          cpu: "15"
+          ephemeral-storage: "100Gi"
+      volumeMounts:
+        - name: secret-volume
+          mountPath: /etc/credentials
+          readOnly: true
+        - name: shared-data
+          mountPath: /disk/
+        - name: user-pvc
+          mountPath: /etc/data/pvc
+      securityContext:
+        privileged: true
+  volumes:
+    - hostPath:
+        path: /usr/bin/busybox
+      name: busybox
+    - name: shared-data
+      emptyDir: {}
+    - name: user-pvc
+      persistentVolumeClaim:
+        claimName: kaolin-pvc    
+    - name: secret-volume
+      secret:
+        secretName: windows-vm-secret
+  nodeSelector:
+    "kubernetes.io/os": linux      
+''') {
+    timeout(time: 300, unit: 'MINUTES') {
+    
+    node(POD_LABEL) {
+        stage('Wait for VM node') {
+            script {
+                VM_LABEL = "${POD_LABEL}-VM"
+                echo "Waiting for node with label ${VM_LABEL} to become available"
+                try {
+                    timeout(time: 30, unit: 'MINUTES') { // Set the timeout duration as needed
+                        waitUntil {
+                            def node = Jenkins.instance.nodes.find { it.nodeName == VM_LABEL }
+                            echo "${node}"
+                            node != null && Jenkins.instance.computers.find { it.displayName == node.nodeName }?.online
+                        }
+                    }
+                    echo "Node ${VM_LABEL} is now online"
+                } catch (e) {
+                    echo "Timed out waiting for node ${VM_LABEL} to become available"
+                    // Handle the timeout situation (e.g., fail the build, retry, etc.)
+                    error("Terminating the job due to timeout while waiting for node ${VM_LABEL}, please check vm-runner container logs for details")
+                }
+            }
         }
-        stage("Push wheels on artifacts") {
-          // archiveArtifacts only take relative path, and the working directory doesn't work in jenkins
-          // So we copy from /kaolin to current dir
-          powershell '''
-          cp /kaolin/kaolin-*.whl .
-          '''
-          archiveArtifacts artifacts: "kaolin-*.whl"
+
+        node(VM_LABEL) {
+            stage('Execute PowerShell') {
+                // Customer needs to add their pipeline here
+                powershell 'Get-ChildItem Env: | Sort Name'
+                powershell 'java -version'
+                powershell 'python -V'
+                powershell 'git --version'
+                powershell 'docker --version'
+                powershell 'nvidia-smi'
+               
+            }
+            // Ensure this stage is within a 'pipeline { agent any stages { ... } }' structure
+            // or an appropriate scripted pipeline structure.
+            
+            stage('Fetch Docker image and mount Z:') {
+              
+            
+                withCredentials([string(credentialsId: 'vm-password-credential-id', variable: 'VM_SECRET_PASSWORD')]) {
+            
+                    // Extract VM IP from ipconfig (first non-loopback IPv4 address)
+                    def vmIp = powershell(returnStdout: true, script: '''
+                        $ip = (ipconfig | Select-String "IPv4" | ForEach-Object {
+                          ($_ -split ":")[1].Trim()
+                        } | Where-Object { $_ -notlike "169.*" -and $_ -ne "" })[0]
+                        Write-Output $ip
+                    ''').trim()
+                
+                    echo "Resolved VM IP: ${vmIp}"
+                      
+                      
+                    powershell """
+                        Enable-NetFirewallRule -DisplayGroup "File and Printer Sharing"  # <-- REMOVE THIS LINE from inside the container script
+                        New-NetFirewallRule -DisplayName "Allow SMB Inbound (TCP 445 for Docker Share)" -Direction Inbound -Protocol TCP -LocalPort 445 -Action Allow -Profile Any -Enabled True # <-- REMOVE THIS LINE from inside the container script
+                        net share VirtioShare=Z:\\ /GRANT:Everyone,FULL
+                    """
+                
+                    def dockerArgs = "-e VM_USER=colossus -e VM_PASSWORD=${env.VM_SECRET_PASSWORD} -e VM_IP=${vmIp}"
+                
+                    echo "Running Docker container and mapping Z: using VM IP ${vmIp}"
+                      
+                    docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
+                        docker.image('gitlab-master.nvidia.com:5005/toronto_dl_lab/kaolin/kaolin:mshugrina-ci-fix-4336-windows-wheels-cuda124-py311-torch251').inside(dockerArgs) { 
+                            powershell '''
+                                $driveLetter = "Z:"
+                                $targetHost = $Env:VM_IP
+                                $shareName = "VirtioShare"
+                                $userName = $Env:VM_USER
+                                $password = $Env:VM_PASSWORD
+                        
+                                # Construct UNC path (e.g., \\\\10.0.2.15\\VirtioShare)
+                                $uncPath = "\\\\$targetHost\\$shareName"
+                        
+                                Write-Host "INFO: Attempting to map $driveLetter to $uncPath using user '$userName'."
+                        
+                                try {
+                                    net use $driveLetter $uncPath /user:$userName $password /PERSISTENT:NO
+                                    Write-Host "INFO: Successfully mapped $driveLetter to $uncPath."
+                                } catch {
+                                    Write-Error "ERROR: Failed to execute 'net use'. Exception: $($_.Exception.Message)"
+                                    Write-Host "INFO: Existing network connections:"
+                                    net use
+                                    exit 1
+                                }
+                        
+                                # Validate mapping
+                                if (-not (Test-Path "$driveLetter\\")) {
+                                    Write-Error "ERROR: Drive $driveLetter is not accessible after mapping."
+                                    Write-Host "INFO: Debug info - Available drives:"
+                                    Get-PSDrive -PSProvider FileSystem
+                                    net use
+                                    exit 1
+                                }
+                        
+                                Write-Host "INFO: Drive $driveLetter mapped successfully. Listing contents:"
+                                
+                                
+                                Get-ChildItem "$driveLetter\\" | Format-Table
+                                
+                                Get-ChildItem -Recurse -Depth 1 'z://pvc/'
+                                
+                                get-PSDrive
+                            '''
+                            stage("Install deps") {
+                               powershell 'pip install -r /kaolin/tools/ci_requirements.txt'
+                            }
+                            try {
+                                stage("Pytest") {
+                                    powershell '''
+                                      python --version
+                                      python -c "import kaolin; print(kaolin.__version__)"
+                                      python -c "import torch; print(torch.__version__)"
+                                      $env:KAOLIN_TEST_SHAPENETV1_PATH = 'z://pvc/data/ci_shapenetv1'
+                                      $env:KAOLIN_TEST_SHAPENETV2_PATH = 'z://pvc/data/ci_shapenetv2'
+                                      $env:KAOLIN_TEST_MODELNET_PATH = 'z://pvc/data/ModelNet'
+                                      $env:KAOLIN_TEST_SHREC16_PATH = 'z://pvc/data/ci_shrec16'
+                                      pytest --durations=50 --import-mode=importlib -rs \
+                                          --log-disable=PIL.PngImagePlugin \
+                                          --log-disable=PIL.TiffImagePlugin \
+                                          --log-disable=kaolin.rep.surface_mesh \
+                                          /kaolin/tests/python/kaolin/io/test_gltf.py \
+                                          /kaolin/tests/python/kaolin/io/test_obj.py
+                                    '''
+                                }
+                            } catch(e) {
+                                build_passed = false
+                                echo e.toString()
+                            }
+                            if (currentBuild.getCurrentResult() != "FAILURE") {
+                                stage("Push wheels on volume") {
+                                    powershell '''
+                                    New-Item -Path z://pvc/whl/"$env:folderName"/ -ItemType "directory" -Force
+                                    cp /kaolin/kaolin-*.whl z://pvc/whl/"$env:folderName"/
+                                    Get-ChildItem -Recurse -Depth 1 'z://pvc/whl/'
+                                    '''
+                                }
+                                stage("Push wheels on artifacts") {
+                                    // archiveArtifacts only take relative path, and the working directory doesn't work in jenkins
+                                    // So we copy from /kaolin to current dir
+                                    powershell '''
+                                    cp /kaolin/kaolin-*.whl .
+                                    '''
+                                    archiveArtifacts artifacts: "kaolin-*.whl"
+                                }
+                            }
+
+                        }
+                    }
+                }
+            }
+        }  // node(VM_LABEL)
+  
+        stage('Cleanup') {
+    
+            script {
+                // Resolve VM_LABEL based on POD_LABEL
+                def vmLabel = "${POD_LABEL}-VM"
+                echo "Attempting to remove node: ${vmLabel}"
+                // Fetch the node by name
+                def node = Jenkins.instance.getNode(vmLabel)
+                
+                if (node != null) {
+                    Jenkins.instance.removeNode(node)
+                    echo "Node ${vmLabel} removed successfully."
+                } else {
+                    echo "Node ${vmLabel} not found."
+                }
+            }
         }
-      }
-    }
-  }
+    }  // node(POD_LABEL)
+
+
 }
 
-}  // gitlabCommitStatus
+}
+    
+}
+
