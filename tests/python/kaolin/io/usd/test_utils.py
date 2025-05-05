@@ -66,30 +66,43 @@ class TestMisc:
     def voxelgrid(self, mesh):
         return TestVoxelGrid.make_voxelgrid(mesh)
 
-    def test_get_authored_time_samples_untimed(self, out_dir, mesh, voxelgrid):
+    def test_get_authored_time_samples_untimed(self, out_dir, mesh, voxelgrid, pointcloud):
         out_path = os.path.join(out_dir, 'untimed.usda')
-        usd.export_voxelgrid(file_path=out_path, voxelgrid=voxelgrid, scene_path='/World/voxelgrid')
-        usd.export_mesh(out_path, scene_path='/World/meshes', vertices=mesh.vertices, faces=mesh.faces)
-
+        stage = usd.create_stage(out_path)
+        usd.add_voxelgrid(stage, voxelgrid=voxelgrid, scene_path='/World/voxelgrid')
+        usd.add_mesh(stage, scene_path='/World/meshes', vertices=mesh.vertices, faces=mesh.faces)
+        usd.add_pointcloud(stage, scene_path='/World/pointcloud', points=pointcloud)
         times = usd.get_authored_time_samples(out_path)
         assert times == []
 
     def test_get_authored_time_samples_timed(self, out_dir, mesh, voxelgrid, pointcloud):
         out_path = os.path.join(out_dir, 'timed.usda')
-        usd.export_voxelgrid(file_path=out_path, voxelgrid=voxelgrid, scene_path='/World/voxelgrid')
+        stage = usd.create_stage(out_path)
+        usd.add_voxelgrid(stage, voxelgrid=voxelgrid, scene_path='/World/voxelgrid')
         times = usd.get_authored_time_samples(out_path)
         assert times == []
+        times = usd.get_authored_time_samples(stage)
+        assert times == []
 
-        usd.export_voxelgrid(file_path=out_path, voxelgrid=voxelgrid, scene_path='/World/voxelgrid', time=1)
+        usd.add_voxelgrid(stage, voxelgrid=voxelgrid, scene_path='/World/voxelgrid', time=1)
         times = usd.get_authored_time_samples(out_path)
         assert times == [1]
+        times = usd.get_authored_time_samples(stage)
+        assert times == [1]
 
-        usd.export_mesh(out_path, scene_path='/World/meshes', vertices=mesh.vertices, faces=mesh.faces, time=20)
-        usd.export_mesh(out_path, scene_path='/World/meshes', vertices=mesh.vertices, faces=None, time=250)
+        usd.add_mesh(stage, scene_path='/World/meshes', vertices=mesh.vertices, faces=mesh.faces, time=20)
+        usd.add_mesh(stage, scene_path='/World/meshes', vertices=mesh.vertices, faces=None, time=250)
         times = usd.get_authored_time_samples(out_path)
         assert times == [1.0, 20.0, 250.0]
+        times = usd.get_authored_time_samples(stage)
+        assert times == [1.0, 20.0, 250.0]
 
-        usd.export_pointcloud(out_path, pointcloud)
+        usd.add_pointcloud(stage, scene_path='/World/pointcloud', points=pointcloud, time=300)
+        usd.add_pointcloud(stage, scene_path='/World/pointcloud', points=pointcloud + 10., time=400)
+        times = usd.get_authored_time_samples(out_path)
+        assert times == [1.0, 20.0, 250.0, 300.0, 400.0]
+        times = usd.get_authored_time_samples(stage)
+        assert times == [1.0, 20.0, 250.0, 300.0, 400.0]
 
     @pytest.mark.parametrize('input_stage', [False, True])
     def test_get_scene_paths(self, mesh_path, input_stage):

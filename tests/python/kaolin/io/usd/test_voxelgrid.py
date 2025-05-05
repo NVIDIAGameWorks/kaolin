@@ -15,6 +15,8 @@
 
 import os
 import shutil
+import filecmp
+import random
 
 import torch
 import pytest
@@ -43,43 +45,44 @@ def mesh():
     return obj_mesh
 
 class TestVoxelGrid:
-    def setup_method(self):
+    def setup_method(self, out_dir):
         self.scene_path = '/World/voxelgrid'
         self.num_multiple = 3
 
-    @staticmethod
-    def make_voxelgrid(mesh):
+    @pytest.fixture(scope='class')
+    def golden_path(self, out_dir):
+        return os.path.join(
+            out_dir, os.pardir, os.pardir,  os.pardir, os.pardir, os.pardir,
+            'samples/golden/voxelgrid.usda'
+        )
+
+    @pytest.fixture(scope='class')
+    def voxelgrid(self, mesh):
         resolution = 64
         voxelgrid = trianglemeshes_to_voxelgrids(mesh.vertices.unsqueeze(0), mesh.faces,
                                                  resolution)
         return voxelgrid[0].bool()
 
-    @pytest.fixture(scope='class')
-    def voxelgrid(self, mesh):
-        return TestVoxelGrid.make_voxelgrid(mesh)
-
-    def test_export_single(self, out_dir, voxelgrid):
+    def test_export_single(self, out_dir, voxelgrid, golden_path):
         out_path = os.path.join(out_dir, 'voxelgrid.usda')
         usd.export_voxelgrid(file_path=out_path, voxelgrid=voxelgrid, scene_path=self.scene_path)
 
         # Confirm exported USD matches golden file
-        golden = os.path.join(out_dir, os.pardir, os.pardir,  os.pardir, os.pardir, os.pardir,
-                              'samples/golden/voxelgrid.usda')
-        assert open(golden).read() == open(out_path).read()
+        assert filecmp.cmp(golden_path, out_path)
 
     def test_export_multiple(self, out_dir, voxelgrid):
         out_path = os.path.join(out_dir, 'voxelgrids.usda')
+        voxelgrids = [voxelgrid for _ in range(self.num_multiple)]
 
         # Export multiple voxelgrids using default paths
-        usd.export_voxelgrids(file_path=out_path, voxelgrids=[voxelgrid for _ in range(self.num_multiple)])
+        usd.export_voxelgrids(file_path=out_path, voxelgrids=voxelgrids)
 
     @pytest.mark.parametrize('input_stage', [False, True])
-    def test_import_single(self, out_dir, voxelgrid, input_stage):
-        out_path = os.path.join(out_dir, 'voxelgrid.usda')
+    def test_import_single(self, golden_path, voxelgrid, input_stage):
         if input_stage:
-            path_or_stage = Usd.Stage.Open(out_path)
+            path_or_stage = Usd.Stage.Open(golden_path)
         else:
-            path_or_stage = out_path
+            path_or_stage = golden_path
         voxelgrid_in = usd.import_voxelgrid(path_or_stage, scene_path=self.scene_path)
         assert torch.equal(voxelgrid, voxelgrid_in)
 
@@ -96,3 +99,35 @@ class TestVoxelGrid:
         assert len(voxelgrid_in_list) == self.num_multiple
         for voxelgrid_in in voxelgrid_in_list:
             assert torch.equal(voxelgrid, voxelgrid_in)
+
+
+    def test_fail_export_twice(self, out_dir, voxelgrid):
+        out_path = os.path.join(out_dir, 'fail_exported_twice.usda')
+        usd.export_voxelgrid(out_path, voxelgrid=voxelgrid)
+        with pytest.raises(FileExistsError):
+            usd.export_voxelgrid(out_path, voxelgrid=voxelgrid)
+
+    def test_export_twice(self, out_dir, voxelgrid, golden_path):
+        out_path = os.path.join(out_dir, 'exported_twice.usda')
+        usd.export_voxelgrid(out_path, voxelgrid=(torch.rand(32, 32, 32) > 0.7))
+        usd.export_voxelgrid(out_path, voxelgrid=voxelgrid, scene_path=self.scene_path, overwrite=True)
+        assert filecmp.cmp(out_path, golden_path)
+
+    def test_export_overwrite_full_file(self, out_dir, voxelgrid, golden_path):
+        out_path = os.path.join(out_dir, 'exported_overwrite_full_file.usda')
+        usd.export_voxelgrids(out_path, voxelgrids=[voxelgrid for _ in range(self.num_multiple)])
+        usd.export_voxelgrid(out_path, voxelgrid=voxelgrid, scene_path=self.scene_path, overwrite=True)
+        assert filecmp.cmp(out_path, golden_path)
+
+    def test_export_overwrite_pointcloud(self, out_dir, voxelgrid, golden_path):
+        out_path = os.path.join(out_dir, 'exported_overwrite_pointcloud.usda')
+        usd.export_pointcloud(out_path, pointcloud=torch.rand((100, 3)))
+        usd.export_voxelgrid(out_path, voxelgrid=voxelgrid, scene_path=self.scene_path, overwrite=True)
+        assert filecmp.cmp(out_path, golden_path)
+
+    def test_export_overwrite_mesh(self, out_dir, mesh, voxelgrid, golden_path):
+        out_path = os.path.join(out_dir, 'exported_overwrite_voxelgrid.usda')
+        usd.export_mesh(out_path, vertices=mesh.vertices, faces=mesh.faces)
+        usd.export_voxelgrid(out_path, voxelgrid=voxelgrid, scene_path=self.scene_path, overwrite=True)
+        assert filecmp.cmp(out_path, golden_path)
+
