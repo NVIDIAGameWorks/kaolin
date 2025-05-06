@@ -150,7 +150,7 @@ def check_sign(verts, faces, points, hash_resolution=512):
         for i_batch in range(verts.shape[0]):
             intersector = _UnbatchedMeshIntersector(verts[i_batch], faces, hash_resolution)
             contains = intersector.query(points[i_batch])
-            results.append(torch.tensor(contains, device=device))
+            results.append(contains)
 
     return torch.stack(results)
 
@@ -228,7 +228,7 @@ class _UnbatchedMeshIntersector:
         v1 = t3 - t1
         v2 = t2 - t1
 
-        normals = torch.cross(v1, v2)
+        normals = torch.cross(v1, v2, dim=1)
         alpha = torch.sum(normals[:, :2] * (t1[:, :2] - points[:, :2]), dim=1)
 
         n_2 = normals[:, 2]
@@ -250,11 +250,11 @@ class _UnbatchedMeshIntersector:
 
 class _TriangleIntersector2d:
     def __init__(self, triangles, resolution=128):
-        self.triangles = triangles
-        self.tri_hash = _C.ops.mesh.TriangleHash(triangles, resolution)
+        self.triangles = triangles.contiguous()
+        self.tri_hash = _C.ops.mesh.TriangleHash(self.triangles, resolution)
 
     def query(self, points):
-        point_indices, tri_indices = self.tri_hash.query(points)
+        point_indices, tri_indices = self.tri_hash.query(points.contiguous())
         points = points[point_indices]
         triangles = self.triangles[tri_indices]
         mask = self.check_triangles(points, triangles)
