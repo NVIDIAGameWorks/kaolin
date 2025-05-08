@@ -667,7 +667,7 @@ def unbatched_reduced_sg_inner_product(amplitude, direction, sharpness,
     assert other_amplitude.ndim == 2 and other_amplitude.shape[1] == 3
     assert other_direction.shape == other_amplitude.shape
     assert other_sharpness.shape == other_amplitude.shape[:1]
-    if other_amplitude.shape[0] >= 8:
+    if other_amplitude.shape[0] >= 8 or amplitude.shape[0] == 0:
         output = UnbatchedReducedSgInnerProduct.apply(
             amplitude, direction, sharpness,
             other_amplitude, other_direction, other_sharpness
