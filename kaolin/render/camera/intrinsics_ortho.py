@@ -165,13 +165,9 @@ class OrthographicIntrinsics(CameraIntrinsics):
         # kaolin follows OpenGL conventions of NDC in [-1, 1], where the center of the canvas is denoted as (0, 0)
         # The following lines ensure the projection matrix is compatible with OpenGL.
         # Practitioners using a different graphics api may modify this matrix.
-        # top = self.height / 2
-        # bottom = -top
-        # right = self.width / 2
-        # left = -right
-        top = 1.0
+        top = self.height / 2
         bottom = -top
-        right = 1.0 * self.width / self.height
+        right = self.width / 2
         left = -right
         ortho = self.orthographic_matrix(left, right, bottom, top, self.near, self.far)
         return ortho
