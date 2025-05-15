@@ -49,9 +49,9 @@ The high-level structure is essentially in four parts:
 * A one-liner describing the function (without details or corner cases)
 * A paragraph that gives more detail on the function behavior (if necessary)
 * An `Args:` section (if the function takes arguments, note that `self` is not considered an argument)
-* A `Returns:` section (if the function can return somethings other than `None`)
+* A `Returns:` section (if the function can return something other than `None`)
 
-We want to draw you attention to the following:
+We want to draw your attention to the following:
 
 Indentation is key when writing docstrings. The documentation system is clever enough to remove uniform indentation.
 That is, as long as all the lines have the same amount of padding that padding will be ignored and not passed onto the restructured text processor. Fortunately clang-format leaves this funky formatting alone - respecting the raw string qualifier.
@@ -140,7 +140,7 @@ The resulting .rst file will look like:
 
 If you want the .rst to not be generated, you must add the corresponding python path in [this list][#8].
 
-To add more contents such as an introduction the .rst have to modified following RestructuredText syntax.
+To add more content such as an introduction the .rst have to be modified following RestructuredText syntax.
 
 [#1]: https://www.python.org/dev/peps/pep-0257/
 [#2]: https://www.python.org/dev/peps/pep-0287/

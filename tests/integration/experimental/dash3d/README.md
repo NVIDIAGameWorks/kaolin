@@ -52,7 +52,7 @@ Failing mocha tests can be debugged in Chrome by running:
 ```
 Then, in Chrome navigate to [chrome://inspect/](chrome://inspect/) and
 click "Open dedicated DevTools for Node". You may need to manually add
-the test and `static` sibdirectories under sources. 
+the test and `static` subdirectories under sources. 
 
 #### Cypress Tests
 
@@ -63,7 +63,7 @@ tests are called from python**, but the tests themselves
 to run them manually for debugging. 
 
 First run a python test that spins up a dash3d instance in the 
-background (note that multiple invokations of this may require you
+background (note that multiple invocations of this may require you
 to set `--skip_start_dash3d` at the end of the command in case
 dash3d is already running):
 ```

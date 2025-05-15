@@ -178,11 +178,11 @@ class PinholeIntrinsics(CameraIntrinsics):
                  near clipping plane, define the min depth of the view frustrum
                  or to normalize the depth values. Default: 1e-2
              far (optional, float):
-                 far clipping plane, define the max depth of teh view frustrum
+                 far clipping plane, define the max depth of the view frustrum
                  or to normalize the depth values. Default: 1e2
              num_cameras (optional, int): the numbers of camera in this object. Default: 1
              device (optional, str): the device on which parameters will be allocated. Default: cpu
-             dtype (optional, str): the dtype on which parameters will be alloacted. Default: torch.float
+             dtype (optional, str): the dtype on which parameters will be allocated. Default: torch.float
 
         Returns:
             (PinholeInstrinsics): the constructed pinhole camera intrinsics

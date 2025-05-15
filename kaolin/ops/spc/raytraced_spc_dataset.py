@@ -30,13 +30,13 @@ class RayTracedSPCDataset(Dataset):
     The return value of `__getitem__` will be:
         image (torch.FloatTensor) containing an rgb image of SPC object from input viewpoint, of size (camera.height, camera.width, 3),
         depthmap (torch.FloatTensor) containing distant from viewpoint to intersection for each pixel ray of size (camera.height*camera.width, 1),
-        Cam (torch.FloatTensor) containg world to pixel space matrix of size (4,4),
-        In (torch.FloatTensor)  containg camera intrinsic matrix of size (4,4),
+        Cam (torch.FloatTensor) containing world to pixel space matrix of size (4,4),
+        In (torch.FloatTensor) containing camera intrinsic matrix of size (4,4),
         max_depth (float) value of maximum depth in depth map,
         mip_levels (int) number of mip levels to construct
         TRUE_DEPTH (bool) indicates if depth map is actual depth, or instead z-buffer depth. Default is True,
         start_level (int) level to start carving algorithm
-        Points (torch.ShortTensor) Intial set of points to begin carving. Default is dense octree of level=start_level
+        Points (torch.ShortTensor) Initial set of points to begin carving. Default is dense octree of level=start_level
     """
 
     def __init__(self, viewpoints, gs_octree):
