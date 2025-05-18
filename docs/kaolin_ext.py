@@ -101,6 +101,7 @@ def run_apidoc(_):
             "kaolin/render/camera/legacy.py",
             "kaolin/render/camera/raygen.py",
             "kaolin/render/camera/gsplats.py",
+            "kaolin/render/camera/polyscope.py",
             "kaolin/non_commercial/flexicubes/",
             "kaolin/non_commercial/flexicubes/flexicubes.py",
             "kaolin/non_commercial/flexicubes/tables.py"

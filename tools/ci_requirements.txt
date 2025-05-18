@@ -10,3 +10,4 @@ jupyter
 plyfile
 gitpython
 wget
+polyscope>=2.2.0
