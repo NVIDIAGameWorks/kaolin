@@ -5,7 +5,7 @@ You can send us pull requests to help improve Kaolin, if you are just getting st
 
 Kaolin team members will be assigned to review your pull requests. Once your change passes the review and the continuous integration checks, a Kaolin member will approve and merge them to the repository.
 
-If you want to contribute, [Gitlab issues](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues) are a good starting point, especially the ones with the label [good first issue](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues?scope=all&utf8=%E2%9C%93&state=opened&label_name[]=good%20first%20issue). If you started working on a issue, leave a comment so other people know that you're working on it, you can also coordinate with others on the issue comment threads.
+If you want to contribute, [Gitlab issues](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues) are a good starting point, especially the ones with the label [good first issue](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin-reformat/-/issues?scope=all&utf8=%E2%9C%93&state=opened&label_name[]=good%20first%20issue). If you started working on an issue, leave a comment so other people know that you're working on it, you can also coordinate with others on the issue comment threads.
 
 ## Pull Request Checklist
 
@@ -63,7 +63,7 @@ If you forgot to sign previous commits you can amend them as follows:
 * New features may not accepted if the cost of maintenance is too high in comparison of its benefit, they may also be integrated to contrib subfolders for minimal support and maintenance before eventually being integrated to the core.
 
 #### Writing Tests
-All tests should use [pytest](https://docs.pytest.org/en/latest/) and [pytest-cov](https://pytest-cov.readthedocs.io/en/latest/) frameworks. The tests should be placed in [tests/python directory](tests/python/), which should follows the directory structure of [kaolin](kaolin/). For example,
+All tests should use [pytest](https://docs.pytest.org/en/latest/) and [pytest-cov](https://pytest-cov.readthedocs.io/en/latest/) frameworks. The tests should be placed in [tests/python directory](tests/python/), which should follow the directory structure of [kaolin](kaolin/). For example,
 test for `kaolin/io/obj.py` should be placed into `tests/pyhon/kaolin/io/test_obj.py`. 
 
 #### License

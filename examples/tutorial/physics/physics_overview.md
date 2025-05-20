@@ -1,6 +1,6 @@
 # Physics Sim Overview
 
-Lets say we have an object denoted by $n$ vertices flattened to $x \in R^{3n}$ and velocities $v \in R^{3n}$. 
+Let's say we have an object denoted by $n$ vertices flattened to $x \in R^{3n}$ and velocities $v \in R^{3n}$. 
 Following newtons law $f(x) = f_{int}(x) + f_{ext} = Ma$, we must apply forces to the object to transform/deform it at each timestep $i$. The forces on an object are a sum of the internal forces $f_{int}$ and external forces $f_{ext}$
 
 ## Time Integrators
@@ -15,7 +15,7 @@ $x_{i+1} = x_i + \Delta t v_i$,
 
 $v_{i+1} = v_i + \Delta t a_i \rightarrow v_{i+1} = v_i + \Delta t M^{-1}(f_{int}(x_i) + f_{ext})$
 
-There are other explicit time integration schemes as well (like Runge-Kutta (RK2, RK4) and more). *However*, the problem with explicit integrators are that they require very time timesteps and are inherently unstable for elastodynamics.
+There are other explicit time integration schemes as well (like Runge-Kutta (RK2, RK4) and more). *However*, the problem with explicit integrators is that they require very small timesteps and are inherently unstable for elastodynamics.
 
 Therefore, in Simplicits, we use an implicit time-integrator where $x_{i+1}(v_{i+1}), v_{i+1}(x_{i+1})$. There are several options (such as Implicit Euler, BDF2, and more) from which we pick implicit euler:
 
