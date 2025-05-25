@@ -23,5 +23,6 @@ from .legacy import *
 from .raygen import *
 from .gsplats import *
 from .polyscope import *
+from .trajectory import *
 
 __all__ = [k for k in locals().keys() if not k.startswith('__')]
