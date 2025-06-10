@@ -590,7 +590,7 @@ class PinholeIntrinsics(CameraIntrinsics):
 
     @CameraIntrinsics.height.setter
     def height(self, value: int) -> None:
-        """ Updates the hieght of the image plane.
+        """ Updates the height of the image plane.
         The fov will remain invariant, and the focal length may change instead.
         """
         # Keep the fov invariant and change focal length instead
