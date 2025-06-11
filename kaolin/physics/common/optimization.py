@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import nvtx
 import torch
 import logging
 import warp as wp
@@ -110,7 +109,6 @@ def _line_search(func, x, wp_P, direction, gradient, initial_step_size, bounds, 
     return bounded_direction  # Return the final step size if max_iters is reached
 
 
-@nvtx.annotate("newtons_method")
 def newtons_method(x,
                    energy_fcn,
                    gradient_fcn,
@@ -155,12 +153,9 @@ def newtons_method(x,
     t_x_kinematic = wp.to_torch(x) - wp.to_torch(red_to_full(P, full_to_red(Pt, x))) # x - P @ Pt @ x
 
     for k in range(nm_max_iters):
-        with nvtx.annotate("Energy", color="red"):
-            E_curr = energy_fcn(x)  # scalar
-        with nvtx.annotate("Gradient", color="green"):
-            G_curr = gradient_fcn(x).flatten()  # vector
-        with nvtx.annotate("Hessian", color="blue"):
-            H_curr = hessian_fcn(x)  # sparse matrix
+        E_curr = energy_fcn(x)  # scalar
+        G_curr = gradient_fcn(x).flatten()  # vector
+        H_curr = hessian_fcn(x)  # sparse matrix
 
         # Project out the kinematic dofs
         if P is not None:
@@ -174,27 +169,26 @@ def newtons_method(x,
         t_red_x = wp.to_torch(full_to_red(Pt, x))
         t_red_g = wp.to_torch(red_g)
 
-        with nvtx.annotate("Newton Solve", color="purple"):
-            if direct_solve:
-                A = wp_bsr_to_torch_bsr(red_H).to_dense()
-                b = wp.to_torch(red_g)
-                t_red_dx = -torch.linalg.solve(A, b)
-            else:
-                # TODO:Change this to a block-wise preconditioner, so CG converges in 1 step when
-                # The hessian is block-diagonal and there is no contact
-                precond = preconditioner(
-                    red_H, "diag") if preconditioner_fcn is None else preconditioner_fcn(red_H)
-                dx = wp.zeros_like(red_g)
-                ret_vals = cg(
-                    A=red_H,
-                    b=red_g,
-                    x=dx,
-                    tol=cg_tol,
-                    maxiter=cg_iters,
-                    M=precond,
-                    callback=_print_callback,
-                )
-                t_red_dx = -wp.to_torch(dx)
+        if direct_solve:
+            A = wp_bsr_to_torch_bsr(red_H).to_dense()
+            b = wp.to_torch(red_g)
+            t_red_dx = -torch.linalg.solve(A, b)
+        else:
+            # TODO:Change this to a block-wise preconditioner, so CG converges in 1 step when
+            # The hessian is block-diagonal and there is no contact
+            precond = preconditioner(
+                red_H, "diag") if preconditioner_fcn is None else preconditioner_fcn(red_H)
+            dx = wp.zeros_like(red_g)
+            ret_vals = cg(
+                A=red_H,
+                b=red_g,
+                x=dx,
+                tol=cg_tol,
+                maxiter=cg_iters,
+                M=precond,
+                callback=_print_callback,
+            )
+            t_red_dx = -wp.to_torch(dx)
 
         # Converges if the directional update is small
         if (torch.abs(t_red_dx.t() @ t_red_g) < conv_tol):
@@ -210,14 +204,13 @@ def newtons_method(x,
             t_bounds = wp.to_torch(full_to_red(Pt, wp_bounds))
 
         last_alpha = 1.0
-        with nvtx.annotate("Line Search", color="yellow"):
-            bounded_update = _line_search(func=energy_fcn,
-                                          x=t_red_x,
-                                          wp_P=P,
-                                          direction=t_red_dx,
-                                          gradient=t_red_g,
-                                          initial_step_size=last_alpha,
-                                          bounds=t_bounds)
+        bounded_update = _line_search(func=energy_fcn,
+                                      x=t_red_x,
+                                      wp_P=P,
+                                      direction=t_red_dx,
+                                      gradient=t_red_g,
+                                      initial_step_size=last_alpha,
+                                      bounds=t_bounds)
 
         t_red_x += bounded_update
 

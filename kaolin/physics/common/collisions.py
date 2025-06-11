@@ -17,7 +17,6 @@ import logging
 import torch
 import warp as wp
 import warp.sparse as wps
-import nvtx
 
 from kaolin.physics.simplicits.precomputed import sparse_collision_jacobian_matrix
 from kaolin.physics.utils.warp_utilities import bsr_to_torch

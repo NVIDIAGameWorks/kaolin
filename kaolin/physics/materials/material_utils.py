@@ -15,7 +15,6 @@
 
 import warp as wp
 from typing import Any
-import nvtx
 import torch
 __all__ = [
     "to_lame", "kron3", "compute_defo_grad"

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import torch
-import nvtx
 import warp as wp
 import warp.sparse as wps
 
@@ -423,7 +422,6 @@ class Gravity:
             integration_pt_volume.shape[0], dtype=wp.mat33, device=integration_pt_volume.device)
         self.sparse_hessian = None
 
-    @nvtx.annotate("Gravity Energy", color="red")
     def energy(self, dx, x0, coeff, energy=None):
         r""" Returns the gravity energy at each integration primitive.
         Args:
@@ -521,7 +519,6 @@ class Floor:
         self.hessians_blocks = wp.zeros(
             integration_pt_volume.shape[0], dtype=wp.mat33, device=integration_pt_volume.device)
 
-    @nvtx.annotate("Floor Energy", color="red")
     def energy(self, dx, x0, coeff, energy=None):
         r""" Returns the floor energy at each integration primitive.
         Args:

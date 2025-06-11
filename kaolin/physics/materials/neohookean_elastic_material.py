@@ -1,4 +1,4 @@
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +15,6 @@
 
 import warp as wp
 import warp.sparse as wps
-import nvtx
 import torch
 from .material_utils import kron3
 from kaolin.physics.utils.warp_utilities import mat99, vec9
@@ -245,7 +244,6 @@ class NeohookeanElasticMaterial:
     def __str__(self):
         return "NeohookeanElasticMaterial"
 
-    @nvtx.annotate("Neohookean Energy", color="red")
     def energy(self, defo_grads, coeff=1.0, wp_energy=None):
         r""" Returns the neohookean elastic energy at each integration primitive.
         Args:
