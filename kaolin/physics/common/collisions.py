@@ -629,7 +629,7 @@ class Collision:
         return
 
     def compute_bounds(self, cp_delta_dx, cp_dx, cp_x0):
-        r""" Compute the bounds of the update for each dof. This is used to guarantee intersection-free contact. See :cite:`apply_bounds` in :cite:`kaolin/physics/optimization.py` for more details.
+        r""" Compute the bounds of the update for each dof. This is used to guarantee intersection-free contact. See :func:`kaolin.physics.optimization.apply_bounds` for more details.
 
         Args:
             cp_delta_dx (wp.array(dtype=wp.vec3)): B*dz where dz is the newton update

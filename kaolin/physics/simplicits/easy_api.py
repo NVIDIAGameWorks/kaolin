@@ -509,36 +509,36 @@ class SimplicitsScene:
         self.sim_z_dot = None     # wp.array(num_handles*12, dtype=wp.float32)
 
         # Generated kernels
-        self.force_dict = {"pt_wise": {},
-                           "defo_grad_wise": {}}
+        self.force_dict = {
+            "pt_wise": {},
+            "defo_grad_wise": {}
+        }
 
-        r""" Structure the force_dict like this.
-        force_dict = {
-                "pt_wise":{
-                    "gravity":{
-                        "object": gravity_struct,
-                        "energy": gravity_energy_fcn,
-                        "gradient": gravity_gradient_fcn,
-                        "hessian": gravity_hessian_fcn,
-                    },
-                    "name_of_bc":{
-                        "object": bc_struct,
-                        "energy": bc_energy_fcn,
-                        "gradient": bc_gradient_fcn,
-                        "hessian": bc_hessian_fcn,
-                    }
-                },
-                "defo_grad_wise":{
-                    "material":{
-                        "object": material_struct,
-                        "energy": material_energy_fcn,
-                        "gradient": material_gradient_fcn,
-                        "hessian": material_hessian_fcn,
-                    }
-                }
-
-            }
-        """
+        Structure the force_dict like this.
+        #force_dict = {
+        #    "pt_wise":{
+        #        "gravity":{
+        #            "object": gravity_struct,
+        #            "energy": gravity_energy_fcn,
+        #            "gradient": gravity_gradient_fcn,
+        #            "hessian": gravity_hessian_fcn,
+        #        },
+        #        "name_of_bc":{
+        #            "object": bc_struct,
+        #            "energy": bc_energy_fcn,
+        #            "gradient": bc_gradient_fcn,
+        #            "hessian": bc_hessian_fcn,
+        #        }
+        #    },
+        #    "defo_grad_wise":{
+        #        "material":{
+        #            "object": material_struct,
+        #            "energy": material_energy_fcn,
+        #            "gradient": material_gradient_fcn,
+        #            "hessian": material_hessian_fcn,
+        #        }
+        #    }
+        #}
 
         self.partial_wp_newton_E = None
         self.partial_wp_newton_G = None
