@@ -66,7 +66,7 @@ class RayTracedSPCDataset(Dataset):
         up = eye.new_tensor([0.0, 0.0, 1.0])
         at = eye.new_tensor([0.0, 0.0, 0.0])
         # Avoid degenerate coordinate systems if up and forward axes of camera are parallel
-        if torch.allclose(torch.cross(up, at - eye), torch.zeros_like(eye)):
+        if torch.allclose(torch.cross(up, at - eye, dim=-1), torch.zeros_like(eye)):
             up = eye.new_tensor([0.0, 1.0, 0.0])
 
         camera = Camera.from_args(

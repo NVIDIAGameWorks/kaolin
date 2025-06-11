@@ -51,14 +51,6 @@ Notebook: `examples/tutorial/physics/simplicits_low_level_api.ipynb <https://git
 Look under the hood at the low-level :py:mod:`kaolin.physics` utilities, including energy functions and unwrapped simulation loops.
 
 
-Simulating Muscles
-^^^^^^^^^^^^^^^^^^
-
-Notebook: `examples/tutorial/physics/simplicits_muscle_activation.ipynb <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_muscle_activation.ipynb>`_.
-
-Simulate muscle activation using :any:`kaolin.physics.materials.MuscleMaterial`.
-
-
 Simplicits Background
 =====================
 

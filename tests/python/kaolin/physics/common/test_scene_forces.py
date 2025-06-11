@@ -40,13 +40,15 @@ def test_gravity_energy(device, dtype, dim):
     gravity_object = physics_utils.Gravity(rhos=rhos, acceleration=torch.tensor(
         [0, 9.8, 0], device=device, dtype=dtype)[0:DIM])
 
-    ge = gravity_object.energy(points, integration_weights=torch.tensor(total_vol / N, device=device, dtype=dtype))
+    ge = gravity_object.energy(points, integration_weights=torch.tensor(
+        total_vol / N, device=device, dtype=dtype))
 
     expected_ge = torch.tensor([0], device=device, dtype=dtype)
     integ_weights = torch.tensor(total_vol / N, device=device, dtype=dtype)
     for i in range(0, points.shape[0]):
         expected_ge += rhos[i] * integ_weights * \
-            points[i, :] @ torch.tensor([0, 9.8, 0], device=device, dtype=dtype)[0:DIM]
+            points[i, :] @ torch.tensor([0, 9.8, 0],
+                                        device=device, dtype=dtype)[0:DIM]
 
     assert torch.allclose(ge, expected_ge)
 
@@ -68,7 +70,8 @@ def test_gravity_gradient(device, dtype, dim):
     gravity_object = physics_utils.Gravity(rhos=rhos, acceleration=torch.tensor(
         [0, 9.8, 0], device=device, dtype=dtype)[0:DIM])
 
-    gg = gravity_object.gradient(points, integration_weights=torch.tensor(total_vol / N, device=device, dtype=dtype))
+    gg = gravity_object.gradient(points, integration_weights=torch.tensor(
+        total_vol / N, device=device, dtype=dtype))
 
     expected_gg = torch.zeros_like(points, device=device, dtype=dtype)
 
@@ -96,7 +99,8 @@ def test_gravity_hessian(device, dtype, dim):
     gravity_object = physics_utils.Gravity(rhos=rhos, acceleration=torch.tensor(
         [0, 9.8, 0], device=device, dtype=dtype)[0:DIM])
 
-    gh = gravity_object.hessian(points, integration_weights=torch.tensor(total_vol / N, device=device, dtype=dtype))
+    gh = gravity_object.hessian(points, integration_weights=torch.tensor(
+        total_vol / N, device=device, dtype=dtype))
 
     expected_gh = torch.zeros(N, N, DIM, DIM, device=device, dtype=dtype)
 
@@ -117,13 +121,15 @@ def test_floor_energy(device, dtype, dim):
 
     points = torch.rand(N, DIM, device=device, dtype=dtype)  # n x 3 points
 
-    floor_object = physics_utils.Floor(floor_height=FLOOR_HEIGHT, floor_axis=AXIS)
+    floor_object = physics_utils.Floor(
+        floor_height=FLOOR_HEIGHT, floor_axis=AXIS)
 
     fe = floor_object.energy(points)
     expected_fe = torch.zeros(N, device=device, dtype=dtype)
 
     for i in range(0, points.shape[0]):
-        expected_fe[i] = (points[i, AXIS] - FLOOR_HEIGHT)**2 if points[i, AXIS] < FLOOR_HEIGHT else 0
+        expected_fe[i] = (
+            points[i, AXIS] - FLOOR_HEIGHT)**2 if points[i, AXIS] < FLOOR_HEIGHT else 0
 
     print(fe, expected_fe, torch.sum(expected_fe))
     assert torch.allclose(fe, torch.sum(expected_fe))
@@ -141,9 +147,11 @@ def test_floor_gradient(device, dtype, dim):
     rhos = torch.ones(N, dtype=dtype, device=device)
     total_vol = 10
 
-    points = torch.rand(N, DIM, device=device, dtype=dtype, requires_grad=True)  # n x 3 points
+    points = torch.rand(N, DIM, device=device, dtype=dtype,
+                        requires_grad=True)  # n x 3 points
 
-    floor_object = physics_utils.Floor(floor_height=FLOOR_HEIGHT, floor_axis=AXIS)
+    floor_object = physics_utils.Floor(
+        floor_height=FLOOR_HEIGHT, floor_axis=AXIS)
 
     fg = floor_object.gradient(points)
 
@@ -173,13 +181,16 @@ def test_floor_hessian(device, dtype, dim):
     FLOOR_HEIGHT = 0.5
     DIM = dim
 
-    points = torch.rand(N, 3, device=device, dtype=dtype, requires_grad=True)  # n x 3 points
+    points = torch.rand(N, 3, device=device, dtype=dtype,
+                        requires_grad=True)  # n x 3 points
 
-    floor_object = physics_utils.Floor(floor_height=FLOOR_HEIGHT, floor_axis=AXIS)
+    floor_object = physics_utils.Floor(
+        floor_height=FLOOR_HEIGHT, floor_axis=AXIS)
 
     fh = floor_object.hessian(points)
 
-    expected_fh = torch.autograd.functional.hessian(floor_object.energy, points).transpose(1, 2)
+    expected_fh = torch.autograd.functional.hessian(
+        floor_object.energy, points).transpose(1, 2)
 
     assert torch.allclose(fh, expected_fh)
 
@@ -203,7 +214,8 @@ def test_boundary_energy(device, dtype, dim):
 
     for i in range(bdry_indx.shape[0]):
         idx = bdry_indx[i]
-        expected_be += torch.sum(torch.square(bdry_pos[i] - points[idx]))  # sq norm
+        # sq norm
+        expected_be += torch.sum(torch.square(bdry_pos[i] - points[idx]))
 
     assert torch.allclose(torch.sum(be), expected_be)
 
@@ -215,7 +227,8 @@ def test_boundary_gradient(device, dtype, dim):
     N = 20
     DIM = dim
 
-    points = torch.rand(N, DIM, device=device, dtype=dtype, requires_grad=True)  # n x 3 points
+    points = torch.rand(N, DIM, device=device, dtype=dtype,
+                        requires_grad=True)  # n x 3 points
 
     bdry_cond = physics_utils.Boundary()
     bdry_indx = torch.nonzero(points[:, 0] < 0.5, as_tuple=False).squeeze()
@@ -250,7 +263,8 @@ def test_boundary_hessian(device, dtype, dim):
     N = 20
     DIM = dim
 
-    points = torch.rand(N, DIM, device=device, dtype=dtype, requires_grad=True)  # n x 3 points
+    points = torch.rand(N, DIM, device=device, dtype=dtype,
+                        requires_grad=True)  # n x 3 points
     bdry_cond = physics_utils.Boundary()
     bdry_indx = torch.nonzero(points[:, 0] < 0.5, as_tuple=False).squeeze()
     bdry_pos = points[bdry_indx, :] + 0.1
@@ -258,6 +272,7 @@ def test_boundary_hessian(device, dtype, dim):
 
     bh = bdry_cond.hessian(points)
 
-    expected_bh = torch.autograd.functional.hessian(bdry_cond.energy, points).transpose(1, 2)
+    expected_bh = torch.autograd.functional.hessian(
+        bdry_cond.energy, points).transpose(1, 2)
 
     assert torch.allclose(bh, expected_bh)

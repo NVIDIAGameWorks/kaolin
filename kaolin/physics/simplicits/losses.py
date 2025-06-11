@@ -16,10 +16,11 @@
 import torch
 import torch.nn as nn
 from functools import partial
-import kaolin.physics.materials.utils as material_utils
-import kaolin.physics.materials.linear_elastic_material as linear_elastic_material
-import kaolin.physics.materials.neohookean_elastic_material as neohookean_elastic_material
-from kaolin.physics.simplicits.utils import weight_function_lbs
+from kaolin.physics.materials import (
+    material_utils,
+    linear_elastic_material,
+    neohookean_elastic_material)
+from kaolin.physics.simplicits import weight_function_lbs
 from kaolin.physics.utils.finite_diff import finite_diff_jac
 
 __all__ = [
@@ -41,7 +42,7 @@ def loss_ortho(weights):
     return nn.MSELoss()(weights.T @ weights, torch.eye(weights.shape[1], device=weights.device))
 
 
-def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step):
+def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step, elasticity_type="neohookean", interp_material=False):
     r"""Calculate a version of simplicits elastic loss for training.
 
     Args:
@@ -60,7 +61,8 @@ def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step):
 
     mus, lams = material_utils.to_lame(yms, prs)
 
-    partial_weight_fcn_lbs = partial(weight_function_lbs, tfms=transforms, fcn=model)
+    partial_weight_fcn_lbs = partial(
+        weight_function_lbs, tfms=transforms, fcn=model)
     pt_wise_Fs = finite_diff_jac(partial_weight_fcn_lbs, pts)
     pt_wise_Fs = pt_wise_Fs[:, :, 0]
 
@@ -70,10 +72,21 @@ def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step):
     # shape (N, B, 1)
     mus = mus.expand(N, B).unsqueeze(-1)
     lams = lams.expand(N, B).unsqueeze(-1)
+    
+    if interp_material:
+        mus_min = mus.min()
+        lams_min = lams.min()
+        mus = (1 - interp_step) * mus_min + interp_step * mus
+        lams = (1 - interp_step) * lams_min + interp_step * lams
 
     # ramps up from 100% linear elasticity to 100% neohookean elasticity
-    lin_elastic = (1 - interp_step) * linear_elastic_material.linear_elastic_energy(mus, lams, pt_wise_Fs)
-    neo_elastic = (interp_step) * neohookean_elastic_material.neohookean_energy(mus, lams, pt_wise_Fs)
+    lin_elastic = (1 - interp_step) * \
+        linear_elastic_material.linear_elastic_energy(mus, lams, pt_wise_Fs)
+    if elasticity_type == "neohookean":
+        neo_elastic = (
+            interp_step) * neohookean_elastic_material.neohookean_energy(mus, lams, pt_wise_Fs)
+    else:
+        raise ValueError(f"Elasticity type {elasticity_type} not supported")
 
     # weighted average (since we uniformly sample, this is uniform for now)
     return (appx_vol / pts.shape[0]) * (torch.sum(lin_elastic + neo_elastic))

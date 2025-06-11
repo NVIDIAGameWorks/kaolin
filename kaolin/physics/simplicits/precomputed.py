@@ -1,4 +1,4 @@
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,16 +16,305 @@
 import torch
 from functools import partial
 
-from kaolin.physics.utils.finite_diff import finite_diff_jac
-from kaolin.physics.simplicits.utils import standard_lbs, weight_function_lbs
+import warp as wp
+import numpy as np
+import torch
+import warp.sparse as wps
+
+from kaolin.physics.utils import finite_diff_jac
+from kaolin.physics.utils.warp_utilities import warp_csr_from_torch_dense
+from kaolin.physics.simplicits import standard_lbs, weight_function_lbs
 
 __all__ = [
+    "sparse_lbs_matrix", 
+    "sparse_collision_jacobian_matrix", 
+    "sparse_mass_matrix",
+    "sparse_dFdz_matrix", 
+    "sparse_dFdz_matrix_from_dense",
     'lumped_mass_matrix',
     'lbs_matrix',
     'jacobian_dF_dz_const_handle',
     'jacobian_dF_dz',
     'jacobian_dx_dz'
 ]
+
+
+@wp.kernel
+def _build_lbs_triplets(
+    sim_weights: wp.array2d(dtype=wp.float32),
+    sim_pts: wp.array(dtype=wp.vec3),
+    rows: wp.array(dtype=wp.int32),
+    cols: wp.array(dtype=wp.int32),
+    vals: wp.array3d(dtype=wp.float32),
+):
+    # Get thread index
+    p, k, i = wp.tid()
+    idx = (p * sim_weights.shape[1] + k) * 3 + i
+
+    weight = sim_weights[p, k]
+    point = sim_pts[p]
+
+    # For each point, we need to fill 3 rows (x,y,z, 1 coordinates)
+    # in shape (3, 12)
+    # [[x, y, z, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    #  [0, 0, 0, 0, x, y, z, 1, 0, 0, 0, 0],
+    #  [0, 0, 0, 0, 0, 0, 0, 0, x, y, z, 1]]
+    # repeated for each handle weight
+
+    rows[idx] = p * 3 + i
+    cols[idx] = k * 3 + i
+
+    vals[idx, 0, 0] = weight * point[0]
+    vals[idx, 0, 1] = weight * point[1]
+    vals[idx, 0, 2] = weight * point[2]
+    vals[idx, 0, 3] = weight
+
+@wp.kernel
+def _build_collision_jacobian_triplets(
+    indices: wp.array(dtype=wp.int32),
+    pt_is_static: wp.array(dtype=wp.int32),
+    sim_weights: wp.array2d(dtype=wp.float32),
+    sim_pts: wp.array(dtype=wp.vec3),
+    rows: wp.array(dtype=wp.int32),
+    cols: wp.array(dtype=wp.int32),
+    vals: wp.array3d(dtype=wp.float32),
+    count: wp.array(dtype=wp.int32)
+):
+    # Get thread index
+    t, k, i = wp.tid() # valid point index, handle index, row index
+
+    p = indices[t] # point index from global sim_weights
+    
+    # Skip the static objects
+    if pt_is_static[p] == 1:
+        return
+    
+    wp.atomic_add(count, 0, 1)
+    
+    weight = sim_weights[p, k]
+    point = sim_pts[p]
+    
+    # Index of the triplet
+    idx = (t * sim_weights.shape[1] + k) * 3 + i
+
+    # For each point, we need to fill 3 rows (x,y,z, 1 coordinates)
+    # in shape (3, 12)
+    # [[x, y, z, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+    #  [0, 0, 0, 0, x, y, z, 1, 0, 0, 0, 0],
+    #  [0, 0, 0, 0, 0, 0, 0, 0, x, y, z, 1]]
+    # repeated for each handle weight
+
+    rows[idx] = t * 3 + i # row of the sparse matrix
+    cols[idx] = k * 3 + i # column of the sparse matrix
+
+    vals[idx, 0, 0] = weight * point[0]
+    vals[idx, 0, 1] = weight * point[1]
+    vals[idx, 0, 2] = weight * point[2]
+    vals[idx, 0, 3] = weight
+
+
+@wp.kernel
+def build_dFdz_triplets(sim_weights: wp.array2d(dtype=wp.float32),
+                        rows: wp.array(dtype=wp.int32),
+                        cols: wp.array(dtype=wp.int32),
+                        vals: wp.array(dtype=wp.float32),
+                        triplet_index: wp.array(dtype=wp.int32)):
+
+    # Get thread index
+    i = wp.tid()
+
+    dim = int(3)
+
+    if i < sim_weights.shape[0]:
+        # For each sample point, and each handle we need to fill the following matrix:
+        # [[1, 0, 0, 0, 0, 0, 0, 0, 0 ,0, 0 ,0],
+        #  [0, 1, 0, 0, 0, 0, 0, 0, 0 ,0, 0 ,0],
+        #  [0, 0, 1, 0, 0, 0, 0, 0, 0 ,0, 0 ,0],
+        #  [0, 0, 0, 0, 1, 0, 0, 0, 0 ,0, 0 ,0],
+        #  [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+        #  [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        #  [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+        #  [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+        #  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]]
+
+        for h in range(sim_weights.shape[1]):
+            col = 12*h
+            weight = sim_weights[i, h]
+
+            for d in range(dim*dim):
+                row = dim*dim*i + d
+                # Skip the (dim+1)'th column (translations)
+                if (col+1) % (dim+1) == 0:
+                    col += 1
+                idx = wp.atomic_add(triplet_index, 0, 1)
+                rows[idx] = row
+                cols[idx] = col
+                vals[idx] = weight * wp.float32(1.0)
+
+                col += 1
+
+
+def sparse_lbs_matrix(sim_weights, sim_pts):
+    r"""Creates a sparse LBS matrix from a set of points and corresponding weights.
+
+    Args:
+        sim_weights (wp.array2d(dtype=wp.float32)): Skinning weights.
+        sim_pts (wp.array(dtype=wp.vec3)): Sample points.
+
+    Returns:
+        wp.sparse.bsr_matrix: Sparse LBS matrix.
+    """
+    # Calculate number of non-zero entries
+    # 3 entries per block. Each block is a 1x4 matrix. There are n x num_handles blocks
+    nnz = sim_weights.shape[0] * sim_weights.shape[1] * 3
+
+    # Create arrays for triplets
+    rows = wp.empty(nnz, dtype=wp.int32)
+    cols = wp.empty(nnz, dtype=wp.int32)
+    vals = wp.zeros((nnz, 1, 4), dtype=wp.float32)
+
+    # Launch kernel to build triplets
+    wp.launch(
+        kernel=_build_lbs_triplets,
+        dim=(*sim_weights.shape, 3),
+        inputs=[
+            sim_weights,
+            sim_pts,
+            rows,
+            cols,
+            vals,
+        ]
+    )
+
+    nrow = sim_weights.shape[0]*3
+    ncol = sim_weights.shape[1]*3
+    return wps.bsr_from_triplets(nrow, ncol, rows, cols, vals)
+
+def sparse_collision_jacobian_matrix(sim_weights, sim_pts, indices, cp_is_static):
+    r"""Creates a sparse collision Jacobian matrix from the global weights and points of the scene. 
+    Indices holds to the indices of the sim_pts and sim_weights to include in the matrix. 
+    If index corresponds to a static object, the point is not included, but zeros are added instead.
+
+    Args:
+        sim_weights (wp.array2d(dtype=wp.float32)): Skinning weights.
+        sim_pts (wp.array(dtype=wp.vec3)): Sample points.
+        indices (wp.array(dtype=wp.int32)): Indices of the sim_pts and sim_weights to include in the matrix. 
+        cp_is_static (wp.array(dtype=wp.int32)): 1 if the point is in a static object, 0 otherwise.
+    Returns:
+        wp.sparse.bsr_matrix: Sparse LBS matrix size (3*num_indices, 12*num_handles)
+    """    
+    # Calculate number of non-zero entries
+    # 3 entries per block. Each block is a 1x4 matrix. There are num_pts x num_handles blocks 
+    nnz = indices.shape[0] * sim_weights.shape[1] * 3
+    nrow = indices.shape[0]*3
+    ncol = sim_weights.shape[1]*3
+
+    
+    # Create arrays for triplets
+    rows = wp.empty(nnz, dtype=wp.int32)
+    cols = wp.empty(nnz, dtype=wp.int32)
+    vals = wp.zeros((nnz, 1, 4), dtype=wp.float32)
+    count = wp.zeros(1, dtype=wp.int32)
+
+    # Launch kernel to build triplets
+    wp.launch(
+        kernel=_build_collision_jacobian_triplets,
+        dim=(indices.shape[0], sim_weights.shape[1], 3),
+        inputs=[
+            indices,
+            cp_is_static,
+            sim_weights,
+            sim_pts,
+            rows,
+            cols,
+            vals,
+            count
+        ]
+    )
+    final_nnz = int(count.numpy()[0])
+
+    if final_nnz > 0:
+        final_rows = wp.clone(rows[:final_nnz])
+        final_cols = wp.clone(cols[:final_nnz])
+        final_vals = wp.clone(vals[:final_nnz])
+        return wps.bsr_from_triplets(nrow, ncol, final_rows, final_cols, final_vals)
+    else:
+        return wps.bsr_zeros(nrow, ncol, wp.types.matrix(shape=(1, 4), dtype=wp.float32))
+
+
+def sparse_dFdz_matrix_from_dense(enriched_weights_fcn, pts):
+    r"""Creates a sparse Jacobian matrix of the deformation gradient with respect to the sample points.
+
+    Args:
+        enriched_weights_fcn (function): Function that returns the skinning weights for a given point.
+        pts (torch.Tensor): Sample points.
+
+    Returns:
+        wp.sparse.bsr_matrix: Sparse Jacobian matrix.
+    """
+    weights = enriched_weights_fcn(pts)
+    num_handles = weights.shape[1]
+    z = torch.zeros(num_handles, 3, 4,
+                    device=weights.device).reshape(-1, 1)
+
+    # Get the dense Jacobian
+    dense_dFdz = jacobian_dF_dz(
+        enriched_weights_fcn, pts, z)
+
+    return warp_csr_from_torch_dense(dense_dFdz)
+
+
+def sparse_dFdz_matrix(sim_weights: np.ndarray):
+    # TODO: UNUSED - only works for constant weights.
+    # Debug if the dFdz_from_dense is becoming slow or remove this function.
+
+    num_samples = sim_weights.shape[0]
+    num_handles = sim_weights.shape[1]
+
+    nnz = 9 * num_samples * num_handles
+
+    rows = wp.zeros(nnz, dtype=wp.int32)
+    cols = wp.zeros(nnz, dtype=wp.int32)
+    vals = wp.zeros(nnz, dtype=wp.float32)
+    offset = wp.zeros(1, dtype=wp.int32)
+
+    wp.launch(
+        kernel=build_dFdz_triplets,
+        dim=num_samples,
+        inputs=[wp.array(sim_weights, dtype=wp.float32),
+                rows,
+                cols,
+                vals,
+                offset]
+    )
+
+    num_rows = 9 * num_samples  # 9 per sample
+    num_cols = 12*num_handles  # 12 per handle
+
+    dFdz_csr_matrix = wps.bsr_zeros(num_rows, num_cols, block_type=wp.float32)
+    wps.bsr_set_from_triplets(dFdz_csr_matrix, rows, cols, vals)
+
+    return dFdz_csr_matrix
+
+
+def sparse_mass_matrix(sim_rhos: np.ndarray):
+    # TODO: Maybe this isn't needed as a standalone function?
+    r"""Creates a sparse mass matrix from a set of densities.
+
+    Args:
+        sim_rhos (np.ndarray): Densities.
+
+    Returns:
+        wp.sparse.bsr_matrix: Sparse mass matrix.
+    """
+
+    dim = 3  # dimension of the space
+
+    # Create warp arrays and initialize mass matrix
+    wp_sim_rhos_diag = wp.array(
+        np.repeat(sim_rhos, dim), dtype=wp.float32)
+    mass_matrix = wps.bsr_diag(wp_sim_rhos_diag)
+    return mass_matrix
 
 
 def lumped_mass_matrix(rhos, total_volume, dim=3):
@@ -137,8 +426,10 @@ def jacobian_dF_dz_const_handle(model, x0, z):
     weights = model(x0)
     weights = torch.cat((model(x0), ones_col), dim=1)
     grad_weights = finite_diff_jac(model, x=x0)
-    grad_weights = torch.cat([grad_weights.squeeze(), zeros_vec3_column], dim=1)
-    x0_h = torch.cat((x0, torch.ones(x0.shape[0], 1, device=x0.device, dtype=x0.dtype)), dim=1).detach()
+    grad_weights = torch.cat(
+        [grad_weights.squeeze(), zeros_vec3_column], dim=1)
+    x0_h = torch.cat((x0, torch.ones(
+        x0.shape[0], 1, device=x0.device, dtype=x0.dtype)), dim=1).detach()
 
     def _compute_F(Ts):
         # W0_i, dW0_i: lazy, just avoiding neural net evaluations
@@ -156,7 +447,8 @@ def jacobian_dF_dz_const_handle(model, x0, z):
         deformation_gradient = _compute_F(transforms)
         return deformation_gradient.reshape(9 * num_samples)
 
-    dF_dz = torch.autograd.functional.jacobian(_reshape_and_compute_F, z).squeeze(-1)
+    dF_dz = torch.autograd.functional.jacobian(
+        _reshape_and_compute_F, z).squeeze(-1)
 
     return dF_dz
 
@@ -175,12 +467,14 @@ def jacobian_dF_dz(model, x0, z):
     num_samples = x0.shape[0]
 
     def compute_defo_grad1(z):
-        partial_weight_fcn_lbs = partial(weight_function_lbs, tfms=z.reshape(-1, 3, 4).unsqueeze(0), fcn=model)
+        partial_weight_fcn_lbs = partial(
+            weight_function_lbs, tfms=z.reshape(-1, 3, 4).unsqueeze(0), fcn=model)
         # N x 3 x 3 Deformation gradients
         defo_grads = finite_diff_jac(partial_weight_fcn_lbs, x0, eps=1e-7)
         return defo_grads
 
-    dF_dz = torch.autograd.functional.jacobian(lambda x: compute_defo_grad1(x).reshape(9 * num_samples), z.flatten())
+    dF_dz = torch.autograd.functional.jacobian(
+        lambda x: compute_defo_grad1(x).reshape(9 * num_samples), z.flatten())
     return dF_dz
 
 

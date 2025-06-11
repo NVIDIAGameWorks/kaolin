@@ -19,7 +19,7 @@ import warp as wp
 from typing import Any
 
 import kaolin.physics.materials.linear_elastic_material as linear_elastic_material
-import kaolin.physics.materials.utils as material_utils
+import SparseSimplicits.kaolin.kaolin.physics.materials.material_utils as material_utils
 
 wp.init()
 ###################################
@@ -48,7 +48,8 @@ def linear_elastic_gradient_equivalent(mu, lam, defo_grad):
 
     # Reshape Eps into [-1, 3, 3] tensor
     batchedEps = Eps.reshape(batched_dims.numel(), 3, 3)
-    trace_eps = batched_trace(batchedEps).reshape(batched_dims).unsqueeze(-1).unsqueeze(-1)
+    trace_eps = batched_trace(batchedEps).reshape(
+        batched_dims).unsqueeze(-1).unsqueeze(-1)
     g = 2.0 * mu.unsqueeze(-1) * Eps + lam.unsqueeze(-1) * trace_eps * id_mat
     return g
 
@@ -106,7 +107,8 @@ def test_wp_linear_energy(device, dtype):
     wp_e = wp.zeros(B, dtype=wp.dtype_from_torch(dtype))
     wp_F = wp.from_torch(F.contiguous(), dtype=wp.mat33)
     wp_mus = wp.from_torch(mus.contiguous(), dtype=wp.dtype_from_torch(dtype))
-    wp_lams = wp.from_torch(lams.contiguous(), dtype=wp.dtype_from_torch(dtype))
+    wp_lams = wp.from_torch(
+        lams.contiguous(), dtype=wp.dtype_from_torch(dtype))
 
     wp.launch(
         kernel=elastic_kernel,
@@ -140,7 +142,8 @@ def test_linear_gradients(device, dtype):
     neo_grad = linear_elastic_material.linear_elastic_gradient(mus, lams, F)
     neo_grad_equivalent = linear_elastic_gradient_equivalent(mus, lams, F)
     assert torch.allclose(neo_grad_equivalent, neo_grad, rtol=1e-2, atol=1e-2)
-    assert (neo_grad.shape[0] == N and neo_grad.shape[1] == B and neo_grad.shape[-2] == 3 and neo_grad.shape[-1] == 3)
+    assert (neo_grad.shape[0] == N and neo_grad.shape[1] ==
+            B and neo_grad.shape[-2] == 3 and neo_grad.shape[-1] == 3)
     neo_grad = neo_grad.flatten()
 
     E0 = torch.sum(linear_elastic_material.linear_elastic_energy(mus, lams, F))
@@ -153,9 +156,11 @@ def test_linear_gradients(device, dtype):
         for i in range(F.shape[1]):
             for j in range(F.shape[2]):
                 F[n, i, j] += eps
-                El = torch.sum(linear_elastic_material.linear_elastic_energy(mus, lams, F))
+                El = torch.sum(
+                    linear_elastic_material.linear_elastic_energy(mus, lams, F))
                 F[n, i, j] -= 2 * eps
-                Er = torch.sum(linear_elastic_material.linear_elastic_energy(mus, lams, F))
+                Er = torch.sum(
+                    linear_elastic_material.linear_elastic_energy(mus, lams, F))
                 F[n, i, j] += eps
                 expected_grad[row] = (El - Er) / (2 * eps)
                 row += 1

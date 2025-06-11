@@ -3,7 +3,8 @@ cuda_*.exe
 miniconda3.exe
 vs_buildtools.exe
 
-
+*.nsys-rep
+*.ini
 # all folders starting with _ are local
 _*/
 
@@ -45,3 +46,8 @@ examples/tutorial/logs/
 examples/tutorial/physics/*.log
 examples/tutorial/physics/results/
 examples/tutorial/physics/inria/
+kaolin/physics/material_properties/
+kaolin/physics/simplicits/output/
+kaolin/physics/sparsified/
+output/
+assets/fiscus.ply

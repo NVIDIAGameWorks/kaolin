@@ -36,7 +36,8 @@ def test_lumped_mass_matrix_3D(device, dtype):
 
     mass_matrix, _ = lumped_mass_matrix(rhos, total_volume=total_vol, dim=DIM)
 
-    expected_mass_matrix = (total_vol / N) * torch.eye(DIM * N, dtype=dtype, device=device)
+    expected_mass_matrix = (total_vol / N) * \
+        torch.eye(DIM * N, dtype=dtype, device=device)
 
     assert torch.allclose(mass_matrix, expected_mass_matrix)
 
@@ -53,7 +54,8 @@ def test_lumped_mass_matrix_2D(device, dtype):
 
     mass_matrix, _ = lumped_mass_matrix(rhos, total_volume=total_vol, dim=DIM)
 
-    expected_mass_matrix = (total_vol / N) * torch.eye(DIM * N, dtype=dtype, device=device)
+    expected_mass_matrix = (total_vol / N) * \
+        torch.eye(DIM * N, dtype=dtype, device=device)
 
     assert torch.allclose(mass_matrix, expected_mass_matrix)
 
@@ -65,8 +67,10 @@ def test_lbs_matrix(device, dtype):
     H = 5
     B = 1
     points = torch.rand(N, 3, device=device, dtype=dtype)  # n x 3 points
-    transforms = torch.rand(B, H, 3, 4, device=device, dtype=dtype)  # lbs transforms
-    weights = torch.rand(N, H, device=device, dtype=dtype)  # random skinning weights over points
+    transforms = torch.rand(B, H, 3, 4, device=device,
+                            dtype=dtype)  # lbs transforms
+    # random skinning weights over points
+    weights = torch.rand(N, H, device=device, dtype=dtype)
 
     B = lbs_matrix(points, weights)
 
@@ -78,7 +82,8 @@ def test_lbs_matrix(device, dtype):
 
     for i in range(N):
         pt_i = points[i].unsqueeze(0)
-        pt4_i = torch.cat((pt_i, torch.tensor([[1]], device=device, dtype=dtype)), dim=1)
+        pt4_i = torch.cat(
+            (pt_i, torch.tensor([[1]], device=device, dtype=dtype)), dim=1)
         expect_pt_i = pt_i.T
         for j in range(H):
             expect_pt_i += weights[i, j] * transforms[0, j] @ pt4_i.T
@@ -100,12 +105,14 @@ def test_jacobian_dF_dz(device, dtype):
     points = torch.rand(N, 3, device=device, dtype=dtype)  # n x 3 points
 
     # H handles + 1 for the constant handle
-    transforms = torch.rand(H + 1, 3, 4, device=device, dtype=dtype).unsqueeze(0)
+    transforms = torch.rand(H + 1, 3, 4, device=device,
+                            dtype=dtype).unsqueeze(0)
     model = SimplicitsMLP(3, 64, H, 6).to(device)
     if dtype == torch.double:
         model.double()
 
-    def model_plus_rigid(pts): return torch.cat((model(pts), torch.ones((pts.shape[0], 1), device=device)), dim=1)
+    def model_plus_rigid(pts): return torch.cat(
+        (model(pts), torch.ones((pts.shape[0], 1), device=device)), dim=1)
 
     dF_dz1 = jacobian_dF_dz_const_handle(model, points, transforms.flatten())
     # dF_dz2 = jacobian_dF_dz(model, points, transforms.flatten())
@@ -121,16 +128,19 @@ def test_jacobian_dx_dz(device, dtype):
     H = 5
     B = 1
     points = torch.rand(N, 3, device=device, dtype=dtype)  # n x 3 points
-    transforms = torch.rand(B, H + 1, 3, 4, device=device, dtype=dtype)  # lbs transforms
+    transforms = torch.rand(B, H + 1, 3, 4, device=device,
+                            dtype=dtype)  # lbs transforms
 
     model = SimplicitsMLP(3, 64, H, 6).to(device)
     if dtype == torch.double:
         model.double()
 
-    def model_plus_rigid(pts): return torch.cat((model(pts), torch.ones((pts.shape[0], 1), device=device)), dim=1)
+    def model_plus_rigid(pts): return torch.cat(
+        (model(pts), torch.ones((pts.shape[0], 1), device=device)), dim=1)
     weights = model_plus_rigid(points)
 
-    B = jacobian_dx_dz(model_plus_rigid, points, transforms.squeeze().flatten())
+    B = jacobian_dx_dz(model_plus_rigid, points,
+                       transforms.squeeze().flatten())
 
     x = B @ transforms.squeeze().flatten() + points.flatten()
 
@@ -140,7 +150,8 @@ def test_jacobian_dx_dz(device, dtype):
 
     for i in range(N):
         pt_i = points[i].unsqueeze(0)
-        pt4_i = torch.cat((pt_i, torch.tensor([[1]], device=device, dtype=dtype)), dim=1)
+        pt4_i = torch.cat(
+            (pt_i, torch.tensor([[1]], device=device, dtype=dtype)), dim=1)
         expect_pt_i = pt_i.T
         for j in range(H + 1):
             expect_pt_i += weights[i, j] * transforms[0, j] @ pt4_i.T
