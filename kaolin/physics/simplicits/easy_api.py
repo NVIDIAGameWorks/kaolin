@@ -514,7 +514,7 @@ class SimplicitsScene:
             "defo_grad_wise": {}
         }
 
-        Structure the force_dict like this.
+        #Structure the force_dict like this.
         #force_dict = {
         #    "pt_wise":{
         #        "gravity":{
