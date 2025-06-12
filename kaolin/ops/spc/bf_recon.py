@@ -325,7 +325,7 @@ def bf_recon(input_dataset, final_level, sigma):
                 octree1, empty1, probs1, colors1, normals1 = processFrame(batch, final_level, sigma)
                 lengths = torch.tensor([len(octree1)], dtype=torch.int)
                 level, pyramid1, exsum1 = spc.scan_octrees(octree1, lengths)
-                # fuse new single frame SPC into existing cummulative SPC model
+                # fuse new single frame SPC into existing cumulative SPC model
                 octree0, empty0, probs0, colors0, normals0 = fuseBF(level,
                                                                     octree0, octree1,
                                                                     empty0, empty1,
