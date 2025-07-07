@@ -17,9 +17,10 @@ import math
 import numpy as np
 import torch
 import logging
-from typing import Optional
+from typing import Optional, Callable
 from kaolin.ops.random import sample_spherical_coords
-from kaolin.ops.spc import scan_octrees, morton_to_points, bf_recon, unbatched_query
+from kaolin.ops.conversions import gs_to_voxelgrid
+from kaolin.ops.spc import scan_octrees, morton_to_points, bf_recon, unbatched_points_to_octree
 from kaolin.ops.spc.raytraced_spc_dataset import RayTracedSPCDataset
 from kaolin.ops.spc.bf_recon import bf_recon, unbatched_query
 from kaolin import _C
@@ -102,7 +103,8 @@ def _generate_default_viewpoints():
         (R @ R @ R @ R @ (5.0 * icosahedron)[:, :, None]).squeeze(-1),
         (R @ R @ R @ R @ R @ (6.0 * icosahedron)[:, :, None]).squeeze(-1),
     ], dim=0)
-    return viewpoints
+    delta = 0.001*(0.5 - torch.rand(3*viewpoints.size(0))).reshape(-1,3)
+    return viewpoints + delta
 
 
 def _jitter(pts, octree_level):
@@ -127,8 +129,7 @@ def _jitter(pts, octree_level):
     delta = torch.stack([x,y,z], dim=1)
     return pts + delta
 
-
-def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_level, viewpoints):
+def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_level, viewpoints, scaling_activation, scaling_inverse_activation):
     r"""Creates a tensor of uniform samples 'inside' collection of Gaussian Splats.
 
     Args:
@@ -139,6 +140,13 @@ def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_l
         opacity_threshold (float): Threshold to cull away voxelized cells with low accumulated opacity.
         gs_level (int): The level of the interal octree created.
         query_level (int): The level of the uniform sample grid.
+        viewpoints (optional, torch.Tensor):
+            Collection of viewpoints used to 'carve' out seen voxel space around the shell after it's voxelized.
+            These is a :math:`(\text{C, 3})` tensor of camera viewpoints facing the center,
+            chosen based on empirical heuristics.
+        scaling_activation (Callable): activation applied on scaling.
+        scaling_inverse_activation (Callable): inverse of activation applied on scaling.
+
 
     Returns:
         pidx (torch.LongTensor):
@@ -162,27 +170,30 @@ def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_l
 
     # transform Gaussians to [-1,-1,-1]x[1,1,1]
     xyz = (xyz - cen) / dmax
-    scales = scales / dmax
+    raw_scales = scaling_inverse_activation(scales)
+    scales = scaling_activation(
+        scaling_inverse_activation(1. / dmax).unsqueeze(0) + raw_scales
+    )
 
     # some constants
     scale_voxel_tolerance = 0.125
     iso = 11.345  # 99th percentile
 
     # compute spc from gsplats
-    morton, merged_opacities = _C.ops.conversions.gs_to_spc_cuda(
-        xyz, scales, rots, opacities, iso, scale_voxel_tolerance, gs_level
+    voxels, merged_opacities = gs_to_voxelgrid(
+        xyz, scales, rots, opacities, gs_level, iso=iso, tol=scale_voxel_tolerance, step=10
     )
 
     # filter out low opacities
     mask = merged_opacities[:] >= opacity_threshold
-    morton = morton[mask].contiguous()
-    gs_octree = _C.ops.spc.morton_to_octree(morton, gs_level)
+    voxels = voxels[mask].contiguous()
+    gs_octree = unbatched_points_to_octree(voxels, gs_level)
 
     # create depthmaps
     dataset = RayTracedSPCDataset(viewpoints.contiguous(), gs_octree.contiguous())
 
     # fuse depthmaps into seen/unseen aware spc
-    bf_octree, bf_empty, _, _ = bf_recon(dataset, final_level=query_level, sigma=0.005)
+    bf_octree, bf_empty, _, _ = bf_recon(dataset, final_level=query_level, sigma=0.0005)
     if bf_octree is None or bf_empty is None or len(bf_octree) == 0 or len(bf_empty) == 0:
         logging.warning(
             "3D Gaussian densifier failed to produce a voxelized volume out of the shape.\n"
@@ -211,7 +222,6 @@ def _solidify(xyz, scales, rots, opacities, opacity_threshold, gs_level, query_l
     sample_points = 2 ** (1 - query_level) * sample_points - torch.ones((3), device=device)
     return dmax * sample_points + cen
 
-
 @torch.no_grad()
 def sample_points_in_volume(
     xyz: torch.Tensor,
@@ -225,7 +235,9 @@ def sample_points_in_volume(
     post_scale_factor: float = 1.0,
     jitter: bool = True,
     clip_samples_to_input_bbox: bool = True,
-    viewpoints: Optional[torch.Tensor] = None
+    viewpoints: Optional[torch.Tensor] = None,
+    scaling_activation: Optional[Callable] = None,
+    scaling_inverse_activation: Optional[Callable] = None,
 ):
     r""" Logic for sampling additional points inside a shape represented by sparse 3D Gaussian Splats.
     Reconstructions based on 3D Gaussian Splats result in shells of objects, leaving the internal volume unfilled.
@@ -339,6 +351,8 @@ def sample_points_in_volume(
             These is a :math:`(\text{C, 3})` tensor of camera viewpoints facing the center,
             chosen based on empirical heuristics.
             If not specified, kaolin will opt to use its own set of default views.
+        scaling_activation (Callable): activation applied on scaling.
+        scaling_inverse_activation (Callable): inverse of activation applied on scaling.
 
     Return:
         (torch.FloatTensor): A tensor of :math:`(\text{K, 3})` points sampled inside the approximated shape volume.
@@ -355,6 +369,10 @@ def sample_points_in_volume(
     if viewpoints is None:
         viewpoints = _generate_default_viewpoints()
 
+    if scaling_activation is None:
+        scaling_activation = torch.exp
+    if scaling_inverse_activation is None:
+        scaling_inverse_activation = torch.log
     device = xyz.device
 
     # Select the required points and solidify
@@ -365,10 +383,13 @@ def sample_points_in_volume(
     scale = scale[mask].clone()
     rotation = rotation[mask].clone()
     opacity = opacity[mask].clone()
+
     volume_pts = _solidify(
         xyz.contiguous(), scale.contiguous(), rotation.contiguous(), opacity.contiguous(),
         opacity_threshold=opacity_threshold,
-        gs_level=octree_level, query_level=octree_level, viewpoints=viewpoints
+        gs_level=octree_level, query_level=octree_level, viewpoints=viewpoints,
+        scaling_activation=scaling_activation,
+        scaling_inverse_activation=scaling_inverse_activation,
     )
     # An empty tensor means densification failed - in that case we return an empty point set
     # and skip post-processing

@@ -65,6 +65,10 @@ at::Tensor sum_reduce_cuda(
     at::Tensor feats,
     at::Tensor inclusive_sum);
 
+at::Tensor prod_reduce_cuda(
+    at::Tensor feats,
+    at::Tensor inclusive_sum);
+
 at::Tensor cumsum_cuda(
     at::Tensor feats,
     at::Tensor pack_indices,

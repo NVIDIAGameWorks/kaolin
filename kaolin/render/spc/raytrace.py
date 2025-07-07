@@ -1,4 +1,4 @@
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021,2025 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +23,7 @@ __all__ = [
     'mark_first_hit',
     'diff',
     'sum_reduce',
+    'prod_reduce',
     'cumsum',
     'cumprod',
     'exponential_integration'
@@ -217,6 +218,31 @@ def sum_reduce(feats, boundaries):
         (torch.FloatTensor): summed features of shape :math:`(\text{num_packs}, \text{num_feats})`.
     """
     return SumReduce.apply(feats.contiguous(), boundaries.contiguous())
+
+def prod_reduce(feats, boundaries):
+    r"""Multiply the features of packs as following:
+
+    .. code-block:: python
+
+       feats = [a, b, c, d, e, f]
+       boundaries = [1, 0, 0, 0, 1, 0]
+       output = prod_reduce(feats, boundaries)
+       # output is [a * b * d, e * b]
+
+    .. note::
+
+        Backward pass is not implemented
+
+    Args:
+        feats (torch.FloatTensor): features of shape :math:`(\text{num_rays}, \text{num_feats})`.
+        boundaries (torch.BoolTensor): bools to mark pack boundaries of shape :math:`(\text{num_rays})`.
+            Given some index array marking the pack IDs, the boundaries can be calculated with
+            :func:`mark_pack_boundaries`.
+    Returns:
+        (torch.FloatTensor): multiplied features of shape :math:`(\text{num_packs}, \text{num_feats})`.
+    """
+    inclusive_sum = _C.render.spc.inclusive_sum_cuda(boundaries.int())
+    return _C.render.spc.prod_reduce_cuda(feats.contiguous(), inclusive_sum.contiguous())
 
 def cumsum(feats, boundaries, exclusive=False, reverse=False):
     r"""Cumulative sum across packs of features.

@@ -29,6 +29,8 @@
 #include "../../spc_math.h"
 #include "../../spc_utils.cuh"
 
+#define BLOCK_SIZE 1024
+
 namespace kaolin {
 
 using namespace cub;
@@ -65,60 +67,56 @@ at::Tensor inclusive_sum_cuda_x(at::Tensor Inputs)
 }
 
 
-
-__global__ void d_TrueToZDepth (
-    const uint32_t num, float* dmap, 
-    const uint32_t height, const uint32_t width,
+__global__ void d_FinalMip2D (
+    const uint num, float* img, 
+    const uint width,
     const float fx, const float fy, const float cx, const float cy, 
-    float maxdepth)
-{
-  uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
-
-  if (tidx >= num) return;
-
-  uint x = tidx % width;
-  uint y = tidx / width;
-
-  float u = (x - cx)/fx;
-  float v = (y - cy)/fy;
-
-  float d = dmap[y*width+x];
-  float l = rsqrtf(u*u + v*v + 1.0f);
-  
-  dmap[y*width+x] = d*l;
-}
-
-
-__global__ void d_MinMaxDM (
-    const uint32_t num, float* img, 
-    const uint32_t height, const uint32_t width,
-    float2* out)
+    float2* mip, float maxdepth, bool true_depth)
 {
   uint tidx = blockDim.x * blockIdx.x + threadIdx.x;
 
   if (tidx < num)
   {
-    int x1 = tidx % width;
-    int y1 = tidx / width;
-    int x0 = max(x1-1, 0);
-    int y0 = max(y1-1, 0);
-    int x2 = min(x1+1, width-1);
-    int y2 = min(y1+1, height-1);
+    uint x = tidx % width;
+    uint y = tidx / width;
 
-    float d00  = img[y0*width+x0];
-    float d01  = img[y0*width+x1];
-    float d02  = img[y0*width+x2];
-    float d10  = img[y1*width+x0];
-    float d11  = img[y1*width+x1];
-    float d12  = img[y1*width+x2];
-    float d20  = img[y2*width+x0];
-    float d21  = img[y2*width+x1];
-    float d22  = img[y2*width+x2];
+    x *= 2; y *= 2;
+    uint w = 2*width;
 
-    float z0 = fmin(fmin(fmin(fmin(d00, d01), fmin(d02, d10)),fmin(fmin(d11, d12), fmin(d20, d21))),d22);
-    float z1 = fmax(fmax(fmax(fmax(d00, d01), fmax(d02, d10)),fmax(fmax(d11, d12), fmax(d20, d21))),d22);
+    float u0 = (x - cx)/fx;
+    float v0 = (y - cy)/fy;
+    float u1 = (x+1 - cx)/fx;
+    float v1 = (y+1 - cy)/fy;
 
-    out[tidx] = make_float2(z0, z1);
+    float d00 = img[y*w+x];
+    float d01 = img[y*w+x+1];
+    float d10 = img[(y+1)*w+x];
+    float d11 = img[(y+1)*w+x+1];
+
+    // float t = d00;
+
+    if (true_depth)
+    {
+      float l00 = rsqrtf(u0*u0 + v0*v0 + 1.0f);
+      float l01 = rsqrtf(u1*u1 + v0*v0 + 1.0f);
+      float l10 = rsqrtf(u0*u0 + v1*v1 + 1.0f);
+      float l11 = rsqrtf(u1*u1 + v1*v1 + 1.0f);
+
+      d00 *= d00 == maxdepth ? 1.0 : l00;
+      d01 *= d01 == maxdepth ? 1.0 : l01;
+      d10 *= d10 == maxdepth ? 1.0 : l10;
+      d11 *= d11 == maxdepth ? 1.0 : l11;
+    }
+
+    img[y*w+x] = d00;
+    img[y*w+x+1] = d01;
+    img[(y+1)*w+x] = d10;
+    img[(y+1)*w+x+1] = d11;
+
+    float z0 = fmin(fmin(d00, d10), fmin(d01, d11));
+    float z1 = fmax(fmax(d00, d10), fmax(d01, d11));
+
+    mip[tidx] = make_float2(z0, z1); 
   }
 }
 
@@ -149,64 +147,65 @@ __global__ void d_MiddleMip2D (
 }
 
 
-at::Tensor  build_mip2d_cuda(at::Tensor image, at::Tensor In, int mip_levels, float maxdepth, bool true_depth)
+at::Tensor build_mip2d_cuda(at::Tensor image, at::Tensor In, int mip_levels, float maxdepth, bool true_depth)
 {
-  int height = image.size(0);
-  int width = image.size(1);
+	int h = image.size(0);
+	int w = image.size(1);
+	int s = pow(2, mip_levels);
+	int h0 = h/s;
+	int w0 = w/s;
+	int hw = h0*w0;
+	int width = w;
 
-  int s = pow(2, mip_levels-1);
-  int h0 = height/s;
-  int w0 = width/s;
-  int hw = h0*w0;
-  int size = (int)(hw*(pow(4, mip_levels)-1)/3); 
+	int size = (int)(hw*(pow(4, mip_levels)-1)/3);
+	at::Tensor mipmap = at::empty({ size, 2 }, image.options());
 
-  at::Tensor mipmap = at::empty({ size, 2 }, image.options());
+	float* img = image.data_ptr<float>();
+	float2* mip = reinterpret_cast<float2*>(mipmap.data_ptr<float>());
+	float* in = In.data_ptr<float>();
 
-  float* img = image.data_ptr<float>();
-  float2* mip = reinterpret_cast<float2*>(mipmap.data_ptr<float>());
-  float* in = In.data_ptr<float>();
-  float2* mmmip = mip + (int)(hw*(pow(4, mip_levels-1)-1)/3);
+	float fx = in[0];
+	float fy = in[5];
+	float cx = in[8];
+	float cy = in[9];
 
-  if (true_depth) // turn true depth into z-buffer depth
-  {
-    float fx = in[0];
-    float fy = in[5];
-    float cx = in[8];
-    float cy = in[9];
+	uint32_t num_pixels = hw * pow(4, mip_levels-1);
+	uint64_t offset = (uint64_t)(hw * (pow(4, mip_levels - 1) - 1) / 3);
 
-    d_TrueToZDepth <<< (height*width + 1023)/1024, 1024 >>> 
-    ( height*width,
-      img, 
-      height, width,
-      fx, fy, cx, cy,
-      maxdepth);
-  }
+	width /= 2;
+	d_FinalMip2D<<<(num_pixels + BLOCK_SIZE - 1) / BLOCK_SIZE, BLOCK_SIZE>>> 
+	(
+		num_pixels,
+		img, 
+		width,
+		fx, fy, cx, cy,
+		mip+offset,
+		maxdepth,
+		true_depth
+	);
 
-  d_MinMaxDM <<< (height*width + 1023)/1024, 1024 >>> 
-  ( height*width,
-    img, 
-    height, width,
-    mmmip);
+	AT_CUDA_CHECK(cudaGetLastError());
 
-  for (int l = mip_levels-2; l >= 0; l--)
-  {
-    uint num_threads = hw*pow(4, l);
-    uint64_t offset0 = (uint64_t)(hw*(pow(4, l+1)-1)/3);
-    uint64_t offset1 = (uint64_t)(hw*(pow(4, l)-1)/3);
+	for (int l = mip_levels-2; l >= 0; l--)
+	{
+		num_pixels = hw * pow(4, l);
+		uint64_t offset0 = (uint64_t)(hw * (pow(4, l + 1) - 1) / 3);
+		uint64_t offset1 = (uint64_t)(hw * (pow(4, l) - 1) / 3);
 
-    width /= 2;
-    d_MiddleMip2D <<< (num_threads + 1023)/1024, 1024 >>> 
-    (
-      num_threads,
-      mip+offset0, 
-      width,
-      mip+offset1,
-      maxdepth);
+		width /= 2;
+		d_MiddleMip2D<<<(num_pixels + BLOCK_SIZE - 1) / BLOCK_SIZE, BLOCK_SIZE>>> 
+		(
+			num_pixels,
+			mip + offset0, 
+			width,
+			mip + offset1,
+			maxdepth
+		);
 
-    AT_CUDA_CHECK(cudaGetLastError());
-  }
+		AT_CUDA_CHECK(cudaGetLastError());
+	}
 
-  return mipmap.contiguous();
+  	return mipmap.contiguous();
 }
 
 

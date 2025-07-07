@@ -1,4 +1,4 @@
-// Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,11 +25,18 @@ gs_to_spc_cuda(
   const at::Tensor& means3D,
   const at::Tensor& scales,
   const at::Tensor& rotations,
-  const at::Tensor& opacities,
   const float iso,
   const float tol,
   const uint32_t level);
 
+at::Tensor integrate_gs_cuda(
+  const at::Tensor& points,
+  const at::Tensor& gaus_id,
+  const at::Tensor& means3D,
+  const at::Tensor& cov3Dinv,
+  const at::Tensor& opacities,
+  const uint32_t    level,
+  const uint32_t    step);
 
 }  // namespace kaolin
 

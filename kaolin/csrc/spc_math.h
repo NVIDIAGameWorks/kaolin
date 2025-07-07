@@ -425,7 +425,7 @@ static __host__ __device__ __forceinline__ float3 point_at(
   return vertex + (edge * t);
 }
 
-static __host__ __device__  float3 triangle_closest_point(
+static __host__ __device__  __forceinline__ float3 triangle_closest_point(
     const float3& v1, const float3& v2, const float3& v3,
     const float3& p) {
   const float3 e12 = v2 - v1;
@@ -480,13 +480,6 @@ static __inline__ __host__ __device__ float4 operator* (const float4x4 m, const 
     a.x * m.m[2][0] + a.y * m.m[2][1] + a.z * m.m[2][2] + a.w * m.m[2][3],
     a.x * m.m[3][0] + a.y * m.m[3][1] + a.z * m.m[3][2] + a.w * m.m[3][3]
   );
-}
-
-static inline __device__ float altmax(float a, float b, float m)
-{
-  if (a == m) return b;
-  if (b == m) return a;
-  return fmax(a,b);
 }
 
 __device__ inline void transform_corners(point_data V, float4x4 T, float4 pos[8])

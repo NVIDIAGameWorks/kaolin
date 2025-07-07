@@ -54,6 +54,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ops_conversions.def("unbatched_mcube_forward_cuda", &unbatched_mcube_forward_cuda);
     ops_conversions.def("mesh_to_spc_cuda", &mesh_to_spc_cuda);
     ops_conversions.def("gs_to_spc_cuda", &gs_to_spc_cuda);
+    ops_conversions.def("integrate_gs_cuda", &integrate_gs_cuda);
     py::module ops_spc = ops.def_submodule("spc");
 #if WITH_CUDA
     ops_spc.def("query_cuda", &query_cuda);
@@ -114,6 +115,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   render_spc.def("inclusive_sum_cuda", &inclusive_sum_cuda);
   render_spc.def("diff_cuda", &diff_cuda);
   render_spc.def("sum_reduce_cuda", &sum_reduce_cuda);
+  render_spc.def("prod_reduce_cuda", &prod_reduce_cuda);
   render_spc.def("cumsum_cuda", &cumsum_cuda);
   render_spc.def("cumprod_cuda", &cumprod_cuda);
   py::module render_sg = render.def_submodule("sg");

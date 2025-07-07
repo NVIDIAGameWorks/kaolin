@@ -88,6 +88,13 @@ int sum_reduce_cuda_impl(
     at::Tensor feats_out,
     at::Tensor inclusive_sum);  
 
+int prod_reduce_cuda_impl(
+    int64_t num_feats,
+    int64_t feat_dim,
+    at::Tensor feats_in,
+    at::Tensor feats_out,
+    at::Tensor inclusive_sum);  
+
 void cumsum_cuda_impl(
     int64_t num_feats,
     int64_t feat_dim,
@@ -344,6 +351,32 @@ at::Tensor sum_reduce_cuda(
     at::Tensor feats_out = at::zeros({num_feats, feat_dim}, feats.options());
 
     int cnt = sum_reduce_cuda_impl(num_feats, feat_dim, feats, feats_out, inclusive_sum);
+
+    return feats_out.index({Slice(None, cnt)}).contiguous();
+#else
+  KAOLIN_NO_CUDA_ERROR(__func__);
+#endif  // WITH_CUDA
+}
+
+at::Tensor prod_reduce_cuda(
+    at::Tensor feats,
+    at::Tensor inclusive_sum) {
+#ifdef WITH_CUDA
+    at::TensorArg feats_arg{feats, "feats", 1};
+    at::TensorArg inclusive_sum_arg{inclusive_sum, "inclusive_sum", 2};
+    at::checkDim(__func__, feats_arg, 2);
+    at::checkDim(__func__, inclusive_sum_arg, 1);
+    at::checkAllSameGPU(__func__, {feats_arg, inclusive_sum_arg});
+    at::checkAllContiguous(__func__,  {feats_arg, inclusive_sum_arg});
+    at::checkScalarTypes(__func__, feats_arg, {at::kHalf, at::kFloat, at::kDouble});
+    at::checkScalarType(__func__, inclusive_sum_arg, at::kInt);
+
+    int num_feats = feats.size(0);
+    int feat_dim = feats.size(1);
+
+    at::Tensor feats_out = at::ones({num_feats, feat_dim}, feats.options());
+
+    int cnt = prod_reduce_cuda_impl(num_feats, feat_dim, feats, feats_out, inclusive_sum);
 
     return feats_out.index({Slice(None, cnt)}).contiguous();
 #else

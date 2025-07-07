@@ -39,7 +39,7 @@ class RayTracedSPCDataset(Dataset):
         Points (torch.ShortTensor) Initial set of points to begin carving. Default is dense octree of level=start_level
     """
 
-    def __init__(self, viewpoints, gs_octree):
+    def __init__(self, viewpoints, gs_octree, res=8):
         self.viewpoints = viewpoints
         self.gs_octree = gs_octree
 
@@ -53,13 +53,14 @@ class RayTracedSPCDataset(Dataset):
         self.max_depth = torch.finfo(torch.float32).max
         self.mip_levels = 6
         self.start_level = 4
+        self.res = res
 
     def __len__(self):
         # When limiting the number of data
         return len(self.viewpoints)     
 
     def __getitem__(self, index):
-        res = 2**self.level
+        res = 2**self.res
 
 
         eye = self.viewpoints[index]

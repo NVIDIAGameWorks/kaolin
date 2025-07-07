@@ -1,4 +1,4 @@
-// Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,13 +43,14 @@ size_t get_cub_storage_bytes_sort_pairs(
   uint64_t* d_morton_codes_out, 
   const uint64_t* d_values_in, 
   uint64_t* d_values_out, 
-  uint32_t num_items)
+  uint32_t num_items,
+  cudaStream_t stream = 0)
 {
     size_t    temp_storage_bytes = 0;
     CubDebugExit(
         cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
                                         d_morton_codes_in, d_morton_codes_out, 
-                                        d_values_in, d_values_out, num_items)
+                                        d_values_in, d_values_out, num_items, 0, sizeof(uint64_t) * 8, stream)
     );
     return temp_storage_bytes;
 }
@@ -104,7 +105,7 @@ subdivide_cuda_kernel(
     uint64_t triangle_id = triangle_id_in[tidx]; //triangle id
 
     point_data p_in = to_point(morton_codes_in[tidx]);
-    point_data p_out = make_point_data(2 * p_in.x, 2 * p_in.y, 2*p_in.z);
+    point_data p_out = make_point_data(2 * p_in.x, 2 * p_in.y, 2 * p_in.z);
 
     uint32_t base_idx = tidx == 0 ? 0 : prefix_sum[tidx-1];
 
@@ -210,20 +211,21 @@ __device__ bool VoxelEdgesIntersectEllipsoid(
     const float3& mean, 
     const float* Covi, 
     const float3& v, 
-    const float vsize) 
+    const float vsize,
+    const float iso) 
     {
 
    float3 p = v - mean;
     // if edge crossings, true true
     for (int i = 0; i < 4; i++)
     {
-      if (edge_test(Covi[0], Covi[1], Covi[2], Covi[3], Covi[4], Covi[5], Covi[6], 
+      if (edge_test(Covi[0], Covi[1], Covi[2], Covi[3], Covi[4], Covi[5], iso, 
           p.y+(i/2?vsize:0.0), p.z+(i%2?vsize:0.0), p.x, p.x+vsize)) return true;
 
-      if (edge_test(Covi[3], Covi[1], Covi[4], Covi[0], Covi[2], Covi[5], Covi[6], 
+      if (edge_test(Covi[3], Covi[1], Covi[4], Covi[0], Covi[2], Covi[5], iso, 
           p.x+(i/2?vsize:0.0), p.z+(i%2?vsize:0.0), p.y, p.y+vsize)) return true;
 
-      if (edge_test(Covi[5], Covi[2], Covi[4], Covi[0], Covi[1], Covi[3], Covi[6],
+      if (edge_test(Covi[5], Covi[2], Covi[4], Covi[0], Covi[1], Covi[3], iso,
           p.x+(i/2?vsize:0.0), p.y+(i%2?vsize:0.0), p.z, p.z+vsize)) return true;
     }
 
@@ -290,10 +292,8 @@ GSVoxelInOut(
     const float3& cp1,
     const float3& cp2,
     const float3& v, 
-    const float vsize) 
-    {
-      // if (gaus_idx != 27078) return false;
-      // return AABBinsideVoxel(mean, mean, v, vsize);
+    const float vsize,
+    const float iso) {
 
     if (AABBinsideVoxel(ab0, ab1, v, vsize)) 
       return true;
@@ -304,7 +304,7 @@ GSVoxelInOut(
     if (VoxelFaceOverlapEllipsoid(mean, cp0, cp1, cp2, v, vsize))
       return true;
 
-    return VoxelEdgesIntersectEllipsoid(mean, Covi, v, vsize);
+    return VoxelEdgesIntersectEllipsoid(mean, Covi, v, vsize, iso);
 
 }
 
@@ -321,7 +321,8 @@ decide_cuda_kernel(
   const uint64_t* __restrict__ gaus_id, // face ids
   uint32_t* __restrict__ occupancy, 
   const uint32_t level, 
-  const uint32_t not_done) {
+  const uint32_t not_done,
+  const float iso) {
 
   uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
   if (tidx >= num) return;
@@ -346,7 +347,7 @@ decide_cuda_kernel(
   float3 cp1 = ContactPnts[3*gaus_idx + 1];
   float3 cp2 = ContactPnts[3*gaus_idx + 2];
 
-  if (GSVoxelInOut(gaus_idx, mean, cov3DInvs+8*gaus_idx, ab0, ab1, cp0, cp1, cp2, v, voxelSize))
+  if (GSVoxelInOut(gaus_idx, mean, cov3DInvs+6*gaus_idx, ab0, ab1, cp0, cp1, cp2, v, voxelSize, iso))
     occupancy[tidx] = not_done ? 8 : 1;
   else
     occupancy[tidx] = 0;
@@ -391,10 +392,15 @@ __device__ void computeCov3DInv(
 	float z = q.w;
 
 	// Compute rotation matrix from quaternion
+	// float3x3 R = make_float3x3(
+	// 	1.f - 2.f * (y * y + z * z), 2.f * (x * y - r * z), 2.f * (x * z + r * y),
+	// 	2.f * (x * y + r * z), 1.f - 2.f * (x * x + z * z), 2.f * (y * z - r * x),
+	// 	2.f * (x * z - r * y), 2.f * (y * z + r * x), 1.f - 2.f * (x * x + y * y)
+	// );
 	float3x3 R = make_float3x3(
-		1.f - 2.f * (y * y + z * z), 2.f * (x * y - r * z), 2.f * (x * z + r * y),
-		2.f * (x * y + r * z), 1.f - 2.f * (x * x + z * z), 2.f * (y * z - r * x),
-		2.f * (x * z - r * y), 2.f * (y * z + r * x), 1.f - 2.f * (x * x + y * y)
+		1.f - 2.f * (y * y + z * z), 2.f * (x * y + r * z), 2.f * (x * z - r * y),
+		2.f * (x * y - r * z), 1.f - 2.f * (x * x + z * z), 2.f * (y * z + r * x),
+		2.f * (x * z + r * y), 2.f * (y * z - r * x), 1.f - 2.f * (x * x + y * y)
 	);
 
 	float3x3 M = S * R;
@@ -409,7 +415,6 @@ __device__ void computeCov3DInv(
 	cov3D[3] = Sigma.m[1][1];
 	cov3D[4] = Sigma.m[1][2];
 	cov3D[5] = Sigma.m[2][2];
-  cov3D[6] = iso;
 
   // Compute closest points to coordinate planes
   double c0 = cov3D[0];
@@ -481,7 +486,7 @@ computeCov3DInv_kernel(
   if (tidx >= num) return;
 
 	computeCov3DInv(tidx, means3D[tidx], scales[tidx], rotations[tidx], 
-                  Cov3DInvs + tidx * 8, AABBgs + tidx * 2, ContactPnts + tidx * 3,
+                  Cov3DInvs + tidx * 6, AABBgs + tidx * 2, ContactPnts + tidx * 3,
                   iso, tol, level);
 }
 
@@ -523,12 +528,12 @@ MergeOpacities_kernel(
   uint32_t base_idx = tidx == 0 ? 0 : prefix_sum[tidx-1]; // voxel index in unquified list
   float3 mean = means3D[gidx]; // mean of gaussian
 
-  float c0 = Cov3DInvs[8*gidx + 0]; // inverse covariance values of gaussian
-  float c1 = Cov3DInvs[8*gidx + 1];
-  float c2 = Cov3DInvs[8*gidx + 2];
-  float c3 = Cov3DInvs[8*gidx + 3];
-  float c4 = Cov3DInvs[8*gidx + 4];
-  float c5 = Cov3DInvs[8*gidx + 5];
+  float c0 = Cov3DInvs[6*gidx + 0]; // inverse covariance values of gaussian
+  float c1 = Cov3DInvs[6*gidx + 1];
+  float c2 = Cov3DInvs[6*gidx + 2];
+  float c3 = Cov3DInvs[6*gidx + 3];
+  float c4 = Cov3DInvs[6*gidx + 4];
+  float c5 = Cov3DInvs[6*gidx + 5];
 
   float two_level = (float)(0x1 << level);
   float voxelSize = 2.0f/two_level;
@@ -547,12 +552,13 @@ MergeOpacities_kernel(
   atomicAlpha(&(merged_opacities[base_idx]), alpha);
 }
 
+// This is a newer version of gs_to_spc that does not merge opacities
+
 std::vector<at::Tensor> gs_to_spc_cuda_impl(
-	const at::Tensor& means3D,
-	const at::Tensor& scales,
-	const at::Tensor& rotations,
-	const at::Tensor& opacities,
-	const float iso,
+  const at::Tensor& means3D,
+  const at::Tensor& scales,
+  const at::Tensor& rotations,
+  const float iso,
   const float tol,
   const uint32_t target_level) {
 
@@ -563,20 +569,20 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
   int ngaus = means3D.size(0);
 
   // compute upper right block of covariance matices
-  at::Tensor Cov3DInvs = at::empty({ngaus, 8}, means3D.options().dtype(at::kFloat));
+  at::Tensor Cov3DInvs = at::empty({ngaus, 6}, means3D.options());
   // the AABB of the ellisoid
-  at::Tensor AABBgs = at::empty({ngaus, 6}, means3D.options().dtype(at::kFloat));
+  at::Tensor AABBgs = at::empty({ngaus, 6}, means3D.options());
   // axes aligned contact points with the ellisoid - untranslated
-  at::Tensor ContactPnts = at::empty({ngaus, 9}, means3D.options().dtype(at::kFloat));
+  at::Tensor ContactPnts = at::empty({ngaus, 9}, means3D.options());
 
-  computeCov3DInv_kernel<<<(ngaus + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>>(
-    ngaus, 
-    reinterpret_cast<float3*>(means3D.data_ptr<float>()), 
-    reinterpret_cast<float3*>(scales.data_ptr<float>()), 
-    reinterpret_cast<float4*>(rotations.data_ptr<float>()), 
+  computeCov3DInv_kernel<<<(ngaus + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+    ngaus,
+    reinterpret_cast<float3*>(means3D.data_ptr<float>()),
+    reinterpret_cast<float3*>(scales.data_ptr<float>()),
+    reinterpret_cast<float4*>(rotations.data_ptr<float>()),
     Cov3DInvs.data_ptr<float>(),
     reinterpret_cast<float3*>(AABBgs.data_ptr<float>()),
-    reinterpret_cast<float3*>(ContactPnts.data_ptr<float>()), 
+    reinterpret_cast<float3*>(ContactPnts.data_ptr<float>()),
     iso, tol, target_level);
 
   // allocate local GPU storage
@@ -591,148 +597,210 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
   at::Tensor occupancy = at::empty({0}, means3D.options().dtype(at::kInt));
   at::Tensor prefix_sum = at::empty({0}, means3D.options().dtype(at::kInt));
   at::Tensor temp_storage = at::empty({0}, means3D.options().dtype(at::kByte));
- 
+
   uint64_t temp_storage_bytes;
   uint32_t next_cnt, curr_cnt = ngaus;
   uint32_t curr_buf = 0;
-  for (uint32_t l = 0; l <= target_level; l++) { 
-
+  for (uint32_t l = 0; l <= target_level; l++) {
     occupancy.resize_({curr_cnt});
     prefix_sum.resize_({curr_cnt});
 
     // Do the proposals hit?
-    decide_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>>(
-      curr_cnt, 
-
-      reinterpret_cast<float3*>(means3D.data_ptr<float>()), 
+    decide_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+      curr_cnt,
+      reinterpret_cast<float3*>(means3D.data_ptr<float>()),
       Cov3DInvs.data_ptr<float>(),
       reinterpret_cast<float3*>(AABBgs.data_ptr<float>()),
-      reinterpret_cast<float3*>(ContactPnts.data_ptr<float>()), 
-
-      reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 
-      reinterpret_cast<uint64_t*>(gaus_id[curr_buf].data_ptr<int64_t>()), 
-      reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
-      l, target_level - l);
+      reinterpret_cast<float3*>(ContactPnts.data_ptr<float>()),
+      reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()),
+      reinterpret_cast<uint64_t*>(gaus_id[curr_buf].data_ptr<int64_t>()),
+      reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()),
+      l,
+      target_level - l,
+      iso
+    );
 
     // set up memory for DeviceScan calls
     temp_storage_bytes = get_cub_storage_bytes(NULL, reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
-      reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()), curr_cnt);
-    temp_storage.resize_({(int64_t)temp_storage_bytes});
+      reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()), curr_cnt, stream);
+    temp_storage.resize_({static_cast<int64_t>(temp_storage_bytes)});
 
     CubDebugExit(cub::DeviceScan::InclusiveSum(
       (void*)temp_storage.data_ptr<uint8_t>(), temp_storage_bytes, 
       reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
-      reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()), curr_cnt));
+      reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()), curr_cnt, stream));
 
-    cudaMemcpy(&next_cnt, reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()) + curr_cnt - 1, 
-               sizeof(uint32_t), cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(&next_cnt, reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()) + curr_cnt - 1, 
+                    sizeof(uint32_t), cudaMemcpyDeviceToHost, stream);
 
     if (next_cnt == 0) {
       at::Tensor mcodes = at::empty({0}, means3D.options().dtype(at::kLong));
-      at::Tensor merged_opacities = at::empty({0}, means3D.options().dtype(at::kFloat));
-      return { mcodes, merged_opacities };
-    }
-    else {
+      return { mcodes };
+    } else {
       // re-allocate local GPU storage
-      morton_codes[(curr_buf+1)%2].resize_({next_cnt});
-      gaus_id[(curr_buf+1)%2].resize_({next_cnt});
+      morton_codes[(curr_buf + 1) % 2].resize_({next_cnt});
+      gaus_id[(curr_buf + 1) % 2].resize_({next_cnt});
     }
 
     // Subdivide if more levels remain, repeat
     if (l < target_level) {
-      subdivide_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>>(
+      subdivide_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
         curr_cnt, 
         reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 
         reinterpret_cast<uint64_t*>(gaus_id[curr_buf].data_ptr<int64_t>()), 
-        reinterpret_cast<uint64_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
-        reinterpret_cast<uint64_t*>(gaus_id[(curr_buf+1)%2].data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(morton_codes[(curr_buf + 1) % 2].data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(gaus_id[(curr_buf + 1) % 2].data_ptr<int64_t>()), 
         reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
         reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()));
     } else {
-      compactify_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>>(
+      compactify_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
         curr_cnt, 
         reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 
         reinterpret_cast<uint64_t*>(gaus_id[curr_buf].data_ptr<int64_t>()), 
-        reinterpret_cast<uint64_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
-        reinterpret_cast<uint64_t*>(gaus_id[(curr_buf+1)%2].data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(morton_codes[(curr_buf + 1) % 2].data_ptr<int64_t>()), 
+        reinterpret_cast<uint64_t*>(gaus_id[(curr_buf + 1) % 2].data_ptr<int64_t>()), 
         reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
         reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()));
     }
 
-    curr_buf = (curr_buf+1)%2;
+    curr_buf = (curr_buf + 1) % 2;
     curr_cnt = next_cnt;
   }
 
   // re-allocate local GPU storage
-  morton_codes[(curr_buf+1)%2].resize_({curr_cnt});
-  gaus_id[(curr_buf+1)%2].resize_({curr_cnt});
+  morton_codes[(curr_buf + 1) % 2].resize_({curr_cnt});
+  gaus_id[(curr_buf + 1) % 2].resize_({curr_cnt});
 
   // set up memory for DeviceScan calls
   temp_storage_bytes = get_cub_storage_bytes_sort_pairs(
     NULL, 
     reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 
-    reinterpret_cast<uint64_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(morton_codes[(curr_buf + 1) % 2].data_ptr<int64_t>()), 
     reinterpret_cast<uint64_t*>(gaus_id[curr_buf].data_ptr<int64_t>()), 
-    reinterpret_cast<uint64_t*>(gaus_id[(curr_buf+1)%2].data_ptr<int64_t>()), curr_cnt);
+    reinterpret_cast<uint64_t*>(gaus_id[(curr_buf + 1) % 2].data_ptr<int64_t>()),
+    curr_cnt,
+    stream);
   temp_storage.resize_({(int64_t)temp_storage_bytes});
 
   CubDebugExit(cub::DeviceRadixSort::SortPairs(
     (void*)temp_storage.data_ptr<uint8_t>(), 
     temp_storage_bytes, 
     reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 
-    reinterpret_cast<uint64_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(morton_codes[(curr_buf + 1) % 2].data_ptr<int64_t>()), 
     reinterpret_cast<uint64_t*>(gaus_id[curr_buf].data_ptr<int64_t>()), 
-    reinterpret_cast<uint64_t*>(gaus_id[(curr_buf+1)%2].data_ptr<int64_t>()), curr_cnt));
+    reinterpret_cast<uint64_t*>(gaus_id[(curr_buf + 1) % 2].data_ptr<int64_t>()),
+    curr_cnt,
+    0,
+    sizeof(uint64_t) * 8,
+    stream));
 
   occupancy.resize_({curr_cnt});
-  prefix_sum.resize_({curr_cnt});
 
   // Mark boundaries of unique  
-  d_MarkDuplicates << <(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>> (
+  d_MarkDuplicates <<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>> (
     curr_cnt, 
-    reinterpret_cast<uint64_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
+    reinterpret_cast<uint64_t*>(morton_codes[(curr_buf + 1) % 2].data_ptr<int64_t>()), 
     reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()));
 
-  // set up memory for DeviceScan calls
-  temp_storage_bytes = get_cub_storage_bytes(
-    NULL, 
-    reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
-    reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()), curr_cnt+1);
-  temp_storage.resize_({(int64_t)temp_storage_bytes});
+  at::Tensor points = at::empty({curr_cnt, 3}, means3D.options().dtype(at::kShort));
 
-  uint32_t psize;
-  cub::DeviceScan::InclusiveSum(
-    (void*)temp_storage.data_ptr<uint8_t>(), 
-    temp_storage_bytes, 
-    reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
-    reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()), curr_cnt);
-  CubDebugExit(cudaMemcpy(&psize, reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()) + curr_cnt - 1, 
-               sizeof(uint32_t), cudaMemcpyDeviceToHost));
+  morton_to_points_cuda_kernel<<<(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+    reinterpret_cast<uint64_t*>(morton_codes[(curr_buf + 1) % 2].data_ptr<int64_t>()),
+    reinterpret_cast<point_data*>(points.data_ptr<short>()),
+    curr_cnt);
 
-  // re-allocate local GPU storage
-  morton_codes[curr_buf].resize_({psize});
+  return {
+    points.contiguous(),
+    gaus_id[(curr_buf + 1) % 2].contiguous(),
+    occupancy.to(at::kBool).contiguous(),
+    Cov3DInvs.contiguous()};
+}
 
-  d_Compactify << <(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>> (
-    curr_cnt, 
-    reinterpret_cast<uint64_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
-    reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 
-    reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
-    reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()));
+__global__ void
+integrate_gs_kernel(
+  const uint32_t                  num, 
+  const point_data* __restrict__  points, // voxel morton codes, sorted
+  const float                     voxel_size,
+  const uint64_t*   __restrict__  gaus_id, // corresponding gauss ids
+  const float3*     __restrict__  means3D, 
+  const float*      __restrict__  Cov3DInvs,
+  const float*      __restrict__  opacities, 
+  const uint32_t                  STEP,
+  float*            __restrict__  values) {
 
-  at::Tensor merged_opacities = at::zeros({psize}, means3D.options().dtype(at::kFloat));
+  uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
+  if (tidx >= num) return;
 
-  MergeOpacities_kernel << <(curr_cnt + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS>>> (
-    curr_cnt, 
-    reinterpret_cast<uint64_t*>(morton_codes[(curr_buf+1)%2].data_ptr<int64_t>()), 
-    reinterpret_cast<uint64_t*>(gaus_id[(curr_buf+1)%2].data_ptr<int64_t>()),
-    reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()), 
-    reinterpret_cast<float3*>(means3D.data_ptr<float>()), 
+  point_data p = points[tidx];
+  float3 fp = make_float3(voxel_size * p.x - 1.0, voxel_size * p.y - 1.0, voxel_size * p.z - 1.0);
+
+  uint64_t gidx = gaus_id[tidx];
+  float3 mean = means3D[gidx];
+
+  // inverse covariance values of gaussian
+  double c0 = (double)Cov3DInvs[6 * gidx + 0];
+  double c1 = (double)Cov3DInvs[6 * gidx + 1];
+  double c2 = (double)Cov3DInvs[6 * gidx + 2];
+  double c3 = (double)Cov3DInvs[6 * gidx + 3];
+  double c4 = (double)Cov3DInvs[6 * gidx + 4];
+  double c5 = (double)Cov3DInvs[6 * gidx + 5];
+  double alpha = (double)opacities[gidx];
+
+  float step_size = voxel_size / ((STEP > 1) ? STEP - 1 : 1);
+
+  double integral_sum = 0.0f;
+
+  for (int i = 0; i < STEP; i++) {
+    double vx = fp.x + i * step_size - mean.x;
+    double a = c0 * vx * vx;
+    for (int j = 0; j < STEP; j++) {
+      double vy = fp.y + j * step_size - mean.y;
+      double intermediate_sum = a + 2.0 * c1 * vx * vy + c3 * vy * vy;
+      for (int k = 0; k < STEP; k++) {
+        double vz = fp.z + k * step_size - mean.z;
+	double c = 2.0 * c2 * vx * vz;
+	double e = 2.0 * c4 * vy * vz;
+	double f = c5 * vz * vz;
+	integral_sum += exp(-0.5 * (intermediate_sum + c + e + f));
+      }
+    }
+  }
+
+  values[tidx] = (float)(alpha * integral_sum / (STEP * STEP * STEP));  
+}
+
+
+at::Tensor integrate_gs_cuda_impl(
+  const at::Tensor& points,
+  const at::Tensor& gaus_id,
+  const at::Tensor& means3D,
+  const at::Tensor& Cov3DInvs,
+  const at::Tensor& opacities,
+  const uint32_t level,
+  const uint32_t step) {
+
+  const at::cuda::OptionalCUDAGuard device_guard(at::device_of(points));
+  auto stream = at::cuda::getCurrentCUDAStream();
+
+  int32_t psize = points.size(0);
+
+  float voxel_size = 2.0f / ((float)(0x1 << level));
+
+  at::Tensor results = at::empty({psize}, points.options().dtype(at::kFloat));
+
+  integrate_gs_kernel << <(psize + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>> (
+    psize,
+    reinterpret_cast<point_data*>(points.data_ptr<short>()),
+    voxel_size,
+    reinterpret_cast<uint64_t*>(gaus_id.data_ptr<int64_t>()),
+    reinterpret_cast<float3*>(means3D.data_ptr<float>()),
     Cov3DInvs.data_ptr<float>(),
     opacities.data_ptr<float>(),
-    merged_opacities.data_ptr<float>(),
-    target_level);
+    step,
+    results.data_ptr<float>()
+  );
 
-  return { morton_codes[curr_buf], merged_opacities };
+  return results;
 }
 
 }  // namespace kaolin

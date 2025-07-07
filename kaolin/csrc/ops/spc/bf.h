@@ -39,9 +39,7 @@ std::vector<at::Tensor> oracleB_final(
   uint32_t level,
   float sigma,
   at::Tensor cam, 
-  at::Tensor dmap, 
-  at::Tensor mipmap,
-  int mip_levels);
+  at::Tensor dmap);
 
 std::vector<at::Tensor> process_final_voxels(
   uint32_t num_nodes, 
@@ -57,9 +55,10 @@ std::vector<at::Tensor> colorsB_final(
   at::Tensor points,
   uint32_t level,
   at::Tensor cam, 
+  float sigma,
   at::Tensor im,
   at::Tensor dmap,
-  float max_depth);
+  at::Tensor probs);
 
 std::vector<at::Tensor> merge_empty(
   at::Tensor points,
@@ -68,8 +67,6 @@ std::vector<at::Tensor> merge_empty(
   at::Tensor octree1,  
   at::Tensor empty0,
   at::Tensor empty1,
-  at::Tensor pyramid0,
-  at::Tensor pyramid1,
   at::Tensor exsum0,
   at::Tensor exsum1);
 
@@ -80,14 +77,14 @@ std::vector<at::Tensor> bq_merge(
   at::Tensor octree1,  
   at::Tensor empty0,
   at::Tensor empty1,
+  at::Tensor pyramid0,
+  at::Tensor pyramid1,
   at::Tensor probs0,
   at::Tensor probs1,  
   at::Tensor colors0,
   at::Tensor colors1,
   at::Tensor normals0,
   at::Tensor normals1,
-  at::Tensor pyramid0,
-  at::Tensor pyramid1,
   at::Tensor exsum0,
   at::Tensor exsum1);
 
