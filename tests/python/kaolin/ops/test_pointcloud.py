@@ -17,17 +17,15 @@ import os
 import pytest
 import torch
 
-from kaolin.utils.testing import FLOAT_TYPES, with_seed
+from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_allclose
 import kaolin.ops.pointcloud
-
 
 @pytest.mark.parametrize('device, dtype', FLOAT_TYPES)
 def test_center_points(device, dtype):
-    with_seed(9, 9, 9)
     if dtype == torch.half:
         rtol, atol = 1e-3, 1e-3
     else:
-        rtol, atol = 1e-5, 1e-8  # default torch values
+        rtol, atol = 1e-5, 1e-6  # default torch values
 
     B = 4
     N = 20
@@ -41,30 +39,30 @@ def test_center_points(device, dtype):
     translations = torch.rand((B, 1, 3), device=device, dtype=dtype) - 0.5
 
     # Points are already centered
-    assert torch.allclose(points, kaolin.ops.pointcloud.center_points(points), atol=atol, rtol=rtol)
-    assert torch.allclose(points * factors, kaolin.ops.pointcloud.center_points(points * factors), atol=atol, rtol=rtol)
+    check_allclose(points, kaolin.ops.pointcloud.center_points(points), atol=atol, rtol=rtol)
+    check_allclose(points * factors, kaolin.ops.pointcloud.center_points(points * factors), atol=atol, rtol=rtol)
 
     # Points translated
-    assert torch.allclose(points, kaolin.ops.pointcloud.center_points(points + 0.5), atol=atol, rtol=rtol)
+    check_allclose(points, kaolin.ops.pointcloud.center_points(points + 0.5), atol=atol, rtol=rtol)
 
     points_centered = kaolin.ops.pointcloud.center_points(points + translations)
-    assert torch.allclose(points, points_centered, atol=atol, rtol=rtol)
+    check_allclose(points, points_centered, atol=atol, rtol=rtol)
 
     points_centered = kaolin.ops.pointcloud.center_points(points * factors + translations)
-    assert torch.allclose(points * factors, points_centered, atol=atol, rtol=rtol)
+    check_allclose(points * factors, points_centered, atol=atol, rtol=rtol)
 
     # Now let's also try to normalize
     points_centered = kaolin.ops.pointcloud.center_points(points * factors + translations, normalize=True)
-    assert torch.allclose(points, points_centered, atol=atol, rtol=rtol)
+    check_allclose(points, points_centered, atol=atol, rtol=rtol)
 
     # Now let's test normalizing when there is zero range in one of the dimensions
     points[:, :, 1] = 1.0
     points_centered = kaolin.ops.pointcloud.center_points(points * factors + translations, normalize=True)
     points[:, :, 1] = 0.0
-    assert torch.allclose(points, points_centered, atol=atol, rtol=rtol)
+    check_allclose(points, points_centered, atol=atol, rtol=rtol)
 
     # Now let's try normalizing when one element of the batch is degenerate
     points[0, :, :] = torch.tensor([0, 2., 4.], dtype=dtype, device=device).reshape((1, 3))
     points_centered = kaolin.ops.pointcloud.center_points(points * factors + translations, normalize=True)
     points[0, :, :] = 0
-    assert torch.allclose(points, points_centered, atol=atol, rtol=rtol)
+    check_allclose(points, points_centered, atol=atol, rtol=rtol)

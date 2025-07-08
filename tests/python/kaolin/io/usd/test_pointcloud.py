@@ -16,6 +16,7 @@
 
 import os
 import shutil
+import filecmp
 
 import torch
 import pytest
@@ -71,7 +72,7 @@ class TestPointCloud:
         # Confirm exported USD matches golden file
         golden = os.path.join(out_dir, os.pardir, os.pardir, os.pardir, os.pardir, os.pardir,
                               'samples/golden/pointcloud_GeomPoints.usda')
-        assert open(golden).read() == open(out_path).read()
+        assert filecmp.cmp(golden, out_path)
 
     def test_export_single_instancer(self, out_dir, pointcloud):
         out_path = os.path.join(out_dir, 'pointcloud_instancer.usda')
@@ -80,7 +81,7 @@ class TestPointCloud:
         # Confirm exported USD matches golden file
         golden = os.path.join(out_dir, os.pardir, os.pardir, os.pardir, os.pardir, os.pardir,
                               'samples/golden/pointcloud_PointInstancer.usda')
-        assert open(golden).read() == open(out_path).read()
+        assert filecmp.cmp(golden, out_path)
 
     def test_export_multiple(self, out_dir, pointcloud):
         out_path = os.path.join(out_dir, 'pointclouds.usda')
@@ -105,11 +106,12 @@ class TestPointCloud:
 
     @pytest.mark.parametrize('input_stage', [False, True])
     def test_import_single(self, out_dir, pointcloud, input_stage):
-        out_path = os.path.join(out_dir, 'pointcloud.usda')
+        golden_path = os.path.join(out_dir, os.pardir, os.pardir, os.pardir, os.pardir, os.pardir,
+                                   'samples/golden/pointcloud_PointInstancer.usda')
         if input_stage:
-            path_or_stage = Usd.Stage.Open(out_path)
+            path_or_stage = Usd.Stage.Open(golden_path)
         else:
-            path_or_stage = out_path
+            path_or_stage = golden_path
         pointcloud_in = usd.import_pointcloud(path_or_stage, scene_path=self.scene_path).points
 
         # Confirm imported pointcloud matches original input
@@ -185,3 +187,44 @@ class TestPointCloud:
 
         # Confirm that points have the same shape as color
         assert pointcloud_in.shape == color.shape
+
+############################################
+    def test_fail_export_twice(self, out_dir, pointcloud):
+        out_path = os.path.join(out_dir, 'fail_exported_twice.usda')
+        usd.export_pointcloud(pointcloud=pointcloud + 0.1, file_path=out_path, scene_path=self.scene_path)
+        with pytest.raises(FileExistsError):
+            usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path)
+
+    def test_export_twice(self, out_dir, pointcloud):
+        out_path = os.path.join(out_dir, 'exported_twice.usda')
+        usd.export_pointcloud(pointcloud=pointcloud + 0.1, file_path=out_path, scene_path=self.scene_path)
+        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path, overwrite=True)
+        golden_path = os.path.join(out_dir, os.pardir, os.pardir, os.pardir, os.pardir, os.pardir,
+                                  'samples/golden/pointcloud_PointInstancer.usda')
+        assert filecmp.cmp(out_path, golden_path)
+
+    def test_export_overwrite_full_file(self, out_dir, pointcloud):
+        out_path = os.path.join(out_dir, 'exported_overwrite_full_file.usda')
+        usd.export_pointclouds(pointclouds=[pointcloud + i + 1 for i in range(self.num_multiple)],
+                               file_path=out_path)
+        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path, overwrite=True)
+        golden_path = os.path.join(out_dir, os.pardir, os.pardir, os.pardir, os.pardir, os.pardir,
+                                  'samples/golden/pointcloud_PointInstancer.usda')
+        assert filecmp.cmp(out_path, golden_path)
+
+    def test_export_overwrite_voxelgrid(self, out_dir, pointcloud):
+        out_path = os.path.join(out_dir, 'exported_overwrite_pointcloud.usda')
+        usd.export_voxelgrid(out_path, voxelgrid=torch.rand((32, 32, 32)) > 0.7, scene_path=self.scene_path)
+        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path, overwrite=True)
+        golden_path = os.path.join(out_dir, os.pardir, os.pardir, os.pardir, os.pardir, os.pardir,
+                                  'samples/golden/pointcloud_PointInstancer.usda')
+        assert filecmp.cmp(out_path, golden_path)
+
+    def test_export_overwrite_mesh(self, out_dir, pointcloud):
+        out_path = os.path.join(out_dir, 'exported_overwrite_voxelgrid.usda')
+        usd.export_mesh(out_path, vertices=torch.rand((3, 3)), faces=torch.tensor([[0, 1, 2]], dtype=torch.long))
+        usd.export_pointcloud(pointcloud=pointcloud, file_path=out_path, scene_path=self.scene_path, overwrite=True)
+        golden_path = os.path.join(out_dir, os.pardir, os.pardir, os.pardir, os.pardir, os.pardir,
+                                  'samples/golden/pointcloud_PointInstancer.usda')
+        assert filecmp.cmp(out_path, golden_path)
+

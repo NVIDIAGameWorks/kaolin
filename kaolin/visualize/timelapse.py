@@ -94,7 +94,7 @@ class Timelapse:
 
             # Adjust end timecode to match current iteration
             stage.SetEndTimeCode(iteration)
-            io.usd.add_pointcloud(stage, points, f'/{pc_name}', colors=colour, time=iteration, points_type=points_type)
+            io.usd.add_pointcloud(stage, scene_path=f'/{pc_name}', points=points, colors=colour, time=iteration, points_type=points_type)
 
             stage.Save()
 

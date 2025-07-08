@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import torch
 import numpy as np
 
@@ -139,7 +140,7 @@ def add_voxelgrid(stage, voxelgrid, scene_path, time=None):
         time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
             correspond to.
     Returns:
-        (Usd.Stage)
+        (Usd.Prim): The generated voxelgrid Prim.
 
     Example:
         >>> stage = create_stage('./new_stage.usd')
@@ -190,11 +191,13 @@ def add_voxelgrid(stage, voxelgrid, scene_path, time=None):
     pv = UsdGeom.PrimvarsAPI(prim).CreatePrimvar('grid_size', Sdf.ValueTypeNames.Int)
     pv.Set(voxelgrid.size(0))
 
-    # Create a primvar to identify the poitn instancer as a Kaolin VoxelGrid
+    # Create a primvar to identify the point instancer as a Kaolin VoxelGrid
     pv = UsdGeom.PrimvarsAPI(prim).CreatePrimvar('kaolin_type', Sdf.ValueTypeNames.String)
     pv.Set('VoxelGrid')
 
-def export_voxelgrid(file_path, voxelgrid, scene_path='/World/VoxelGrids/voxelgrid_0', time=None):
+    return instancer_prim
+
+def export_voxelgrid(file_path, voxelgrid, scene_path='/World/VoxelGrids/voxelgrid_0', time=None, overwrite=False):
     r"""Export a single voxelgrid to a USD scene.
 
     Export a binary voxelgrid where occupied voxels are defined by non-zero values. The voxelgrid is
@@ -208,6 +211,7 @@ def export_voxelgrid(file_path, voxelgrid, scene_path='/World/VoxelGrids/voxelgr
             If no path is provided, a default path is used.
         time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
             correspond to.
+        overwrite (bool): If True, overwrite existing .usda. If False (default) raise an error if files already exists.
     Returns:
         (Usd.Stage)
 
@@ -217,11 +221,11 @@ def export_voxelgrid(file_path, voxelgrid, scene_path='/World/VoxelGrids/voxelgr
     """
     if time is None:
         time = Usd.TimeCode.Default()
-    stage = export_voxelgrids(file_path, [voxelgrid], [scene_path], times=[time])
+    stage = export_voxelgrids(file_path, [voxelgrid], [scene_path], times=[time], overwrite=overwrite)
     return stage
 
 
-def export_voxelgrids(file_path, voxelgrids, scene_paths=None, times=None):
+def export_voxelgrids(file_path, voxelgrids, scene_paths=None, times=None, overwrite=False):
     r"""Export one or more voxelgrids to a USD scene.
 
     Export one or more binary voxelgrids where occupied voxels are defined by non-zero values. The voxelgrids are
@@ -234,12 +238,16 @@ def export_voxelgrids(file_path, voxelgrids, scene_paths=None, times=None):
         scene_path (list of str, optional): Absolute path(s) of voxelgrid within the USD file scene.
             Must be a valid Sdf.Path. If no path is provided, a default path is used.
         times (list of int): Positive integers defining the time at which the supplied parameters correspond to.
+        overwrite (bool): If True, overwrite existing .usda. If False (default) raise an error if files already exists.
 
     Example:
         >>> voxelgrid_1 = torch.rand(32, 32, 32) > 0.5
         >>> voxelgrid_2 = torch.rand(32, 32, 32) > 0.5
         >>> stage = export_voxelgrids('./new_stage.usd', [voxelgrid_1, voxelgrid_2])
     """
+    if os.path.exists(file_path) and not overwrite:
+        raise FileExistsError(f"{file_path} already exists; to overwrite whole file use 'overwrite' argument;" +
+                              "to add mesh to existing usd, use add_mesh' instead.")
     if scene_paths is None:
         scene_paths = [f'/World/VoxelGrids/voxelgrid_{i}' for i in range(len(voxelgrids))]
     if times is None:

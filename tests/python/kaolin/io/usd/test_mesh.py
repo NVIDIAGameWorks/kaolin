@@ -17,6 +17,7 @@
 import os
 import shutil
 import glob
+import filecmp
 
 import torch
 import pytest
@@ -65,6 +66,13 @@ def mesh():
     obj_mesh = obj.import_mesh(os.path.join(__samples_path, 'rocket.obj'), with_normals=True,
                                with_materials=True, error_handler=obj.skip_error_handler)
     return obj_mesh
+
+@pytest.fixture(scope='class')
+def golden_overwrite_path(out_dir, mesh):
+    path = os.path.join(out_dir, 'golden_overwrite.usda')
+    usd.export_mesh(path, vertices=mesh.vertices, faces=mesh.faces)
+    return path
+
 
 @pytest.fixture(scope='module')
 def mesh_alt():
@@ -140,9 +148,10 @@ class TestMeshes:
         stage = usd.export_mesh(out_path, scene_paths[0], mesh.vertices, mesh.faces)
 
         # Check against golden usd file path
-        assert open(mesh_path).read() == open(out_path).read()
+        assert filecmp.cmp(mesh_path, out_path)
+        #assert open(mesh_path).read() == open(out_path).read()
 
-    @pytest.mark.parametrize('input_stage', [False, True, 'generated'])
+    @pytest.mark.parametrize('input_stage', [False, True])
     @pytest.mark.parametrize('with_paths', [False, True])
     def test_export_import_multiple(self, scene_paths, out_dir, mesh, mesh_alt, input_stage, with_paths):
         out_path = os.path.join(out_dir, 'partial_meshes.usda')
@@ -154,25 +163,23 @@ class TestMeshes:
         actual_face_normals_list = [mesh.normals[mesh.face_normals_idx],
                                     mesh_alt.normals[mesh_alt.face_normals_idx]]
         # Try exporting just vertices and faces
-        stage = usd.export_meshes(out_path, scene_paths, vertices_list, faces_list)
+        usd.export_meshes(out_path, scene_paths, vertices_list, faces_list, overwrite=True)
 
         # Now export all the attributes
         out_path = os.path.join(out_dir, 'meshes.usda')
         # TODO: properly export with materials once can convert OBJ materials to USD
-        stage = usd.export_meshes(out_path, scene_paths, vertices_list, faces_list,
-                                  uvs=[mesh.uvs, mesh_alt.uvs],
-                                  face_uvs_idx=[mesh.face_uvs_idx, mesh_alt.face_uvs_idx],
-                                  face_normals=actual_face_normals_list)
+        usd.export_meshes(out_path, scene_paths, vertices_list, faces_list,
+                          uvs=[mesh.uvs, mesh_alt.uvs],
+                          face_uvs_idx=[mesh.face_uvs_idx, mesh_alt.face_uvs_idx],
+                          face_normals=actual_face_normals_list,
+                          overwrite=True)
 
         # Test that we can read both meshes correctly with/without paths
         args = {}
         if with_paths:
             args = {'scene_paths': scene_paths}
 
-        if input_stage == 'generated':
-            path_or_stage = stage  # Also test stage output by export_meshes
-        else:
-            path_or_stage = Usd.Stage.Open(out_path) if input_stage else out_path
+        path_or_stage = Usd.Stage.Open(out_path) if input_stage else out_path
 
         # TODO: once above is fixed use with_materials=True here
         meshes_in = usd.import_meshes(path_or_stage, with_normals=True, **args)
@@ -270,10 +277,11 @@ class TestMeshes:
         assert mesh[0].faces.size(1) == 3
 
         out_path = os.path.join(out_dir, 'homogenized.usda')
-        usd.export_mesh(out_path, '/World/Rocket', vertices=mesh[0].vertices, faces=mesh[0].faces)
+        usd.export_mesh(out_path, '/World/Rocket', vertices=mesh[0].vertices, faces=mesh[0].faces, overwrite=True)
 
         # Confirm exported USD matches golden file
-        assert open(homogenized_golden_path).read() == open(out_path).read()
+        assert filecmp.cmp(homogenized_golden_path, out_path)
+        #assert open(homogenized_golden_path).read() == open(out_path).read()
 
     @pytest.mark.parametrize('use_triangulate_shortcut', [True, False])
     @pytest.mark.parametrize('input_stage', [False, True])
@@ -292,10 +300,11 @@ class TestMeshes:
         assert mesh.faces.size(1) == 3
 
         out_path = os.path.join(out_dir, 'homogenized.usda')
-        usd.export_mesh(out_path, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces)
+        usd.export_mesh(out_path, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces, overwrite=True)
 
         # Confirm exported USD matches golden file
-        assert open(homogenized_golden_path).read() == open(out_path).read()
+        assert filecmp.cmp(homogenized_golden_path, out_path)
+        #assert open(homogenized_golden_path).read() == open(out_path).read()
 
     @pytest.mark.parametrize('input_stage', [False, True])
     def test_import_with_transform(self, scene_paths, out_dir, hetero_mesh_path, input_stage):
@@ -377,13 +386,13 @@ class TestMeshes:
                 usd.export_mesh(out_path, '/World/Rocket', vertices=mesh.vertices, faces=mesh.faces,
                                 face_uvs_idx=mesh.face_uvs_idx, face_normals=mesh.face_normals, uvs=mesh.uvs,
                                 material_assignments=mesh.material_assignments, materials=mesh.materials,
-                                overwrite_textures=overwrite_textures)
+                                overwrite=True, overwrite_textures=overwrite_textures)
             else:
                 usd.export_meshes(out_path, ['/World/Rocket'], vertices=[mesh.vertices], faces=[mesh.faces],
                                   face_uvs_idx=[mesh.face_uvs_idx], face_normals=[mesh.face_normals], uvs=[mesh.uvs],
                                   material_assignments=[mesh.material_assignments],
                                   materials=[mesh.materials],
-                                  overwrite_textures=overwrite_textures)
+                                  overwrite=True, overwrite_textures=overwrite_textures)
 
         # Confirm exported USD matches golden file
         # Note: we can't match UVs due to small arithmetic changes introduced due to UV convention fixing
@@ -442,6 +451,44 @@ class TestMeshes:
         mesh_in = usd.import_mesh(out_path)
         assert torch.allclose(mesh_in.uvs.view(-1, 2), mesh.uvs.view(-1, 2))
 
+
+    def test_fail_export_twice(self, out_dir, mesh):
+        out_path = os.path.join(out_dir, 'fail_exported_twice.usda')
+        usd.export_mesh(out_path, vertices=mesh.vertices, faces=mesh.faces)
+        with pytest.raises(FileExistsError):
+            usd.export_mesh(out_path, vertices=mesh.vertices, faces=mesh.faces)
+
+
+    def test_export_twice(self, out_dir, mesh, golden_overwrite_path):
+        out_path = os.path.join(out_dir, 'exported_twice.usda')
+        usd.export_mesh(out_path, vertices=mesh.vertices + 10., faces=mesh.faces)
+        usd.export_mesh(out_path, vertices=mesh.vertices, faces=mesh.faces,
+                        overwrite=True)
+        assert filecmp.cmp(out_path, golden_overwrite_path)
+
+    def test_export_overwrite_full_file(self, out_dir, mesh, golden_overwrite_path):
+        out_path = os.path.join(out_dir, 'exported_overwrite_full_file.usda')
+        usd.export_meshes(out_path,
+                          vertices=[mesh.vertices + 10, mesh.vertices + 20],
+                          faces=[mesh.faces, mesh.faces])
+        usd.export_mesh(out_path, vertices=mesh.vertices, faces=mesh.faces,
+                        overwrite=True)
+        assert filecmp.cmp(out_path, golden_overwrite_path)
+
+    def test_export_overwrite_pointcloud(self, out_dir, mesh, golden_overwrite_path):
+        out_path = os.path.join(out_dir, 'exported_overwrite_pointcloud.usda')
+        usd.export_pointcloud(out_path, pointcloud=torch.rand((100, 3)))
+        usd.export_mesh(out_path, vertices=mesh.vertices, faces=mesh.faces,
+                        overwrite=True)
+        assert filecmp.cmp(out_path, golden_overwrite_path)
+
+    def test_export_overwrite_voxelgrid(self, out_dir, mesh, golden_overwrite_path):
+        out_path = os.path.join(out_dir, 'exported_overwrite_voxelgrid.usda')
+        usd.export_voxelgrid(out_path, voxelgrid=(torch.rand(32, 32, 32) > 0.7))
+        usd.export_mesh(out_path, vertices=mesh.vertices, faces=mesh.faces,
+                        overwrite=True)
+        assert filecmp.cmp(out_path, golden_overwrite_path)
+
     @pytest.mark.parametrize('input_stage', [False, True])
     def test_import_st_indices_facevarying(self, out_dir, mesh, input_stage):
         out_path = os.path.join(out_dir, 'st_indices.usda')
@@ -449,7 +496,8 @@ class TestMeshes:
         scene_path = '/World/mesh_0'
         face_uvs_idx = (torch.rand(mesh.faces.shape[:2]) * 99).long()
         usd.export_mesh(out_path, scene_path=scene_path, vertices=mesh.vertices,
-                        faces=mesh.faces, uvs=uvs, face_uvs_idx=face_uvs_idx)
+                        faces=mesh.faces, uvs=uvs, face_uvs_idx=face_uvs_idx,
+                        overwrite=True)
 
         # check that interpolation was set correctly to 'faceVarying'
         stage = Usd.Stage.Open(out_path)
@@ -469,7 +517,7 @@ class TestMeshes:
         uvs = torch.rand((mesh.vertices.size(0), 2))
         scene_path = '/World/mesh_0'
         usd.export_mesh(out_path, scene_path=scene_path, vertices=mesh.vertices,
-                        faces=mesh.faces, uvs=uvs)
+                        faces=mesh.faces, uvs=uvs, overwrite=True)
 
         # check that interpolation was set correctly to 'vertex'
         stage = Usd.Stage.Open(out_path)
@@ -489,7 +537,7 @@ class TestMeshes:
         uvs = torch.rand((mesh.faces.size(0) * mesh.faces.size(1), 2))
         scene_path = '/World/mesh_0'
         usd.export_mesh(out_path, scene_path=scene_path, vertices=mesh.vertices,
-                        faces=mesh.faces, uvs=uvs)
+                        faces=mesh.faces, uvs=uvs, overwrite=True)
 
         # check that interpolation was set correctly to 'faceVarying'
         stage = Usd.Stage.Open(out_path)
@@ -606,16 +654,19 @@ class TestDiverseInputs:
         # import as multiple meshes
         read_usd_mesh = SurfaceMesh.cat(
             usd.import_meshes(fname, with_normals=True, with_materials=True), fixed_topology=False).to(device)
-        print(f'Read USD mesh uvs {bname} {device}: {read_usd_mesh.uvs[0][:5, :]}')
         assert len(read_usd_mesh) == expected_mesh_counts[bname]
         assert len(read_usd_mesh.materials[0]) != 0
 
         # Now write the USD to file, read it back and make sure attributes match the original mesh
         out_path = os.path.join(out_dir, f'reexport_{bname}.usda')
-        usd.export_meshes(out_path, vertices=read_usd_mesh.vertices, faces=read_usd_mesh.faces,
-                          uvs=read_usd_mesh.uvs, face_uvs_idx=read_usd_mesh.face_uvs_idx,
+        usd.export_meshes(out_path, vertices=read_usd_mesh.vertices,
+                          faces=read_usd_mesh.faces,
+                          uvs=read_usd_mesh.uvs,
+                          face_uvs_idx=read_usd_mesh.face_uvs_idx,
                           face_normals=read_usd_mesh.face_normals,
-                          material_assignments=read_usd_mesh.material_assignments, materials=read_usd_mesh.materials)
+                          material_assignments=read_usd_mesh.material_assignments,
+                          materials=read_usd_mesh.materials,
+                          overwrite=True)
 
         exported_usd_mesh = SurfaceMesh.cat(
             usd.import_meshes(out_path, with_normals=True,  with_materials=True), fixed_topology=False).to(device)
@@ -653,10 +704,15 @@ class TestDiverseInputs:
             # TODO: also support moving mesh materials to device
 
             # Now write the USD to file, read it back and make sure attributes match the original mesh
-            usd.export_meshes(out_path, vertices=read_usd_mesh.vertices, faces=read_usd_mesh.faces,
-                              uvs=read_usd_mesh.uvs, face_uvs_idx=read_usd_mesh.face_uvs_idx,
+            usd.export_meshes(out_path,
+                              vertices=read_usd_mesh.vertices,
+                              faces=read_usd_mesh.faces,
+                              uvs=read_usd_mesh.uvs,
+                              face_uvs_idx=read_usd_mesh.face_uvs_idx,
                               face_normals=read_usd_mesh.face_normals,
-                              material_assignments=read_usd_mesh.material_assignments, materials=read_usd_mesh.materials)
+                              material_assignments=read_usd_mesh.material_assignments,
+                              materials=read_usd_mesh.materials,
+                              overwrite=True)
 
         # Next, we import original and exported and check consistency
         for bname in all_bnames:

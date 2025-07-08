@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from collections import namedtuple
+import os
 import numpy as np
 import torch
 
@@ -195,12 +196,16 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
             https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
             https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: 'point_instancer'.
 
+    Returns:
+        (Usd.Prim): The generated pointcloud Prim.
+
     Example:
         >>> stage = create_stage('./new_stage.usd')
-        >>> points = torch.rand(100, 3)
-        >>> add_pointcloud(stage, points, '/World/PointClouds/pointcloud_0')
+        >>> pointcloud = torch.rand(100, 3)
+        >>> prim = add_pointcloud(stage, pointcloud, '/World/PointClouds/pointcloud_0')
         >>> stage.Save()
     """
+    pointcloud = points # TODO(cfujitsang): we should do breaking changes in API to be consistent
     scene_path = Sdf.Path(scene_path)
     if time is None:
         time = Usd.TimeCode.Default()
@@ -225,32 +230,34 @@ def add_pointcloud(stage, points, scene_path, colors=None, time=None, points_typ
         geom_points = UsdGeom.Points(points_prim)
 
     # Calculate default point scale
-    bounds = points.max(dim=0)[0] - points.min(dim=0)[0]
+    bounds = pointcloud.max(dim=0)[0] - pointcloud.min(dim=0)[0]
     min_bound = min(bounds)
-    scale = (min_bound / points.size(0) ** (1 / 3)).item()
+    scale = (min_bound / pointcloud.size(0) ** (1 / 3)).item()
 
     # Generate instancer parameters
-    positions = points.detach().cpu().tolist()
-    scales = np.asarray([scale, ] * points.size(0))
+    positions = pointcloud.detach().cpu().tolist()
+    scales = np.asarray([scale, ] * pointcloud.size(0))
 
     if points_type == 'point_instancer':
-        indices = [0] * points.size(0)
+        indices = [0] * pointcloud.size(0)
         # Populate point instancer
         geom_points.GetProtoIndicesAttr().Set(indices, time=time)
         geom_points.GetPositionsAttr().Set(positions, time=time)
-        scales = [(scale,) * 3] * points.size(0)
+        scales = [(scale,) * 3] * pointcloud.size(0)
         geom_points.GetScalesAttr().Set(scales, time=time)
     elif points_type == 'usd_geom_points':
         # Populate UsdGeomPoints
-        geom_points.GetPointsAttr().Set(points.numpy(), time=time)
+        geom_points.GetPointsAttr().Set(pointcloud.numpy(), time=time)
         geom_points.GetWidthsAttr().Set(Vt.FloatArray.FromNumpy(scales), time=time)
 
     if colors is not None and points_type == 'usd_geom_points':
-        assert colors.shape == points.shape, 'Colors and points must have the same shape.'
+        assert colors.shape == pointcloud.shape, 'Colors and points must have the same shape.'
         geom_points.GetDisplayColorAttr().Set(colors.numpy(), time=time)
 
+    return points_prim
+
 def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/pointcloud_0',
-                      color=None, time=None, points_type='point_instancer'):
+                      color=None, time=None, points_type='point_instancer', overwrite=False):
     r"""Export a single pointcloud to a USD scene.
 
     Export a single pointclouds to USD. The pointcloud will be added to the USD stage and represented
@@ -269,16 +276,17 @@ def export_pointcloud(file_path, pointcloud, scene_path='/World/PointClouds/poin
                 Please refer here for UsdGeomPoints:
                 https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
                 https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: 'point_instancer'.
+        overwrite (bool): If True, overwrite existing .usda. If False (default) raise an error if files already exists.
 
     Example:
         >>> points = torch.rand(100, 3)
         >>> export_pointcloud('./new_stage.usd', points)
     """
-    export_pointclouds(file_path, [pointcloud], [scene_path], colors=[color], times=[time],
-                       points_type=points_type)
+    export_pointclouds(file_path, pointclouds=[pointcloud], scene_paths=[scene_path],
+                       colors=[color], times=[time], points_type=points_type, overwrite=overwrite)
 
 def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, times=None,
-                       points_type='point_instancer'):
+                       points_type='point_instancer', overwrite=False):
     r"""Export one or more pointclouds to a USD scene.
 
     Export one or more pointclouds to USD. The pointclouds will be added to the USD stage and represented
@@ -297,11 +305,15 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, ti
             Please refer here for UsdGeomPoints:
             https://graphics.pixar.com/usd/docs/api/class_usd_geom_points.html and here for PointInstancer
             https://graphics.pixar.com/usd/docs/api/class_usd_geom_point_instancer.html. Default: 'point_instancer'.
+        overwrite (bool): If True, overwrite existing .usda. If False (default) raise an error if files already exists.
 
     Example:
         >>> points = torch.rand(100, 3)
         >>> export_pointcloud('./new_stage.usd', points)
     """
+    if os.path.exists(file_path) and not overwrite:
+        raise FileExistsError(f"{file_path} already exists; to overwrite whole file use 'overwrite' argument;" +
+                              "to add mesh to existing usd, use add_mesh' instead.")
     if scene_paths is None:
         scene_paths = [f'/World/PointClouds/pointcloud_{i}' for i in range(len(pointclouds))]
     if times is None:
@@ -311,6 +323,7 @@ def export_pointclouds(file_path, pointclouds, scene_paths=None, colors=None, ti
 
     assert len(pointclouds) == len(scene_paths)
     stage = create_stage(file_path)
-    for scene_path, points, color, time in zip(scene_paths, pointclouds, colors, times):
-        add_pointcloud(stage, points, scene_path, color, time=time, points_type=points_type)
+    for scene_path, pointcloud, color, time in zip(scene_paths, pointclouds, colors, times):
+        add_pointcloud(stage, points=pointcloud, scene_path=scene_path, colors=color,
+                       time=time, points_type=points_type)
     stage.Save()

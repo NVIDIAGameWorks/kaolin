@@ -113,7 +113,6 @@ class TestDiverseInputs:
         if method_to_test == 'generic':
             read_usd_mesh = import_mesh(fname, triangulate=True)
         else:
-            print("fname")
             read_usd_mesh = usd.import_mesh(fname, with_normals=True, with_materials=True, triangulate=True)
 
         # Read gltf version
