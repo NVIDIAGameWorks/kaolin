@@ -530,8 +530,6 @@ class TestEasyAPISimplicitsScene:
 
         for i in range(50):
             scene.run_sim_step()
-            print(scene.get_object_deformed_pts(0)[:, 1].mean(
-            ), scene.get_object_deformed_pts(1)[:, 1].mean())
             assert (scene.get_object_deformed_pts(0)[:, 1].mean() 
                     - scene.get_object_deformed_pts(1)[:, 1].mean()) > 0.5, \
             f"Mean y coordinate of object 0 is within 1 unit of object 1, so objects overlap at timestep {i}"

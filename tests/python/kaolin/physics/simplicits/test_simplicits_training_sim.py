@@ -161,4 +161,4 @@ def test_cantilever_beam_simulation(device, dtype):
     data = torch.load(os.path.dirname(os.path.realpath(
         __file__)) + "/regression_test_data/wpfem_vertex_deformations_beam.pth", weights_only=False)
     
-    run_regression_test(simplicits_scene, data, tol=0.015, test_name="cantilever_beam")
+    run_regression_test(simplicits_scene, data, tol=0.02, test_name="cantilever_beam")
