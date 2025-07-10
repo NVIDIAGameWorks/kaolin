@@ -19,36 +19,29 @@ import warp as wp
 import warp.sparse as wps
 
 from kaolin.physics.simplicits.precomputed import sparse_collision_jacobian_matrix
-from kaolin.physics.utils.warp_utilities import bsr_to_torch
+from kaolin.physics.utils.warp_utilities import _bsr_to_torch
 
 __all__ = ['Collision']
 
-# TODO:Consider calling detect_particle_collisions each iteration of newton step
-# - Pros:
-#   - Allows for smaller collision radius
-# - Cons:
-#   - Slower than once per timestep
 # TODO: Separate the cps from qps. Currently we use qps for both.
 # TODO: Currently self collisions are disabled via high immune radius.
-# TODO: Consider floor friction.
-# TODO: In collision bounds kernel, swap out J_a, J_b indices with cp_to_obj_id, and obj_id_to_dof maps.
+# TODO: Consider floor friction, alternatively use a floor object and set friction for that
+# TODO: Object-wise friction parameters
 # TODO: Allow variable collision radii for different objects.
-# TODO: Expose friction parameters to users
+
 
 NULL_ELEMENT_INDEX = wp.constant(-1)
 
 
 @wp.kernel
-def _detect_particle_collisions(
+def _detect_particle_collisions_wp_kernel(
     max_contacts: int,                    # max number of contacts to detect
     grid: wp.uint64,                      # hashgrid for current points
     radius: float,                        # collision radius
     self_collision_immune_radius: float,  # ignore self collisions within radius
-    # current positions of points B*z + x0
-    pos_cur: wp.array(dtype=wp.vec3),
+    pos_cur: wp.array(dtype=wp.vec3),     # current positions of points B*z + x0
     pos_rest: wp.array(dtype=wp.vec3),    # rest positions of points x0
-    # displacements of points ... velocity of points * dt (how much they moved in current timestep)B*z_k - B*z_0 where k is newton iteration
-    pos_delta: wp.array(dtype=wp.vec3),
+    pos_delta: wp.array(dtype=wp.vec3),   # displacements of points ... velocity of points * dt (how much they moved in current timestep)B*z_k - B*z_0 where k is newton iteration
     qp_obj_ids: wp.array(dtype=int),      # point to object id mapping
     cp_is_static: wp.array(dtype=int),    # 1 for true, 0 for false
     count: wp.array(dtype=int),           # number of contacts detected
@@ -56,7 +49,7 @@ def _detect_particle_collisions(
     kinematic_gaps: wp.array(dtype=wp.vec3),  # kinematic gaps
     indices_a: wp.array(dtype=int),       # collision indices pairs a-b
     indices_b: wp.array(dtype=int),       # collision indices pairs a-b
-):
+):  # pragma: no cover
     tid = wp.tid()
 
     # Get current point's index, object and position
@@ -111,14 +104,34 @@ def _detect_particle_collisions(
 
 
 @wp.func
-def _collision_offset(
+def _collision_offset_wp_func(
     c: int,
     dx_cur: wp.array(dtype=wp.vec3),
     dx_start_of_timestep: wp.array(dtype=wp.vec3),
     kinematic_gaps: wp.array(dtype=wp.vec3),
     indices_a: wp.array(dtype=int),
     indices_b: wp.array(dtype=int),
-):
+):  # pragma: no cover
+    r"""
+    Compute the relative offset between two colliding points.
+    
+    This function calculates the current relative position between two points involved
+    in a collision, accounting for their motion since the start of the timestep and
+    any kinematic gaps (initial separations).
+    
+    Args:
+        c (int): Index of the collision pair
+        dx_cur (wp.array(dtype=wp.vec3)): Current displacements of all points
+        dx_start_of_timestep (wp.array(dtype=wp.vec3)): Displacements at the start of the timestep
+        kinematic_gaps (wp.array(dtype=wp.vec3)): Initial separation vectors between colliding points
+        indices_a (wp.array(dtype=int)): Indices of the first point in each collision pair
+        indices_b (wp.array(dtype=int)): Indices of the second point in each collision pair
+        
+    Returns:
+        wp.vec3: The relative offset vector from point B to point A, accounting for
+                motion and kinematic gaps. If point B is static (NULL_ELEMENT_INDEX),
+                only point A's motion is considered.
+    """
     idx_a = indices_a[c]
     idx_b = indices_b[c]
 
@@ -132,18 +145,18 @@ def _collision_offset(
 
 
 @wp.func
-def _collision_target_distance(
+def _collision_target_distance_wp_func(
     c: int,
     radius: float,
     indices_a: wp.array(dtype=int),
     indices_b: wp.array(dtype=int),
-):
+):  # pragma: no cover
     return wp.select(indices_b[c] == NULL_ELEMENT_INDEX, 2.0, 1.0) * radius
     # return 2.0 * radius
 
 
 @wp.kernel
-def _collision_energy(
+def _collision_energy_wp_kernel(
     coeff: float,
     radius: float,
     barrier_distance_ratio: float,
@@ -157,12 +170,12 @@ def _collision_energy(
     indices_a: wp.array(dtype=int),
     indices_b: wp.array(dtype=int),
     energies: wp.array(dtype=float),
-):
+):  # pragma: no cover
     c = wp.tid()
 
-    offset = _collision_offset(
+    offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
-    rc = _collision_target_distance(c, radius, indices_a, indices_b)
+    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
     rp_ratio = barrier_distance_ratio
 
     nor = normals[c]
@@ -210,7 +223,7 @@ def _collision_energy(
 
 
 @wp.kernel
-def _collision_gradient(coeff: float,
+def _collision_gradient_wp_kernel(coeff: float,
                         radius: float,
                         barrier_distance_ratio: float,
                         mu: float,
@@ -222,14 +235,14 @@ def _collision_gradient(coeff: float,
                         normals: wp.array(dtype=wp.vec3),
                         indices_a: wp.array(dtype=int),
                         indices_b: wp.array(dtype=int),
-                        gradient: wp.array(dtype=wp.vec3)):
+                                  gradient: wp.array(dtype=wp.vec3)):  # pragma: no cover
     """Calculates the collision energy for each object point
     """
     c = wp.tid()
 
-    offset = _collision_offset(
+    offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
-    rc = _collision_target_distance(c, radius, indices_a, indices_b)
+    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
     rp_ratio = barrier_distance_ratio
 
     nor = normals[c]
@@ -263,7 +276,7 @@ def _collision_gradient(coeff: float,
 
 
 @wp.kernel
-def _collision_hessian_diag_blocks(coeff: float,
+def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
                                    radius: float,
                                    barrier_distance_ratio: float,
                                    mu: float,
@@ -275,12 +288,12 @@ def _collision_hessian_diag_blocks(coeff: float,
                                    normals: wp.array(dtype=wp.vec3),
                                    indices_a: wp.array(dtype=int),
                                    indices_b: wp.array(dtype=int),
-                                   hessian: wp.array(dtype=wp.mat33)):
+                                             hessian: wp.array(dtype=wp.mat33)):  # pragma: no cover
     c = wp.tid()
 
-    offset = _collision_offset(
+    offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
-    rc = _collision_target_distance(c, radius, indices_a, indices_b)
+    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
     rp_ratio = barrier_distance_ratio
 
     nor = normals[c]
@@ -336,7 +349,7 @@ def _collision_hessian_diag_blocks(coeff: float,
 
 
 @wp.kernel
-def _compute_collision_bounds(
+def _get_collision_bounds_wp_kernel(
     radius: float,
     barrier_distance_ratio: float,
     dx_cur: wp.array(dtype=wp.vec3),
@@ -351,7 +364,7 @@ def _compute_collision_bounds(
     jacobian_b_offsets: wp.array(dtype=int),
     jacobian_b_columns: wp.array(dtype=int),
     dof_t_max: wp.array(dtype=float),
-):
+):  # pragma: no cover
     c = wp.tid()
 
     # Distance delta
@@ -369,9 +382,9 @@ def _compute_collision_bounds(
         delta_d_b = -wp.dot(nor, delta_dx[idx_b])
 
     # Current distance
-    offset = _collision_offset(
+    offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
-    rc = _collision_target_distance(c, radius, indices_a, indices_b)
+    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
     rp = barrier_distance_ratio * rc
     gap_cur = rp - wp.dot(offset, nor)
 
@@ -477,9 +490,15 @@ class Collision:
             cp_dx (wp.array(dtype=wp.vec3)): Current contact point displacements.
             cp_x0 (wp.array(dtype=wp.vec3)): Rest contact point positions.
             cp_obj_ids (wp.array(dtype=int)): Map from contact point to object id.
+            cp_is_static (wp.array(dtype=int), optional): Array indicating which contact points are static (1 for static, 0 for dynamic). Defaults to None.
 
-        Returns:
-            None
+        Note:
+            The function sets the collision indices in the collision_indices_a and collision_indices_b buffers, 
+            collision normals in the collision_normals buffer, 
+            and kinematic gaps between the contact points in the collision_kinematic_gaps buffer.
+            
+            The number of contacts is stored in the num_contacts attribute.
+            
         """
         # TODO: If we call this function multiple times per timestep, we need to store the
         # cp_dx_at_nm_iteration_0_torch at the start of each timestep, not here.
@@ -510,7 +529,7 @@ class Collision:
         
         # Find collisions
         wp.launch(
-            kernel=_detect_particle_collisions,
+            kernel=_detect_particle_collisions_wp_kernel,
             dim=current_cp.shape[0],
             inputs=[max_contacts,
                     self.hashgrid.id,
@@ -576,7 +595,7 @@ class Collision:
 
         return
 
-    def build_jacobian(self, cp_w, cp_x0, cp_is_static=None):
+    def get_jacobian(self, cp_w, cp_x0, cp_is_static=None):
         r""" Builds the jacobians of the collision points w.r.t the dofs. For contact pairs :math:`x_a \in \mathbb{R}^3, x_b \in \mathbb{R}^3`, the jacobians are:
 
         .. math::
@@ -587,8 +606,12 @@ class Collision:
         The difference, :math:`J = J_a - J_b`, is the jacobian of the collision gaps.
 
         Args:
-            cp_w (wp.array2d(dtype=wp.float32)): Contact point skinning weights.
-            cp_x0 (wp.array(dtype=wp.vec3)): Rest contact point positions.
+            cp_w (wp.array2d(dtype=wp.float32)): Contact point skinning weights of size :math:`(\text{num_pts}, \text{num_handles})`
+            cp_x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
+            cp_is_static (wp.array(dtype=int), optional): Array indicating which contact points are static (1 for static, 0 for dynamic). Defaults to None.
+        
+        Note:
+            The jacobian set by this function is a sparse matrix of size :math:`(3 \times \text{num_contacts}, 12 \times \text{num_handles})`.
         """
 
         # indices of the colliding point pairs
@@ -620,21 +643,26 @@ class Collision:
             self.collision_J_a.nnz_sync()
             self.collision_J_b.nnz_sync()
 
-        J = self.collision_J_a - self.collision_J_b
-        self.collision_J = J #wps.bsr_copy(J, block_shape=(3, 12))
+        self.collision_J = self.collision_J_a - self.collision_J_b #wps.bsr_copy(J, block_shape=(3, 12))
         self.collision_J.nnz_sync()
 
-        self.collision_J_dense = bsr_to_torch(self.collision_J).to_dense()
+        if self.num_contacts > 0:
+            self.collision_J_dense = _bsr_to_torch(self.collision_J).to_dense()
+        else:
+            self.collision_J_dense = torch.zeros(self.collision_J.shape, device=wp.device_to_torch(self.collision_J.device), dtype=wp.dtype_to_torch(self.collision_J.dtype))
 
         return
 
-    def compute_bounds(self, cp_delta_dx, cp_dx, cp_x0):
+    def get_bounds(self, cp_delta_dx, cp_dx, cp_x0):
         r""" Compute the bounds of the update for each dof. This is used to guarantee intersection-free contact. See :func:`kaolin.physics.optimization.apply_bounds` for more details.
 
         Args:
-            cp_delta_dx (wp.array(dtype=wp.vec3)): B*dz where dz is the newton update
-            cp_dx (wp.array(dtype=wp.vec3)): B*z where z is the current dofs
-            cp_x0 (wp.array(dtype=wp.vec3)): Rest contact point positions.
+            cp_delta_dx (wp.array(dtype=wp.vec3)): :math:`(B*dz).reshape(-1, 3)` where :math:`dz` is the newton update of size :math:`(\text{num_pts}, 3)`
+            cp_dx (wp.array(dtype=wp.vec3)): :math:`(B*z).reshape(-1, 3)` where :math:`z` is the current dofs of size :math:`(\text{num_pts}, 3)`
+            cp_x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
+            
+        Returns:
+            wp.array(dtype=float): Bounds of the update for each dof of size :math:`(\text{num_dofs},)`
         """
         if self.num_contacts == 0 and not self.bounds:
             return None
@@ -655,7 +683,7 @@ class Collision:
             (self.collision_J_a.ncol), dtype=float, device=self.collision_J_a.device)
 
         wp.launch(
-            _compute_collision_bounds,
+            _get_collision_bounds_wp_kernel,
             dim=self.num_contacts,
             inputs=[
                 self.collision_radius,
@@ -695,17 +723,20 @@ class Collision:
         Compute the collision energy.
 
         Args:
-            dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs.
-            x0 (wp.array(dtype=wp.vec3)): Rest contact point positions.
+            dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient for the collision energy.
-            energy (wp.array(dtype=float)): Output energy. Used for cuda-graph capture
-        """
+            energy (wp.array(dtype=float)): Output energy. Used for cuda-graph capture of size :math:`1`
 
+        Returns:
+            wp.array(dtype=float): Optional output energy of size :math:`1`
+        """
+        
         if energy is None:
             energy = wp.zeros(1, dtype=float)
 
         wp.launch(
-            kernel=_collision_energy,
+            kernel=_collision_energy_wp_kernel,
             dim=self.num_contacts,
             inputs=[coeff,
                     self.collision_radius,
@@ -730,15 +761,18 @@ class Collision:
         Compute the gradient of the collision energy.
 
         Args:
-            dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs.
-            x0 (wp.array(dtype=wp.vec3)): Rest contact point positions.
+            dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient for the collision energy.
+
+        Returns:
+            wp.array(dtype=wp.vec3): Gradient of the collision energy of size :math:`(\text{num_contacts}, 3)`
         """
         gradient = wp.zeros(
             self.num_contacts, dtype=wp.vec3, device=dx.device)
 
         wp.launch(
-            kernel=_collision_gradient,
+            kernel=_collision_gradient_wp_kernel,
             dim=self.num_contacts,
             inputs=[coeff,
                     self.collision_radius,
@@ -763,16 +797,19 @@ class Collision:
         Compute the hessian of the collision energy.
 
         Args:
-            dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs.
-            x0 (wp.array(dtype=wp.vec3)): Rest contact point positions.
+            dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs of size :math:`(\text{num_pts}, 3)`
+            x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient for the collision energy.
+
+        Returns:
+            wp.array(dtype=wp.mat33): Hessian of the collision energy of size :math:`(\text{num_contacts}, 3, 3)`
         """
 
         hessian_blocks = wp.zeros(
             self.num_contacts, dtype=wp.mat33, device=dx.device)
 
         wp.launch(
-            kernel=_collision_hessian_diag_blocks,
+            kernel=_collision_hessian_diag_blocks_wp_kernel,
             dim=self.num_contacts,
             inputs=[coeff,
                     self.collision_radius,

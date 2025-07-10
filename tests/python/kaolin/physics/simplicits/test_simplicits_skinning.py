@@ -17,9 +17,9 @@ import os
 import pytest
 import torch
 
-from kaolin.physics.simplicits.utils import standard_lbs, weight_function_lbs
+from kaolin.physics.simplicits.skinning import standard_lbs, weight_function_lbs
 
-from kaolin.utils.testing import FLOAT_TYPES, with_seed
+from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_allclose
 
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
@@ -53,7 +53,7 @@ def test_weight_fcn_lbs(device, dtype):
         expected_point = pt_i.T
         for j in range(H):
             expected_point += weights[i, j] * transforms[0, j] @ pt4_i.T
-        assert torch.allclose(expected_point.flatten(
+        check_allclose(expected_point.flatten(
         ), transformed_points[i].flatten(), atol=atol, rtol=rtol)
 
 
@@ -86,5 +86,5 @@ def test_standard_lbs(device, dtype):
             expected_point += weights[i, j] * transforms[0, j] @ pt4_i.T
 
         # checking 3D point by 3D point, so flattening should be ok
-        assert torch.allclose(expected_point.flatten(
+        check_allclose(expected_point.flatten(
         ), transformed_points[i].flatten(), atol=atol, rtol=rtol)

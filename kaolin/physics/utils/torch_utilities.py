@@ -15,15 +15,18 @@
 
 import torch
 
-__all__ = ["hess_reduction", "torch_bsr_to_torch_triplets"]
+__all__ = ["standard_transform_to_relative", 
+           "create_projection_matrix",
+           "hess_reduction",
+           "torch_bsr_to_torch_triplets"]
 
 
 def standard_transform_to_relative(transform):
     r"""Converts a standard transform to a relative transform.
     Args:
-        transform (torch.Tensor): A 3x4 or 4x4 torch tensor specifying object's transform.
+        transform (torch.Tensor): A :math:`(3 \times 4)` or :math:`(4 \times 4)` torch tensor specifying object's transform.
     Returns:
-        torch.Tensor: A 3x4 torch tensor specifying object's relative transform.
+        torch.Tensor: A :math:`3 \times 4` torch tensor specifying object's relative transform.
     """
     if transform.shape == (4, 4):
         relative_transform = transform[:3, :]
@@ -37,6 +40,7 @@ def standard_transform_to_relative(transform):
     
     return relative_transform
 
+
 def create_projection_matrix(num_dofs, list_of_kin_dofs):
     r"""Creates a projection matrix that removes kinematic degrees of freedom.
 
@@ -49,8 +53,7 @@ def create_projection_matrix(num_dofs, list_of_kin_dofs):
         list_of_kin_dofs (list or torch.Tensor): Indices of the kinematic DOFs to remove
 
     Returns:
-        torch.Tensor: A (num_dofs - num_kin_dofs) x num_dofs projection matrix that removes
-                     the kinematic DOF rows
+        torch.Tensor: A projection matrix of size :math:`(\text{num_dofs} - \text{num_kin_dofs}, \text{num_dofs})`, that removes the kinematic DOF rows.
     """
     # Create a mask of the dynamic (non-kinematic) dofs
     mask = torch.ones(num_dofs, dtype=torch.bool)
@@ -62,11 +65,13 @@ def create_projection_matrix(num_dofs, list_of_kin_dofs):
 
 
 def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None):
-    r""" This does Ja.T @ H @ Jb for a block-wise diagonal H matrix.
+    r""" This does :math:`\text{Ja}^T \times \text{H} \times \text{Jb}` for a block-wise diagonal :math:`\text{H}` matrix.
+    
     Args:
         dense_Ja (torch.Tensor): The left Jacobian matrix
         block_wise_H (torch.Tensor): 3D tensor of block-wise Hessian matrices
-        dense_Jb (torch.Tensor): The right Jacobian matrix. If not provided, will use Ja.T @ H @ Ja
+        dense_Jb (torch.Tensor): The right Jacobian matrix. If not provided, will use :math:`\text{Ja}`
+    
     Returns:
         torch.Tensor: The reduced Hessian matrix
     """
@@ -93,7 +98,7 @@ def torch_bsr_to_torch_triplets(mat):
     r"""Converts a sparse torch BSR matrix (or CSR matrix) to a sparse torch triplets.
 
     Args:
-        mat (torch.sparse_<b,c>sr_tensor): A sparse torch matrix
+        mat (torch.sparse_bsr_tensor): A sparse torch matrix of shape :math:`(m, n)` with block shape :math:`(b, b)`.
 
     Returns:
         tuple: (row_indices, col_indices, values) representing the triplets

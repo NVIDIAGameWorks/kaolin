@@ -24,12 +24,12 @@ def finite_diff_jac(fcn, x, eps=1e-7):
     r"""Computes the jacobian :math:`\frac{\partial fcn}{\partial x}` using finite diff 
 
     Args:
-        fcn (callable): Function that takes input :math:`(\text{num_pts}*6, \text{dim})` points for central finite differences and outputs a shape :math:`(\text{num_pts}*6, A_1, ..., A_n)`
+        fcn (callable): Function that takes input :math:`(6\text{num_pts}, \text{dim})` points for central finite differences and outputs a shape :math:`(\text{num_pts}*6, A_1, ..., A_n)`
         x (torch.Tensor): Input values, :math:`(\text{num_pts}, \text{dim})` 
         eps (float, optional): Squared finite difference epsilon. Defaults to 1e-7.
 
     Returns:
-        torch.Tensor: Returns the jacobian of fcn w.r.t x (:math:`\frac{\partial fcn(x)}{\partial x}`), of shape :math:`(\text{num_pts}, A_1, ..., A_n, \text{dim}, \text{dim})`
+        torch.Tensor: Returns the jacobian of fcn w.r.t `x`, :math:`\frac{\partial fcn(x)}{\partial x}`, of shape :math:`(\text{num_pts}, A_1, ..., A_n, \text{dim}, \text{dim})`
     """
     delta = math.sqrt(eps)
     h = delta * torch.eye(x.shape[1], device=x.device, dtype=x.dtype)

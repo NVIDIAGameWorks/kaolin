@@ -24,12 +24,12 @@ __all__ = [
 
 
 @wp.kernel
-def _wp_standard_lbs(
+def _standard_lbs_wp_kernel(
     rest_pts: wp.array2d(dtype=wp.float32),
     tfms: wp.array3d(dtype=wp.float32),
     weights: wp.array2d(dtype=wp.float32),
     output_pts: wp.array2d(dtype=wp.float32),
-):
+):  # pragma: no cover
     tid = wp.tid()
 
     x = wp.vec3(rest_pts[tid, 0], rest_pts[tid, 1], rest_pts[tid, 2])
@@ -53,7 +53,7 @@ def _wp_standard_lbs(
     output_pts[tid, 1] = x[1]
     output_pts[tid, 2] = x[2]
 
-# TODO: Warpify this. Kernel is already written
+# TODO: Warpify this if needed. Kernel is already written
 # def weight_function_lbs(torch_pts, wp_tfms, torch_fcn):
 #     """
 #     Compute the LBS skinning map.
@@ -70,7 +70,7 @@ def _wp_standard_lbs(
 
 #     # Launch kernel to build triplets
 #     wp.launch(
-#         kernel=_wp_standard_lbs,
+#         kernel=_standard_lbs_wp_kernel,
 #         dim=wp_rest_pts.shape[0],  # Number of points
 #         inputs=[
 #             wp_rest_pts,
@@ -99,8 +99,8 @@ def weight_function_lbs(x0, tfms, fcn):
 
 def standard_lbs(x0, tfms, w_x0):
     r""" 
-    Applies the linear blend skinning transform batched over all pts: x0 for a batch of transforms, given skinning weights w_x0
-    x_i = sum(w_j(x0_i) * T_j [x0_i; 1] + x0_i, for j=1..n) 
+    Applies the linear blend skinning transform batched over all pts (:math:`x_0`) for a batch of transforms (:math:`T`), given skinning weights (:math:`w_{x0}`), as
+    :math:`x_i = \sum_{j=1}^{n} w_j(x_{0,i}) \cdot T_j \begin{bmatrix} x_{0,i} \\ 1 \end{bmatrix} + x_{0,i}`
 
     Args:
         x0 (torch.Tensor): Rest state points, of shape :math:`(\text{num_pts}, \text{dim})`

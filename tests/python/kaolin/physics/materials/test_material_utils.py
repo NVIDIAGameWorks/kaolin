@@ -16,9 +16,11 @@
 import os
 import pytest
 import torch
-
-import SparseSimplicits.kaolin.kaolin.physics.materials.material_utils as material_utils
-
+import warp as wp
+import kaolin.physics as physics
+from functools import partial
+import kaolin.physics.materials.material_utils as material_utils
+from kaolin.utils.testing import check_allclose
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
@@ -34,5 +36,40 @@ def test_to_lame(device, dtype):
     expected_mus = yms / (2 * (1 + prs))
     expected_lams = yms * prs / ((1 + prs) * (1 - 2 * prs))
 
-    assert torch.allclose(mus, expected_mus)
-    assert torch.allclose(lams, expected_lams)
+    check_allclose(mus, expected_mus)
+    check_allclose(lams, expected_lams)
+
+
+@pytest.mark.parametrize('device', ['cuda'])
+@pytest.mark.parametrize('dtype', [torch.float])
+def test_wp_get_F(device, dtype):
+    N = 20
+    # Create N random points in the unit cube in torch
+    pts = torch.rand(N, 3, device=device, dtype=dtype)
+
+    # Create a random deformation in the unit cube in torch
+    dz = 1e-1 * torch.rand(1, 3, 4, device=device, dtype=dtype)
+    z0 = torch.zeros(1, 3, 4, device=device, dtype=dtype)
+    z = dz + z0
+
+    # Create fcn, return vector of ones
+    def model(x): return torch.ones(
+        (x.shape[0], 1), device=device, dtype=dtype)
+
+    partial_weight_fcn_lbs = partial(
+        physics.simplicits.skinning.weight_function_lbs, tfms=z.unsqueeze(0), fcn=model)
+
+    expected_F = physics.utils.finite_diff_jac(
+        partial_weight_fcn_lbs, pts).squeeze()
+
+    # Warp code to get F using dFdz
+    wp_z = wp.from_torch(z.flatten().contiguous())
+    wp_dFdz = physics.simplicits.precomputed.sparse_dFdz_matrix_from_dense(
+        model, pts)
+    wp_dFdz = wp.sparse.bsr_copy(wp_dFdz, block_shape=(9, 4))
+    wp_F = physics.materials.material_utils.get_defo_grad(wp_z, wp_dFdz)
+    F = wp.to_torch(wp_F)
+
+
+    check_allclose(expected_F, F, atol=1e-3)
+    # Warp code to get F using finite differences

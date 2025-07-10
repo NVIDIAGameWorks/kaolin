@@ -14,10 +14,10 @@
 # limitations under the License.
 
 import warp as wp
-from typing import Any
-import torch
+from kaolin.physics.utils.warp_utilities import mat99
+
 __all__ = [
-    "to_lame", "kron3", "compute_defo_grad"
+    "to_lame", "get_defo_grad"
 ]
 
 
@@ -37,12 +37,12 @@ def to_lame(yms, prs):
 
 
 @wp.func
-def kron3(a: wp.mat33, b: wp.mat33):
-    """Kronecker product of two 3x3 matrices
+def _kron3_wp_func(a: wp.mat33, b: wp.mat33):  # pragma: no cover
+    """Kronecker product of two :math:`(3,3)` matrices
 
     Args:
-        a (wp.mat33): Warp 3x3 matrix
-        b (wp.mat33): Warp 3x3 matrix
+        a (wp.mat33): Warp :math:`(3,3)` matrix
+        b (wp.mat33): Warp :math:`(3,3)` matrix
 
     Returns:
         wp.mat33: A warp 9x9 matrix.
@@ -57,18 +57,18 @@ def kron3(a: wp.mat33, b: wp.mat33):
 
 
 @wp.kernel
-def _get_defo_grad_kernel(F: wp.array(dtype=wp.mat33)):
+def _get_defo_grad_wp_kernel(F: wp.array(dtype=wp.mat33)):  # pragma: no cover
     tid = wp.tid()
     F[tid] += wp.identity(3, dtype=wp.float32)
 
 
-def compute_defo_grad(wp_z, wp_dFdz):
+def get_defo_grad(wp_z, wp_dFdz):
     r"""
     Get the deformation gradient per-sample point.
 
     Args:
-        wp_z (wp.array(dtype=wp.float)): Warp array of the deformation gradient Jacobian.
-        wp_dFdz (wp.sparse.bsr_matrix): Sparse matrix of the deformation gradient Jacobian.
+        wp_z (wp.array(dtype=wp.float)): Warp array of the deformation gradient Jacobian. Vector of size :math:`(12\text{handles},)`
+        wp_dFdz (wp.sparse.bsr_matrix): Sparse matrix of the deformation gradient Jacobian. Sparse matrix size :math:`(9 \text{num_points}, 12 \text{handles})`. Block shape :math:`(9, 4)`
 
     Returns:
         wp.array(dtype=wp.mat33): Warp array of wp.mat33 deformation gradients.
@@ -77,6 +77,6 @@ def compute_defo_grad(wp_z, wp_dFdz):
     # Get deformation gradient
     dFdz_z = wp_dFdz @ wp_z
     Fs = wp.array(dFdz_z, dtype=wp.mat33)
-    wp.launch(kernel=_get_defo_grad_kernel,
+    wp.launch(kernel=_get_defo_grad_wp_kernel,
               dim=Fs.shape, inputs=[Fs], adjoint=False)
     return Fs

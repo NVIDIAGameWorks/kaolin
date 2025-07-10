@@ -16,10 +16,9 @@
 import torch
 import logging
 import warp as wp
-import warp.sparse as wps
-from warp.optim.linear import cg, LinearOperator, preconditioner
+from warp.optim.linear import cg, preconditioner
 
-from kaolin.physics.utils import wp_bsr_to_torch_bsr
+from kaolin.physics.utils import _wp_bsr_to_torch_bsr
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +29,14 @@ def _print_callback(i, err, tol):
     print(f"CG solver: at iteration {i} error = \t {err}  \t tol: {tol}")
 
 
-def full_to_red(wp_Pt, wp_x):
+def _full_to_red(wp_Pt, wp_x):
     if wp_Pt is None:
         return wp_x
     else:
         return wp.array(wp_Pt @ wp_x).flatten()
 
 
-def red_to_full(wp_P, wp_red_x):
+def _red_to_full(wp_P, wp_red_x):
     if wp_P is None:
         return wp_red_x
     else:
@@ -84,7 +83,7 @@ def _line_search(func, x, wp_P, direction, gradient, initial_step_size, bounds, 
         torch float: Optimal step size used to scale the search direction
     """
     t = initial_step_size  # Initial step size
-    wp_x = red_to_full(wp_P, wp.from_torch(x))
+    wp_x = _red_to_full(wp_P, wp.from_torch(x))
     f = func(wp_x)
 
     can_break = False
@@ -92,7 +91,7 @@ def _line_search(func, x, wp_P, direction, gradient, initial_step_size, bounds, 
 
     for __ in range(max_steps):
         x_new = x + bounded_direction
-        wp_x_new = red_to_full(wp_P, wp.from_torch(x_new))
+        wp_x_new = _red_to_full(wp_P, wp.from_torch(x_new))
         f_new = func(wp_x_new)
 
         if f_new <= f + alpha * (gradient.permute(torch.arange(gradient.ndim - 1, -1, -1)) @ bounded_direction):
@@ -126,7 +125,7 @@ def newtons_method(x,
     finds an appropriate step size, and updates the dofs. It continues to do this iteratively until the directional update is small which indicates the energy is minimized.
 
     Args:
-        x (wp.array): Initial guess.
+        x (wp.array): Initial guess of size :math:`(\text{num_dofs},)`
         energy_fcn (function): Energy function. Takes in warp.array and returns a scalar.
         gradient_fcn (function): Gradient function. Takes in warp.array and returns a warp.array.
         hessian_fcn (function): Hessian function. Takes in warp.array and returns a sparse matrix (wps.bsr_matrix).
@@ -141,7 +140,7 @@ def newtons_method(x,
         direct_solve (bool, optional): Whether to use a dense direct solver, or a sparse CG solver. Defaults to False.
 
     Returns:
-        wp.array: Optimized objective.
+        wp.array: Optimized objective of size :math:`(\text{num_dofs},)`
     """
     # 1. Detect collisions, build collision jacobians
     # 2. Start newton iteration
@@ -150,7 +149,7 @@ def newtons_method(x,
     # 5. Do line search
     
     # Get the kinematic dofs
-    t_x_kinematic = wp.to_torch(x) - wp.to_torch(red_to_full(P, full_to_red(Pt, x))) # x - P @ Pt @ x
+    t_x_kinematic = wp.to_torch(x) - wp.to_torch(_red_to_full(P, _full_to_red(Pt, x))) # x - P @ Pt @ x
 
     for k in range(nm_max_iters):
         E_curr = energy_fcn(x)  # scalar
@@ -165,12 +164,12 @@ def newtons_method(x,
             red_H = H_curr
             red_g = G_curr
 
-        # Convert things to torch
-        t_red_x = wp.to_torch(full_to_red(Pt, x))
+        # Convert reduced dofs and gradient to torch
+        t_red_x = wp.to_torch(_full_to_red(Pt, x))
         t_red_g = wp.to_torch(red_g)
 
         if direct_solve:
-            A = wp_bsr_to_torch_bsr(red_H).to_dense()
+            A = _wp_bsr_to_torch_bsr(red_H).to_dense()
             b = wp.to_torch(red_g)
             t_red_dx = -torch.linalg.solve(A, b)
         else:
@@ -195,13 +194,13 @@ def newtons_method(x,
             logger.debug(f"Newton: Converged in {k} iterations")
             break
 
-        full_dx = red_to_full(P, wp.from_torch(t_red_dx))
+        full_dx = _red_to_full(P, wp.from_torch(t_red_dx))
         wp_bounds = bounds_fcn(
             full_dx, x)
         if wp_bounds is None:
             t_bounds = torch.ones_like(t_red_x)
         else:
-            t_bounds = wp.to_torch(full_to_red(Pt, wp_bounds))
+            t_bounds = wp.to_torch(_full_to_red(Pt, wp_bounds))
 
         last_alpha = 1.0
         bounded_update = _line_search(func=energy_fcn,
@@ -214,7 +213,7 @@ def newtons_method(x,
 
         t_red_x += bounded_update
 
-        t_x = wp.to_torch(red_to_full(P, wp.from_torch(t_red_x))) + t_x_kinematic 
+        t_x = wp.to_torch(_red_to_full(P, wp.from_torch(t_red_x))) + t_x_kinematic 
         x = wp.from_torch(t_x)
     
     return x

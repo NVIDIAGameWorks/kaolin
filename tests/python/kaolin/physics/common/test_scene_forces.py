@@ -13,266 +13,291 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import pytest
 import torch
-from functools import partial
-
-import kaolin.physics.utils as physics_utils
-from kaolin.physics.simplicits.precomputed import lbs_matrix, jacobian_dF_dz, jacobian_dF_dz_const_handle
-from kaolin.physics.utils.finite_diff import finite_diff_jac
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-@pytest.mark.parametrize('dim', [2, 3])
-def test_gravity_energy(device, dtype, dim):
-    N = 20
-    DIM = dim
-
-    rhos = torch.ones(N, 1, dtype=dtype, device=device)
-    total_vol = 10
-
-    acc = torch.zeros(DIM * N, device=device, dtype=dtype)
-    acc[1::3] = 9.8
-    points = torch.rand(N, DIM, device=device, dtype=dtype)  # n x 3 points
-
-    gravity_object = physics_utils.Gravity(rhos=rhos, acceleration=torch.tensor(
-        [0, 9.8, 0], device=device, dtype=dtype)[0:DIM])
-
-    ge = gravity_object.energy(points, integration_weights=torch.tensor(
-        total_vol / N, device=device, dtype=dtype))
-
-    expected_ge = torch.tensor([0], device=device, dtype=dtype)
-    integ_weights = torch.tensor(total_vol / N, device=device, dtype=dtype)
-    for i in range(0, points.shape[0]):
-        expected_ge += rhos[i] * integ_weights * \
-            points[i, :] @ torch.tensor([0, 9.8, 0],
-                                        device=device, dtype=dtype)[0:DIM]
-
-    assert torch.allclose(ge, expected_ge)
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-@pytest.mark.parametrize('dim', [2, 3])
-def test_gravity_gradient(device, dtype, dim):
-    N = 20
-    DIM = dim
-
-    rhos = torch.ones(N, 1, dtype=dtype, device=device)
-    total_vol = 10
-
-    masses = rhos * (total_vol / rhos.shape[0])
-    acc = torch.tensor([0, 9.8, 0], device=device, dtype=dtype)[0:DIM]
-    points = torch.rand(N, DIM, device=device, dtype=dtype)  # n x 3 points
-
-    gravity_object = physics_utils.Gravity(rhos=rhos, acceleration=torch.tensor(
-        [0, 9.8, 0], device=device, dtype=dtype)[0:DIM])
-
-    gg = gravity_object.gradient(points, integration_weights=torch.tensor(
-        total_vol / N, device=device, dtype=dtype))
-
-    expected_gg = torch.zeros_like(points, device=device, dtype=dtype)
-
-    integ_weights = torch.tensor(total_vol / N, device=device, dtype=dtype)
-    for i in range(0, points.shape[0]):
-        expected_gg[i, :] = rhos[i] * integ_weights * acc
-
-    assert torch.allclose(gg, expected_gg)
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-@pytest.mark.parametrize('dim', [2, 3])
-def test_gravity_hessian(device, dtype, dim):
-    N = 20
-    DIM = dim
-
-    rhos = torch.ones(N, 1, dtype=dtype, device=device)
-    total_vol = 10
-
-    masses = rhos * (total_vol / rhos.shape[0])
-    acc = torch.tensor([0, 9.8, 0], device=device, dtype=dtype)[0:DIM]
-    points = torch.rand(N, DIM, device=device, dtype=dtype)  # n x 3 points
-
-    gravity_object = physics_utils.Gravity(rhos=rhos, acceleration=torch.tensor(
-        [0, 9.8, 0], device=device, dtype=dtype)[0:DIM])
-
-    gh = gravity_object.hessian(points, integration_weights=torch.tensor(
-        total_vol / N, device=device, dtype=dtype))
-
-    expected_gh = torch.zeros(N, N, DIM, DIM, device=device, dtype=dtype)
-
-    assert torch.allclose(gh, expected_gh)
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-@pytest.mark.parametrize('dim', [2, 3])
-def test_floor_energy(device, dtype, dim):
-    N = 20
-    AXIS = 1
-    FLOOR_HEIGHT = 0.5
-    DIM = dim
-
-    rhos = torch.ones(N, dtype=dtype, device=device)
-    total_vol = 10
-
-    points = torch.rand(N, DIM, device=device, dtype=dtype)  # n x 3 points
-
-    floor_object = physics_utils.Floor(
-        floor_height=FLOOR_HEIGHT, floor_axis=AXIS)
-
-    fe = floor_object.energy(points)
-    expected_fe = torch.zeros(N, device=device, dtype=dtype)
-
-    for i in range(0, points.shape[0]):
-        expected_fe[i] = (
-            points[i, AXIS] - FLOOR_HEIGHT)**2 if points[i, AXIS] < FLOOR_HEIGHT else 0
-
-    print(fe, expected_fe, torch.sum(expected_fe))
-    assert torch.allclose(fe, torch.sum(expected_fe))
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-@pytest.mark.parametrize('dim', [2, 3])
-def test_floor_gradient(device, dtype, dim):
-    N = 20
-    AXIS = 1
-    FLOOR_HEIGHT = 0.5
-    DIM = dim
-
-    rhos = torch.ones(N, dtype=dtype, device=device)
-    total_vol = 10
-
-    points = torch.rand(N, DIM, device=device, dtype=dtype,
-                        requires_grad=True)  # n x 3 points
-
-    floor_object = physics_utils.Floor(
-        floor_height=FLOOR_HEIGHT, floor_axis=AXIS)
-
-    fg = floor_object.gradient(points)
-
-    points = points.detach()
-    expected_fg = torch.zeros_like(points)
-
-    fe0 = floor_object.energy(points)
-    eps = 1e-4
-    for i in range(points.shape[0]):
-        for j in range(points.shape[1]):
-            points[i, j] += eps
-            fel = torch.sum(floor_object.energy(points))
-            points[i, j] -= 2 * eps
-            fer = torch.sum(floor_object.energy(points))
-            points[i, j] += eps
-            expected_fg[i, j] += (fel - fer) / (2 * eps)
-
-    assert torch.allclose(fg, expected_fg, rtol=1e-3, atol=1e-3)
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-@pytest.mark.parametrize('dim', [2, 3])
-def test_floor_hessian(device, dtype, dim):
-    N = 20
-    AXIS = 1
-    FLOOR_HEIGHT = 0.5
-    DIM = dim
-
-    points = torch.rand(N, 3, device=device, dtype=dtype,
-                        requires_grad=True)  # n x 3 points
-
-    floor_object = physics_utils.Floor(
-        floor_height=FLOOR_HEIGHT, floor_axis=AXIS)
-
-    fh = floor_object.hessian(points)
-
-    expected_fh = torch.autograd.functional.hessian(
-        floor_object.energy, points).transpose(1, 2)
-
-    assert torch.allclose(fh, expected_fh)
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-@pytest.mark.parametrize('dim', [2, 3])
-def test_boundary_energy(device, dtype, dim):
-    N = 20
-    DIM = dim
-
-    points = torch.rand(N, DIM, device=device, dtype=dtype)  # n x 3 points
-
-    bdry_cond = physics_utils.Boundary()
-    bdry_indx = torch.nonzero(points[:, 0] < 0.5, as_tuple=False).squeeze()
-    bdry_pos = points[bdry_indx, :] + 0.1
-    bdry_cond.set_pinned_verts(bdry_indx, bdry_pos)
-
-    be = bdry_cond.energy(points)
-    expected_be = torch.tensor([0], device=device, dtype=dtype)
-
-    for i in range(bdry_indx.shape[0]):
-        idx = bdry_indx[i]
-        # sq norm
-        expected_be += torch.sum(torch.square(bdry_pos[i] - points[idx]))
-
-    assert torch.allclose(torch.sum(be), expected_be)
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-@pytest.mark.parametrize('dim', [2, 3])
-def test_boundary_gradient(device, dtype, dim):
-    N = 20
-    DIM = dim
-
-    points = torch.rand(N, DIM, device=device, dtype=dtype,
-                        requires_grad=True)  # n x 3 points
-
-    bdry_cond = physics_utils.Boundary()
-    bdry_indx = torch.nonzero(points[:, 0] < 0.5, as_tuple=False).squeeze()
-    bdry_pos = points[bdry_indx, :] + 0.1
-    bdry_cond.set_pinned_verts(bdry_indx, bdry_pos)
-
-    bg = bdry_cond.gradient(points)
-
-    points = points.clone().detach()
-    expected_bg = torch.zeros_like(points)
-
-    be = bdry_cond.energy(points)
-
-    eps = 1e-4
-    for i in range(points.shape[0]):
-        for j in range(points.shape[1]):
-            points[i, j] += eps
-            fel = torch.sum(bdry_cond.energy(points))
-            points[i, j] -= 2 * eps
-            fer = torch.sum(bdry_cond.energy(points))
-            points[i, j] += eps
-            expected_bg[i, j] += (fel - fer) / (2 * eps)
-    print(bg)
-    print(expected_bg)
-    assert torch.allclose(bg, expected_bg, rtol=1e-3, atol=1e-3)
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-@pytest.mark.parametrize('dim', [2, 3])
-def test_boundary_hessian(device, dtype, dim):
-    N = 20
-    DIM = dim
-
-    points = torch.rand(N, DIM, device=device, dtype=dtype,
-                        requires_grad=True)  # n x 3 points
-    bdry_cond = physics_utils.Boundary()
-    bdry_indx = torch.nonzero(points[:, 0] < 0.5, as_tuple=False).squeeze()
-    bdry_pos = points[bdry_indx, :] + 0.1
-    bdry_cond.set_pinned_verts(bdry_indx, bdry_pos)
-
-    bh = bdry_cond.hessian(points)
-
-    expected_bh = torch.autograd.functional.hessian(
-        bdry_cond.energy, points).transpose(1, 2)
-
-    assert torch.allclose(bh, expected_bh)
+import warp as wp
+import kaolin
+from kaolin.physics.common import Gravity, Floor, Boundary
+
+
+@pytest.fixture(params=['no_displacement', 'y_displacement', 'xy_displacement'])
+def object_points(request):
+    num_points = 20
+    dx = torch.zeros(num_points, 3)
+
+    if request.param == 'y_displacement':
+        dx[:, 1] = 0.1
+    elif request.param == 'xy_displacement':
+        dx[:, 0] = 0.1
+        dx[:, 1] = 0.2
+
+    return {
+        'x0': wp.array(torch.rand(num_points, 3), dtype=wp.vec3),
+        'dx': wp.array(dx, dtype=wp.vec3), 
+        'density': wp.array(torch.ones(num_points), dtype=wp.float32),
+        'volume': wp.array(torch.ones(num_points)/num_points, dtype=wp.float32)
+    }
+    
+    
+# Gravity Tests
+@pytest.mark.parametrize("object_points", [
+    "object_points_no_displacement",
+    "object_points_y_displacement",
+    "object_points_xy_displacement"
+], indirect=True)
+def test_gravity_energy(object_points):
+    
+    g = wp.vec3(0.0, -9.81, 0.0)
+    x0 = object_points['x0'] 
+    dx = object_points['dx']
+    density = object_points['density']
+    volume = object_points['volume']
+    
+    gravity = Gravity(g, density, volume)
+    energy = gravity.energy(dx, x0, 1.0)
+    
+    # Analytically calculate gravity energy
+    points = wp.to_torch(x0) + wp.to_torch(dx)
+    masses = wp.to_torch(density) * wp.to_torch(volume)
+    expected_energy = 0.0
+    for i in range(len(points)):
+        expected_energy += masses[i] * (-9.81 * points[i,1])  # g.dot(p) where g = (0,-9.81,0)
+    
+    kaolin.utils.testing.check_allclose(wp.to_torch(energy)[0], expected_energy, rtol=1e-5), \
+        "Gravity energy doesn't match analytical calculation"
+
+
+@pytest.mark.parametrize("object_points", [
+    "object_points_no_displacement",
+    "object_points_y_displacement",
+    "object_points_xy_displacement"
+], indirect=True)
+def test_gravity_gradient(object_points):
+    g = wp.vec3(0.0, -9.81, 0.0)
+    
+    x0 = object_points['x0'] 
+    dx = object_points['dx']
+    density = object_points['density']
+    volume = object_points['volume']
+    
+    gravity = Gravity(g, density, volume)
+    gradient = gravity.gradient(dx, x0, 1.0, None)
+    
+    torch_gradient = wp.to_torch(gradient)
+    torch_density = wp.to_torch(density)
+    torch_volume = wp.to_torch(volume)
+    for i in range(len(torch_gradient)):
+        kaolin.utils.testing.check_allclose(torch_gradient[i, :], (torch_density[i]*torch_volume[i])*torch.tensor([0.0, -9.81, 0.0], device=torch_gradient.device), rtol=1e-5), "Gravity gradient y-component should be -9.81"
+
+
+@pytest.mark.parametrize("object_points", [
+    "object_points_no_displacement",
+    "object_points_y_displacement",
+    "object_points_xy_displacement"
+], indirect=True)
+def test_gravity_hessian(object_points):
+    g = wp.vec3(0.0, -9.81, 0.0)
+        
+    x0 = object_points['x0'] 
+    dx = object_points['dx']
+    density = object_points['density']
+    volume = object_points['volume']
+    
+    gravity = Gravity(g, density, volume)
+    hessian = gravity.hessian(dx, x0, 1.0)
+    assert (wp.to_torch(hessian) == 0).all(), "Gravity hessian should be zero"
+
+# Floor Tests
+
+
+@pytest.mark.parametrize("object_points", [
+    "object_points_no_displacement",
+    "object_points_y_displacement",
+    "object_points_xy_displacement"
+], indirect=True)
+@pytest.mark.parametrize("floor_height", [-1.0, 0.0, 1.0])
+def test_floor_energy(object_points, floor_height):
+    floor_axis = 1
+    flip_floor = 0
+    floor = Floor(floor_height, floor_axis, flip_floor, object_points['volume'])  # y-axis floor at 0
+    energy = floor.energy(object_points['dx'], object_points['x0'], 1.0)
+    
+    # Calculate expected energy analytically
+    x0_torch = wp.to_torch(object_points['x0'])
+    dx_torch = wp.to_torch(object_points['dx'])
+    volume_torch = wp.to_torch(object_points['volume'])
+    
+    # Floor energy is sum of volume * penetration depth squared
+    expected_energy = torch.as_tensor(0.0).to(x0_torch.device)
+    for i in range(len(x0_torch)):
+        points = x0_torch[i] + dx_torch[i]
+        if points[floor_axis] < floor_height:
+            penetration = (points[floor_axis] - floor_height)  # depth below floor
+            expected_energy += volume_torch[i] * penetration**2
+
+    kaolin.utils.testing.check_allclose(wp.to_torch(energy)[0], expected_energy, rtol=1e-5), "Floor energy does not match analytical calculation"
+
+
+@pytest.mark.parametrize("object_points", [
+    "object_points_no_displacement",
+    "object_points_y_displacement",
+    "object_points_xy_displacement"
+], indirect=True)
+@pytest.mark.parametrize("floor_height", [-1.0, 0.0, 1.0])
+def test_floor_gradient(object_points, floor_height):
+    floor_axis = 1
+    flip_floor = 0
+    floor = Floor(floor_height, floor_axis, flip_floor, object_points['volume'])
+    gradient = floor.gradient(object_points['dx'], object_points['x0'], 1.0, None)
+    
+    torch_gradient = wp.to_torch(gradient)
+    
+    # Calculate expected gradient analytically
+    x0_torch = wp.to_torch(object_points['x0'])
+    dx_torch = wp.to_torch(object_points['dx']) 
+    volume_torch = wp.to_torch(object_points['volume'])
+    
+    # Floor gradient is -k * d * V for points below floor
+    # where d is penetration depth and V is volume
+    expected_gradient = torch.zeros_like(torch_gradient)
+    for i in range(len(x0_torch)):
+        points = x0_torch[i] + dx_torch[i]
+        if points[floor_axis] < floor_height:
+            penetration = (points[floor_axis] - floor_height)  # depth below floor
+            expected_gradient[i, floor_axis] = 2.0*penetration * volume_torch[i]
+            
+    kaolin.utils.testing.check_allclose(torch_gradient, expected_gradient, rtol=1e-5), "Floor gradient does not match analytical calculation"
+
+
+@pytest.mark.parametrize("object_points", [
+    "object_points_no_displacement",
+    "object_points_y_displacement",
+    "object_points_xy_displacement"
+], indirect=True)
+@pytest.mark.parametrize("floor_height", [-1.0, 0.0, 1.0])
+def test_floor_hessian(object_points, floor_height):
+    floor_axis = 1
+    flip_floor = 0
+    floor = Floor(floor_height, floor_axis, flip_floor, object_points['volume'])
+    hessian = floor.hessian(object_points['dx'], object_points['x0'], 1.0)
+    hess_torch = wp.to_torch(hessian)
+    
+    # Calculate expected hessian analytically
+    x0_torch = wp.to_torch(object_points['x0'])
+    dx_torch = wp.to_torch(object_points['dx']) 
+    volume_torch = wp.to_torch(object_points['volume'])
+    
+    # Floor hessian is 2 * V for points below floor
+    # where V is volume
+    expected_hessian = torch.zeros_like(hess_torch)
+    for i in range(len(x0_torch)):
+        points = x0_torch[i] + dx_torch[i]
+        if points[floor_axis] < floor_height:
+            expected_hessian[i, floor_axis, floor_axis] = 2.0 * volume_torch[i]
+    kaolin.utils.testing.check_allclose(hess_torch, expected_hessian, rtol=1e-5), "Floor hessian does not match analytical calculation"
+
+
+
+# Boundary Tests
+@pytest.mark.parametrize("object_points", [
+    "object_points_no_displacement",
+    "object_points_y_displacement",
+    "object_points_xy_displacement"
+], indirect=True)
+def test_boundary_energy(object_points):
+    # Calculate expected energy analytically
+    x0_torch = wp.to_torch(object_points['x0'])
+    dx_torch = wp.to_torch(object_points['dx'])
+    volume_torch = wp.to_torch(object_points['volume'])
+    
+    # Function which returns a boolean vector of length x0_torch.shape[0] where pinned indices are 1
+    # Pinned indices are the indices of points that are within 10% of the top of the bounding box in the y direction
+    pinned_fcn = lambda x: x[:, 1] > 0.9*x[:, 1].max()
+    pinned_indices = torch.nonzero(pinned_fcn(x0_torch), as_tuple=False).squeeze(1)
+    
+    # Calculate expected energy
+    expected_energy = torch.as_tensor(0.0).to(x0_torch.device)
+    for i in range(pinned_indices.shape[0]):
+        idx = pinned_indices[i]
+        pinned_pos = x0_torch[idx]
+        n = dx_torch[idx] + x0_torch[idx] - pinned_pos
+        expected_energy += torch.dot(n, n)
+    
+    
+    boundary = Boundary(object_points['volume'])
+    boundary.set_pinned(indices=wp.from_torch(pinned_indices.to(torch.int32), dtype=wp.int32), 
+                        pinned_x=wp.from_torch(x0_torch[pinned_indices], dtype=wp.vec3))
+    
+    energy = boundary.energy(object_points['dx'], object_points['x0'], 1.0)
+    
+    assert torch.allclose(wp.to_torch(energy)[0], expected_energy, rtol=1e-4), "Boundary energy does not match analytical calculation"
+
+
+@pytest.mark.parametrize("object_points", [
+    "object_points_no_displacement",
+    "object_points_y_displacement",
+    "object_points_xy_displacement"
+], indirect=True)
+def test_boundary_gradient(object_points):
+    # Calculate expected energy analytically
+    x0_torch = wp.to_torch(object_points['x0'])
+    dx_torch = wp.to_torch(object_points['dx'])
+    volume_torch = wp.to_torch(object_points['volume'])
+
+    # Function which returns a boolean vector of length x0_torch.shape[0] where pinned indices are 1
+    # Pinned indices are the indices of points that are within 10% of the top of the bounding box in the y direction
+    def pinned_fcn(x): return x[:, 1] > 0.9*x[:, 1].max()
+    pinned_indices = torch.nonzero(
+        pinned_fcn(x0_torch), as_tuple=False).squeeze(1)
+
+    # Calculate expected gradient analytically
+    expected_gradient = torch.zeros_like(x0_torch)
+    for i in range(pinned_indices.shape[0]):
+        idx = pinned_indices[i]
+        pinned_pos = x0_torch[idx]
+        n = dx_torch[idx] + x0_torch[idx] - pinned_pos
+        expected_gradient[idx] += 2.0 * n
+
+    boundary = Boundary(object_points['volume'])
+    boundary.set_pinned(indices=wp.from_torch(pinned_indices.to(torch.int32), dtype=wp.int32),
+                        pinned_x=wp.from_torch(x0_torch[pinned_indices], dtype=wp.vec3))
+
+    gradient = boundary.gradient(object_points['dx'], object_points['x0'], 1.0, None)
+
+    assert torch.allclose(wp.to_torch(gradient), expected_gradient, rtol=1e-4), "Boundary gradient does not match analytical calculation"
+
+
+@pytest.mark.parametrize("object_points", [
+    "object_points_no_displacement",
+    "object_points_y_displacement",
+    "object_points_xy_displacement"
+], indirect=True)
+def test_boundary_hessian(object_points):
+    # Calculate expected energy analytically
+    x0_torch = wp.to_torch(object_points['x0'])
+    dx_torch = wp.to_torch(object_points['dx'])
+    volume_torch = wp.to_torch(object_points['volume'])
+
+    # Function which returns a boolean vector of length x0_torch.shape[0] where pinned indices are 1
+    # Pinned indices are the indices of points that are within 10% of the top of the bounding box in the y direction
+    def pinned_fcn(x): return x[:, 1] > 0.9*x[:, 1].max()
+    pinned_indices = torch.nonzero(
+        pinned_fcn(x0_torch), as_tuple=False).squeeze(1)
+
+    boundary = Boundary(object_points['volume'])
+    boundary.set_pinned(indices=wp.from_torch(pinned_indices.to(torch.int32), dtype=wp.int32),
+                        pinned_x=wp.from_torch(x0_torch[pinned_indices], dtype=wp.vec3))
+
+    hessian = boundary.hessian(object_points['dx'], object_points['x0'], 1.0)
+
+    # Floor hessian is 2 * V for points below floor
+    # where V is volume
+    expected_hessian = torch.zeros_like(wp.to_torch(hessian))
+    for i in range(pinned_indices.shape[0]):
+        idx = pinned_indices[i]
+        expected_hessian[idx, 0, 0] = 2.0
+        expected_hessian[idx, 1, 1] = 2.0
+        expected_hessian[idx, 2, 2] = 2.0
+    
+    assert torch.allclose(wp.to_torch(hessian), expected_hessian,
+                          rtol=1e-5), "Boundary hessian does not match analytical calculation"

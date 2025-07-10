@@ -1,4 +1,4 @@
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,29 +17,241 @@ import pytest
 import torch
 from typing import Any
 import warp as wp
+import kaolin.physics as physics
 
 import kaolin.physics.materials.neohookean_elastic_material as neohookean_elastic_material
-import SparseSimplicits.kaolin.kaolin.physics.materials.material_utils as material_utils
+import kaolin.physics.materials.material_utils as material_utils
+from kaolin.utils.testing import check_allclose
+from kaolin.physics.materials import NeohookeanElasticMaterial
 
-wp.init()
+def _unbatched_neohookean_energy(mu, lam, defo_grad):
+    r"""Implements an version of neohookean energy. Calculate energy per-integration primitive.
+
+    Args:
+        mu (torch.Tensor): Tensor of lame parameter mu, of shape :math:`(\text{batch_dim}, 1)`
+        lam (torch.Tensor): Tensor of lame parameter lambda, of shape :math:`(\text{batch_dim}, 1)`
+        defo_grad (torch.Tensor): Flattened 3d deformation gradients, of shape :math:`(\text{batch_dim}*3*3, 1)`
+
+    Returns:
+        torch.Tensor: Vector of per-primitive energy values, shape :math:`(\text{batch_dim}, 1)`
+    """
+    F = defo_grad.reshape(-1, 9)
+    F_0 = F[:, 0]
+    F_1 = F[:, 1]
+    F_2 = F[:, 2]
+    F_3 = F[:, 3]
+    F_4 = F[:, 4]
+    F_5 = F[:, 5]
+    F_6 = F[:, 6]
+    F_7 = F[:, 7]
+    F_8 = F[:, 8]
+
+    J = (F_0 * (F_4 * F_8 - F_5 * F_7)
+         - F_1 * (F_3 * F_8 - F_5 * F_6)
+         + F_2 * (F_3 * F_7 - F_4 * F_6)).unsqueeze(dim=1)
+
+    IC = (F_0 * F_0 + F_1 * F_1 + F_2 * F_2 +
+          F_3 * F_3 + F_4 * F_4 + F_5 * F_5 +
+          F_6 * F_6 + F_7 * F_7 + F_8 * F_8).unsqueeze(dim=1)
+
+    return 0.5 * mu * (IC - 3.0) + 0.5 * lam * (J - 1.) * (J - 1.) - mu * (J - 1.0)
+
+
+def _unbatched_neohookean_gradient(mu, lam, defo_grad):
+    r"""Implements a version of neohookean gradients w.r.t deformation gradients. Calculate gradient per-integration primitive.
+
+    Args:
+        mu (torch.Tensor): Tensor of lame parameter mu, of shape :math:`(\text{batch_dim}, 1)`
+        lam (torch.Tensor): Tensor of lame parameter lambda, of shape :math:`(\text{batch_dim}, 1)`
+        defo_grad (torch.Tensor): Flattened 3d deformation gradients, of shape :math:`(\text{batch_dim}*3*3, 1)`
+
+    Returns:
+        torch.Tensor: Tensor of per-primitive neohookean gradient w.r.t defo_grad, flattened, shape :math:`(\text{batch_dim}, 9)`
+    """
+    F = defo_grad.reshape(-1, 9)
+    F_0 = F[:, 0]
+    F_1 = F[:, 1]
+    F_2 = F[:, 2]
+    F_3 = F[:, 3]
+    F_4 = F[:, 4]
+    F_5 = F[:, 5]
+    F_6 = F[:, 6]
+    F_7 = F[:, 7]
+    F_8 = F[:, 8]
+    # compute batch determinant of all F's
+    J = (F_0 * (F_4 * F_8 - F_5 * F_7)
+         - F_1 * (F_3 * F_8 - F_5 * F_6)
+         + F_2 * (F_3 * F_7 - F_4 * F_6)).unsqueeze(dim=1)
+
+    # a = 1.0 + mu/lam
+    FinvT = torch.inverse(defo_grad.reshape(-1, 3, 3)).transpose(1, 2)
+
+    return (mu[:, :, None] * defo_grad.reshape(-1, 3, 3) + (J * (lam * (J + (-1.0)) + (-mu))).unsqueeze(dim=2) * FinvT)
+
+
+def _unbatched_neohookean_hessian(mu, lam, defo_grad):
+    r"""Implements a version of neohookean hessian w.r.t deformation gradients. Calculate per-integration primitive.
+
+    Args:
+        mu (torch.Tensor): Tensor of lame parameter mu, of shape :math:`(\text{batch_dim}, 1)`
+        lam (torch.Tensor): Tensor of lame parameter lambda, of shape :math:`(\text{batch_dim}, 1)`
+        defo_grad (torch.Tensor): Flattened 3d deformation gradients, of shape :math:`(\text{batch_dim}*3*3, 1)`
+
+    Returns:
+        torch.Tensor: Tensor of per-primitive neohookean hessian w.r.t defo_grad, flattened, shape :math:`(\text{batch_dim}, 9,9)`
+    """
+    F = defo_grad.reshape(-1, 9)
+    F_0 = F[:, 0]
+    F_1 = F[:, 1]
+    F_2 = F[:, 2]
+    F_3 = F[:, 3]
+    F_4 = F[:, 4]
+    F_5 = F[:, 5]
+    F_6 = F[:, 6]
+    F_7 = F[:, 7]
+    F_8 = F[:, 8]
+    id_mat = torch.eye(9, device=mu.device)
+
+    # can save more time by not recomputing this stuff
+    J = (F_0 * (F_4 * F_8 - F_5 * F_7)
+         - F_1 * (F_3 * F_8 - F_5 * F_6)
+         + F_2 * (F_3 * F_7 - F_4 * F_6)).unsqueeze(dim=1)
+
+    # a = 1.0 + mu/lam
+    FinvT = torch.inverse(defo_grad.reshape(-1, 3, 3)).transpose(1, 2)
+    gamma = J * (lam * (2.0 * J + (-1.0)) + (-mu))
+    dgamma = gamma - lam * J * J
+
+    FFinv = torch.bmm(FinvT.reshape(-1, 9, 1), FinvT.reshape(-1, 1, 9))
+    H1 = mu[:, :, None] * id_mat
+    H2 = gamma[:, :, None] * FFinv
+    H3 = -dgamma[:, :, None] * \
+        FFinv.reshape(-1, 3, 3, 3, 3).transpose(2, 4).reshape(-1, 9, 9)
+
+    return H1 + H2 + H3
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float, torch.double])
+def test_neohookean_gradients_test_helper_fcn(device, dtype):
+    N = 20
+    B = 1
+    eps = 1e-8
+
+    F = torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+    + eps * torch.rand(N, B, 3, 3, device=device, dtype=dtype)
+
+    yms = 1e3 * torch.ones(N, 1, device=device)
+    prs = 0.4 * torch.ones(N, 1, device=device)
+
+    mus, lams = material_utils.to_lame(yms, prs)
+
+    neo_grad = _unbatched_neohookean_gradient(
+        mus, lams, F)
+    assert (neo_grad.shape[0] == N and neo_grad.shape[1]
+            == 3 and neo_grad.shape[2] == 3)
+    neo_grad = neo_grad.flatten()
+
+    E0 = torch.sum(
+        _unbatched_neohookean_energy(mus, lams, F))
+
+    expected_grad = torch.zeros_like(F.flatten(), device=device)
+    row = 0
+
+    # Using Finite Diff to compute the expected gradients
+    for n in range(F.shape[0]):
+        for i in range(F.shape[1]):
+            for j in range(F.shape[2]):
+                F[n, i, j] += eps
+                El = torch.sum(
+                    _unbatched_neohookean_energy(mus, lams, F))
+                F[n, i, j] -= 2 * eps
+                Er = torch.sum(
+                    _unbatched_neohookean_energy(mus, lams, F))
+                F[n, i, j] += eps
+                expected_grad[row] = (El - Er) / (2 * eps)
+                row += 1
+
+    check_allclose(neo_grad, expected_grad, rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float, torch.double])
+def test_neohookean_hessian_helper_vs_fd(device, dtype):
+    N = 5
+    B = 1
+    eps = 1e-3
+
+    F = torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+
+    yms = 1e3 * torch.ones(N, 1, device=device)
+    prs = 0.4 * torch.ones(N, 1, device=device)
+
+    mus, lams = material_utils.to_lame(yms, prs)
+
+    neo_hess = _unbatched_neohookean_hessian(
+        mus, lams, F)
+
+    expected_hess = torch.zeros(N, 9, 9, device=device, dtype=dtype)
+    row = 0
+
+    # Using Finite Diff to compute the expected hessian
+    for n in range(F.shape[0]):
+        for i in range(F.shape[1]):
+            for j in range(F.shape[2]):
+                F[n, i, j] += eps
+                Gl = _unbatched_neohookean_gradient(
+                    mus[n].unsqueeze(0), lams[n].unsqueeze(0), F[n].unsqueeze(0)).flatten()
+                F[n, i, j] -= 2 * eps
+                Gr = _unbatched_neohookean_gradient(
+                    mus[n].unsqueeze(0), lams[n].unsqueeze(0), F[n].unsqueeze(0)).flatten()
+                F[n, i, j] += eps
+                expected_hess[n, 3 * i + j, :] = (Gl - Gr) / (2 * eps)
+                row += 1
+
+    check_allclose(neo_hess, expected_hess, rtol=1e-1, atol=1e-1)
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float, torch.double])
+def test_neohookean_hessian_helper_vs_autograd(device, dtype):
+    N = 5
+    B = 1
+
+    F = 2*torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+
+    yms = 1e3 * torch.ones(N, 1, device=device)
+    prs = 0.4 * torch.ones(N, 1, device=device)
+
+    mus, lams = material_utils.to_lame(yms, prs)
+
+    # N x 9 x 9 (the block diags)
+    neo_hess = _unbatched_neohookean_hessian(
+        mus, lams, F)
+
+    # 9N x 9N (the full hessian with a bunch of zeros)
+    autograd_hessian = torch.autograd.functional.jacobian(
+        lambda x: _unbatched_neohookean_gradient(mus, lams, x), F)
+    autograd_hessian = autograd_hessian.reshape(9 * N, 9 * N)
+
+    # Make sure the block diags match up
+    for n in range(N):
+        check_allclose(
+            neo_hess[n], autograd_hessian[9 * n:9 * n + 9, 9 * n:9 * n + 9], rtol=1e-1, atol=1e-1)
+        # zero out the block
+        autograd_hessian[9 * n:9 * n + 9, 9 * n:9 * n + 9] *= 0
+
+    # Make sure the rest of the matrix is zeros
+    check_allclose(torch.zeros_like(autograd_hessian),
+                   autograd_hessian, rtol=1e-1, atol=1e-1)
+
+
 ##################################################
-
-
-@wp.kernel
-def elastic_kernel(mus: wp.array(dtype=Any, ndim=2),
-                   lams: wp.array(dtype=Any, ndim=2),
-                   Fs: wp.array(dtype=wp.mat33, ndim=2),
-                   wp_e: wp.array(dtype=Any, ndim=1)):
-    pt_idx, batch_idx = wp.tid()
-
-    mu_ = mus[pt_idx, batch_idx]
-    lam_ = lams[pt_idx, batch_idx]
-    F_ = Fs[pt_idx, batch_idx]
-
-    E = neohookean_elastic_material.wp_neohookean_energy(mu_, lam_, F_)
-    wp.atomic_add(wp_e, batch_idx, E)
+###### TESTING THE BATCHED TORCH TRAINING CODE HERE ##
+######
+######
+######
 ##################################################
-
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
@@ -55,47 +267,12 @@ def test_neohookean_energy(device, dtype):
     mus, lams = material_utils.to_lame(yms, prs)
 
     E1 = torch.sum(
-        neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
+        _unbatched_neohookean_energy(mus, lams, F))
 
-    E2 = torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(
+    E2 = torch.sum(_unbatched_neohookean_energy(
         mus, lams, F.unsqueeze(1)))
-    assert torch.allclose(E1, E2)
+    check_allclose(E1, E2)
 
-
-@pytest.mark.parametrize('device', ['cuda'])
-@pytest.mark.parametrize('dtype', [torch.float])
-def test_wp_neohookean_energy(device, dtype):
-    N = 20
-    B = 4
-
-    F = torch.eye(3, device=device, dtype=dtype).expand(N, B, 3, 3)
-
-    yms = 1e3 * torch.ones(N, B, device=device)
-    prs = 0.4 * torch.ones(N, B, device=device)
-
-    mus, lams = material_utils.to_lame(yms, prs)
-
-    E1 = torch.tensor(0, device=device, dtype=dtype)
-
-    wp_e = wp.zeros(B, dtype=wp.dtype_from_torch(dtype))
-    wp_F = wp.from_torch(F.contiguous(), dtype=wp.mat33)
-    wp_mus = wp.from_torch(mus.contiguous(), dtype=wp.dtype_from_torch(dtype))
-    wp_lams = wp.from_torch(
-        lams.contiguous(), dtype=wp.dtype_from_torch(dtype))
-
-    wp.launch(
-        kernel=elastic_kernel,
-        dim=(N, B),
-        inputs=[
-            wp_mus,  # mus: wp.array(dtype=float),   ; shape (N,B,)
-            wp_lams,  # lams: wp.array(dtype=float),  ; shape (N,B,)
-            wp_F  # defo_grads: wp.array(dtype=wp.mat33),  ; shape (N,B,3,3)
-        ],
-        outputs=[wp_e],  # out_e: wp.array(dtype=float)  ; shape (B,)
-        adjoint=False
-    )
-    E2 = wp.to_torch(wp_e).sum()
-    assert torch.allclose(E1, E2)
 
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
@@ -115,12 +292,13 @@ def test_neohookean_energy_complex_deformations(device, dtype):
     E1 = torch.tensor([0], device=device, dtype=dtype)
     for b in range(B):
         for c in range(C):
-            E1 += torch.sum(neohookean_elastic_material.unbatched_neohookean_energy(
+            E1 += torch.sum(_unbatched_neohookean_energy(
                 mus[:, b, c, :], lams[:, b, c, :], F[:, b, c, :, :]))
 
-    E2 = torch.sum(neohookean_elastic_material.neohookean_energy(mus, lams, F))
+    E2 = torch.sum(neohookean_elastic_material._neohookean_energy(mus, lams, F))
 
-    assert torch.allclose(E1, E2)
+    check_allclose(E1, E2)
+
 
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
@@ -138,12 +316,12 @@ def test_neohookean_batched_gradients(device, dtype):
 
     mus, lams = material_utils.to_lame(yms, prs)
 
-    neo_grad = neohookean_elastic_material.neohookean_gradient(mus, lams, F)
-    assert (neo_grad.shape[0] == N and neo_grad.shape[1] ==
-            B and neo_grad.shape[-2] == 3 and neo_grad.shape[-1] == 3)
+    neo_grad = neohookean_elastic_material._neohookean_gradient(mus, lams, F)
+    assert (neo_grad.shape[0] == N and neo_grad.shape[1]
+            == B and neo_grad.shape[-2] == 3 and neo_grad.shape[-1] == 3)
     neo_grad = neo_grad.flatten()
 
-    E0 = torch.sum(neohookean_elastic_material.neohookean_energy(mus, lams, F))
+    E0 = torch.sum(neohookean_elastic_material._neohookean_energy(mus, lams, F))
 
     expected_grad = torch.zeros_like(F.flatten(), device=device)
     row = 0
@@ -155,127 +333,97 @@ def test_neohookean_batched_gradients(device, dtype):
                 for j in range(F.shape[3]):
                     F[n1, n2, i, j] += eps
                     El = torch.sum(
-                        neohookean_elastic_material.neohookean_energy(mus, lams, F))
+                        neohookean_elastic_material._neohookean_energy(mus, lams, F))
                     F[n1, n2, i, j] -= 2 * eps
                     Er = torch.sum(
-                        neohookean_elastic_material.neohookean_energy(mus, lams, F))
+                        neohookean_elastic_material._neohookean_energy(mus, lams, F))
                     F[n1, n2, i, j] += eps
                     expected_grad[row] = (El - Er) / (2 * eps)
                     row += 1
 
-    assert torch.allclose(neo_grad, expected_grad, rtol=1e-2, atol=1e-2)
+    check_allclose(neo_grad, expected_grad, rtol=1e-2, atol=1e-2)
 
 
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-def test_neohookean_gradients(device, dtype):
+##################################################
+###### TESTING THE WARP CODE HERE ######
+######
+######
+######
+##################################################
+
+@pytest.fixture
+def neohookean_setup(device, dtype):
+    """Fixture to set up neohookean material for testing."""
     N = 20
     B = 1
-    eps = 1e-8
+    vol = 1.0
 
-    F = torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
-    + eps * torch.rand(N, B, 3, 3, device=device, dtype=dtype)
+    yms = 1e3 * torch.ones(N, B, device=device)
+    prs = 0.4 * torch.ones(N, B, device=device)
+    integration_pt_volume = (vol/N)*torch.ones((N, 1),
+                                               device=device, dtype=dtype)
 
-    yms = 1e3 * torch.ones(N, 1, device=device)
-    prs = 0.4 * torch.ones(N, 1, device=device)
+    F = 2.0*torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
 
-    mus, lams = material_utils.to_lame(yms, prs)
+    mus, lams = physics.materials.material_utils.to_lame(yms, prs)
 
-    neo_grad = neohookean_elastic_material.unbatched_neohookean_gradient(
-        mus, lams, F)
-    assert (neo_grad.shape[0] == N and neo_grad.shape[1]
-            == 3 and neo_grad.shape[2] == 3)
-    neo_grad = neo_grad.flatten()
+    wp_mus = wp.from_torch(mus.flatten().contiguous(),
+                           dtype=wp.dtype_from_torch(dtype))
+    wp_lams = wp.from_torch(lams.flatten().contiguous(),
+                            dtype=wp.dtype_from_torch(dtype))
 
-    E0 = torch.sum(
-        neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
+    wp_vols = wp.from_torch(
+        integration_pt_volume.flatten(), dtype=wp.float32)
 
-    expected_grad = torch.zeros_like(F.flatten(), device=device)
-    row = 0
+    wp_neohookean_struct = physics.materials.NeohookeanElasticMaterial(
+        wp_mus, wp_lams, wp_vols)
 
-    # Using Finite Diff to compute the expected gradients
-    for n in range(F.shape[0]):
-        for i in range(F.shape[1]):
-            for j in range(F.shape[2]):
-                F[n, i, j] += eps
-                El = torch.sum(
-                    neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
-                F[n, i, j] -= 2 * eps
-                Er = torch.sum(
-                    neohookean_elastic_material.unbatched_neohookean_energy(mus, lams, F))
-                F[n, i, j] += eps
-                expected_grad[row] = (El - Er) / (2 * eps)
-                row += 1
-
-    assert torch.allclose(neo_grad, expected_grad, rtol=1e-2, atol=1e-2)
+    return wp_neohookean_struct, F, mus, lams, integration_pt_volume
 
 
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-def test_neohookean_hessian_vs_fd(device, dtype):
-    N = 5
-    B = 1
-    eps = 1e-3
+@pytest.mark.parametrize('device', ['cuda'])
+@pytest.mark.parametrize('dtype', [torch.float])
+def test_neohookean_energy(device, dtype, neohookean_setup):
+    wp_neohookean_struct, defo_grads, mus, lams, vols = neohookean_setup
 
-    F = torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+    expected_energy = torch.sum(_unbatched_neohookean_energy(mus, lams, defo_grads))
 
-    yms = 1e3 * torch.ones(N, 1, device=device)
-    prs = 0.4 * torch.ones(N, 1, device=device)
+    wp_defo_grads = wp.from_torch(defo_grads.contiguous(), dtype=wp.mat33)
+    energy = wp_neohookean_struct.energy(wp_defo_grads)
 
-    mus, lams = material_utils.to_lame(yms, prs)
-
-    neo_hess = neohookean_elastic_material.unbatched_neohookean_hessian(
-        mus, lams, F)
-
-    expected_hess = torch.zeros(N, 9, 9, device=device, dtype=dtype)
-    row = 0
-
-    # Using Finite Diff to compute the expected hessian
-    for n in range(F.shape[0]):
-        for i in range(F.shape[1]):
-            for j in range(F.shape[2]):
-                F[n, i, j] += eps
-                Gl = neohookean_elastic_material.unbatched_neohookean_gradient(
-                    mus[n].unsqueeze(0), lams[n].unsqueeze(0), F[n].unsqueeze(0)).flatten()
-                F[n, i, j] -= 2 * eps
-                Gr = neohookean_elastic_material.unbatched_neohookean_gradient(
-                    mus[n].unsqueeze(0), lams[n].unsqueeze(0), F[n].unsqueeze(0)).flatten()
-                F[n, i, j] += eps
-                expected_hess[n, 3 * i + j, :] = (Gl - Gr) / (2 * eps)
-                row += 1
-
-    assert torch.allclose(neo_hess, expected_hess, rtol=1e-1, atol=1e-1)
+    check_allclose(
+        expected_energy/defo_grads.shape[0], wp.to_torch(energy))
 
 
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-def test_neohookean_hessian_vs_autograd(device, dtype):
-    N = 5
-    B = 1
+@pytest.mark.parametrize('device', ['cuda'])
+@pytest.mark.parametrize('dtype', [torch.float])
+def test_neohookean_gradient(device, dtype, neohookean_setup):
+    wp_neohookean_struct, defo_grads, mus, lams, vols = neohookean_setup
 
-    F = 2*torch.eye(3, device=device, dtype=dtype).expand(N, 3, 3)
+    expected_grad = _unbatched_neohookean_gradient(
+        mus, lams, defo_grads).reshape(-1, 9) * vols.reshape(-1, 1)
 
-    yms = 1e3 * torch.ones(N, 1, device=device)
-    prs = 0.4 * torch.ones(N, 1, device=device)
+    wp_defo_grads = wp.from_torch(defo_grads.contiguous(), dtype=wp.mat33)
+    wp_neohookean_grad = wp_neohookean_struct.gradient(wp_defo_grads)
 
-    mus, lams = material_utils.to_lame(yms, prs)
+    check_allclose(expected_grad.reshape(-1, 3, 3), wp.to_torch(
+        wp_neohookean_grad))
 
-    # N x 9 x 9 (the block diags)
-    neo_hess = neohookean_elastic_material.unbatched_neohookean_hessian(
-        mus, lams, F)
 
-    # 9N x 9N (the full hessian with a bunch of zeros)
-    autograd_hessian = torch.autograd.functional.jacobian(
-        lambda x: neohookean_elastic_material.unbatched_neohookean_gradient(mus, lams, x), F)
-    autograd_hessian = autograd_hessian.reshape(9 * N, 9 * N)
+@pytest.mark.parametrize('device', ['cuda'])
+@pytest.mark.parametrize('dtype', [torch.float])
+def test_neohookean_hessian(device, dtype, neohookean_setup):
+    wp_neohookean_struct, defo_grads, mus, lams, vols = neohookean_setup
 
-    # Make sure the block diags match up
-    for n in range(N):
-        assert torch.allclose(
-            neo_hess[n], autograd_hessian[9 * n:9 * n + 9, 9 * n:9 * n + 9], rtol=1e-1, atol=1e-1)
-        # zero out the block
-        autograd_hessian[9 * n:9 * n + 9, 9 * n:9 * n + 9] *= 0
+    expected_hess =  (_unbatched_neohookean_hessian(
+        mus, lams, defo_grads)/defo_grads.shape[0])
 
-    # Make sure the rest of the matrix is zeros
-    assert torch.allclose(torch.zeros_like(autograd_hessian),
-                          autograd_hessian, rtol=1e-1, atol=1e-1)
+    wp_defo_grads = wp.from_torch(defo_grads.contiguous(), dtype=wp.mat33)
+
+    wp_neohookean_struct.hessian(wp_defo_grads)
+
+    check_allclose(expected_hess, wp.to_torch(
+        wp_neohookean_struct.hessians_blocks))
+    
+
+
