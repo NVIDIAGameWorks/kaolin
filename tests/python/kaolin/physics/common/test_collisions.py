@@ -37,8 +37,8 @@ def test_scenes(request):
         return {
             'x0': wp.array(x0, dtype=wp.vec3),
             'dx': wp.array(dx, dtype=wp.vec3),
-            'obj_ids': wp.array(torch.zeros(num_points, device=device), dtype=wp.int32), # all points are in the same object
-            'is_static': wp.array(torch.zeros(num_points, device=device), dtype=wp.int32), # all points are dynamic
+            'obj_ids': wp.array(torch.zeros(num_points, device=device, dtype=torch.int32), dtype=wp.int32), # all points are in the same object
+            'is_static': wp.array(torch.zeros(num_points, device=device, dtype=torch.int32), dtype=wp.int32), # all points are dynamic
             'weights': wp.array(torch.ones((num_points, 1), device=device), dtype=wp.float32)
         }
     elif request.param == 'two_objects' or request.param == 'three_objects':
@@ -55,8 +55,8 @@ def test_scenes(request):
             x0 = torch.rand(num_points, 3, device=device)
             _stacked_x0.append(x0)
             _stacked_dx.append(dx)
-            _stacked_obj_ids.append(torch.ones(num_points, device=device)*i)
-            _stacked_is_static.append(torch.zeros(num_points, device=device)) # all points are dynamic
+            _stacked_obj_ids.append(torch.ones(num_points, device=device, dtype=torch.int32)*i)
+            _stacked_is_static.append(torch.zeros(num_points, device=device, dtype=torch.int32)) # all points are dynamic
             _stacked_weights.append(torch.ones(num_points, 1, device=device))
             
         return {
@@ -79,8 +79,8 @@ def test_scenes(request):
             x0 = torch.rand(num_points, 3, device=device)
             _stacked_x0.append(x0)
             _stacked_dx.append(dx)
-            _stacked_obj_ids.append(torch.ones(num_points, device=device)*i)
-            _stacked_is_static.append(torch.zeros(num_points, device=device))  # all points are dynamic
+            _stacked_obj_ids.append(torch.ones(num_points, device=device, dtype=torch.int32)*i)
+            _stacked_is_static.append(torch.zeros(num_points, device=device, dtype=torch.int32))  # all points are dynamic
             _stacked_weights.append(torch.ones(num_points, 1, device=device))
         
         # make one object static

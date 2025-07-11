@@ -18,7 +18,7 @@ import warp as wp
 
 
 @wp.func
-def _cauchy_strain_wp_func(F: wp.mat33) -> wp.mat33:
+def _cauchy_strain_wp_func(F: wp.mat33) -> wp.mat33:  # pragma: no cover
     r"""Warp function to calculate cauchy strain.
 
     Args:
@@ -33,7 +33,7 @@ def _cauchy_strain_wp_func(F: wp.mat33) -> wp.mat33:
 
 
 @wp.func
-def _linear_elastic_energy_wp_func(mu: float, lam: float, F: wp.mat33) -> float:
+def _linear_elastic_energy_wp_func(mu: float, lam: float, F: wp.mat33) -> float:  # pragma: no cover
     r"""Implements a batched version of linear elastic energy. Calculate energy per-integration primitive. For more background information, refer to `Jernej Barbic's Siggraph Course Notes\
     <https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf>`_ section 3.2.
 
@@ -52,7 +52,7 @@ def _linear_elastic_energy_wp_func(mu: float, lam: float, F: wp.mat33) -> float:
     return mu * wp.trace(eps_outerprod) + (lam / 2.0) * eps_trace * eps_trace
 
 
-def _cauchy_strain(defo_grad):
+def _cauchy_strain(defo_grad):  # pragma: no cover
     r"""Calculates cauchy strain
 
     Args:
@@ -66,7 +66,7 @@ def _cauchy_strain(defo_grad):
     return 0.5 * (defo_grad.transpose(-2, -1) + defo_grad) - torch.eye(3, device=defo_grad.device)[None].expand(dimensions)
 
 
-def _linear_elastic_energy(mu, lam, defo_grad):
+def _linear_elastic_energy(mu, lam, defo_grad):  # pragma: no cover
     r"""Implements a batched version of linear elastic energy. Calculate energy per-integration primitive. For more background information, refer to `Jernej Barbic's Siggraph Course Notes\
     <https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf>`_ section 3.2.
 
@@ -92,7 +92,7 @@ def _linear_elastic_energy(mu, lam, defo_grad):
     return mu * batched_trace(Eps_outerprod.reshape(batched_dims.numel(), 3, 3)).reshape(batched_dims).unsqueeze(-1) + (lam / 2) * trace_eps * trace_eps
 
 
-def _linear_elastic_gradient(mu, lam, defo_grad):
+def _linear_elastic_gradient(mu, lam, defo_grad):  # pragma: no cover
     """Implements a batched version of the jacobian of linear elastic energy. Calculates gradients per-integration primitive. For more background information, refer to `Jernej Barbic's Siggraph Course Notes\
     <https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf>`_ section 3.2.
 
