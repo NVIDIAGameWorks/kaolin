@@ -8,11 +8,12 @@ currentBuild.description = sourceBranch + ": " + commitHash
 
 gitlabCommitStatus("build-${configName}") {
 
+// TODO(cfujitsang): need to use a library to reduce boilerplate code
 def VM_LABEL = ''
 def JENKINS_INSTANCE = 'https://prod.blsm.nvidia.com/kaolin-gitlab-ci'
 podTemplate(
-  cloud:'nvks-prod',  // Note: different cloud? we had 'sc-ipp-blossom-116'
-  envVars:[envVar(key:'JENKINS_URL', value:"${env.JENKINS_URL}")],  // needed? Vishal didn't have this
+  cloud:'nvks-prod',
+  envVars:[envVar(key:'JENKINS_URL', value:"${env.JENKINS_URL}")],
   yaml: '''
 apiVersion: v1
 kind: Pod

@@ -24,7 +24,7 @@ Quick Start (Linux, Windows)
 
 .. code-block:: bash
 
-    $ pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VER}_cu{CUDA_VER}.html
+    $ pip install kaolin==0.18.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VER}_cu{CUDA_VER}.html
 
 .. Note::
     Replace *TORCH_VER* and *CUDA_VER* with any of the compatible options below.
@@ -32,41 +32,35 @@ Quick Start (Linux, Windows)
 
 .. rst-class:: center-align-center-col
 
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch / CUDA** | **cu117** | **cu118** | **cu121** | **cu124** |
-    +==================+===========+===========+===========+===========+
-    | **torch-2.5.1**  |           |     ✓     |     ✓     |     ✓     |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.5.0**  |           |     ✓     |     ✓     |     ✓     |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.4.1**  |           |     ✓     |     ✓     |     ✓     |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.4.0**  |           |     ✓     |     ✓     |     ✓     |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.3.1**  |           |     ✓     |     ✓     |           |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.3.0**  |           |     ✓     |     ✓     |           |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.2.2**  |           |     ✓     |     ✓     |           |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.2.1**  |           |     ✓     |     ✓     |           |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.2.0**  |           |     ✓     |     ✓     |           |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.1.2**  |           |     ✓     |     ✓     |           |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.1.1**  |           |     ✓     |     ✓     |           |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.1.0**  |           |     ✓     |     ✓     |           |
-    +------------------+-----------+-----------+-----------+-----------+
-    | **torch-2.0.1**  |     ✓     |     ✓     |           |           |
-    +------------------+-----------+-----------+-----------+-----------+
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch / CUDA** | **cu118** | **cu121** | **cu124** | **cu126** | **cu128** | **cu129** |
+    +==================+===========+===========+===========+===========+===========+===========+
+    | **torch-2.8.0**  |           |           |           |     ✓     |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-2.7.1**  |     ✓     |           |           |     ✓     |     ✓     |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-2.7.0**  |     ✓     |           |           |     ✓     |     ✓     |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-2.6.0**  |     ✓     |           |     ✓     |     ✓     |           |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-2.5.1**  |     ✓     |     ✓     |     ✓     |     ✓     |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-2.5.0**  |     ✓     |     ✓     |     ✓     |     ✓     |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-2.4.1**  |     ✓     |     ✓     |     ✓     |     ✓     |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-2.4.0**  |     ✓     |     ✓     |     ✓     |     ✓     |     ✓     |     ✓     |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-2.3.1**  |     ✓     |     ✓     |           |           |           |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
+    | **torch-2.3.0**  |     ✓     |     ✓     |           |           |           |           |
+    +------------------+-----------+-----------+-----------+-----------+-----------+-----------+
    
-For example, to install kaolin for torch 2.0.1 and CUDA 11.8:
+For example, to install kaolin for torch 2.8.0 and CUDA 12.9:
 
 .. code-block:: bash
 
-    $ pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.1_cu118.html
+    $ pip install kaolin==0.18.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.8.0_cu129.html
 
 You can check https://nvidia-kaolin.s3.us-east-2.amazonaws.com/index.html to see all the wheels available.
 
@@ -90,7 +84,7 @@ Clone and optionally check out an `official release <https://github.com/NVIDIAGa
 
     $ git clone --recursive https://github.com/NVIDIAGameWorks/kaolin
     $ cd kaolin
-    $ git checkout v0.17.0 # optional
+    $ git checkout v0.18.0 # optional
 
 2. Install dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -115,14 +109,14 @@ You can verify that CUDA is properly installed at the desired version with nvcc 
 ^^^^^^^^^^^^^^^^^^
 
 Follow `official instructions <https://pytorch.org>`_ to install PyTorch of a supported version.
-Kaolin may be able to work with other PyTorch versions, but we only explicitly test within the version range 2.0.1 to 2.5.1.
+Kaolin may be able to work with other PyTorch versions, but we only explicitly test within the version range 2.3.0 to 2.8.0.
 See below for overriding PyTorch version check during install.
 
-Here is how to install the latest Pytorch version supported by Kaolin for cuda 12.4:
+Here is how to install the latest Pytorch version supported by Kaolin for cuda 12.8:
 
 .. code-block:: bash
 
-    $ pip install torch==2.5.1 --extra-index-url https://download.pytorch.org/whl/cu124
+    $ pip install torch==2.8.0 --extra-index-url https://download.pytorch.org/whl/cu128
 
 
 4. Optional Environment Variables

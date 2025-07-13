@@ -712,7 +712,7 @@ int prod_reduce_cuda_impl(
   int cnt;
 
   const int num_threads = 1024;
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.type(), "prod_reduce_cuda", ([&] {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(feats_in.scalar_type(), "prod_reduce_cuda", ([&] {
       const at::cuda::OptionalCUDAGuard device_guard(at::device_of(feats_out));
       auto stream = at::cuda::getCurrentCUDAStream();
       cudaMemcpyAsync(&cnt, inclusive_sum_ptr + num_feats - 1, sizeof(int), cudaMemcpyDeviceToHost, stream);

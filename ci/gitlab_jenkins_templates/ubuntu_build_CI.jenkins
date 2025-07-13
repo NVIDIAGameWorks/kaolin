@@ -76,6 +76,16 @@ spec:
           stage("Push") {
             targetImage.push()
           }
+          stage("Get cuda version") {
+            targetImage.inside() {
+                cudaVer = sh (
+                  script: """
+                  python -c "import torch; print(torch.version.cuda)"
+                  """,
+                  returnStdout: true
+                ).trim()
+            }
+          }
         }
       } catch (e) {
         // In case of build failure, we need to update the following tests as we won't run them.
@@ -105,6 +115,7 @@ def prepareUbuntuTestJob(arch) {
         string(name: 'sourceBranch', value: "${sourceBranch}"),
         string(name: 'configName', value: "${configName}"),
         string(name: 'imageTag', value: "${targetImageTag}"),
+        string(name: 'cudaVer', value: "${cudaVer}"),
         string(name: 'arch', value: "${arch}"),
         string(name: 'commitHash', value: "${commitHash}")
       ],

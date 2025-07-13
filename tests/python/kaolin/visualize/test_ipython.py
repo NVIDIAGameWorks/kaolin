@@ -88,6 +88,9 @@ class TestVisualizers:
         kwargs = {}
 
         if with_focus_at:
+            sign = (torch.rand((3,), device=camera.device, dtype=camera.dtype) > 0.5) * 2. - 1.
+            dist = (torch.rand((3,), device=camera.device, dtype=camera.dtype) + 0.1) * 10
+            focus_at = camera.cam_pos() + sign * dist
             focus_at = torch.rand((3,), device=camera.device, dtype=camera.dtype) - 0.5 * 10
             kwargs['focus_at'] = focus_at
         else:
