@@ -25,14 +25,22 @@ def point_to_mesh_distance(pointclouds, face_vertices):
 
     .. note::
 
-        The calculated distance is the squared euclidean distance.
-        
+        The calculated distance is the squared, unsigned Euclidean distance.
 
-    Type 0 indicates the distance is from a point on the surface of the triangle.
+    .. math::
 
-    Type 1 to 3 indicates the distance is from a point to a vertices.
+        d^2(P, \mathcal{M}) = \min_{T \in \mathcal{M}}
+            \| P - \Pi_T(P) \|_2^2
 
-    Type 4 to 6 indicates the distance is from a point to an edge.
+    Distance-type codes:
+
+        * **0** - projection lies inside the triangle (face distance)
+        * **1** - nearest to vertex 0
+        * **2** - nearest to vertex 1
+        * **3** - nearest to vertex 2
+        * **4** - nearest to edge 0-1
+        * **5** - nearest to edge 1-2
+        * **6** - nearest to edge 2-0
 
     Args:
         pointclouds (torch.Tensor):
@@ -44,10 +52,10 @@ def point_to_mesh_distance(pointclouds, face_vertices):
     Returns:
         (torch.Tensor, torch.LongTensor, torch.IntTensor):
 
-            - Distances between pointclouds and meshes,
+            - Squared distances between pointclouds and meshes,
               of shape :math:`(\text{batch_size}, \text{num_points})`.
-            - face indices selected, of shape :math:`(\text{batch_size}, \text{num_points})`.
-            - Types of distance of shape :math:`(\text{batch_size}, \text{num_points})`.
+            - Face indices selected, of shape :math:`(\text{batch_size}, \text{num_points})`.
+            - Distance types, of shape :math:`(\text{batch_size}, \text{num_points})`.
 
     Example:
         >>> from kaolin.ops.mesh import index_vertices_by_faces
