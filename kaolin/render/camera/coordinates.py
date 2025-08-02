@@ -61,3 +61,19 @@ def opengl_coords():
     return torch.tensor([[1, 0, 0],
                          [0, 1, 0],
                          [0, 0, 1]])
+
+def opencv_coords():
+    """OpenCV camera coordinate convension, with Z axis looking outwards from the
+    camera sensor frame::
+
+         X<---------|
+                   /|
+                 Z  |
+                    |
+                    ⌄
+                    Y
+
+    """
+    return torch.tensor([[-1, 0, 0],
+                         [0, -1, 0],
+                         [0, 0, 1]])
