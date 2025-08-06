@@ -19,10 +19,10 @@ SIGGRAPH 2025 Tutorial
 .. raw:: html
 
   <div style="padding: 10px; display: flex; justify-content: space-between; width: 100%">
-    <video controls autoplay width="48%">
+    <video controls autoplay width="36%">
       <source src="../_images/grut_spray_can_enc.mp4" type="video/mp4">
     </video>
-    <video controls autoplay width="48%">
+    <video controls autoplay width="63%">
       <source src="../_images/flexisim.mp4" type="video/mp4">
     </video>
   </div>
