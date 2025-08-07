@@ -25,6 +25,10 @@ pip install kaolin==0.18.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/t
 
 In this version we added [collisions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.simplicits.html#kaolin.physics.simplicits.SimplicitsScene.enable_collisions) to our [physics module](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.html).
 
+
+https://github.com/user-attachments/assets/96a97f0a-c996-405e-bffd-c718ddb453aa
+
+
 We also added a [conversion from 3D gaussians to voxelgrids](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.conversions.html#kaolin.ops.conversions.gs_to_voxelgrid), that we are using in our [Densifying function](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.gaussian.html#kaolin.ops.gaussian.sample_points_in_volume) to improve the accuracy.
 
 We have a [new tutorial notebook](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simulatable_3dgrut.ipynb) showing physics simulation with mesh and gaussiansin a single scene and rendering using 3DGRUT.
