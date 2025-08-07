@@ -1,50 +1,70 @@
 
-CVPR 2025 Tutorial
-==================
+SIGGRAPH 2025 Tutorial
+======================
 
 .. raw:: html
 
-    <h2 class='green'>3D Deep Learning, Gaussian Splats and Physics Simulation<br/>
-    <span class='lab_subtitle'>a Hands-On Lab with NVIDIA Kaolin Library</span>
+    <h2 class='green'>Tackling Gaussian Splats, Physics Simulation, and Visualization With NVIDIA Kaolin and Warp Libraries<br/>
+    <span class='lab_subtitle'>Hands-On Class</span>
     </h2>
 
-.. image:: ../img/cvpr2025.jpg
+.. video:: ../videos/grut_spray_can_enc.mp4
+  :height: 0
+  :width: 0
+
+.. video:: ../videos/flexisim.mp4
+   :height: 0
+   :width: 0
+
+.. raw:: html
+
+  <div style="padding: 10px; display: flex; justify-content: space-between; width: 100%">
+    <video controls autoplay width="36%">
+      <source src="../_images/grut_spray_can_enc.mp4" type="video/mp4">
+    </video>
+    <video controls autoplay width="63%">
+      <source src="../_images/flexisim.mp4" type="video/mp4">
+    </video>
+  </div>
+
 
 .. raw:: html
 
     <div style="background-color: #f5f5f5; padding: 10px; display: flex; justify-content: space-between; width: 100%;">
         <div style="flex: 1; text-align: center; padding: 10px;">
-            <h4><a href="#cvpr2025-attend">Attend</a></h4>
+            <h4><a href="#siggraph2025-attend">Attend</a></h4>
         </div>
         <div style="flex: 1; text-align: center; padding: 10px;">
-            <h4><a href="#cvpr2025-content">Content</a></h4>
+            <h4><a href="#siggraph2025-content">Content</a></h4>
         </div>
         <div style="flex: 1; text-align: center; padding: 10px;">
-            <h4><a href="#cvpr2025-organizers">Organizers</a></h4>
+            <h4><a href="#siggraph2025-organizers">Organizers</a></h4>
         </div>
         <div style="flex: 1; text-align: center; padding: 10px;">
-            <h4><a href="#cvpr2025-run-it-yourself">Run It Yourself</a></h4>
+            <h4><a href="#siggraph2025-run-it-yourself">Run It Yourself</a></h4>
         </div>
     </div>
 
-Bring your laptop to this hands-on course from basics to the bleeding edge of 3D research,
+Bring your laptop to this hands-on class from basics to the bleeding edge of 3D research,
 powered by a dedicated GPU back end for each user and NVIDIA Kaolin Library, a PyTorch-based toolkit for fast,
 GPU-optimized operations and interactive applications on Gaussian splats, meshes, and volumetric data.
-This lab will focus on new research allowing interactive physics simulation with contact for 3D Gaussian Splats and meshes,
-rendered jointly using latest advances (`3DGUT <https://github.com/nv-tlabs/3dgrut>`_, a CVPR oral) and viewed interactively in a Jupyter notebook.
-Complete coding examples are released together with this tutorial, and are supported by Kaolin Library v0.18.0.
+This lab will focus on new research allowing interactive physics simulation with contact for 3D Gaussians Splats and meshes,
+along with an introduction to `NVIDIA Warp <https://developer.nvidia.com/warp-python>`_,
+all viewed interactively in Jupyter notebooks hosted on the `NVIDIA Deep Learning Institute <https://www.nvidia.com/en-us/training/>`_.
 
-.. _cvpr2025 attend:
+This tutorial will be focused on the newly added collision features to simplicits and will also provide an introduction to Warp.
+
+.. _siggraph2025 attend:
 
 When & Where:
 -------------
 
-Join us in Nashville, Tennessee on **Wednesday, June 11th, 8AM-noon CDT during CVPR 2025**.
-See the `Official Schedule <https://cvpr.thecvf.com/virtual/2025/tutorial/35901>`_ for room location.
+Join us in Vancouver, Canada on **Sunday, August 10th, 12:30-2pm PST during SIGGRAPH 2025**,
+Rooms 121-122 in the West Building.
 
 Don't forget to bring your laptop!
 
-.. _cvpr2025 content:
+.. _siggraph2025 content:
 
 Content:
 --------
@@ -58,32 +78,26 @@ Content:
    * - Time
      - Topic
      - Supporting Materials
-   * - 8-8:15am
-     - Introduction
-     - `Kaolin Documentation <https://kaolin.readthedocs.io/en/latest/>`_
-   * - 8:15-8:30am
-     - Setting up on the cluster
-     - Per-attendee GPU back end reserved by the `Deep Learning Institute <https://www.nvidia.com/en-us/training/>`_
-   * - 8:30-9:15am
+   * - 12:30-12:40pm
+     - Introduction and setting up on Cloud
+     - `Kaolin Documentation <https://kaolin.readthedocs.io/en/latest/>`_, Per-attendee GPU back end reserved by the `Deep Learning Institute <https://www.nvidia.com/en-us/training/>`_
+   * - 12:40-12:50pm
      - Kaolin basics (hands on)
      - Load and manipulate mesh attributes and PBR materials, control cameras, differentiable rendering, interactive viewing of any render function. See `notebook <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/gltf_viz.ipynb>`__.
-   * - 9:15-10:00am
+   * - 12:50-1:30pm
      - Introduction to Kaolin Physics simulation (hands on)
-     - Learn theoretical background on representation-agnostic physics simulation method `Simplicits <https://research.nvidia.com/labs/toronto-ai/simplicits/>`_, and the :ref:`API <physics_simulation>` for its latest implementation in Kaolin, now accelerated with `NVIDIA Warp <https://github.com/NVIDIA/warp>`_. See `notebook <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_easy_api.ipynb>`__.
-   * - 10-10:20am
-     - Break
-     - At least one lecturer will be available to help or answer questions. **New attendees can join at this point.**
-   * - 10:20-11am
-     - Physics simulation for 3D Gaussian Splat objects with collisions, interactive viewing in Jupyter (hands-on)
-     - Directly simulate 3D Gaussian Splat objects and view them interactively within a Jupyter notebook. Enable **collision resolution** between objects. Theoretical primer on collisions. See `notebook <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_inria_splatting.ipynb>`__ (to be updated soon!). Previous version (slower, no collisions) covered in this `video <https://www.youtube.com/watch?v=BaTlXbIXK30&list=PLalVOiLxaOcUjbn-EQ8iEnUBbWf9uY_-k>`_.
-   * - 11-11:45am
-     - 3D Gaussians and meshes simulated and rendered together (hands-on)
-     - Add meshes to the mix and simulate meshes and Gaussian-based radiance fields together, interactively view and jointly render them using latest research advances from `NVIDIA 3DGUT <https://github.com/nv-tlabs/3dgrut>`_, a CVPR oral. See `notebook <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simulatable_3dgrut.ipynb>`_ (coming soon!). Discussion of open problems.
-   * - 11:45am-noon
-     - Q & A
+     - Learn theoretical background on representation-agnostic physics simulation method `Simplicits <https://research.nvidia.com/labs/toronto-ai/simplicits/>`_, and the :ref:`API <physics_simulation>` for its latest implementation in Kaolin, now accelerated with `NVIDIA Warp <https://developer.nvidia.com/warp-python>`__. See `notebook <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_inria_splatting.ipynb>`__.
+   * - 1:30-1:35pm
+     - 3D Gaussians and meshes simulated and rendered together (overview).
+     - Add meshes to the mix and simulate meshes and Gaussian-based radiance fields together, interactively view and jointly render them using latest research advances from `NVIDIA 3DGUT <https://github.com/nv-tlabs/3dgrut>`_, a CVPR oral. See `notebook <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simulatable_3dgrut.ipynb>`__.
+   * - 1:35-1:55pm
+     - Introduction to Warp and FlexiSim (hands on)
+     - Make and debug Warp kernel for differentiable physics, see `notebook <https://github.com/NVIDIA/accelerated-computing-hub/blob/main/Accelerated_Python_User_Guide/notebooks/Chapter_12_Intro_to_NVIDIA_Warp.ipynb>`__. See `FlexiSim page <https://research.nvidia.com/labs/toronto-ai/flexisim/>`_.
+   * - 1:55-2:00pm
+     - Conclusion and Q & A
      - Instructors available for help with individual coding examples.
 
-.. _cvpr2025 run it yourself:
+.. _siggraph2025 run it yourself:
 
 Run It Yourself:
 ----------------
@@ -91,7 +105,7 @@ Run It Yourself:
 Install Kaolin v0.18.0 following `our installation instructions <https://kaolin.readthedocs.io/en/latest/notes/installation.html>`_,
 and follow our `tutorial notebooks <https://github.com/NVIDIAGameWorks/kaolin/tree/master/examples/tutorial>`_ as well as the `Warp notebook <https://github.com/NVIDIA/accelerated-computing-hub/blob/main/Accelerated_Python_User_Guide/notebooks/Chapter_12_Intro_to_NVIDIA_Warp.ipynb>`_
 
-.. _cvpr2025 organizers:
+.. _siggraph2025 organizers:
 
 Organizers:
 -----------
@@ -104,9 +118,9 @@ Organizers:
   :height: 0px
   :width: 0px
 
-.. image:: ../img/people/or_camel.jpg
-  :height: 0px
-  :width: 0px
+.. image:: ../img/people/gilles.jpg
+   :height: 0px
+   :width: 0px
 
 .. image:: ../img/people/masha_kaleidoscope.jpg
   :height: 0px
@@ -140,14 +154,13 @@ Organizers:
     </div>
 
     <div style="display: flex; gap: 20px; align-items: start;">
-        <img src="../_images/or_camel.jpg" style="width: 20%; flex-shrink: 0;">
+        <img src="../_images/gilles.jpg" style="width: 20%; flex-shrink: 0;">
         <div style="flex: 1;">
-            <h3>Or Perel</h3>
-            <p>Or is a Research Scientist at NVIDIA Toronto AI Lab and a Ph.D. student at the University of Toronto.
-            Previously, he worked at Amazon Rekognition and Autodesk. He obtained his M.Sc. in Computer Sciences from Tel Aviv University,
-            under the supervision of Prof. Daniel Cohen-Or. His research lies at the convergence of computer vision, graphics,
-            and machine learning, with particular interest in AI-driven 3D simulations, including realistic reconstructions and
-            interactive workflows for manipulating them.</p>
+            <h3>Gilles Daviet</h3>
+            <p>Gilles joined the High-Fidelity Physics simulation team as a research scientist in 2021,
+               with interests including inverse problems, differentiable simulators, and complex materials.
+               Before joining NVIDIA, he did his PhD in Computer Science and Applied Mathematics at Inria Grenoble
+               and spent five years developing physics tools for visual effects at Weta Digital.</p>
         </div>
     </div>
 
