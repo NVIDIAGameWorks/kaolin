@@ -40,18 +40,14 @@ spec:
       resources:
         requests:
           memory: "2Gi" 
-          nvidia.com/pgpu: "1"
         limits:
           memory: "8Gi"
-          nvidia.com/pgpu: "1"
       volumeMounts:
         - name: busybox
           mountPath: /bin/busybox
         - name: shared-data
           mountPath: /tmp/disk
   containers:
-
-
     - name: vm-runner
       image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/windows-vm-runner:v6
       imagePullPolicy: Always
@@ -135,16 +131,15 @@ spec:
         }
 
         node(VM_LABEL) {
-            stage('Execute PowerShell') {
-                // Customer needs to add their pipeline here
-                powershell 'Get-ChildItem Env: | Sort Name'
-                powershell 'java -version'
-                powershell 'python -V'
-                powershell 'git --version'
-                powershell 'docker --version'
-                powershell 'nvidia-smi'
-               
-            }
+            //stage('Execute PowerShell') {
+            //    // Customer needs to add their pipeline here
+            //    powershell 'Get-ChildItem Env: | Sort Name'
+            //    powershell 'java -version'
+            //    powershell 'python -V'
+            //    powershell 'git --version'
+            //    powershell 'docker --version'
+            //   
+            //}
             // Ensure this stage is within a 'pipeline { agent any stages { ... } }' structure
             // or an appropriate scripted pipeline structure.
             
@@ -175,78 +170,63 @@ spec:
                     echo "Running Docker container and mapping Z: using VM IP ${vmIp}"
                       
                     docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
-                        docker.image('gitlab-master.nvidia.com:5005/toronto_dl_lab/kaolin/kaolin:mshugrina-ci-fix-4336-windows-wheels-cuda124-py311-torch251').inside(dockerArgs) { 
-                            powershell '''
-                                $driveLetter = "Z:"
-                                $targetHost = $Env:VM_IP
-                                $shareName = "VirtioShare"
-                                $userName = $Env:VM_USER
-                                $password = $Env:VM_PASSWORD
-                        
-                                # Construct UNC path (e.g., \\\\10.0.2.15\\VirtioShare)
-                                $uncPath = "\\\\$targetHost\\$shareName"
-                        
-                                Write-Host "INFO: Attempting to map $driveLetter to $uncPath using user '$userName'."
-                        
-                                try {
-                                    net use $driveLetter $uncPath /user:$userName $password /PERSISTENT:NO
-                                    Write-Host "INFO: Successfully mapped $driveLetter to $uncPath."
-                                } catch {
-                                    Write-Error "ERROR: Failed to execute 'net use'. Exception: $($_.Exception.Message)"
-                                    Write-Host "INFO: Existing network connections:"
-                                    net use
-                                    exit 1
-                                }
-                        
-                                # Validate mapping
-                                if (-not (Test-Path "$driveLetter\\")) {
-                                    Write-Error "ERROR: Drive $driveLetter is not accessible after mapping."
-                                    Write-Host "INFO: Debug info - Available drives:"
-                                    Get-PSDrive -PSProvider FileSystem
-                                    net use
-                                    exit 1
-                                }
-                        
-                                Write-Host "INFO: Drive $driveLetter mapped successfully. Listing contents:"
-                                
-                                
-                                Get-ChildItem "$driveLetter\\" | Format-Table
-                                
-                                Get-ChildItem -Recurse -Depth 1 'z://pvc/'
-                                
-                                get-PSDrive
-                            '''
+                        docker.image("${imageTag}").inside(dockerArgs) {
                             stage("Install deps") {
-                               powershell 'pip install -r /kaolin/tools/ci_requirements.txt'
+                               powershell '''
+                               pip install -r /kaolin/tools/ci_requirements.txt
+                               '''
                             }
-                            try {
-                                stage("Pytest") {
-                                    powershell '''
-                                      python --version
-                                      python -c "import kaolin; print(kaolin.__version__)"
-                                      python -c "import torch; print(torch.__version__)"
-                                      $env:KAOLIN_TEST_SHAPENETV1_PATH = 'z://pvc/data/ci_shapenetv1'
-                                      $env:KAOLIN_TEST_SHAPENETV2_PATH = 'z://pvc/data/ci_shapenetv2'
-                                      $env:KAOLIN_TEST_MODELNET_PATH = 'z://pvc/data/ModelNet'
-                                      $env:KAOLIN_TEST_SHREC16_PATH = 'z://pvc/data/ci_shrec16'
-                                      pytest --durations=50 --import-mode=importlib -rs \
-                                          --log-disable=PIL.PngImagePlugin \
-                                          --log-disable=PIL.TiffImagePlugin \
-                                          --log-disable=kaolin.rep.surface_mesh \
-                                          /kaolin/tests/python/kaolin/io/test_gltf.py \
-                                          /kaolin/tests/python/kaolin/io/test_obj.py
-                                    '''
-                                }
-                            } catch(e) {
-                                build_passed = false
-                                echo e.toString()
+                            stage("Pytest") {
+                                powershell '''
+                                  python --version
+                                  python -c "import kaolin; print(kaolin.__version__)"
+                                  python -c "import torch; print(torch.__version__)"
+                                  pytest --durations=50 --import-mode=importlib -rs \
+                                      --log-disable=PIL.PngImagePlugin \
+                                      --log-disable=PIL.TiffImagePlugin \
+                                      --log-disable=kaolin.rep.surface_mesh \
+                                      /kaolin/tests/python/kaolin/io/test_gltf.py \
+                                      /kaolin/tests/python/kaolin/io/test_obj.py
+                                '''
                             }
                             if (currentBuild.getCurrentResult() != "FAILURE") {
                                 stage("Push wheels on volume") {
                                     powershell '''
-                                    New-Item -Path z://pvc/whl/"$env:folderName"/ -ItemType "directory" -Force
-                                    cp /kaolin/kaolin-*.whl z://pvc/whl/"$env:folderName"/
-                                    Get-ChildItem -Recurse -Depth 1 'z://pvc/whl/'
+                                        $driveLetter = "Z:"
+                                        $targetHost = $Env:VM_IP
+                                        $shareName = "VirtioShare"
+                                        $userName = $Env:VM_USER
+                                        $password = $Env:VM_PASSWORD
+                        
+                                        # Construct UNC path (e.g., \\\\10.0.2.15\\VirtioShare)
+                                        $uncPath = "\\\\$targetHost\\$shareName"
+
+                                        Write-Host "INFO: Attempting to map $driveLetter to $uncPath using user '$userName'."
+
+                                        try {
+                                            net use $driveLetter $uncPath /user:$userName $password /PERSISTENT:NO
+                                            Write-Host "INFO: Successfully mapped $driveLetter to $uncPath."
+                                        } catch {
+                                            Write-Error "ERROR: Failed to execute 'net use'. Exception: $($_.Exception.Message)"
+                                            Write-Host "INFO: Existing network connections:"
+                                            net use
+                                            exit 1
+                                        }
+
+                                        # Validate mapping
+                                        if (-not (Test-Path "$driveLetter\\")) {
+                                            Write-Error "ERROR: Drive $driveLetter is not accessible after mapping."
+                                            Write-Host "INFO: Debug info - Available drives:"
+                                            Get-PSDrive -PSProvider FileSystem
+                                            net use
+                                            exit 1
+                                        }
+
+                                        Write-Host "INFO: Drive $driveLetter mapped successfully. Listing contents:"
+
+                                        New-Item -Path z://pvc/whl/"$env:folderName"/ -ItemType "directory" -Force
+                                        cp /kaolin/kaolin-*.whl z://pvc/whl/"$env:folderName"/
+                                        Get-ChildItem -Recurse -Depth 2 "z://pvc/whl/"
                                     '''
                                 }
                                 stage("Push wheels on artifacts") {

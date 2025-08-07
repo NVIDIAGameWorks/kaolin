@@ -155,6 +155,7 @@ def prepareUbuntuTestJob(arch) {
         string(name: 'sourceBranch', value: "${sourceBranch}"),
         string(name: 'configName', value: "${configName}"),
         string(name: 'imageTag', value: "${targetImageTag}"),
+        string(name: 'cudaVer', value: "${cudaVer}"),
         string(name: 'arch', value: "${arch}"),
         string(name: 'commitHash', value: "${commitHash}")
       ],

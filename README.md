@@ -14,31 +14,30 @@ Note that Kaolin library is part of the larger [NVIDIA Kaolin effort](https://de
 Starting with v0.12.0, Kaolin supports installation with wheels:
 ```
 # Replace TORCH_VERSION and CUDA_VERSION with your torch / cuda versions
-pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
+pip install kaolin==0.18.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-{TORCH_VERSION}_cu{CUDA_VERSION}.html
 ```
-For example, to install kaolin 0.17.0 over torch 2.0.1 and cuda 11.8:
+For example, to install kaolin 0.18.0 over torch 2.8.0 and cuda 12.8:
 ```
-pip install kaolin==0.17.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.0.1_cu118.html
+pip install kaolin==0.18.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.8.0_cu128.html
 ```
 
-## About the Latest Release (0.17.0)
+## About the Latest Release (0.18.0)
 
-In this version we added [sample_points_in_volume](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.gaussian.html#kaolin.ops.gaussian.sample_points_in_volume) function used for "densifying" a gaussian splats, this can be used to improve [Physics simulation](https://kaolin.readthedocs.io/en/latest/modules/physics.html).
+In this version we added [collisions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.simplicits.html#kaolin.physics.simplicits.SimplicitsScene.enable_collisions) to our [physics module](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.html).
 
-We further improved physics training and simulation using [NVIDIA Warp](https://github.com/NVIDIA/warp) on some of our functions. We also added support for transmittance in the GLTF loader.
 
-![](assets/no_densifier_small.gif) | ![](assets/with_densifier_small.gif)
-:---------------------------------:|:------------------------------------:
-Without Densifier                  |  With Densifier
+https://github.com/user-attachments/assets/cfc24cca-b332-47a6-84d3-401489b681e9
+
+
+We also added a [conversion from 3D gaussians to voxelgrids](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.conversions.html#kaolin.ops.conversions.gs_to_voxelgrid), that we are using in our [Densifying function](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.gaussian.html#kaolin.ops.gaussian.sample_points_in_volume) to improve the accuracy.
+
+We have a [new tutorial notebook](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simulatable_3dgrut.ipynb) showing physics simulation with mesh and gaussiansin a single scene and rendering using 3DGRUT.
 
 Check our updated tutorials:
 * [Use Simplicit's Easy API to Simulate a Mesh](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_easy_api.ipynb)
-* [Interact with a Physics Simulation](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_interactive.ipynb)
-* [Use Simplicit's Full-Feature API](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_low_level_api.ipynb)
 * [Simulate a Gaussian Splat](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin/-/blob/master/examples/tutorial/physics/simplicits_inria_splatting.ipynb)
-* [Simulate a Muscle Activation on a Musculoskeletal Mesh](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin/-/blob/master/examples/tutorial/physics/simplicits_muscle_activation.ipynb)
 
-See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.17.0) for details.
+See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.18.0) for details.
 
 ## Contributing
 
@@ -92,7 +91,7 @@ If you are using Kaolin library for your research, please cite:
       author = {Fuji Tsang, Clement and Shugrina, Maria and Lafleche, Jean Francois and Perel, Or and Loop, Charles and Takikawa, Towaki and Modi, Vismay and Zook, Alexander and Wang, Jiehan and Chen, Wenzheng and Shen, Tianchang and Gao, Jun and Jatavallabhula, Krishna Murthy and Smith, Edward and Rozantsev, Artem and Fidler, Sanja and State, Gavriel and Gorski, Jason and Xiang, Tommy and Li, Jianing and Li, Michael and Lebaredian, Rev},
       title = {Kaolin: A Pytorch Library for Accelerating 3D Deep Learning Research},
       date = {2024-11-20},
-      version = {0.17.0},
+      version = {0.18.0},
       url={\url{https://github.com/NVIDIAGameWorks/kaolin}}
 }
 ```

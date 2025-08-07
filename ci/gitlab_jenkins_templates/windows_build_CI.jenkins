@@ -13,7 +13,10 @@ def cuda_version_url = [
     '11.7': 'https://developer.download.nvidia.com/compute/cuda/11.7.1/local_installers/cuda_11.7.1_516.94_windows.exe',
     '11.8': 'https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe',
     '12.1': 'https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_531.14_windows.exe',
-    '12.4': 'https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_551.78_windows.exe'
+    '12.4': 'https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_551.78_windows.exe',
+    '12.6': 'https://developer.download.nvidia.com/compute/cuda/12.6.3/local_installers/cuda_12.6.3_561.17_windows.exe',
+    '12.8': 'https://developer.download.nvidia.com/compute/cuda/12.8.1/local_installers/cuda_12.8.1_572.61_windows.exe',
+    '12.9': 'https://developer.download.nvidia.com/compute/cuda/12.9.1/local_installers/cuda_12.9.1_576.57_windows.exe'
 ]
 
 docker_registry_server = targetImageTag.split(':')[0..1].join(':')
@@ -24,11 +27,12 @@ currentBuild.description = sourceBranch + ': ' + commitHash
 
 gitlabCommitStatus("build-${configName}") {
 
+// TODO(cfujitsang): need to use a library to reduce boilerplate code
 def VM_LABEL = ''
 def JENKINS_INSTANCE = 'https://prod.blsm.nvidia.com/kaolin-gitlab-ci'
 podTemplate(
-  cloud:'nvks-prod',  // Note: different cloud? we had 'sc-ipp-blossom-116'
-  envVars:[envVar(key:'JENKINS_URL', value:"${env.JENKINS_URL}")],  // needed? Vishal didn't have this
+  cloud:'nvks-prod',
+  envVars:[envVar(key:'JENKINS_URL', value:"${env.JENKINS_URL}")],
   yaml: '''
 apiVersion: v1
 kind: Pod
@@ -208,6 +212,7 @@ spec:
                                 --build-arg CUDA_URL=${cudaUrl} \
                                 --build-arg PYTHON_VERSION=${pythonVer} \
                                 --build-arg PYTORCH_VERSION=${torchVer} \
+                                --build-arg IGNORE_TORCH_VER=1 \
                                 .
                             """)
               }
@@ -228,6 +233,7 @@ spec:
                               "${targetImageTag}",
                               """-m 32g --no-cache -f ./tools/windows/Dockerfile.install \
                                   --build-arg BASE_IMAGE=${targetImageTag}-base \
+                                  --build-arg IGNORE_TORCH_VER=1 \
                                   .
                               """)
                 }

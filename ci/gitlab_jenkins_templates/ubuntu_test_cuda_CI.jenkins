@@ -27,9 +27,75 @@ if (arch == "MULTI") {
     """
 }
 
-node_blacklist = """
+cudaVerTuple = cudaVer.split('\\.')
+cudaMajor = cudaVerTuple[0]
+Float cudaMinor = cudaVerTuple[1]
+if (cudaMajor == "12" && cudaMinor > 2) {
+    node_blacklist = """
+            - "ipp1-0581.ipp1a1.colossus"
+            - "ipp1-0648.ipp1u1.colossus"
+            - "ipp1-0901.ipp1u1.colossus"
+            - "ipp1-1926.ipp1u1.colossus"
+            - "ipp1-1928.ipp1u1.colossus"
             - "a4u8g-0031.ipp1u1.colossus"
-"""
+            - "ipp1-0022.ipp1u1.colossus"
+            - "ipp1-0136.ipp1u1.colossus"
+            - "ipp1-0208.ipp1u1.colossus"
+            - "ipp1-0216.ipp1u1.colossus"
+            - "ipp1-0218.ipp1u1.colossus"
+            - "ipp1-0268.ipp1u1.colossus"
+            - "ipp1-0295.ipp1u1.colossus"
+            - "ipp1-0323.ipp1u1.colossus"
+            - "ipp1-0386.ipp1u1.colossus"
+            - "ipp1-0453.ipp1u1.colossus"
+            - "ipp1-0454.ipp1u1.colossus"
+            - "ipp1-0557.ipp1a1.colossus"
+            - "ipp1-0558.ipp1u1.colossus"
+            - "ipp1-0574.ipp1u1.colossus"
+            - "ipp1-0593.ipp1u1.colossus"
+            - "ipp1-0624.ipp1u1.colossus"
+            - "ipp1-0776.ipp1u1.colossus"
+            - "ipp1-0893.ipp1u1.colossus"
+            - "ipp1-0895.ipp1u1.colossus"
+            - "ipp1-0897.ipp1u1.colossus"
+            - "ipp1-0902.ipp1u1.colossus"
+            - "ipp1-1163.ipp1a1.colossus"
+            - "ipp1-1257.ipp1u1.colossus"
+            - "ipp1-1266.ipp1u1.colossus"
+            - "ipp1-1267.ipp1u1.colossus"
+            - "ipp1-1335.ipp1u1.colossus"
+            - "ipp1-1427.ipp1u1.colossus"
+            - "ipp1-1555.ipp1u1.colossus"
+            - "ipp1-1556.ipp1u1.colossus"
+            - "ipp1-1557.ipp1u1.colossus"
+            - "ipp1-1558.ipp1u1.colossus"
+            - "ipp1-1560.ipp1u1.colossus"
+            - "ipp1-1562.ipp1u1.colossus"
+            - "ipp1-1564.ipp1a1.colossus"
+            - "ipp1-1565.ipp1u1.colossus"
+            - "ipp1-1991.ipp1u1.colossus"
+            - "ipp1-2248.ipp1u1.colossus"
+            - "ipp1-2250.ipp1u1.colossus"
+            - "ipp1-2255.ipp1u1.colossus"
+            - "ipp1-2993.ipp1u1.colossus"
+            - "ipp2-0946.ipp2u1.colossus"
+            - "ipp2-0958.ipp2u1.colossus"
+            - "ipp2-1688.ipp2u1.colossus"
+            - "nvc-t2-045.ipp2u1.colossus"
+            - "s1019-0255.ipp1u1.colossus"
+            - "s1019-0256.ipp1u1.colossus"
+            - "s1019-0257.ipp1u1.colossus"
+            - "s1019-0292.ipp1u1.colossus"
+            - "s1019-0293.ipp1u1.colossus"
+            - "s1019-0293.ipp1u1.colossus"
+            - "x11-0615.ipp1a1.colossus"
+            - "x11-0619.ipp1a1.colossus"
+    """
+} else {
+    node_blacklist = """
+            - "a4u8g-0031.ipp1u1.colossus"
+    """
+}
 
 gitlabCommitStatus("test-${configName}-${arch}") {
 
@@ -79,9 +145,9 @@ spec:
 """) {
   node(POD_LABEL) {
     container("docker") {
-      timeout(time: 90, unit: 'MINUTES') {
+      timeout(time: 230, unit: 'MINUTES') {
         stage("Install deps") {
-          sh 'pip install -r /kaolin/tools/ci_requirements.txt'
+          sh 'pip install -r /kaolin/tools/ci_requirements.txt "jupyter_client<8"'
           sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'
         }
         def build_passed = true
@@ -215,24 +281,21 @@ spec:
           echo e.toString()
         }
         try {
-          stage("Physics - Simplicits Interactive") {
-            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_interactive.ipynb'
-          }
-        } catch(e) {
-          build_passed = false
-          echo e.toString()
-        }
-        try {
-          stage("Physics - Simplicits Low-Level API") {
-            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_low_level_api.ipynb'
-          }
-        } catch(e) {
-          build_passed = false
-          echo e.toString()
-        }
-        try {
-          stage("Physics - Simplicits Muscle Activation") {
-            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_muscle_activation.ipynb'
+          stage("Physics - Simulatable 3DGRUT - 3DGRUT") {
+            sh '''#!/bin/bash
+                  PYTHON_VERSION=`python --version`
+                  PYTHON_MINOR=`echo "$PYTHON_VERSION" | cut -d'.' -f2`
+                  if [[ "$PYTHON_MINOR" -ge "11" ]]; then
+                      export CONDA_NO_PLUGINS=true
+                      DEBIAN_FRONTEND=noninteractive add-apt-repository ppa:ubuntu-toolchain-r/test
+                      DEBIAN_FRONTEND=noninteractive apt-get install -y gcc-11 g++-11
+                      conda config --set solver classic
+                      conda install -c conda-forge mesa-libgl-devel-cos7-x86_64 -y
+                      cd /tmp && git clone --recursive https://github.com/nv-tlabs/3dgrut
+                      cd /tmp/3dgrut && cp /kaolin/tests/python/examples/install_only_3dgrut.sh . && ./install_only_3dgrut.sh base WITH_GCC11
+                      cd /kaolin/examples/tutorial/physics/ && ipython simulatable_3dgrut.ipynb
+                  fi
+            '''
           }
         } catch(e) {
           build_passed = false

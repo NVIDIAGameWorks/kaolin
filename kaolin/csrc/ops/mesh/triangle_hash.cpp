@@ -67,7 +67,6 @@ void TriangleHash::_build_hash(at::Tensor triangles) {
     scalar_t a, b, c, _min, _max;
 
     for (int i_tri = 0; i_tri < n_tri; i_tri++) {
-#pragma unroll
       for (int j = 0; j < 2; j++) {
         a = triangles_ptr[i_tri * 6 + j];
         b = triangles_ptr[i_tri * 6 + j + 2];

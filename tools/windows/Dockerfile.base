@@ -79,6 +79,9 @@ RUN Invoke-WebRequest "https://repo.continuum.io/miniconda/Miniconda3-latest-Win
 RUN setx /M PATH $('C:\Users\Administrator\miniconda3\Library\bin;C:\Users\Administrator\miniconda3\Scripts;C:\Users\Administrator\miniconda3;' + $Env:PATH)
 RUN Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Users\Administrator\miniconda3'; \
     Remove-Item .\miniconda3.exe; \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main; \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r; \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/msys2; \
     conda install -y python=$Env:PYTHON_VERSION
 
 # NOTE: update the install list (2 lines here) if SSL_CERTIFICATE errors crop up to pip install the related dependency
