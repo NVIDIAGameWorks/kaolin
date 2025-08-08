@@ -37,6 +37,8 @@ Check our updated tutorials:
 * [Use Simplicit's Easy API to Simulate a Mesh](https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/physics/simplicits_easy_api.ipynb)
 * [Simulate a Gaussian Splat](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin/-/blob/master/examples/tutorial/physics/simplicits_inria_splatting.ipynb)
 
+Flexicubes license got changed to Apache v2.0, which is making it usable for commercial purposes. See the [new location](https://kaolin.readthedocs.io/en/latest/modules/kaolin.ops.conversions.html#kaolin.ops.conversions.FlexiCubes).
+
 See [change logs](https://github.com/NVIDIAGameWorks/kaolin/releases/tag/v0.18.0) for details.
 
 ## Contributing
