@@ -253,7 +253,7 @@ class FlexiCubes:
         ), "'alpha' should be a tensor of shape (num_cubes, 8)"
         assert gamma_f is None or (
             torch.is_tensor(gamma_f) and
-            ckaolin.utils.testing.heck_tensor(gamma_f, (num_cubes,), throw=False)
+            kaolin.utils.testing.check_tensor(gamma_f, (num_cubes,), throw=False)
         ), "'gamma_f' should be a tensor of shape (num_cubes,)"
 
         surf_cubes, occ_fx8 = self._identify_surf_cubes(scalar_field, cube_idx)
