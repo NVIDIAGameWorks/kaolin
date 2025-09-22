@@ -78,15 +78,18 @@ def _unbatched_marching_tetrahedra(vertices, tets, sdf, return_tet_idx):
         mapping[mask_edges] = torch.arange(mask_edges.sum(), dtype=torch.long, device=device)
         idx_map = mapping[idx_map]
 
-        interp_v = unique_edges[mask_edges]
-    edges_to_interp = vertices[interp_v.reshape(-1)].reshape(-1, 2, 3)
-    edges_to_interp_sdf = sdf[interp_v.reshape(-1)].reshape(-1, 2, 1)
-    edges_to_interp_sdf[:, -1] *= -1
+        interp_v = unique_edges[mask_edges].reshape(-1)
 
-    denominator = edges_to_interp_sdf.sum(1, keepdim=True)
+    edges_to_interp = torch.index_select(vertices, 0, interp_v).reshape(-1, 2, 3)
+    edges_to_interp_sdf = torch.index_select(sdf, 0, interp_v).reshape(-1, 2, 1)
 
-    edges_to_interp_sdf = torch.flip(edges_to_interp_sdf, [1]) / denominator
-    verts = (edges_to_interp * edges_to_interp_sdf).sum(1)
+    edges_to_interp0, edges_to_interp1 = edges_to_interp.unbind(dim=1)
+
+    edges_to_interp_sdf0, edges_to_interp_sdf1 = edges_to_interp_sdf.unbind(dim=1)
+    edges_to_interp_sdf1 = -edges_to_interp_sdf1
+
+    verts = (edges_to_interp0 * edges_to_interp_sdf1 + edges_to_interp1 * edges_to_interp_sdf0)
+    verts = verts / (edges_to_interp_sdf0 + edges_to_interp_sdf1)
 
     idx_map = idx_map.reshape(-1, 6)
 
