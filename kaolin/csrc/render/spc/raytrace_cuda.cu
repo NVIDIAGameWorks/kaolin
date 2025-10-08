@@ -1,4 +1,4 @@
-// Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -230,7 +230,7 @@ subdivide_cuda_kernel(
     const float3* __restrict__ ray_o,
     const point_data* __restrict__ points, 
     const uint8_t* __restrict__ octree, 
-    const uint* __restrict__ exclusive_sum, 
+    const uint* __restrict__ inclusive_sum, 
     const uint* __restrict__ info,
     const uint* __restrict__ prefix_sum, 
     const uint32_t level) {
@@ -244,7 +244,7 @@ subdivide_cuda_kernel(
     uint base_idx = prefix_sum[tidx];
 
     uint8_t o = octree[pidx];
-    uint s = exclusive_sum[pidx];
+    uint s = (pidx == 0) ? 0 : inclusive_sum[pidx-1];
 
     float scale = 1.0 / ((float)(0x1 << level));
     float3 org = ray_o[ridx];
@@ -505,7 +505,7 @@ std::vector<at::Tensor> raytrace_cuda_impl(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
-    at::Tensor exclusive_sum,
+    at::Tensor inclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
     uint32_t max_level,
@@ -517,7 +517,7 @@ std::vector<at::Tensor> raytrace_cuda_impl(
   
   uint8_t* octree_ptr = octree.data_ptr<uint8_t>();
   point_data* points_ptr = reinterpret_cast<point_data*>(points.data_ptr<short>());
-  uint*  exclusive_sum_ptr = reinterpret_cast<uint*>(exclusive_sum.data_ptr<int>());
+  uint*  inclusive_sum_ptr = reinterpret_cast<uint*>(inclusive_sum.data_ptr<int>());
   float3* ray_o_ptr = reinterpret_cast<float3*>(ray_o.data_ptr<float>());
   float3* ray_d_ptr = reinterpret_cast<float3*>(ray_d.data_ptr<float>());
 
@@ -593,7 +593,7 @@ std::vector<at::Tensor> raytrace_cuda_impl(
     if (l < target_level) {
       subdivide_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
           num, reinterpret_cast<uint2*>(nuggets0.data_ptr<int>()), reinterpret_cast<uint2*>(nuggets1.data_ptr<int>()), ray_o_ptr, points_ptr,
-          octree_ptr, exclusive_sum_ptr, info_ptr, prefix_sum_ptr, l);
+          octree_ptr, inclusive_sum_ptr, info_ptr, prefix_sum_ptr, l);
     } else {
       compactify_cuda_kernel<uint2><<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
           num, reinterpret_cast<uint2*>(nuggets0.data_ptr<int>()), reinterpret_cast<uint2*>(nuggets1.data_ptr<int>()),

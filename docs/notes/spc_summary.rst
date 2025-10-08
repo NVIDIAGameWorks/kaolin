@@ -119,10 +119,13 @@ Since ``octrees`` use :ref:`packed` batching, we need ``lengths`` a 1D tensor of
 ``exsum:``
 ----------
 
-:class:`torch.IntTensor` of shape :math:`(\text{octrees_num_bytes} + \text{batch_size})` is the exclusive sum of the bit counts of each ``octrees`` byte.
+:class:`torch.IntTensor` of shape :math:`(\text{octrees_num_bytes})` is the inclusive sum of the bit counts of each ``octrees`` byte (per octree). Element ``i`` holds the running total of set bits through byte ``i``, so the base offset of node ``ord`` is ``0 if ord == 0 else exsum[ord - 1]``.
 
 .. note::
   To generate ``pyramids`` and ``exsum`` see :func:`kaolin.ops.spc.scan_octrees`
+
+.. note::
+  Prior to the convention change, ``exsum`` had shape :math:`(\text{octrees_num_bytes} + \text{batch_size})` -- an *exclusive* sum with a leading ``0`` per octree. That legacy layout is deprecated but still accepted by the SPC functions (which emit a ``DeprecationWarning``); :func:`kaolin.ops.spc.scan_octrees` can still produce it via ``legacy_exsum=True``.
 
 .. _spc_points:
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,6 +26,7 @@ __all__ = [
 ]
 
 import math
+import warnings
 from torch.autograd import Function
 import torch
 
@@ -35,15 +36,17 @@ import math
 from .uint8 import bits_to_uint8
 from kaolin.rep import Spc
 from .points import points_to_morton, points_to_corners
+from .exsum_compat import (ensure_current_exsum, current_to_legacy,
+                            octree_byte_lengths_from_pyramid)
 
 
-def scan_octrees(octrees, lengths):
+def scan_octrees(octrees, lengths, legacy_exsum=False):
     r"""Scan batch of octrees tensor.
 
     Scanning refers to processing the octrees to extract auxiliary information.
 
     There are two steps. First, a list is formed
-    containing the number of set bits in each octree node/byte. Second, the exclusive
+    containing the number of set bits in each octree node/byte. Second, the inclusive
     sum of this list is taken.
 
     Args:
@@ -51,6 +54,11 @@ def scan_octrees(octrees, lengths):
             Batched :ref:`packed<packed>` collection of octrees of shape :math:`(\text{num_node})`.
         lengths (torch.IntTensor):
             The number of byte per octree. of shape :math:`(\text{batch_size})`.
+        legacy_exsum (bool):
+            If ``True``, return ``exsum`` in the deprecated legacy layout of size
+            :math:`(\text{octree_num_bytes} + \text{batch_size})` (each octree's block
+            prefixed with a leading ``0``) and emit a ``DeprecationWarning``. Provided
+            for code that has not yet migrated off the old convention. Default: ``False``.
 
     Returns:
         (int, torch.IntTensor, torch.IntTensor):
@@ -60,17 +68,21 @@ def scan_octrees(octrees, lengths):
               the batch of structured point cloud hierarchies,
               of shape :math:`(\text{batch_size}, 2, \text{max_level + 1})`.
               See :ref:`the documentation <spc_pyramids>` for more details.
-            - :ref:`exsum<spc_exsum>`, a 1D tensor containing the exclusive sum of the bit
+            - :ref:`exsum<spc_exsum>`, a 1D tensor containing the inclusive sum of the bit
               counts of each byte of the individual octrees within the batched input ``octrees`` tensor,
-              of size :math:(\text{octree_num_bytes} + \text{batch_size})`.
+              of size :math:`(\text{octree_num_bytes})` (or
+              :math:`(\text{octree_num_bytes} + \text{batch_size})` when ``legacy_exsum=True``).
               See :ref:`the documentation <spc_exsum>` for more details.
-
-    .. note::
-
-        The returned tensor of exclusive sums is padded with an extra element for each
-        item in the batch.
     """
-    return _C.ops.spc.scan_octrees_cuda(octrees.contiguous(), lengths.contiguous())
+    max_level, pyramids, exsum = _C.ops.spc.scan_octrees_cuda(
+        octrees.contiguous(), lengths.contiguous())
+    if legacy_exsum:
+        warnings.warn(
+            "scan_octrees(legacy_exsum=True) returns the deprecated exsum layout of "
+            "size (num_bytes + batch_size); this will be removed in a future release.",
+            DeprecationWarning, stacklevel=2)
+        exsum = current_to_legacy(exsum, lengths)
+    return max_level, pyramids, exsum
 
 def generate_points(octrees, pyramids, exsum):
     r"""Generate the point data for a structured point cloud.
@@ -84,8 +96,10 @@ def generate_points(octrees, pyramids, exsum):
             Batched tensor containing point hierarchy structural information
             of shape :math:`(\text{batch_size}, 2, \text{max_level}+2)`
         exsum (torch.IntTensor):
-            Batched tensor containing the exclusive sum of the bit
-            counts of individual octrees of shape :math:`(k + \text{batch_size})`
+            Batched tensor containing the inclusive sum of the bit
+            counts of individual octrees of shape :math:`(\text{num_bytes})`.
+            The deprecated legacy layout of shape
+            :math:`(\text{num_bytes} + \text{batch_size})` is also accepted (with a warning).
 
     Returns:
         (torch.ShortTensor):
@@ -93,6 +107,8 @@ def generate_points(octrees, pyramids, exsum):
             of shape :math:`(\text{num_points_at_all_levels}, 3)`.
             See :ref:`the documentation<spc_points>` for more details
     """
+    exsum = ensure_current_exsum(
+        exsum, octree_byte_lengths_from_pyramid(pyramids), "generate_points")
     return _C.ops.spc.generate_points_cuda(octrees.contiguous(),
                                            pyramids.contiguous(),
                                            exsum.contiguous())
@@ -258,10 +274,12 @@ def unbatched_query(octree, exsum, query_coords, level, with_parents=False):
 
     Args:
         octree (torch.ByteTensor): The octree, of shape :math:`(\text{num_bytes})`.
-        exsum (torch.IntTensor): The exclusive sum of the octree bytes,
-                                 of shape :math:`(\text{num_bytes} + 1)`.
+        exsum (torch.IntTensor): The inclusive sum of the octree bytes,
+                                 of shape :math:`(\text{num_bytes})`. The deprecated
+                                 legacy layout of shape :math:`(\text{num_bytes} + 1)`
+                                 is also accepted (with a warning).
                                  See :ref:`spc_exsum` for more details.
-        query_coords (torch.FloatTensor or torch.IntTensor): 
+        query_coords (torch.FloatTensor or torch.IntTensor):
             A tensor of locations to sample of shape :math:`(\text{num_query}, 3)`. If the tensor is
             a FloatTensor, assumes the coordinates are normalized in [-1, 1]. Otherwise if the tensor is
             an IntTensor, assumes the coordinates are in the [0, 2^level] space.
@@ -291,6 +309,9 @@ def unbatched_query(octree, exsum, query_coords, level, with_parents=False):
         input_coords = (query_coords.float() / (2**level)) * 2.0 - 1.0
     else:
         input_coords = query_coords
+
+    exsum = ensure_current_exsum(
+        exsum, torch.tensor([octree.shape[0]], dtype=torch.long), "unbatched_query")
 
     if with_parents:
         return _C.ops.spc.query_multiscale_cuda(octree.contiguous(), exsum.contiguous(),

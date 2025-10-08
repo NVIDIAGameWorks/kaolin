@@ -37,7 +37,7 @@ std::vector<at::Tensor> raytrace_cuda_impl(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
-    at::Tensor exclusive_sum,
+    at::Tensor inclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
     uint32_t max_level,
@@ -178,7 +178,7 @@ std::vector<at::Tensor> raytrace_cuda(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
-    at::Tensor exclusive_sum,
+    at::Tensor inclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
     uint32_t target_level,
@@ -188,11 +188,11 @@ std::vector<at::Tensor> raytrace_cuda(
   at::TensorArg octree_arg{octree, "octree", 1};
   at::TensorArg points_arg{points, "points", 2};
   at::TensorArg pyramid_arg{pyramid, "pyramid", 3};
-  at::TensorArg exclusive_sum_arg{exclusive_sum, "exclusive_sum", 4};
+  at::TensorArg inclusive_sum_arg{inclusive_sum, "inclusive_sum", 4};
   at::TensorArg ray_o_arg{ray_o, "ray_o", 5};
   at::TensorArg ray_d_arg{ray_d, "ray_d", 6};
-  at::checkAllSameGPU(__func__, {octree_arg, points_arg, exclusive_sum_arg, ray_o_arg, ray_d_arg});
-  at::checkAllContiguous(__func__,  {octree_arg, points_arg, exclusive_sum_arg, ray_o_arg, ray_d_arg});
+  at::checkAllSameGPU(__func__, {octree_arg, points_arg, inclusive_sum_arg, ray_o_arg, ray_d_arg});
+  at::checkAllContiguous(__func__,  {octree_arg, points_arg, inclusive_sum_arg, ray_o_arg, ray_d_arg});
   at::checkDeviceType(__func__, {pyramid}, at::DeviceType::CPU);
   
   CHECK_SHORT(points);
@@ -212,7 +212,7 @@ std::vector<at::Tensor> raytrace_cuda(
               "SPC pyramid corrupt, check if the SPC pyramid has been sliced");
 
   // do cuda
-  return raytrace_cuda_impl(octree, points, pyramid, exclusive_sum, ray_o, ray_d, 
+  return raytrace_cuda_impl(octree, points, pyramid, inclusive_sum, ray_o, ray_d, 
                                 max_level, target_level, return_depth, with_exit);
 
 #else

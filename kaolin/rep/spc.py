@@ -1,4 +1,4 @@
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -108,11 +108,13 @@ class Spc(object):
         if exsum is not None:
             assert isinstance(exsum, torch.Tensor) and exsum.dtype == torch.int, \
                 "exsum must be an IntTensor."
-            assert (exsum.ndim == 1 and
-                    exsum.shape[0] == octrees.shape[0] + lengths.shape[0]), \
-                "exsum must be of shape (num_bytes + batch_size)."
+            assert exsum.ndim == 1, "exsum must be a 1D tensor."
             assert exsum.device == octrees.device, \
                 "exsum must be on the same device than octrees."
+            # Accept either the current layout (num_bytes) or the deprecated legacy
+            # layout (num_bytes + batch_size); normalize + warn on the latter.
+            from ..ops.spc.exsum_compat import ensure_current_exsum
+            exsum = ensure_current_exsum(exsum, lengths, "Spc")
 
         if point_hierarchies is not None:
             assert isinstance(point_hierarchies, torch.Tensor) and \

@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -80,7 +80,7 @@ __device__ int Identify(
     if (bits&(0x1 << child_idx)) {
       // count set bits up to child - inclusive sum
       uint cnt = __popc(bits&((0x2 << child_idx) - 1));
-      ord = PrefixSum[ord] + cnt;
+      ord = ((ord == 0) ? 0 : PrefixSum[ord-1]) + cnt;
 
       if (depth == 0)
         return ord - offset;
@@ -299,7 +299,7 @@ void Conv3d_forward_cuda(
 
     d_Proot += GetPyramid(Pyramid, batch, 1, Olevel + 1, Olevel);
     dO += GetPyramid(Pyramid, batch, 1, Olevel, Olevel);
-    dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel) + 1;
+    dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel);
   }
 
   AT_CUDA_CHECK(cudaGetLastError());
@@ -384,7 +384,7 @@ void Conv3d_backward_cuda(
     Grad_Outputs += M * Psize;
     d_Proot += GetPyramid(Pyramid, batch, 1, Olevel + 1, Olevel);
     dO += GetPyramid(Pyramid, batch, 1, Olevel, Olevel);
-    dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel) + 1;
+    dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel);
   }
 }
 
@@ -465,7 +465,7 @@ void ConvTranspose3d_forward_cuda(
     X += N * Qsize;
     Y += M * Psize;
     dO += GetPyramid(Pyramid, batch, 1, Olevel, Olevel);
-    dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel) + 1;
+    dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel);
   }
   AT_CUDA_CHECK(cudaGetLastError());
 }
@@ -549,7 +549,7 @@ void ConvTranspose3d_backward_cuda(
     Grad_Inputs += N * Qsize;
     Grad_Outputs += M * Psize;
     dO += GetPyramid(Pyramid, batch, 1, Olevel, Olevel);
-    dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel) + 1;
+    dP += GetPyramid(Pyramid, batch, 1, Olevel, Olevel);
   }
 }
 

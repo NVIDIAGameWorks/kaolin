@@ -1,4 +1,4 @@
-# Copyright (c) 2021,2025 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +16,8 @@
 import warnings
 from kaolin import _C
 import torch
+
+from kaolin.ops.spc.exsum_compat import ensure_current_exsum
 
 __all__ = [
     'unbatched_raytrace',
@@ -42,8 +44,10 @@ def unbatched_raytrace(octree, point_hierarchy, pyramid, exsum, origin, directio
                                              of shape :math:`(\text{num_points}, 3)`.
         pyramid (torch.IntTensor): the pyramid associated to the octree,
                                    of shape :math:`(2, \text{max_level} + 2)`.
-        exsum (torch.IntTensor): the prefix sum associated to the octree.
-                                 of shape :math:`(\text{num_bytes} + \text{batch_size})`.
+        exsum (torch.IntTensor): the prefix sum associated to the octree,
+                                 of shape :math:`(\text{num_bytes})`. The deprecated legacy
+                                 layout of shape :math:`(\text{num_bytes} + 1)` is also accepted
+                                 (with a warning).
         origin (torch.FloatTensor): the origins of the rays,
                                     of shape :math:`(\text{num_rays}, 3)`.
         direction (torch.FloatTensor): the directions of the rays,
@@ -65,6 +69,9 @@ def unbatched_raytrace(octree, point_hierarchy, pyramid, exsum, origin, directio
               depths to each AABB intersection. When `with_exit` is set, returns 
               shape :math:`(\text{num_intersection}), 2` of entry and exit depths.
     """
+    exsum = ensure_current_exsum(
+        exsum, torch.tensor([octree.shape[0]], dtype=torch.long), "unbatched_raytrace")
+
     output = _C.render.spc.raytrace_cuda(
         octree.contiguous(),
         point_hierarchy.contiguous(),

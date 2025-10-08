@@ -37,7 +37,7 @@ std::vector<at::Tensor> raytrace_cuda(
     at::Tensor octree,
     at::Tensor points,
     at::Tensor pyramid,
-    at::Tensor exclusive_sum,
+    at::Tensor inclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
     uint32_t target_level,
