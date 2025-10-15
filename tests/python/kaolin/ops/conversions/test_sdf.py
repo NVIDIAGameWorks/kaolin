@@ -19,7 +19,6 @@ import torch
 
 from kaolin.ops.conversions import sdf
 
-
 class TestSdfToVoxelgrids:
 
     def sphere(self, points, center=0, radius=0.5):
@@ -50,6 +49,7 @@ class TestSdfToVoxelgrids:
                            match=r"Expected sdf to be list "
                                  r"but got <class 'int'>."):
             sdf.sdf_to_voxelgrids(0)
+
     def test_each_sdf_type(self):
         with pytest.raises(TypeError,
                            match=r"Expected sdf\[0\] to be callable "

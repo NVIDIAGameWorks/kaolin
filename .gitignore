@@ -16,7 +16,6 @@ kaolin.egg-info
 *.so
 *.egg
 .eggs/
-kaolin/cython/**/*.cpp
 node_modules/
 
 # byte-compiled python files

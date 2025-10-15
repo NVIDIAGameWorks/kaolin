@@ -47,21 +47,6 @@ else:
                 "Set IGNORE_TORCH_VER=1 to proceed with this version."
             )
 
-# Check for Cython
-cython_spec = importlib.util.find_spec("cython")
-if cython_spec is None:
-    raise ImportError(
-        f"Kaolin requires Cython >= {CYTHON_MIN_VER}. Please install it before proceeding."
-    )
-else:
-    import Cython
-    cython_ver = parse_version(Cython.__version__)
-    if cython_ver < parse_version(CYTHON_MIN_VER):
-        warnings.warn(
-            f"Kaolin requires Cython >= {CYTHON_MIN_VER}, "
-            f"but found version {Cython.__version__}. This may cause compatibility issues."
-        )
-
 # Check for NumPy
 numpy_spec = importlib.util.find_spec("numpy")
 if numpy_spec is None:
@@ -192,28 +177,7 @@ def get_extensions():
     for ext in extensions:
         ext.libraries = ['cudart_static' if x == 'cudart' else x for x in ext.libraries]
 
-    # Cython extensions
-    use_cython = True
-    ext_suffix = '.pyx' if use_cython else '.cpp'
-    cython_extensions = [
-        CppExtension(
-            'kaolin.ops.conversions.mise',
-            sources=[f'kaolin/cython/ops/conversions/mise{ext_suffix}'],
-        ),
-    ]
-    
-    if use_cython:
-        from Cython.Build import cythonize
-        from Cython.Compiler import Options
-        compiler_directives = Options.get_directive_defaults()
-        compiler_directives["emit_code_comments"] = False
-        cython_extensions = cythonize(
-            cython_extensions,
-            language='c++',
-            compiler_directives=compiler_directives
-        )
-    
-    return extensions + cython_extensions
+    return extensions
 
 def get_include_dirs():
     """Get include directories for CUDA builds."""
