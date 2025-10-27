@@ -5,6 +5,8 @@ python:
   - requirements: docs/readthedocs_requirements.txt
   - requirements: tools/doc_requirements.txt
   - requirements: tools/build_requirements.txt
+  - requirements: tools/requirements.txt
+  - requirements: tools/doc_requirements.txt
   - method: setuptools
     path: '.'
 
