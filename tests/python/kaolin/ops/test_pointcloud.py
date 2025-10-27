@@ -16,6 +16,8 @@
 import os
 import pytest
 import torch
+import numpy as np
+import math
 
 from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_allclose
 import kaolin.ops.pointcloud
@@ -66,3 +68,181 @@ def test_center_points(device, dtype):
     points_centered = kaolin.ops.pointcloud.center_points(points * factors + translations, normalize=True)
     points[0, :, :] = 0
     check_allclose(points, points_centered, atol=atol, rtol=rtol)
+
+def validate_farthest_points_np(all_points, all_indices, k, rel_tol=1e-5, abs_tol=1e-5, verbose=False):
+    """
+    A helper that validates the outputs of point sampling, checking that the indices are 
+    the correct length, valid, and distinct.
+
+    Also tests that the first point really is the most distant from the center, and that each 
+    subsequent point really is the farthest, up to tolerance.
+    """
+
+    if verbose: 
+        print(f"\nChecking {k} farthest points")
+
+    B = all_points.shape[0]
+    for i_batch in range(B):
+
+        # Iterate over batch dimension and convert to numpy
+        points = all_points[i_batch,:,:].detach().cpu().numpy()
+        indices = all_indices[i_batch,:].detach().cpu().numpy()
+
+        ## Check that we have the right number of points
+        assert len(indices) == k
+
+        ## Check that all indices are valid
+        assert np.all(indices >= 0) and np.all(indices < points.shape[0])
+
+        ## Check that all indices are unique
+        assert len(np.unique(indices)) == k
+
+        if indices.shape[0] == 0:
+            continue
+
+        ## Check that the first point really is the farthest from the center
+        first_pos = points[indices[0],:]
+        center_pos = np.mean(points, where=np.isfinite(points), axis=0)
+        farthest_from_center_dist = np.nanmax(np.linalg.norm(points - center_pos[None,:], axis=-1))
+        first_from_center_dist = np.linalg.norm(first_pos - center_pos, axis=-1)
+        if np.isfinite(center_pos).all():
+            assert math.isclose(first_from_center_dist, farthest_from_center_dist, rel_tol=rel_tol, abs_tol=abs_tol), f"Point {0}={indices[0]} is not the farthest from the center: {first_from_center_dist} != {farthest_from_center_dist}"
+        else:
+            # if all points are nan/inf, any first point is fine
+            pass
+
+
+        ## Walk the points one at a time, checking that each new point is the farthest from the previous set
+        # (or very close to it, allowing a small numerical epsilon for comparison)
+        for i in range(1, k): # first point is always valid
+
+            taken_mask = np.zeros(points.shape[0], dtype=bool)
+            taken_mask[indices[:i]] = True
+            selected_points = points[indices[:i], :]
+            dists_to_current_set = np.linalg.norm(points[:,None,:] - selected_points[None,:,:], axis=2)
+
+            dists_to_current_set[~np.isfinite(dists_to_current_set)] = np.nan # mask any inf values to nan, to simplify handling below
+            min_dist_to_current_set = np.nanmin(dists_to_current_set, axis=1)
+            farthest_untaken_dist = np.nanmax(min_dist_to_current_set[~taken_mask])
+            farthest_untaken_ind = np.where(min_dist_to_current_set == farthest_untaken_dist)[0]
+            new_point_dist = min_dist_to_current_set[indices[i]]
+
+            if verbose: 
+                print(f"  point {i}={indices[i]}  coords <{points[indices[i]]}>  dist={new_point_dist}  farthest_dist={farthest_untaken_dist}")
+
+            if np.isfinite(farthest_untaken_dist):
+                assert math.isclose(new_point_dist, farthest_untaken_dist, rel_tol=rel_tol, abs_tol=abs_tol), f"Point {i}={indices[i]} is not the farthest: {new_point_dist} != {farthest_untaken_dist} (at ind={farthest_untaken_ind})"
+            else:
+                # here we expect that the algorithm outputs something with not-finite distance, might as well confirm
+                assert not np.isfinite(new_point_dist), f"Expected non-finite distance for point {i}={indices[i]}, got {new_point_dist}"
+
+@pytest.mark.parametrize('device', ['cuda'])
+def test_farthest_point_sampling(device):
+    torch.cuda.manual_seed(42)
+
+    # Basic usage, k < N
+    # note: it's important to test with k > M_TOP_PROCESS (512 by default), because some
+    # logic is only trigged in that situation
+    N = 3000
+    k = 32
+    points = torch.rand(1, N, 3, device=device) 
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+
+    # Basic usage w/ batching, k < N
+    N = 3000
+    k = 32
+    B = 4
+    points = torch.rand(B, N, 3, device=device) 
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+
+    # k = 0
+    N = 3000
+    k = 0
+    points = torch.rand(1, N, 3, device=device) 
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+
+    # k = 1
+    N = 3000
+    k = 1
+    points = torch.rand(1, N, 3, device=device) 
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+
+    # N smaller than M_TOP_PROCESS
+    N = 32
+    k = 8
+    points = torch.rand(1, N, 3, device=device) 
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+
+    # k = N
+    N = 32
+    k = N
+    points = torch.rand(1, N, 3, device=device) 
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+
+    # N equal or 1 greater than M_TOP_PROCESS
+    N = 512
+    k = 8
+    points = torch.rand(1, N, 3, device=device) 
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+    N = 512+1
+    k = 8
+    points = torch.rand(1, N, 3, device=device) 
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+
+    # k < N, repeated points
+    N = 3000
+    k = 32
+    points = torch.rand(1, N, 3, device=device) 
+    points[1:N//2,:] = points[0,:] # make the first 50% points identical
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+
+    # k == N, repeated points
+    N = 20
+    k = N
+    points = torch.rand(1, N, 3, device=device) 
+    points[1:N//2,:] = points[0,:] # make the first 50% points identical
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, N)
+    validate_farthest_points_np(points, indices, k)
+
+    # k < N, NaN points, no NaNs should be taken
+    N = 3000
+    k = 32
+    points = torch.rand(1, N, 3, device=device) 
+    points[1:N//2,:] = np.nan
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+    assert np.all(np.isfinite(points[:,indices,:].detach().cpu().numpy()))
+
+    # k < N, some NaNs must be taken
+    N = 20
+    k = 15
+    points = torch.rand(1, N, 3, device=device) 
+    points[1:N//2,:] = np.nan
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+
+    # k < N, inf points, no infs should be taken
+    N = 3000
+    k = 32
+    points = torch.rand(1, N, 3, device=device) 
+    points[1:N//2,:] = np.inf
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
+    assert np.all(np.isfinite(points[:,indices,:].detach().cpu().numpy()))
+
+    # k < N, some infs must be taken
+    N = 20
+    k = 15
+    points = torch.rand(1, N, 3, device=device) 
+    points[1:N//2,:] = np.inf
+    indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
+    validate_farthest_points_np(points, indices, k)
