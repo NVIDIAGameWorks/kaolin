@@ -178,14 +178,12 @@ def get_raw_mesh_prim_geometry(mesh_prim, time=None, with_normals=False, with_uv
     return result
 
 
-def get_mesh_prim_materials(mesh_prim, stage_dir, num_faces, time=None):
+def get_mesh_prim_materials(mesh_prim, time=None):
     """ Extracts and parses materials for a mesh_prim; currently only works for prims with a
     corresponding stage path (needs to be addressed).
 
     Args:
         mesh_prim: USD Prim that should be of type Mesh
-        stage_dir: root stage directory
-        num_faces: number of faces
         time: timecode to extract values for
 
     Returns:
@@ -198,12 +196,6 @@ def get_mesh_prim_materials(mesh_prim, stage_dir, num_faces, time=None):
     if time is None:
         time = Usd.TimeCode.Default()
 
-    # TODO: what is this ref path and is it set in the right way?
-    metadata = mesh_prim.GetMetadata('references')
-    ref_path = ''
-    if metadata:
-        ref_path = os.path.dirname(metadata.GetAddedOrExplicitItems()[0].assetPath)
-
     mesh_subsets = UsdGeom.Subset.GetAllGeomSubsets(UsdGeom.Imageable(mesh_prim)) or []
     mesh_material = UsdShade.MaterialBindingAPI.Apply(mesh_prim).ComputeBoundMaterial()[0]
 
@@ -211,14 +203,14 @@ def get_mesh_prim_materials(mesh_prim, stage_dir, num_faces, time=None):
     materials = {}
     assignments = {}
 
-    def _read_material_catch_errors(mat, mat_path):
+    def _read_material_catch_errors(mat):
         mesh_material_path = str(mat.GetPath())
         if mesh_material_path in materials:
             return mesh_material_path, materials[mesh_material_path]
 
         res = None
         try:
-            res = UsdMaterialIoManager.read_material(mat, mat_path, time)
+            res = UsdMaterialIoManager.read_material(mat, time)
             materials[mesh_material_path] = res
         except MaterialNotSupportedError as e:
             warnings.warn(e.args[0])
@@ -228,20 +220,13 @@ def get_mesh_prim_materials(mesh_prim, stage_dir, num_faces, time=None):
         return mesh_material_path, res
 
     if mesh_material:
-        name, _ = _read_material_catch_errors(mesh_material, stage_dir)
-        assignments[name] = torch.arange(0, num_faces).to(torch.int64)
+        name, _ = _read_material_catch_errors(mesh_material)
+        num_faces = UsdGeom.Mesh(mesh_prim).GetFaceCount(timeCode=time)
+        assignments[name] = torch.arange(0, num_faces, dtype=torch.int64)
 
     for subset in mesh_subsets:
         subset_material, _ = UsdShade.MaterialBindingAPI.Apply(subset.GetPrim()).ComputeBoundMaterial()
-        subset_material_metadata = subset_material.GetPrim().GetMetadata('references')
-        mat_ref_path = ref_path
-        if subset_material_metadata:
-            asset_path = subset_material_metadata.GetAddedOrExplicitItems()[0].assetPath
-            mat_ref_path = os.path.join(ref_path, os.path.dirname(asset_path))
-        if not os.path.isabs(mat_ref_path):
-            mat_ref_path = os.path.join(stage_dir, mat_ref_path)
-
-        name, _ = _read_material_catch_errors(subset_material, mat_ref_path)
+        name, _ = _read_material_catch_errors(subset_material)
         # Note: down the line might want to check that subset.GetElementTypeAttr() == 'face', but it is currently
         # the only option supported by USD standard.
         assignments[name] = torch.from_numpy(np.array(subset.GetIndicesAttr().Get())).to(torch.int64)
@@ -348,7 +333,7 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
         if with_materials:
             num_faces = len(geo['face_sizes'])
             materials_dict, material_assignments_dict = get_mesh_prim_materials(
-                mesh_prim, stage_dir, num_faces, time=time)
+                mesh_prim, time=time)
             attrs.setdefault('materials_dict', {}).update(materials_dict)
             attrs.setdefault('material_assignments_dict', {})
             for mat_name, face_ids in material_assignments_dict.items():

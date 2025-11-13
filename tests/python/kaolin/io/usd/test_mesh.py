@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2023 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019-2025 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -639,26 +639,31 @@ class TestMeshes:
 class TestDiverseInputs:
     @pytest.fixture(scope='class')
     def expected_mesh_counts(self):
-        return {'ico_smooth': 1,
-                'ico_flat': 1,
-                'fox': 1,
-                'pizza': 1,
-                'armchair': 3,
-                'amsterdam': 18,
-                'avocado': 1}
+        return {
+            'ico_smooth': 1,
+            'ico_flat': 1,
+            'fox': 1,
+            'pizza': 1,
+            'armchair': 3,
+            'amsterdam': 18,
+            'avocado': 1,
+        }
 
     @pytest.mark.parametrize("device", ["cuda", "cpu"])
-    @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam', 'armchair'])
-    def test_read_write_read_consistency(self, device, bname, out_dir, expected_mesh_counts):
-        fname = glob.glob(io_data_path(f'{bname}.usd') + '*')[0]
+    @pytest.mark.parametrize('fname', ['ico_flat.usda', 'ico_flat.usdz', 'ico_smooth.usda', 'ico_smooth.usdz', 'fox.usdc', 'fox.usdz', 'pizza.usda', 'pizza.usdz', 'amsterdam.usda', 'amsterdam.usdz', 'armchair.usdc', 'armchair.usdz'])
+    def test_read_write_read_consistency(self, device, fname, out_dir, expected_mesh_counts):
+        model_name, input_ext = os.path.splitext(fname)
+        output_ext = '.usda' if input_ext == '.usdz' else input_ext
+
+        fpath = io_data_path(fname)
         # import as multiple meshes
         read_usd_mesh = SurfaceMesh.cat(
-            usd.import_meshes(fname, with_normals=True, with_materials=True), fixed_topology=False).to(device)
-        assert len(read_usd_mesh) == expected_mesh_counts[bname]
+            usd.import_meshes(fpath, with_normals=True, with_materials=True), fixed_topology=False).to(device)
+        assert len(read_usd_mesh) == expected_mesh_counts[model_name]
         assert len(read_usd_mesh.materials[0]) != 0
 
         # Now write the USD to file, read it back and make sure attributes match the original mesh
-        out_path = os.path.join(out_dir, f'reexport_{bname}.usda')
+        out_path = os.path.join(out_dir, f'reexport_multi_{model_name}{output_ext}')
         usd.export_meshes(out_path, vertices=read_usd_mesh.vertices,
                           faces=read_usd_mesh.faces,
                           uvs=read_usd_mesh.uvs,
@@ -701,7 +706,6 @@ class TestDiverseInputs:
             # import as multiple meshes
             read_usd_mesh = SurfaceMesh.cat(
                 usd.import_meshes(fname, with_normals=True, with_materials=True), fixed_topology=False).to(device)
-            # TODO: also support moving mesh materials to device
 
             # Now write the USD to file, read it back and make sure attributes match the original mesh
             usd.export_meshes(out_path,

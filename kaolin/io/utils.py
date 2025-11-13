@@ -1,4 +1,4 @@
-# Copyright (c) 2022-24 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import numpy as np
+from io import BytesIO
 import os
 from pathlib import Path
 import posixpath
@@ -20,13 +21,15 @@ from PIL import Image
 import torch
 import warnings
 
-__all__ = ["heterogeneous_mesh_handler_skip",
-           "heterogeneous_mesh_handler_naive_homogenize",
-           "mesh_handler_naive_triangulate",
-           "NonHomogeneousMeshError",
-           "TextureExporter",
-           "write_image",
-           "read_image"]
+__all__ = [
+    "heterogeneous_mesh_handler_skip",
+    "heterogeneous_mesh_handler_naive_homogenize",
+    "NonHomogeneousMeshError",
+    "mesh_handler_naive_triangulate",
+    "read_image_from_buffer",
+    "TextureExporter",
+    "write_image"
+]
 
 
 class NonHomogeneousMeshError(Exception):
@@ -54,7 +57,6 @@ def heterogeneous_mesh_handler_naive_homogenize(*args, **kwargs):
                   "please use kaolin.io.utils.mesh_handler_naive_triangulate instead",
                   DeprecationWarning, stacklevel=2)
     return mesh_handler_naive_triangulate(*args, **kwargs)
-
 
 def mesh_handler_naive_triangulate(vertices, face_vertex_counts, *features, face_assignments=None):
     r"""Triangulate a list of faces containing polygons of varying number of edges using naive fan
@@ -170,8 +172,7 @@ def write_image(img_tensor, path):
     img = Image.fromarray(img_tensor.squeeze().detach().cpu().numpy())
     img.save(path)
 
-
-def read_image(path):
+def _read_image_file(path):
     """ Reads image from path. Note that this way is order of magnitude faster than some other ways;
     use this function rather than writing your own.
 
@@ -188,6 +189,22 @@ def read_image(path):
         res = res.unsqueeze(-1)
     return res.float() / 255.
 
+def read_image_from_buffer(buffer):
+    """ Reads image from an in-memory buffer.
+
+    Args:
+        buffer (bytes): Buffer representing image.
+
+    Returns:
+        (torch.FloatTensor) in range 0..1 with shape `(height, width, num_channels)`
+    """
+
+    img = Image.open(BytesIO(buffer))
+    # Note: > 10x faster than ((torch.FloatTensor(img.getdata())).reshape(*img.size, -1) / 255.).permute(2, 0, 1)
+    res = torch.from_numpy(np.array(img))
+    if len(res.shape) == 2:
+        res = res.unsqueeze(-1)
+    return res.float() / 255.
 
 class TextureExporter:
     """ Utility functor that encapsulates logic about overwriting image files. Useful for e.g. saving textures

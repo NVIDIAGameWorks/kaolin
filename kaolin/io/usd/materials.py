@@ -20,9 +20,10 @@ import pathlib
 import re
 import posixpath
 import warnings
+import torch
 
 try:
-    from pxr import UsdShade, Sdf, Usd
+    from pxr import UsdShade, Sdf, Usd, Ar
 except ImportError:
     warnings.warn('Warning: module pxr not found', ImportWarning)
 
@@ -71,7 +72,7 @@ def import_material(file_path_or_stage, scene_path, texture_path=None, time=None
 
     try:
         material = UsdShade.Material(stage.GetPrimAtPath(scene_path))
-        return UsdMaterialIoManager.read_material(material, texture_path=texture_path, time=time)
+        return UsdMaterialIoManager.read_material(material, time=time)
     except Exception as e:
         raise MaterialLoadError(f'Failed to read UsdShade.Material from {scene_path} with exception {e}')
 
@@ -213,12 +214,13 @@ class UsdMaterialIoManager:
             shader_name (str): Name of the shader
             reader_fn (Callable): Function that will be called to read shader attributes. The function must take as
                 input a dictionary of input parameters and a string representing the texture path
-                `(UsdShade.Shader, texture_path, time)` and typically return a `Material`
+                `(UsdShade.Shader, time)` and typically return a `Material`
         """
         if shader_name in cls._usd_readers:
-            warnings.warn(f'Shader {shader_name} is already registered. Overwriting previous definition.')
+            warnings.warn(f'Shader {shader_name} is already registered. Overwriting previous definition.',
+                          stacklevel=2)
 
-        _check_callable_with_args(reader_fn, 3)
+        _check_callable_with_args(reader_fn, 2)
         cls._usd_readers[shader_name] = reader_fn
 
     @classmethod
@@ -234,23 +236,21 @@ class UsdMaterialIoManager:
                 `TextureExporter`. The `writer_fn` must return created `UsdShade.Material`.
         """
         if shader_name in cls._usd_writers:
-            warnings.warn(f'Shader {shader_name} is already registered. Overwriting previous definition.')
+            warnings.warn(f'Shader {shader_name} is already registered. Overwriting previous definition.',
+                          stacklevel=2)
 
         _check_callable_with_args(
             writer_fn, 5, ['stage', 'scene_path', 'time', 'write_texture_by_basename_fn'])
         cls._usd_writers[shader_name] = writer_fn
 
     @classmethod
-    def read_material(cls, usd_material, texture_path, time=None):
+    def read_material(cls, usd_material, time=None):
         r"""Read USD material into internal PyTorch material representation. The type returned will be the
         type returned by the registered reader function, selected based on shader name specified in the
         usd_material.
 
         Args:
             usd_material (UsdShade.Material): Valid USD Material prim
-            texture_path (str, optional): Path to textures directory. If the USD has absolute paths
-                to textures, set to an empty string. By default, the textures will be assumed to be
-                under the same directory as the USD specified by `file_path`.
             time (convertible to float, optional): Positive integer indicating the time at which to retrieve parameters.
 
         Returns:
@@ -278,7 +278,8 @@ class UsdMaterialIoManager:
                 shader_name = shader.GetPrim().GetAttribute('info:mdl:sourceAsset:subIdentifier').Get(time=time)
             else:
                 shader_name = ''
-                warnings.warn(f'A reader for the material defined by `{usd_material}` is not yet implemented.')
+                warnings.warn(f'A reader for the material defined by `{usd_material}` is not yet implemented.',
+                              stacklevel=2)
 
             if shader_name not in cls._usd_readers:
                 warnings.warn('No registered readers were able to process the material '
@@ -288,7 +289,7 @@ class UsdMaterialIoManager:
                 return params
 
             reader = cls._usd_readers[shader_name]
-            res = reader(surface_shader, texture_path, time)
+            res = reader(surface_shader, time)
             try:
                 res.material_name = str(usd_material.GetPath())
             except Exception as e:
@@ -331,10 +332,6 @@ class UsdMaterialIoManager:
             file_prefix=texture_file_prefix, image_extension=image_extension,
             overwrite_files=overwrite_textures)
 
-        # if stage.GetPrimAtPath(scene_path):
-        #     logging.warning(f'Overwriting existing material at path {scene_path}')
-        #     stage.RemovePrim(scene_path)
-
         material = writer(pbr_material, stage=stage, scene_path=scene_path, time=time,
                           write_texture_by_basename_fn=texture_exporter)
 
@@ -361,26 +358,6 @@ def _add_texture_shader(stage, path, texture_path, time, channels_out=3, scale=N
         texture.CreateOutput(channel, Sdf.ValueTypeNames.Float)
 
     return texture
-
-
-def _read_image(path, colorspace="auto"):
-    """
-    From https://graphics.pixar.com/usd/release/wp_usdpreviewsurface.html
-    `colorspace`: Flag indicating the color space in which the source texture is encoded. Possible Values:
-        raw : Use texture data as it was read from the texture and do not mark it as using a specific color space.
-        sRGB : Mark texture as sRGB when reading.
-        auto : Check for gamma/color space metadata in the texture file itself; if metadata is indicative of sRGB,
-            mark texture as sRGB . If no relevant metadata is found, mark texture as sRGB if it is either 8-bit and
-            has 3 channels or if it is 8-bit and has 4 channels. Otherwise, do not mark texture as sRGB and use
-            texture data as it was read from the texture.
-    """
-    if colorspace.lower() not in ['auto', 'srgb', 'raw']:
-        raise MaterialLoadError(f'Colorspace {colorspace} is not supported. Valid values are [auto, sRGB, raw]')
-    if not os.path.exists(path):
-        raise MaterialLoadError(f'No such image file: `{path}`')
-
-    return kaolin.io.utils.read_image(path)
-
 
 def _get_shader_parameters(shader, time):
     # Get shader parameters
@@ -415,10 +392,8 @@ def _get_shader_parameters(shader, time):
     return params
 
 
-def read_usd_preview_surface(shader, texture_file_path, time):
+def read_usd_preview_surface(shader, time):
     """Read UsdPreviewSurface material."""
-    texture_file_path = pathlib.Path(texture_file_path).as_posix()
-
     shader_parameters = _get_shader_parameters(shader, time)
     params = {}
 
@@ -431,22 +406,20 @@ def read_usd_preview_surface(shader, texture_file_path, time):
             else:
                 value = data['value']
         if 'file' in data and data['file']:
-            fp = data['file'].get('value', Sdf.AssetPath()).resolvedPath
-            if not os.path.exists(fp):  # if relative path not already resolved, let's use relative texture dir
-                fp = posixpath.join(texture_file_path, data['file'].get('value', Sdf.AssetPath()).path)
-            if not os.path.exists(fp):  # if texture dir was passed in without accounting for relative paths set in USD
-                fp = posixpath.join(texture_file_path, os.path.basename(data['file'].get('value', Sdf.AssetPath()).path))
             if 'colorspace' in data:
                 colorspace = data['colorspace']['value']
             else:
                 colorspace = 'auto'
+            fp = data['file'].get('value', Sdf.AssetPath()).resolvedPath
             try:
-                texture_value = _read_image(fp, colorspace=colorspace)
-            except MaterialLoadError as e:
+                buffer = Ar.GetResolver().OpenAsset(Ar.ResolvedPath(fp)).GetBuffer()
+                texture_value = kaolin.io.utils.read_image_from_buffer(buffer)
+            except Exception as e:
                 # TODO: perhaps raise the error instead?
-                warnings.warn(f'An error was encountered while processing the data {data["file"]}. "{e}"')
+                warnings.warn(f'An error was encountered while processing the data {data["file"]}. "{e}"',
+                              stacklevel=2)
                 if 'fallback' in data:
-                    texture_value = data['fallback']['value']
+                    texture_value = torch.tensor(data['fallback']['value'])
                 else:
                     raise e
         return value, texture_value
