@@ -151,7 +151,7 @@ def _collision_target_distance_wp_func(
     indices_a: wp.array(dtype=int),
     indices_b: wp.array(dtype=int),
 ):  # pragma: no cover
-    return wp.select(indices_b[c] == NULL_ELEMENT_INDEX, 2.0, 1.0) * radius
+    return wp.where(indices_b[c] == NULL_ELEMENT_INDEX, 1.0, 2.0) * radius
     # return 2.0 * radius
 
 
@@ -207,10 +207,10 @@ def _collision_energy_wp_kernel(
             * dt
             * (
                 0.5 * nu * vt_norm * vt_norm
-                + wp.select(
+                + wp.where(
                     vt_norm < 1.0,
-                    vt_norm - 1.0 / 3.0,
                     vt_norm * vt_norm * (1.0 - vt_norm / 3.0),
+                    vt_norm - 1.0 / 3.0,
                 )
             )
         )
@@ -264,8 +264,8 @@ def _collision_gradient_wp_kernel(coeff: float,
 
         mu_fn = -mu * dE_d_hat / rc  # yield force
 
-        f1_over_vt_norm = wp.select(
-            vt_norm < 1.0, 1.0 / vt_norm, 2.0 - vt_norm)
+        f1_over_vt_norm = wp.where(
+            vt_norm < 1.0,  2.0 - vt_norm, 1.0 / vt_norm)
         gradient[c] += mu_fn * (f1_over_vt_norm + nu) * vt
         ###
 
@@ -321,8 +321,8 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
 
         mu_fn = -mu * dE_d_hat / rc  # yield force
 
-        f1_over_vt_norm = wp.select(
-            vt_norm < 1.0, 1.0 / vt_norm, 2.0 - vt_norm)
+        f1_over_vt_norm = wp.where(
+            vt_norm < 1.0,  2.0 - vt_norm, 1.0 / vt_norm)
 
         # regularization such that f / H dt <= k v (penalizes friction switching dir)
         friction_slip_reg = 0.1
