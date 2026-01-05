@@ -1,12 +1,27 @@
 #!/usr/bin/env groovy
 
+// Map from CUDA version to URL to obtain windows installer
+def cuda_version_url = [
+    // CUDA drivers on test machines only available for CUDA version >= 11.0
+    //  see: https://gitlab-master.nvidia.com/ipp/cloud-infra/blossom/dev/windows-gpu-pods/-/tree/master/ContainerDriverSetup
+    // test machines currently are the only option, named 'gpu_tester'
+    //      two machines exist, only the TITAN RTX will pass tests
+    '11.8': 'https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_522.06_windows.exe',
+    '12.1': 'https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_531.14_windows.exe',
+    '12.4': 'https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_551.78_windows.exe',
+    '12.6': 'https://developer.download.nvidia.com/compute/cuda/12.6.3/local_installers/cuda_12.6.3_561.17_windows.exe',
+    '12.8': 'https://developer.download.nvidia.com/compute/cuda/12.8.1/local_installers/cuda_12.8.1_572.61_windows.exe',
+    '12.9': 'https://developer.download.nvidia.com/compute/cuda/12.9.1/local_installers/cuda_12.9.1_576.57_windows.exe',
+    '13.0': 'https://developer.download.nvidia.com/compute/cuda/13.0.2/local_installers/cuda_13.0.2_windows.exe'
+]
+
 docker_registry_server = targetImageTag.split(':')[0..1].join(':')
 // This will be the "RUN" displayed on Blue Ocean
 currentBuild.displayName = targetImageTag.split(':')[2]
 // This will be the "MESSAGE" displayed on Blue Ocean
 currentBuild.description = sourceBranch + ': ' + commitHash
 
-gitlabCommitStatus("build-${configName}") {
+gitlabCommitStatus("build-windows-base-cuda${cudaVer}") {
 
 // TODO(cfujitsang): need to use a library to reduce boilerplate code
 def VM_LABEL = ''
@@ -116,7 +131,7 @@ spec:
           VM_LABEL = "${POD_LABEL}-VM"
           echo "Waiting for node with label ${VM_LABEL} to become available"
           try {
-              timeout(time: 30, unit: 'MINUTES') { // Set the timeout duration as needed
+              timeout(time: 60, unit: 'MINUTES') { // Set the timeout duration as needed
             waitUntil {
               def node = Jenkins.instance.nodes.find { it.nodeName == VM_LABEL }
               echo "${node}"
@@ -184,19 +199,16 @@ spec:
                     ])
             }
             docker.withRegistry("https://${docker_registry_server}", 'kaolin-gitlab-access-token-as-password') {
-              stage('Build image') {
-                targetImage = docker.build(
-                  "${targetImageTag}",
-                  """-m 32g --no-cache -f ./tools/windows/Dockerfile.install \
-                      --build-arg BASE_IMAGE=${windowsBaseImage} \
-                      --build-arg PYTHON_VERSION=${pythonVer} \
-                      --build-arg PYTORCH_VERSION=${torchVer} \
-                      --build-arg FORCE_CUDA=1 \
-                      --build-arg IGNORE_TORCH_VER=1 \
-                      .
-                  """)
-              }
-
+                stage('Build') {
+                  cudaUrl = cuda_version_url[cudaVer]
+                  targetImage = docker.build(
+                    "${targetImageTag}",
+                    """-m 32g --no-cache -f ./tools/windows/Dockerfile.base \
+                        --build-arg CUDA_VERSION=${cudaVer} \
+                        --build-arg CUDA_URL=${cudaUrl} \
+                        .
+                    """)
+                }
               stage('Push') {
                 targetImage.push()
               }
@@ -209,31 +221,59 @@ spec:
           } // Timeout
         } catch (e) {
           // In case of build failure, we need to update the following tests as we won't run them.
-          if (buildWheel.toBoolean()) {
-            updateGitlabCommitStatus(name: "test-${configName}", state: 'canceled')
-          } else {
-            for (arch in archsToTest.split(';')) {
-              updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: 'canceled')
-            }
-          }
+          // TODO(cfujitsang)
           throw e
         } // Try/Catch
       }
-
-        stage('cleanup') {
-          container('vm-cleaner') {
-            script {
-              def jenkinsUrl = "${JENKINS_INSTANCE}"
-              def jenkinsCliJarUrl = "${jenkinsUrl}/jnlpJars/jenkins-cli.jar"
-              sh "curl -O ${jenkinsCliJarUrl} > /dev/null 2>&1"
-              withCredentials([usernamePassword(credentialsId: 'svc-blossom-creds', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                sh "echo 'Running command with password ********'"
-
-                sh "java -jar jenkins-cli.jar -s ${jenkinsUrl} -auth ${USERNAME}:${PASSWORD} delete-node ${VM_LABEL}"
-              }
+stage('cleanup') {
+    podTemplate(
+        cloud: 'nvks-prod',
+        yaml: """
+apiVersion: v1
+kind: Pod
+spec:
+  restartPolicy: Never
+  containers:
+  - name: jnlp
+    image: jenkins/inbound-agent:4.11-1-jdk11  # ← correct image
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+  - name: vm-cleaner
+    image: maven:3.6.3-jdk-11               # ← maven goes here
+    command: ["sh", "-c", "sleep infinity"]
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+  nodeSelector:
+    kubernetes.io/os: linux
+    nvidia.com/node_type: builder
+"""
+    ) {
+        node(POD_LABEL) {
+            container('vm-cleaner') {
+                script {
+                    def jenkinsUrl = "https://prod.blsm.nvidia.com/kaolin-gitlab-ci"
+                    sh "curl -O ${jenkinsUrl}/jnlpJars/jenkins-cli.jar"
+                    withCredentials([usernamePassword(
+                        credentialsId: 'svc-blossom-creds',
+                        usernameVariable: 'USERNAME',
+                        passwordVariable: 'PASSWORD'
+                    )]) {
+                        sh """
+                            java -jar jenkins-cli.jar \
+                                -s ${jenkinsUrl} \
+                                -auth \$USERNAME:\$PASSWORD \
+                                delete-node ${VM_LABEL}
+                        """
+                    }
+                }
             }
-          }
         }
+    }
+}
     }
   }
 }

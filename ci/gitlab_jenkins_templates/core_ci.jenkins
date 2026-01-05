@@ -12,12 +12,12 @@ def defaultWheelsPythonVers = ['3.9', '3.10', '3.11', '3.12']
 def ubuntu_from_pytorch_configs = [
     [
         // python: 3.10
-        'cudaVer': '11.8', 'cudnnVer': '8', 'torchVer': '2.3.0',
+        'cudaVer': '11.8', 'cudnnVer': '9', 'torchVer': '2.5.0',
         'archsToTest': 'MULTI'
     ],
     [
         // python: 3.11
-        'cudaVer': '12.8', 'cudnnVer': '9', 'torchVer': '2.7.1',
+        'cudaVer': '13.0', 'cudnnVer': '9', 'torchVer': '2.10.0',
         'archsToTest': 'MULTI'
     ]
 ]
@@ -40,12 +40,12 @@ def ubuntu_from_nvcr_configs = [
 def ubuntu_from_cuda_configs = [
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'pythonVer': '3.9', 'torchVer': '2.3.0',
+        'pythonVer': '3.9', 'torchVer': '2.5.0',
         'archsToTest': 'MULTI'
     ],
     [
-        'cudaVer': '12.1.0', 'cudnnVer': '8',
-        'pythonVer': '3.12', 'torchVer': '2.7.1',
+        'cudaVer': '13.0.1', 'cudnnVer': '',
+        'pythonVer': '3.12', 'torchVer': '2.10.0',
         'archsToTest': 'MULTI'
     ],
 ]
@@ -54,10 +54,10 @@ def ubuntu_from_cuda_configs = [
 // (Use docker image ubuntu:18.04 as a base)
 def ubuntu_cpuonly_configs = [
     [
-        'pythonVer': '3.9', 'torchVer': '2.3.0',
+        'pythonVer': '3.9', 'torchVer': '2.5.0',
     ],
     [
-        'pythonVer': '3.11', 'torchVer': '2.7.1',
+        'pythonVer': '3.12', 'torchVer': '2.10.0',
     ]
 ]
 
@@ -404,14 +404,38 @@ def windows_from_server_configs = [
 */
     [
         'cudaVer': '11.8',
-        'pythonVer': '3.9', 'torchVer': '2.3.0',
+        'pythonVer': '3.9', 'torchVer': '2.5.0',
         'archsToTest': ''
     ],
     [
-        'cudaVer': '12.6',
-        'pythonVer': '3.12', 'torchVer': '2.7.1',
+        'cudaVer': '13.0',
+        'pythonVer': '3.12', 'torchVer': '2.10.0',
         'archsToTest': ''
     ],
+]
+
+def windows_base_configs = [
+    [
+        'cudaVer': '11.8',
+    ],
+    [
+        'cudaVer': '12.1',
+    ],
+    [
+        'cudaVer': '12.4',
+    ],
+    [
+        'cudaVer': '12.6',
+    ],
+    [
+        'cudaVer': '12.8',
+    ],
+    [
+        'cudaVer': '12.9',
+    ],
+    [
+        'cudaVer': '13.0',
+    ]
 ]
 
 dockerRegistryServer = 'gitlab-master.nvidia.com:5005'
@@ -427,7 +451,6 @@ node {
     // To enable master branch we have to accept all the push requests
     // and prune them here.
     sh "echo ${gitlabActionType}"
-    jobMap = [:]
     // Jenkins doesn't parse the commit hash from the webhook.
     // So we need to get the commit hash from the last commit in the branch,
     // So we unsure that all the build and run are on the same commit
@@ -438,8 +461,13 @@ node {
     commitHash = sh(script: "git log -1 --pretty=format:%h",
                     returnStdout: true).trim()
     sh "echo ${commitHash}"
+    def hasForWindowsBaseInCommit = sh(script: "git log -1 | grep '.*\\[for windows base\\].*'",
+                                       returnStatus: true)
+    def hasPushWindowsBaseInCommit = sh(script: "git log -1 | grep '.*\\[push windows base\\].*'",
+                                        returnStatus: true)
     if (gitlabActionType == "MERGE" &&
         gitlabMergeRequestTitle.contains("[for wheels]")) {
+            jobMap = [:]
             for (config in ubuntu_for_cuda_wheels_configs) {
                 pythonVers = config.containsKey('pythonVers') && config.containsKey != '' ? config['pythonVers'] : defaultWheelsPythonVers
                 for (pythonVer in pythonVers) {
@@ -503,7 +531,53 @@ node {
                     )
                 }
             }
+        stage('Launch builds') {
+            parallel jobMap
+        }
+
+    } else if (hasForWindowsBaseInCommit == 0) {
+        buildWindowsBaseJobMap = [:]
+        for (config in windows_base_configs) {
+            def cudaVerLabel = config['cudaVer'].split('\\.').join('')
+            def configName = "windows-base-cuda${cudaVerLabel}"
+            buildWindowsBaseJobMap["${configName}"] = prepareWindowsBaseJob(
+                configName,
+                config['cudaVer'],
+            )
+        }
+        stage('Launch windows base builds') {
+            parallel buildWindowsBaseJobMap
+        }
+
+    } else if (hasPushWindowsBaseInCommit == 0) {
+        def registryImagePath = imageBaseTag.substring(dockerRegistryServer.length() + 1)
+        stage('Promote windows base images to master') {
+            withCredentials([usernamePassword(credentialsId: 'kaolin-gitlab-access-token-as-password',
+                                              usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+                for (config in windows_base_configs) {
+                    def branchTag = "windows-base-cuda${config['cudaVer']}-${branchRef}"
+                    def masterTag = "windows-base-cuda${config['cudaVer']}-master"
+                    sh """
+                        TOKEN=\$(curl -s -u \$REG_USER:\$REG_PASS \
+                            'https://gitlab-master.nvidia.com/jwt/auth?service=container_registry&scope=repository:${registryImagePath}:pull,push' \
+                            | sed 's/.*"token":"\\([^"]*\\)".*/\\1/')
+                        MANIFEST=\$(curl -s \
+                            -H "Authorization: Bearer \$TOKEN" \
+                            -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
+                            "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${branchTag}")
+                        curl -s -X PUT \
+                            -H "Authorization: Bearer \$TOKEN" \
+                            -H 'Content-Type: application/vnd.docker.distribution.manifest.v2+json' \
+                            -d "\$MANIFEST" \
+                            "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${masterTag}"
+                    """
+                }
+            }
+        }
+
     } else {
+        jobMap = [:]
+
         // Check if the last commit message has a [with custom] tag
         def hasNoCustomInMess = sh(script: "git log -1 | grep '.*\\[with custom\\].*'",
                                    returnStatus: true)
@@ -580,9 +654,9 @@ node {
                 false
             )
         }
-    }
-    stage('Launch builds') {
-        parallel jobMap
+        stage('Launch builds') {
+            parallel jobMap
+        }
     }
 }
 
@@ -678,6 +752,27 @@ def prepareUbuntuCPUOnlyJob(configName, pythonVer, torchVer, buildWheel) {
   }
 }
 
+def prepareWindowsBaseJob(configName, cudaVer) {
+  return {
+    stage("${configName}") {
+      updateGitlabCommitStatus(name: "build-windows-base-cuda${cudaVer}", state: "pending")
+      build job: "windows_base_build_template_CI",
+      parameters: [
+        string(name: 'configName', value: "${configName}"),
+        string(name: 'cudaVer', value: "${cudaVer}"),
+        string(name: 'targetImageTag',
+               value: "${imageBaseTag}:windows-base-cuda${cudaVer}-${branchRef}"),
+        string(name: 'sourceBranch', value: "${gitlabSourceBranch}"),
+        string(name: 'repoUrl', value: "${scm.userRemoteConfigs[0].url}"),
+        string(name: 'commitHash', value: "${commitHash}")
+      ],
+      wait: true,
+      propagate: true
+    }
+  }
+}
+
+
 def prepareWindowsCUDAJob(configName, cudaVer, pythonVer, torchVer, archsToTest,
                           buildWheel) {
   return {
@@ -685,11 +780,28 @@ def prepareWindowsCUDAJob(configName, cudaVer, pythonVer, torchVer, archsToTest,
       updateGitlabCommitStatus(name: "build-${configName}", state: "pending")
       if (buildWheel.toBoolean()) {
         updateGitlabCommitStatus(name: "test-${configName}", state: "pending")
-      } //else {
-      //  for (arch in archsToTest.split(';')) {
-      //    updateGitlabCommitStatus(name: "test-${configName}-${arch}", state: "pending")
-      //  }
-      //}
+      }
+      def branchBaseImage = "${imageBaseTag}:windows-base-cuda${cudaVer}-${branchRef}"
+      def masterBaseImage = "${imageBaseTag}:windows-base-cuda${cudaVer}-master"
+      def windowsBaseImage
+      def registryImagePath = imageBaseTag.substring(dockerRegistryServer.length() + 1)
+      def branchTag = "windows-base-cuda${cudaVer}-${branchRef}"
+      withCredentials([usernamePassword(credentialsId: 'kaolin-gitlab-access-token-as-password',
+                                        usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+        def statusCode = sh(
+          script: """
+              TOKEN=\$(curl -s -u \$REG_USER:\$REG_PASS \
+                  'https://gitlab-master.nvidia.com/jwt/auth?service=container_registry&scope=repository:toronto_dl_lab/kaolin/kaolin:pull' \
+                  | sed 's/.*"token":"\\([^"]*\\)".*/\\1/')
+              curl -s -o /dev/null -w '%{http_code}' \
+                  -H "Authorization: Bearer \$TOKEN" \
+                  -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
+                  "https://gitlab-master.nvidia.com:5005/v2/toronto_dl_lab/kaolin/kaolin/manifests/windows-base-cuda${cudaVer}-${branchRef}"
+          """,
+          returnStdout: true
+        ).trim()
+        windowsBaseImage = (statusCode == '200') ? branchBaseImage : masterBaseImage
+      }
 
       build job: "windows_build_template_CI",
       parameters: [
@@ -697,6 +809,7 @@ def prepareWindowsCUDAJob(configName, cudaVer, pythonVer, torchVer, archsToTest,
         string(name: 'cudaVer', value: "${cudaVer}"),
         string(name: 'pythonVer', value: "${pythonVer}"),
         string(name: 'torchVer', value: "${torchVer}"),
+        string(name: 'windowsBaseImage', value: "${windowsBaseImage}"),
         string(name: 'targetImageTag',
                value: "${imageBaseTag}:${branchRef}-${BUILD_ID}-${configName}"),
         string(name: 'sourceBranch', value: "${gitlabSourceBranch}"),

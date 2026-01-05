@@ -1,17 +1,38 @@
 # Note: Keep C:\Program Files (x86)\Microsoft Visual Studio\Installer directory.
 #       disutils/setuptools calls vswhere.exe from that location unconditionally.
-
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+ARG PYTHON_VERSION=3.9
+ARG PYTORCH_VERSION=2.3.0
+ARG FORCE_CUDA=1
 ARG IGNORE_TORCH_VER=0
+
+ENV PYTHON_VERSION=${PYTHON_VERSION}
+ENV PYTORCH_VERSION=${PYTORCH_VERSION}
+ENV FORCE_CUDA=${FORCE_CUDA}
 ENV IGNORE_TORCH_VER=${IGNORE_TORCH_VER}
 
-#### Kaolin ####
 
-WORKDIR /kaolin
+RUN conda install -y python=$Env:PYTHON_VERSION
+
+# NOTE: update the install list (2 lines here) if SSL_CERTIFICATE errors crop up to pip install the related dependency
+RUN $cudaDir = Get-ChildItem -Path 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\' -Directory | Select-Object -First 1 -ExpandProperty Name; \
+    if (-not $cudaDir) { throw 'No CUDA installation found' }; \
+    $cudaVer = $cudaDir.TrimStart('v'); \
+    Write-Host ('Detected CUDA: ' + $cudaVer); \
+    $Env:TORCH_STR = ${Env:PYTORCH_VERSION} + '+cu' + $cudaVer.Replace('.',''); \
+    $Env:TORCH_URL='https://download.pytorch.org/whl/cu' + $cudaVer.Replace('.',''); \
+    Write-Host ('Installing PyTorch: torch==' + ${Env:TORCH_STR} + ' from ' + ${Env:TORCH_URL}); \
+    pip install --no-cache-dir torch==${Env:TORCH_STR} torchvision --index-url ${Env:TORCH_URL};
+
+
+RUN pip install brotli
+
 
 RUN conda list > conda_build.txt
+
+WORKDIR /kaolin
 
 COPY . .
 
@@ -21,7 +42,11 @@ RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.pytho
     --trusted-host files.pythonhosted.org -r tools\ci_requirements.txt \
     -r tools\viz_requirements.txt -r tools\requirements.txt -r tools/build_requirements.txt
 
-RUN python setup.py develop
+SHELL ["cmd", "/S", "/C"]
+
+RUN "C:\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" x64 -vcvars_ver=14.34 && \
+    set DISTUTILS_USE_SDK=1 && \
+    python setup.py develop
 
 # fix for paging memory issue on CI machines
 #   see: https://gist.github.com/cobryan05/7d1fe28dd370e110a372c4d268dcb2e5

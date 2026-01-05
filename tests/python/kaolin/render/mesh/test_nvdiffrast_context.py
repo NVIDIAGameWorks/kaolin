@@ -1,4 +1,4 @@
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +17,6 @@ import os
 import torch
 import pytest
 
-from importlib import reload
-
-global kaolin
 import kaolin
 
 if os.getenv('KAOLIN_TEST_NVDIFFRAST', '0') == '0':
@@ -29,38 +26,7 @@ class TestNvidiaContext:
 
     @pytest.mark.parametrize('device', ['cuda:0', 'cuda'])
     @pytest.mark.parametrize('raise_error', [True, False])
-    def test_true_default_nvdiffrast_context(self, device, raise_error):
+    def test_default_nvdiffrast_context(self, device, raise_error):
         import nvdiffrast.torch
-        global kaolin
-        kaolin = reload(kaolin)
         ctx = kaolin.render.mesh.nvdiffrast_context.default_nvdiffrast_context(device, raise_error)
         assert isinstance(ctx, nvdiffrast.torch.RasterizeCudaContext)
-        # TODO(cfujitsang): is there a way to test for specific device?
-
-    @pytest.mark.skipif(os.getenv('KAOLIN_TEST_NVDIFFRAST_OPENGL', '0') == '0', reason='test is ignored as KAOLIN_TEST_NVDIFFRAST_OPENGL is not set')
-    @pytest.mark.parametrize('device', ['cuda:0', 'cuda'])
-    @pytest.mark.parametrize('raise_error', [True, False])
-    def test_cuda_default_nvdiffrast_context(self, device, raise_error):
-        import nvdiffrast.torch
-        global kaolin
-        kaolin = reload(kaolin)
-        kaolin.render.mesh.nvdiffrast_context.nvdiffrast_use_opengl()
-        ctx = kaolin.render.mesh.nvdiffrast_context.default_nvdiffrast_context(device, raise_error)
-        assert isinstance(ctx, nvdiffrast.torch.RasterizeGLContext)
-        kaolin.render.mesh.nvdiffrast_context.nvdiffrast_use_cuda()
-        ctx = kaolin.render.mesh.nvdiffrast_context.default_nvdiffrast_context(device, raise_error)
-        assert isinstance(ctx, nvdiffrast.torch.RasterizeCudaContext)
-
-    @pytest.mark.skipif(os.getenv('KAOLIN_TEST_NVDIFFRAST_OPENGL', '0') == '0', reason='test is ignored as KAOLIN_TEST_NVDIFFRAST_OPENGL is not set')
-    @pytest.mark.parametrize('device', ['cuda:0', 'cuda'])
-    @pytest.mark.parametrize('raise_error', [True, False])
-    def test_opengl_default_nvdiffrast_context(self, device, raise_error):
-        import nvdiffrast.torch
-        global kaolin
-        kaolin = reload(kaolin)
-        kaolin.render.mesh.nvdiffrast_context.nvdiffrast_use_cuda()
-        ctx = kaolin.render.mesh.nvdiffrast_context.default_nvdiffrast_context(device, raise_error)
-        assert isinstance(ctx, nvdiffrast.torch.RasterizeCudaContext)
-        kaolin.render.mesh.nvdiffrast_context.nvdiffrast_use_opengl()
-        ctx = kaolin.render.mesh.nvdiffrast_context.default_nvdiffrast_context(device, raise_error)
-        assert isinstance(ctx, nvdiffrast.torch.RasterizeGLContext)

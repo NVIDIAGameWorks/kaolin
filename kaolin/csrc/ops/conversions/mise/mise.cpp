@@ -54,9 +54,9 @@ MISE::MISE(int32_t in_resolution_0, int32_t in_depth, double in_threshold) {
   GridPoint point;
   Vector3D loc;
 
-  for (int i = 0; i < resolution_0; i++) {
-    for (int j = 0; j < resolution_0; j++) {
-      for (int k = 0; k < resolution_0; k++) {
+  for (int32_t i = 0; i < resolution_0; i++) {
+    for (int32_t j = 0; j < resolution_0; j++) {
+      for (int32_t k = 0; k < resolution_0; k++) {
         loc = Vector3D(i * voxel_size_0, j * voxel_size_0, k * voxel_size_0);
         voxel = Voxel(loc, 0, true);
         TORCH_CHECK(voxels.size() == i * resolution_0 * resolution_0 + j * resolution_0 + k);
@@ -65,11 +65,11 @@ MISE::MISE(int32_t in_resolution_0, int32_t in_depth, double in_threshold) {
     }
   }
 
-  int resolution_1 = resolution_0 + 1;
+  int32_t resolution_1 = resolution_0 + 1;
   grid_points.reserve(resolution_1 * resolution_1 * resolution_1);
-  for (int i = 0; i < resolution_1; i++) {
-    for (int j = 0; j < resolution_1; j++) {
-      for (int k = 0; k < resolution_1; k++) {
+  for (int32_t i = 0; i < resolution_1; i++) {
+    for (int32_t j = 0; j < resolution_1; j++) {
+      for (int32_t k = 0; k < resolution_1; k++) {
         loc = Vector3D(i * voxel_size_0, j * voxel_size_0, k * voxel_size_0);
         TORCH_CHECK(grid_points.size() == i * resolution_1 * resolution_1 + j * resolution_1 + k);
         add_grid_point(loc);
@@ -81,12 +81,12 @@ MISE::MISE(int32_t in_resolution_0, int32_t in_depth, double in_threshold) {
 void MISE::update(at::Tensor points, at::Tensor values) {
   TORCH_CHECK(points.size(0) == values.size(0));
   TORCH_CHECK(points.size(1) == 3);
-  long* points_ptr = points.data_ptr<long>();
+  int64_t* points_ptr = points.data_ptr<int64_t>();
   double* values_ptr = values.data_ptr<double>();
   Vector3D loc;
-  long idx;
+  int64_t idx;
 
-  for (int i = 0; i < points.size(0); i++) {
+  for (int32_t i = 0; i < points.size(0); i++) {
     loc = Vector3D(points_ptr[i * 3], points_ptr[i * 3 + 1], points_ptr[i * 3 + 2]);
     idx = get_grid_point_idx(loc);
     if (idx == -1)
@@ -98,7 +98,7 @@ void MISE::update(at::Tensor points, at::Tensor values) {
 }
 
 at::Tensor MISE::query() {
-  int n_unknown = 0;
+  int32_t n_unknown = 0;
   for (auto p : grid_points) {
     if (!p.known)
       n_unknown += 1;
@@ -107,7 +107,7 @@ at::Tensor MISE::query() {
   at::Tensor points = at::zeros({n_unknown, 3}, std::nullopt, at::kLong,
                                 std::nullopt, at::kCPU, std::nullopt);
   auto points_ptr = points.data_ptr<int64_t>();
-  int idx = 0;
+  int32_t idx = 0;
   for (auto p : grid_points) {
     if (!p.known) {
       points_ptr[idx * 3 + 0] = p.loc.x;
@@ -120,34 +120,34 @@ at::Tensor MISE::query() {
 }
 
 at::Tensor MISE::to_dense() {
-  int resolution_1 = resolution + 1;
+  int32_t resolution_1 = resolution + 1;
   at::Tensor out = at::full({resolution_1, resolution_1, resolution_1}, std::numeric_limits<float>::quiet_NaN(), at::kFloat, std::nullopt, at::kCPU, std::nullopt);
   float* out_ptr = out.data_ptr<float>();
   for (auto point : grid_points) {
     out_ptr[point.loc.x * resolution_1 * resolution_1 + point.loc.y * resolution_1 + point.loc.z] = point.value;
   }
 
-  for (int i = 1; i < resolution_1; i++) {
-    for (int j = 0; j < resolution_1; j++) {
-      for (int k = 0; k < resolution_1; k++) {
+  for (int32_t i = 1; i < resolution_1; i++) {
+    for (int32_t j = 0; j < resolution_1; j++) {
+      for (int32_t k = 0; k < resolution_1; k++) {
         if (std::isnan(out_ptr[i * resolution_1 * resolution_1 + j * resolution_1 + k]))
           out_ptr[i * resolution_1 * resolution_1 + j * resolution_1 + k] = out_ptr[(i-1) * resolution_1 * resolution_1 + j * resolution_1 + k];
       }
     }
   }
 
-  for (int i = 0; i < resolution_1; i++) {
-    for (int j = 1; j < resolution_1; j++) {
-      for (int k = 0; k < resolution_1; k++) {
+  for (int32_t i = 0; i < resolution_1; i++) {
+    for (int32_t j = 1; j < resolution_1; j++) {
+      for (int32_t k = 0; k < resolution_1; k++) {
         if (std::isnan(out_ptr[i * resolution_1 * resolution_1 + j * resolution_1 + k]))
           out_ptr[i * resolution_1 * resolution_1 + j * resolution_1 + k] = out_ptr[i * resolution_1 * resolution_1 + (j-1) * resolution_1 + k];
       }
     }
   }
 
-  for (int i = 0; i < resolution_1; i++) {
-    for (int j = 0; j < resolution_1; j++) {
-      for (int k = 1; k < resolution_1; k++) {
+  for (int32_t i = 0; i < resolution_1; i++) {
+    for (int32_t j = 0; j < resolution_1; j++) {
+      for (int32_t k = 1; k < resolution_1; k++) {
         if (std::isnan(out_ptr[i * resolution_1 * resolution_1 + j * resolution_1 + k]))
           out_ptr[i * resolution_1 * resolution_1 + j * resolution_1 + k] = out_ptr[i * resolution_1 * resolution_1 + j * resolution_1 + k - 1];
         TORCH_CHECK(!std::isnan(out_ptr[i * resolution_1 * resolution_1 + j * resolution_1 + k]));
@@ -160,7 +160,7 @@ at::Tensor MISE::to_dense() {
 void MISE::subdivide_voxels() {
   std::vector<bool> next_to_positive;
   std::vector<bool> next_to_negative;
-  long idx;
+  int64_t idx;
   Vector3D loc, adj_loc;
 
   next_to_positive.resize(voxels.size(), false);
@@ -171,9 +171,9 @@ void MISE::subdivide_voxels() {
     if (!grid_point.known)
       continue;
 
-    for (int i = -1; i < 1; i++) {
-      for (int j = -1; j < 1; j++) {
-        for (int k = -1; k < 1; k++) {
+    for (int32_t i = -1; i < 1; i++) {
+      for (int32_t j = -1; j < 1; j++) {
+        for (int32_t k = -1; k < 1; k++) {
           adj_loc = Vector3D(loc.x + i, loc.y + j, loc.z + k);
           idx = get_voxel_idx(adj_loc);
           if (idx == -1)
@@ -188,7 +188,7 @@ void MISE::subdivide_voxels() {
     }
   }
 
-  int n_subdivide = 0;
+  int32_t n_subdivide = 0;
   for (size_t idx = 0; idx < voxels.size(); idx++) {
     if (!voxels[idx].is_leaf || voxels[idx].level == depth)
       continue;
@@ -198,9 +198,9 @@ void MISE::subdivide_voxels() {
 
   voxels.reserve(voxels.size() + 8 * n_subdivide);
   grid_points.reserve(voxels.size() + 19 * n_subdivide);
-  int init_voxel_size = voxels.size();
+  int32_t init_voxel_size = voxels.size();
 
-  for (int idx = 0; idx < init_voxel_size; idx++) {
+  for (int32_t idx = 0; idx < init_voxel_size; idx++) {
     if (!voxels[idx].is_leaf || voxels[idx].level == depth)
       continue;
     if (next_to_positive[idx] && next_to_negative[idx])
@@ -208,20 +208,20 @@ void MISE::subdivide_voxels() {
   }
 }
 
-void MISE::subdivide_voxel(long idx) {
+void MISE::subdivide_voxel(int64_t idx) {
   Voxel voxel;
   GridPoint point;
   Vector3D loc0 = voxels[idx].loc;
   Vector3D loc;
-  int new_level = voxels[idx].level + 1;
-  int new_size = 1 << (depth - new_level);
+  int32_t new_level = voxels[idx].level + 1;
+  int32_t new_size = 1 << (depth - new_level);
   TORCH_CHECK(new_level <= depth);
   TORCH_CHECK(1 <= new_size && new_size <= voxel_size_0);
 
   voxels[idx].is_leaf = false;
-  for (int i = 0; i < 2; i++) {
-    for (int j = 0; j < 2; j++) {
-      for (int k = 0; k < 2; k++) {
+  for (int32_t i = 0; i < 2; i++) {
+    for (int32_t j = 0; j < 2; j++) {
+      for (int32_t k = 0; k < 2; k++) {
         loc = Vector3D(loc0.x + i * new_size, loc0.y + j * new_size, loc0.z + k * new_size);
         voxel = Voxel(loc, new_level, true);
         voxels[idx].children[i][j][k] = voxels.size();
@@ -230,9 +230,9 @@ void MISE::subdivide_voxel(long idx) {
     }
   }
   
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      for (int k = 0; k < 3; k++) {
+  for (int32_t i = 0; i < 3; i++) {
+    for (int32_t j = 0; j < 3; j++) {
+      for (int32_t k = 0; k < 3; k++) {
         loc = Vector3D(loc0.x + i * new_size, loc0.y + j * new_size, loc0.z + k * new_size);
         if (get_grid_point_idx(loc) == -1)
           add_grid_point(loc);
@@ -241,12 +241,12 @@ void MISE::subdivide_voxel(long idx) {
   }
 }
 
-long MISE::get_voxel_idx(Vector3D loc) {
+int64_t MISE::get_voxel_idx(Vector3D loc) {
   if (!(0 <= loc.x && loc.x < resolution && 0 <= loc.y && loc.y < resolution && 0 <= loc.z && loc.z < resolution))
     return -1;
 
   Vector3D loc0 = Vector3D(loc.x >> depth, loc.y >> depth, loc.z >> depth);
-  int idx = loc0.x * resolution_0 * resolution_0 + loc0.y * resolution_0 + loc0.z;
+  int32_t idx = loc0.x * resolution_0 * resolution_0 + loc0.y * resolution_0 + loc0.z;
   Voxel voxel = voxels[idx];
   TORCH_CHECK(voxel.loc.x == loc0.x * voxel_size_0);
   TORCH_CHECK(voxel.loc.y == loc0.y * voxel_size_0);
@@ -259,7 +259,7 @@ long MISE::get_voxel_idx(Vector3D loc) {
   );
 
   Vector3D loc_offset;
-  long voxel_size = voxel_size_0;
+  int64_t voxel_size = voxel_size_0;
 
   while (!voxel.is_leaf) {
     voxel_size = voxel_size >> 1;
@@ -281,18 +281,18 @@ long MISE::get_voxel_idx(Vector3D loc) {
 
 void MISE::add_grid_point(Vector3D loc) {
   GridPoint point = GridPoint(loc, 0., false);
-  int resolution_1 = resolution + 1;
+  int32_t resolution_1 = resolution + 1;
   grid_point_hash[resolution_1 * resolution_1 * loc.x + resolution_1 * loc.y + loc.z] = grid_points.size();
   grid_points.push_back(point);
 }
 
-int MISE::get_grid_point_idx(Vector3D loc) {
-  int resolution_1 = resolution + 1;
+int32_t MISE::get_grid_point_idx(Vector3D loc) {
+  int32_t resolution_1 = resolution + 1;
   auto p_idx = grid_point_hash.find(loc.x * resolution_1 * resolution_1 + loc.y * resolution_1 + loc.z);
   if (p_idx == grid_point_hash.end())
     return -1;
 
-  int idx = p_idx->second;
+  int32_t idx = p_idx->second;
   TORCH_CHECK(grid_points[idx].loc.x == loc.x);
   TORCH_CHECK(grid_points[idx].loc.y == loc.y);
   TORCH_CHECK(grid_points[idx].loc.z == loc.z);

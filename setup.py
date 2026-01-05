@@ -17,9 +17,8 @@ import sys
 import subprocess  # Added import
 
 # Define version constraints
-TORCH_MIN_VER = '1.6.0'
-TORCH_MAX_VER = '2.8.0'  # Updated to support newer PyTorch versions
-CYTHON_MIN_VER = '0.29.37'
+TORCH_MIN_VER = '2.3.0'
+TORCH_MAX_VER = '2.10.0'  # Updated to support newer PyTorch versions
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
 
 # Module required before installation
@@ -73,9 +72,7 @@ def get_cuda_bare_metal_version(cuda_dir):
 # Handle CUDA availability
 if not torch.cuda.is_available() and os.getenv('FORCE_CUDA', '0') == '1':
     logging.warning(
-        "Torch did not find available GPUs. Assuming cross-compilation.\n"
-        "Default architectures: Pascal (6.0, 6.1, 6.2), Volta (7.0), Turing (7.5),\n"
-        "Ampere (8.0) if CUDA >= 11.0, Hopper (9.0) if CUDA >= 11.8, Blackwell (12.0) if CUDA >= 12.8\n"
+        "Torch did not find available GPUs. Assuming cross-compilation and all supported architectures.\n"
         "Set TORCH_CUDA_ARCH_LIST for specific architectures."
     )
     if os.getenv("TORCH_CUDA_ARCH_LIST") is None:
@@ -91,10 +88,15 @@ if not torch.cuda.is_available() and os.getenv('FORCE_CUDA', '0') == '1':
         elif major == 12:
             if minor <= 6:
                 os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0"
-            else:
+            elif minor == 8:
                 os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0;12.0"
+            else:
+                os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0;12.0;12.1"
+        elif major == 13:
+            os.environ["TORCH_CUDA_ARCH_LIST"] = "7.5;8.0;8.6;8.9;9.0;12.0;12.1"
         else:
             os.environ["TORCH_CUDA_ARCH_LIST"] = "6.0;6.1;6.2;7.0;7.5"
+
         print(f'TORCH_CUDA_ARCH_LIST: {os.environ["TORCH_CUDA_ARCH_LIST"]}')
 elif not torch.cuda.is_available():
     logging.warning(
