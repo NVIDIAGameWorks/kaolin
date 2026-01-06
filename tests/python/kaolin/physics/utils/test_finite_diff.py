@@ -1,4 +1,4 @@
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,8 +29,8 @@ from kaolin.utils.testing import FLOAT_TYPES, with_seed, check_allclose
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
+@with_seed(9, 9, 9)
 def test_finite_diff_jac_2(device, dtype):
-    with_seed(9, 9, 9)
     rtol, atol = torch.tensor([1], dtype=dtype, device=device), torch.tensor(
         [1], dtype=dtype, device=device)
 
@@ -38,8 +38,10 @@ def test_finite_diff_jac_2(device, dtype):
     H = 5
     B = 1
     points = torch.rand(N, 3, device=device, dtype=dtype)  # n x 3 points
-    transforms = torch.cat((torch.eye(3, device=device, dtype=dtype), torch.zeros(
-        3, 1, device=device, dtype=dtype)), dim=1).repeat(H, 1, 1).unsqueeze(0)
+    transforms = torch.cat([
+        torch.eye(3, device=device, dtype=dtype),
+        torch.zeros(3, 1, device=device, dtype=dtype)
+    ], dim=1).repeat(H - 1, 1, 1).unsqueeze(0)
     model = SimplicitsMLP(3, 64, H, 6).to(device)
     if dtype == torch.double:
         model.double()
@@ -56,16 +58,16 @@ def test_finite_diff_jac_2(device, dtype):
 
     # weird errors when type is half. rtol and atol does not match the expected device type
     check_allclose(expected, transformed_points_jac,
-                          rtol=rtol.item(), atol=atol.item())
+                   rtol=rtol.item(), atol=atol.item())
 
 
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
+@with_seed(9, 9, 9)
 def test_finite_diff_jac(device, dtype):
-    with_seed(9, 9, 9)
 
-    rtol, atol = torch.tensor(
-        [1e-3], dtype=dtype, device=device), torch.tensor([1e-3], dtype=dtype, device=device)
+    rtol = torch.tensor([1e-3], dtype=dtype, device=device)
+    atol = torch.tensor([1e-3], dtype=dtype, device=device)
 
     N = 20
     H = 5
@@ -88,4 +90,4 @@ def test_finite_diff_jac(device, dtype):
 
     # weird errors when type is half. rtol and atol does not match the expected device type
     check_allclose(expected, transformed_points_jac,
-                          rtol=rtol.item(), atol=atol.item())
+                   rtol=rtol.item(), atol=atol.item())

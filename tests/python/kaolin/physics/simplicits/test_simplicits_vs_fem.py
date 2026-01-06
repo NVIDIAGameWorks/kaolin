@@ -19,7 +19,7 @@ import warp as wp
 import kaolin
 import numpy as np
 from typing import Any
-from kaolin.physics.simplicits.easy_api import SimplicitsScene, SimplicitsObject
+from kaolin.physics.simplicits import SimplicitsScene, SimplicitsObject
 import pytest
 from kaolin.utils.testing import with_seed
 
@@ -31,8 +31,7 @@ def run_regression_test(simplicits_scene, fem_data, tol=1e-2, test_name="fem_tes
     frame_100_verts = fem_data["v_end"]  # beam verts at frame 100
 
     # Checking deformation at start
-    our_start_verts = simplicits_scene.get_object_deformed_pts(
-        0, start_verts)  # find OUR starting deformation on the fem beam's verts
+    our_start_verts = simplicits_scene.get_object_deformed_pts(0, points='rendered')
 
     cd = kaolin.metrics.pointcloud.chamfer_distance(start_verts.unsqueeze(0),
                                                     our_start_verts.unsqueeze(
@@ -43,8 +42,7 @@ def run_regression_test(simplicits_scene, fem_data, tol=1e-2, test_name="fem_tes
     # Checking deformation at frame 1
     simplicits_scene.run_sim_step()
 
-    our_frame_1_verts = simplicits_scene.get_object_deformed_pts(
-        0, start_verts)
+    our_frame_1_verts = simplicits_scene.get_object_deformed_pts(0, points='rendered')
 
     cd = kaolin.metrics.pointcloud.chamfer_distance(frame_1_verts.unsqueeze(0),
                                                     our_frame_1_verts.unsqueeze(
@@ -57,8 +55,7 @@ def run_regression_test(simplicits_scene, fem_data, tol=1e-2, test_name="fem_tes
     for i in range(99):
         simplicits_scene.run_sim_step()
 
-    our_frame_100_verts = simplicits_scene.get_object_deformed_pts(
-        0, start_verts)
+    our_frame_100_verts = simplicits_scene.get_object_deformed_pts(0, points='rendered')
 
     cd = kaolin.metrics.pointcloud.chamfer_distance(frame_100_verts.unsqueeze(0),
                                                     our_frame_100_verts.unsqueeze(

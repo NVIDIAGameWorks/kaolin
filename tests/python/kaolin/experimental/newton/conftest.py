@@ -32,10 +32,10 @@ from kaolin.physics.simplicits import SimplicitsObject
 
 # Constants for test objects
 NUM_SAMPLES = 10000
-SOFT_YOUNGS_MODULUS = 1e5
-POISSON_RATIO = 0.45
-DENSITY = 500
-APPROX_VOLUME = 0.5
+SOFT_YOUNGS_MODULUS = float(1e5)
+POISSON_RATIO = float(0.45)
+DENSITY = float(500.0)
+APPROX_VOLUME = float(0.5)
 
 
 @pytest.fixture(scope="session")
@@ -87,5 +87,5 @@ def simplicits_model_with_object(simplicits_object):
     from kaolin.experimental.newton.model import SimplicitsModel
 
     model = SimplicitsModel()
-    obj_idx = model.simplicits_scene.add_object(simplicits_object)
+    obj_idx = model.simplicits_scene.add_object(simplicits_object, num_qp=1024)
     return model, obj_idx

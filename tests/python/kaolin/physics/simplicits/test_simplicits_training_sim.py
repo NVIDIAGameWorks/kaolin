@@ -19,7 +19,7 @@ import warp as wp
 import kaolin
 import numpy as np
 from typing import Any
-from kaolin.physics.simplicits.easy_api import SimplicitsScene, SimplicitsObject
+from kaolin.physics.simplicits import SimplicitsScene, SimplicitsObject
 import pytest
 from kaolin.utils.testing import with_seed
 
@@ -30,8 +30,7 @@ def run_regression_test(simplicits_scene, fem_data, tol=1e-2, test_name="fem_tes
     frame_100_verts = fem_data["v_end"]  # beam verts at frame 100
 
     # Checking deformation at start
-    our_start_verts = simplicits_scene.get_object_deformed_pts(
-        0, start_verts)  # find OUR starting deformation on the fem beam's verts
+    our_start_verts = simplicits_scene.get_object_deformed_pts(0, 'rendered')
 
     cd = kaolin.metrics.pointcloud.chamfer_distance(start_verts.unsqueeze(0),
                                                     our_start_verts.unsqueeze(
@@ -42,8 +41,7 @@ def run_regression_test(simplicits_scene, fem_data, tol=1e-2, test_name="fem_tes
     # Checking deformation at frame 1
     simplicits_scene.run_sim_step()
 
-    our_frame_1_verts = simplicits_scene.get_object_deformed_pts(
-        0, start_verts)
+    our_frame_1_verts = simplicits_scene.get_object_deformed_pts(0, 'rendered')
 
     cd = kaolin.metrics.pointcloud.chamfer_distance(frame_1_verts.unsqueeze(0),
                                                     our_frame_1_verts.unsqueeze(
@@ -56,8 +54,7 @@ def run_regression_test(simplicits_scene, fem_data, tol=1e-2, test_name="fem_tes
     for i in range(99):
         simplicits_scene.run_sim_step()
 
-    our_frame_100_verts = simplicits_scene.get_object_deformed_pts(
-        0, start_verts)
+    our_frame_100_verts = simplicits_scene.get_object_deformed_pts(0, 'rendered')
 
     cd = kaolin.metrics.pointcloud.chamfer_distance(frame_100_verts.unsqueeze(0),
                                                     our_frame_100_verts.unsqueeze(
@@ -119,7 +116,9 @@ def cantilever_beam_scene_setup(device, dtype):
     scene.newton_hessian_regularizer = 0
     scene.direct_solve = True
     
-    scene.add_object(simplicits_object, num_qp=1024)
+    fem_data_path = os.path.dirname(os.path.realpath(__file__)) + "/regression_test_data/wpfem_vertex_deformations_beam.pth"
+    fem_v0 = torch.load(fem_data_path, weights_only=False)["v0"]
+    scene.add_object(simplicits_object, num_qp=1024, renderable_pts=fem_v0)
 
     scene.set_scene_gravity(torch.tensor([0, 9.8, 0]))
     scene.set_scene_floor(floor_height=-1.0, floor_axis=1,

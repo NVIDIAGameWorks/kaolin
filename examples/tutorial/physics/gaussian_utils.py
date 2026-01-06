@@ -19,21 +19,6 @@ def pad_transforms(obj_tfms):
     padded_tensor = torch.cat([obj_tfms, padding_row], dim=1)
     return padded_tensor
 
-def transform_gaussians_lbs(xyz, rotations, raw_scales, skinning_weights, transforms, shs_feat=None):
-    with torch.no_grad():
-        # N x 4 x 4 = sum((N x H x 1 x 1) * (1 x H x 4 x 4), dim=1)
-        per_pt_transforms = torch.sum(skinning_weights.unsqueeze(-1).unsqueeze(-1) * transforms, dim=1)
-        # log_tensor(per_pt_transforms, 'pt transforms', logger)
-    
-        # convert relative transforms to absolute transforms
-        per_pt_transforms = per_pt_transforms + torch.eye(4, dtype=per_pt_transforms.dtype,
-                                                          device=per_pt_transforms.device).unsqueeze(0)
-    
-        new_xyz, new_rot, new_scales, new_shs_feat = kaolin.ops.gaussians.transform_gaussians(
-            xyz, rotations, raw_scales, per_pt_transforms, shs_feat=shs_feat, use_log_scales=True)
-    
-        return new_xyz, new_rot, new_scales, new_shs_feat
-
 def concat_gaussians(gaussians):
     from gaussian_renderer import GaussianModel
     assert isinstance(gaussians, Sequence)

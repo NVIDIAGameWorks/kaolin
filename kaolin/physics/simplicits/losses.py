@@ -16,12 +16,12 @@
 import torch
 import torch.nn as nn
 from functools import partial
-from kaolin.physics.materials import (
+from ..materials import (
     material_utils,
     linear_elastic_material,
     neohookean_elastic_material)
-from kaolin.physics.simplicits import weight_function_lbs
-from kaolin.physics.utils.finite_diff import finite_diff_jac
+from .skinning import weight_function_lbs
+from ..utils.finite_diff import finite_diff_jac
 
 __all__ = [
     'loss_ortho',
@@ -46,7 +46,7 @@ def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step, 
     r"""Calculate a version of simplicits elastic loss for training.
 
     Args:
-        model (nn.Module): Simplicits object network
+        model (SkinningModule): Skinning module
         pts (torch.Tensor): Tensor of sample points in :math:`\mathbb{R}^dim`, for now dim=3, of shape :math:`(\text{num_samples}, \text{dim})`
         yms (torch.Tensor): Length pt-wise youngs modulus, of shape :math:`(\text{num_samples})`
         prs (torch.Tensor): Length pt-wise poisson ratios, of shape :math:`(\text{num_samples})`
@@ -92,18 +92,17 @@ def loss_elastic(model, pts, yms, prs, rhos, transforms, appx_vol, interp_step, 
     return (appx_vol / pts.shape[0]) * (torch.sum(lin_elastic + neo_elastic))
 
 
-def compute_losses(model, normalized_pts, yms, prs, rhos, en_interp, batch_size, num_handles, appx_vol, num_samples, le_coeff, lo_coeff):
+def compute_losses(skinning_mod, normalized_pts, yms, prs, rhos, en_interp, batch_size, appx_vol, num_samples, le_coeff, lo_coeff):
     r""" Perform a step of the simplicits training process
 
     Args:
-        model (nn.module): Simplicits network
+        skinning_mod (SkinningModule): Skinning module
         normalized_pts (torch.Tensor): Spatial points in :math:`R^3`, of shape :math:`(\text{num_pts}, 3)`
         yms (torch.Tensor): Point-wise youngs modulus, of shape :math:`(\text{num_pts})` 
         prs (torch.Tensor): Point-wise poissons ratio, of shape :math:`(\text{num_pts})`
         rhos (torch.Tensor): Point-wise density, of shape :math:`(\text{num_pts})`
         en_interp (float): interpolation between energy at current step
         batch_size (int): Number of sample deformations
-        num_handles (int): Number of handles
         appx_vol (float): Approximate volume of object
         num_samples (int): Number of sample points. 
         le_coeff (float): floating point coefficient for elastic loss 
@@ -112,8 +111,6 @@ def compute_losses(model, normalized_pts, yms, prs, rhos, en_interp, batch_size,
     Returns:
         torch.Tensor, torch.Tensor: The elastic loss term, the orthogonality losses terms
     """
-    batch_transforms = 0.1 * torch.randn(batch_size, num_handles, 3, 4,
-                                         dtype=normalized_pts.dtype).to(normalized_pts.device)
 
     # Select num_samples from all points
     sample_indices = torch.randint(low=0, high=normalized_pts.shape[0], size=(
@@ -125,12 +122,14 @@ def compute_losses(model, normalized_pts, yms, prs, rhos, en_interp, batch_size,
     sample_rhos = rhos[sample_indices]
 
     # Get current skinning weights at sample pts
-    weights = model(sample_pts)
+    weights = skinning_mod(sample_pts)
+    batch_transforms = 0.1 * torch.randn(batch_size, weights.shape[-1], 3, 4,
+                                         dtype=normalized_pts.dtype).to(normalized_pts.device)
 
     # Calculate elastic energy for the batch of transforms
     # loss_elastic(model, pts, yms, prs,  rhos, transforms, appx_vol, interp_step)
     # le = torch.tensor(0,device=sample_pts.device, dtype=sample_pts.dtype) #
-    le = le_coeff * loss_elastic(model, sample_pts, sample_yms, sample_prs,
+    le = le_coeff * loss_elastic(skinning_mod, sample_pts, sample_yms, sample_prs,
                                  sample_rhos, batch_transforms, appx_vol, en_interp)
 
     # Calculate orthogonality of skinning weights

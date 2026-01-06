@@ -1,4 +1,4 @@
-# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +15,8 @@
 
 import logging
 import warnings
+from typing import Literal, Any
+
 import warp as wp
 import warp.sparse as wps
 import numpy as np
@@ -23,367 +25,129 @@ import kaolin
 
 from functools import partial
 
-from kaolin.physics.simplicits.losses import compute_losses
-from kaolin.physics.simplicits.network import SimplicitsMLP
+from ..utils import warp_utilities, torch_utilities
 
-import kaolin.physics.utils.warp_utilities as warp_utilities
-import kaolin.physics.utils.torch_utilities as torch_utilities
-
-from kaolin.physics.common import Collision, Gravity, Floor, Boundary
-from kaolin.physics.materials import NeohookeanElasticMaterial
-from kaolin.physics.materials.material_utils import get_defo_grad, to_lame
-from kaolin.physics.common.optimization import newtons_method
-from kaolin.physics.simplicits.precomputed import sparse_lbs_matrix, sparse_dFdz_matrix_from_dense
-from kaolin.physics.simplicits.skinning import weight_function_lbs
+from ..common import Collision, Gravity, Floor, Boundary
+from ..materials import NeohookeanElasticMaterial
+from ..materials.material_utils import get_defo_grad, to_lame
+from ..common.optimization import newtons_method
+from .precomputed import sparse_lbs_matrix, sparse_dFdz_matrix
+from .skinning import standard_lbs
+from .training import SkinnedPointsProtocol, SkinnedPhysicsPoints, SimplicitsObject
 
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'SimplicitsObject',
     'SimulatedObject',
     'SimplicitsScene',
 ]
 
-class NormalizedSkinningWeightsFcn(torch.nn.Module):
-    r"""
-    A skinning weight function that normalizes the points to the unit cube and then applies the model, and appends a constant weight of 1.
+class SimulatedObject(SkinnedPhysicsPoints):
     """
-    def __init__(self, model, bb_min, bb_max):
-        super().__init__()
-        self.model = model
-        self.bb_min = bb_min
-        self.bb_max = bb_max
+    Class containing minimal information for a simulatable simplicits object AND ALSO
+    all the variables and state variables needed to run actual simulation.
 
-    def forward(self, pts):
-        return torch.cat([
-            self.model((pts - self.bb_min) / (self.bb_max - self.bb_min)),
-            torch.ones((pts.shape[0], 1), device=pts.device)
-        ], dim=1)
+    This class contains time-varying simulation state and is internal to the
+    Simulator logic.
 
-class SkinningWeightsFcn(torch.nn.Module):
-    r"""
-    A skinning weight function that applies the model to the points directly and appends a constant weight of 1.
     """
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
-
-    def forward(self, pts):
-        return torch.cat([
-            self.model(pts),
-            torch.ones((pts.shape[0], 1), device=pts.device)
-        ], dim=1)
-
-class SimplicitsObject:
-    @staticmethod
-    def create_trained(pts, yms, prs, rhos, appx_vol,
-                       num_handles=10,
-                       num_samples=1000,
-                       model_layers=6,
-                       training_batch_size=10,
-                       training_num_steps=10000,
-                       training_lr_start=1e-3,
-                       training_lr_end=1e-3,
-                       training_le_coeff=1e-1,
-                       training_lo_coeff=1e6,
-                       training_log_every=1000,
-                       normalize_for_training=True):
-        r"""Constructs a SimplicitsObject by training a neural network to learn skinning weights.
-
-        This method creates a SimplicitsObject by training a neural network to learn skinning weights
-        that can be used for deformation. The network is trained to minimize a combination of
-        local and global energy terms.
-        
-        Note:
-            If num_handles is set to 0, the object will be created as rigid instead of deformable.
-            The training process uses a combination of local and global energy terms to ensure
-            both local detail preservation and global shape maintenance.
-
-        Args:
-            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            appx_vol (torch.Tensor): Approximate volume tensor of shape :math:`(1,)`
-            num_handles (int, optional): Number of control handles for deformation. Defaults to 10
-            num_samples (int, optional): Number of samples used for training. Defaults to 1000
-            model_layers (int, optional): Number of layers in the neural network. Defaults to 6
-            training_batch_size (int, optional): Batch size for training. Defaults to 10
-            training_num_steps (int, optional): Number of training iterations. Defaults to 10000
-            training_lr_start (float, optional): Initial learning rate. Defaults to 1e-3
-            training_lr_end (float, optional): Final learning rate. Defaults to 1e-3
-            training_le_coeff (float, optional): Coefficient for local energy term. Defaults to 1e-1
-            training_lo_coeff (float, optional): Coefficient for global energy term. Defaults to 1e6
-            training_log_every (int, optional): Logging frequency during training. Defaults to 1000
-            normalize_for_training (bool, optional): Whether to normalize points to unit cube for training. Defaults to True
-
-        Returns:
-            SimplicitsObject: A trained SimplicitsObject with learned skinning weights
-
-        """
-        if num_handles == 0:
-            warnings.warn(
-                f'Num Handles is 0. Simplicits Object will be created as rigid.', UserWarning)
-
-            return SimplicitsObject.create_rigid(pts, yms, prs, rhos, appx_vol)
-        
-        if not torch.is_tensor(yms):
-            yms = torch.full((pts.shape[0],), yms, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(prs):
-            prs = torch.full((pts.shape[0],), prs, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(rhos):
-            rhos = torch.full((pts.shape[0],), rhos, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(appx_vol):
-            appx_vol = torch.tensor([appx_vol], dtype=pts.dtype, device=pts.device)
-
-        device = pts.device
-
-        bb_max = torch.max(pts, dim=0).values
-        bb_min = torch.min(pts, dim=0).values
-        bb_vol = (bb_max[0] - bb_min[0]) * (bb_max[1] -
-                                            bb_min[1]) * (bb_max[2] - bb_min[2])
-
-        # normalize the points
-        if (normalize_for_training):
-            # Normalize the appx vol of object
-            norm_bb_max = torch.max((pts - bb_min) / (bb_max - bb_min),
-                                    dim=0).values  # get the bb_max of the normalized pts
-            norm_bb_min = torch.min((pts - bb_min) / (bb_max - bb_min),
-                                    dim=0).values  # get the bb_min of the normalized pts
-
-            norm_bb_vol = (norm_bb_max[0] - norm_bb_min[0]) * (norm_bb_max[1] -
-                                                               norm_bb_min[1]) * (norm_bb_max[2] - norm_bb_min[2])
-            normalized_pts = (pts - bb_min) / (bb_max - bb_min)
-            norm_appx_vol = appx_vol * (norm_bb_vol / bb_vol)
-
-            # Set pts, appx_vol, yms, prs, rhos to normalized values
-            training_pts = normalized_pts
-            training_appx_vol = norm_appx_vol
-        else:
-            training_pts = pts
-            training_appx_vol = appx_vol
-
-        training_yms = yms.unsqueeze(-1)
-        training_prs = prs.unsqueeze(-1)
-        training_rhos = rhos.unsqueeze(-1)
-
-        ######### Train the model #########
-        model = SimplicitsMLP(3, 64, num_handles, model_layers)
-        model.to(device)
-
-        optimizer = torch.optim.Adam(model.parameters(), training_lr_start)
-
-        model.train()
-        e_logs = []
-        for i in range(training_num_steps):
-            optimizer.zero_grad()
-            le, lo = compute_losses(model, 
-                                    training_pts, 
-                                    training_yms, 
-                                    training_prs,
-                                    training_rhos, 
-                                    float(i / training_num_steps), 
-                                    le_coeff=training_le_coeff, 
-                                    lo_coeff=training_lo_coeff,
-                                    batch_size=training_batch_size, 
-                                    num_handles=num_handles,
-                                    appx_vol=training_appx_vol,
-                                    num_samples=num_samples)
-            loss = le + lo
-
-            loss.backward()
-            optimizer.step()
-
-            # Update learning rate. Linearly interpolate from lr_start to lr_end
-            for grp in optimizer.param_groups:
-                grp['lr'] = training_lr_start + \
-                    float(i / training_num_steps) * \
-                    (training_lr_end - training_lr_start)
-
-            if i % training_log_every == 0:
-                logger.info(
-                    f'Training step: {i}, le: {le.item()}, lo: {lo.item()}')
-                e_logs.append((le.item(), lo.item()))
-
-        model.eval()
-        ######### End of training #########
-
-        if (normalize_for_training):
-            skinning_weight_function = NormalizedSkinningWeightsFcn(model, bb_min, bb_max)
-        else:
-            skinning_weight_function = SkinningWeightsFcn(model)
-
-        
-        return SimplicitsObject(pts, yms, prs, rhos, appx_vol, skinning_weight_function)
-
-
-    @staticmethod
-    def create_rigid(pts, yms, prs, rhos, appx_vol=1):
-        r"""Creates a rigid SimplicitsObject with a single weight for affine deformations.
-
-        This method creates a SimplicitsObject that behaves as a rigid body. At low stiffness values
-        (young's modulus/ym), deformations will not be expressive, but with high stiffness values,
-        the object will act as rigid.
-
-        Args:
-            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            appx_vol (Union[torch.Tensor, float], optional): Approximate volume. Can be either:
-                - A tensor of shape :math:`(1,)`
-                - A float value. Defaults to 1
-
-        Returns:
-            SimplicitsObject: A rigid SimplicitsObject with a constant weight function
-        """
-        def constant_weight_function(x):
-            return torch.ones(
-                x.shape[0], 1, device=x.device, dtype=x.dtype)
-
-        return SimplicitsObject.create_from_function(pts, yms, prs, rhos, appx_vol, constant_weight_function)
-
-    @staticmethod
-    def create_from_function(pts, yms, prs, rhos, appx_vol, fcn):
-        r"""Creates a SimplicitsObject with a custom skinning weight function.
-
-        This method creates a SimplicitsObject using a user-provided function to compute skinning weights.
-        The function should take points as input and return a matrix of skinning weights.
-
-        Args:
-            pts (torch.Tensor): Points tensor of shape (N, 3) representing the object's geometry
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
-                - A tensor of shape (N,) for per-point values
-                - A float value that will be applied to all points
-            prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
-                - A tensor of shape (N,) for per-point values
-                - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
-                - A tensor of shape (N,) for per-point values
-                - A float value that will be applied to all points
-            appx_vol (Union[torch.Tensor, float]): Approximate volume. Can be either:
-                - A tensor of shape (1,)
-                - A float value
-            fcn (callable): Function that takes points and returns skinning weights matrix
-
-        Returns:
-            SimplicitsObject: A SimplicitsObject with the provided skinning weight function
-        """
-        return SimplicitsObject(pts, yms, prs, rhos, appx_vol, skinning_weight_function=fcn)
-
-    def __init__(self, pts, yms, prs, rhos, appx_vol, skinning_weight_function=None):
-        r"""Initialize a SimplicitsObject with geometry, material properties, and skinning weights.
-
-        A SimplicitsObject is a collection of points, material properties, and a linear blend skinning
-        weight function that can be used to deform the object. Objects can be initialized in several ways
-        using the static factory methods (read their docstrings for more details). Objects can also be
-        denoted as kinematic or dynamic (default). Kinematic objects still have handles, but they are
-        not solved for during simulation.
-
-        Args:
-            pts (torch.Tensor): Points tensor of shape (N, 3) representing the object's geometry
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
-                - A tensor of shape (N,) for per-point values
-                - A float value that will be applied to all points
-            prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
-                - A tensor of shape (N,) for per-point values
-                - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
-                - A tensor of shape (N,) for per-point values
-                - A float value that will be applied to all points
-            appx_vol (Union[torch.Tensor, float]): Approximate volume. Can be either:
-                - A tensor of shape (1,)
-                - A float value
-            skinning_weight_function (callable, optional): Function that takes points and returns skinning weights matrix.
-                If None, the object will be rigid. Defaults to None
-
-        """
-        if not torch.is_tensor(yms):
-            yms = torch.full((pts.shape[0],), yms, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(prs):
-            prs = torch.full((pts.shape[0],), prs, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(rhos):
-            rhos = torch.full((pts.shape[0],), rhos, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(appx_vol):
-            appx_vol = torch.tensor([appx_vol], dtype=pts.dtype, device=pts.device)
-
-        self.pts = pts
-        self.yms = yms
-        self.prs = prs
-        self.rhos = rhos
-        self.appx_vol = appx_vol
-
-        self.num_handles = skinning_weight_function(pts[:1]).shape[1]
-
-        self.skinning_weight_function = skinning_weight_function
-
-
-        self.device = pts.device
-        self.dtype = pts.dtype
-        
-class SimulatedObject:
-    @staticmethod
-    def create_from_object(obj: SimplicitsObject, id, num_qp, num_cp, init_transform, is_kinematic=False):
-        obj = SimulatedObject(obj, id, num_qp, num_cp, init_transform, is_kinematic)
-        obj._sample_cubatures()
-        obj.reset_sim_state()
-        obj._set_sim_constants()
-        return obj
-
-    def __init__(self, obj: SimplicitsObject, id, num_qp, num_cp, init_transform, is_kinematic=False):
-        r""" Initialize a simulated object from a simplicits object. Users should avoid direct access to this class.
-            Instead object-wise getters/setters for its parameters, forces and materials in the Scene to update/modify this object.
-
-            Args:
-                obj (SimplicitsObject): Saves the Simplicits Object to be used in the sim by reference here
-                id (int): Object id
-                num_qp (int): Number of quadrature points (integration primitives)
-                num_cp (int): Number of collision points. TODO: Not used yet.
-                init_transform (torch.Tensor): Initial transformation matrix of shape (12, 1).
-                is_kinematic (bool, optional): Whether the object is kinematic. Defaults to False.
-        """
-
-        self.simplicits_object = obj
-        self.is_kinematic = is_kinematic
-        self.id = id
-        if num_qp >= self.simplicits_object.pts.shape[0]:
-            num_qp = self.simplicits_object.pts.shape[0]
-        self.num_qp = num_qp
-        self.num_cp = num_cp
+    def __init__(self, pts, yms, prs, rhos, appx_vol, skinning_weights, dwdx,
+                 renderable: SkinnedPointsProtocol = None,
+                 init_transform=None,
+                 is_kinematic=False):
+        super().__init__(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol,
+                         skinning_weights=skinning_weights, dwdx=dwdx,
+                         renderable=renderable)
         self.init_transform = init_transform
-        self.num_handles = obj.num_handles
+        self.is_kinematic = is_kinematic
 
-        # Per-sampled primitive values
-        self.sample_indices = None
-        self.sample_pts = None
-        self.sample_rhos = None
-        self.sample_vols = None
-        self.sample_yms = None
-        self.sample_prs = None
-        self.sample_masses = None
+        # TODO(vismay): need guidance on qp vs. cp here (seems CP should be in scene, but are different from SimulatedObject,
+        # which is mostly concerned with pt energies; maybe SimulatedObject could optionally take cp_pts in addition,
+        # or collision should be treated separately (e.g. what if we don't use a pt-based method?)
+        self.num_qp = self.pts.shape[0]
+        self.num_cp = self.pts.shape[0]
 
-        # Per-sampled primitive sparse matrices
-        self.sample_B = None
-        self.sample_dFdz = None
+        # TODO(vismay): should we allow non-uniform vols on construction instead?
+        self.sample_vols = torch.full(
+            (self.num_qp,), float(self.appx_vol / self.num_qp),
+            device=self.device, dtype=self.dtype)  # uniform integration sampling over vol
+        self.sample_masses = (self.appx_vol / self.num_qp) * self.rhos
 
-        # Dofs
+        self.B = sparse_lbs_matrix(
+            wp.from_torch(self.skinning_weights),
+            wp.from_torch(self.pts, dtype=wp.vec3))
+        self.B.nnz_sync()
+
+        if is_kinematic:
+            num_rows = 9 * self.pts.shape[0]
+            num_cols = 12 * self.skinning_weights.shape[1]
+            self.dFdz = wps.bsr_zeros(num_rows, num_cols, wp.float32)
+        else:
+            self.dFdz = sparse_dFdz_matrix(
+                self.skinning_weights.detach().cpu().numpy(),
+                self.dwdx.detach().cpu().numpy(),
+                self.pts.detach().cpu().numpy())
+        self.dFdz.nnz_sync()
+
+        self._B_dense = None
+        self._dFdz_dense = None
+
+        # Let's initialize simulation state variables
         self.z = None
         self.z_prev = None
         self.z_dot = None
+        self.reset_sim_state()
 
+
+    @property
+    def B_dense(self):
+        if self._B_dense is None:
+            self._B_dense = warp_utilities._bsr_to_torch(self.B).to_dense()
+        return self._B_dense
+
+    @property
+    def dFdz_dense(self):
+        if self._dFdz_dense is None:
+            if self.is_kinematic:
+                self._dFdz_dense = torch.zeros(self.dFdz.shape, device=self.device, dtype=self.dtype)
+            else:
+                self._dFdz_dense = warp_utilities._bsr_to_torch(self.dFdz).to_dense()
+        return self._dFdz_dense
+
+    @classmethod
+    def from_skinned_physics_points(cls, phys_pts: SkinnedPhysicsPoints, init_transform, is_kinematic=False):
+        """
+        Creates simulation object given skinned physics points, minimal data needed for Simplicits simulation
+        (e.g. this data can be read from disk).
+
+        Args:
+            phys_pts (SkinnedPhysicsPoints): SkinnedPhysicsPoints object to use to define SimulatedObject properties.
+            init_transform: Initial transform of the SimulatedObject.
+            is_kinematic: If true, the object will be kinematic in the scene. Default: False.
+
+        Returns:
+            (SimulatedObject): SimulatedObject object.
+        """
+        return cls(pts=phys_pts.pts, yms=phys_pts.yms, prs=phys_pts.prs,
+                   rhos=phys_pts.rhos, appx_vol=phys_pts.appx_vol,
+                   skinning_weights=phys_pts.skinning_weights, dwdx=phys_pts.dwdx,
+                   renderable=phys_pts.renderable,
+                   init_transform=init_transform, is_kinematic=is_kinematic)
+
+    def reset_sim_state(self):
+        r"""Reset the simulation state. Object's handle transforms are set back to initial deformations.
+        This does not reset any material parameters or simplicits object parameters.
+        """
+
+        self.z = torch.zeros(self.num_handles * 12, dtype=self.dtype, device=self.device)
+
+        # Sets the final (constant) handle
+        if self.init_transform is not None:
+            self.z[-12:] = self.init_transform.flatten()
+
+        self.z_prev = self.z.clone().detach()
+        self.z_dot = torch.zeros_like(self.z, device=self.device)
 
     def __str__(self):
         r"""String describing object.
@@ -391,94 +155,21 @@ class SimulatedObject:
         Returns:
             string: String description of object
         """
-        unique_densities = torch.unique(self.sample_rhos).tolist()
-        unique_yms = torch.unique(self.sample_yms).tolist()
-        unique_prs = torch.unique(self.sample_prs).tolist()
-        appx_vol = self.simplicits_object.appx_vol
-        return f"SimulatedObject(Densities={unique_densities}, Yms={unique_yms}, Prs={unique_prs}, AppxVol={appx_vol}, num_cub_pts={self.sample_pts.shape[0]}, kinematic={self.is_kinematic})"
-
-    def _sample_cubatures(self):
-        r"""Internal function to sample cubature points (and collision points and other per-primitive values) over the simplicits object.
-        """
-
-        # Use all if num_qp is less that self.simplicits_object.pts
-        if self.num_qp < self.simplicits_object.pts.shape[0]:
-            self.sample_indices = torch.randperm(
-                len(self.simplicits_object.pts))[:self.num_qp]
-        else:
-            self.sample_indices = torch.arange(len(self.simplicits_object.pts))
-
-        self.sample_pts = self.simplicits_object.pts[self.sample_indices, :].float()
-        self.sample_rhos = self.simplicits_object.rhos[self.sample_indices].float()
-        self.sample_vols = torch.full(
-            (self.num_qp,), float(self.simplicits_object.appx_vol / self.num_qp),
-            device=self.sample_pts.device, dtype=self.sample_pts.dtype)  # uniform integration sampling over vol
-        self.sample_yms = self.simplicits_object.yms[self.sample_indices].float()
-        self.sample_prs = self.simplicits_object.prs[self.sample_indices].float()
-        self.sample_masses = (self.simplicits_object.appx_vol /
-                              self.num_qp) * self.sample_rhos
-
-        self.sample_skinning_weights = self.simplicits_object.skinning_weight_function(self.sample_pts)
-
-    def _set_sim_constants(self):
-        r""" Constants required for simulation. Computed upfront. Must be updated when _sample_cubature() is called
-        """
-        self.sample_B = sparse_lbs_matrix(
-            wp.from_torch(self.sample_skinning_weights),
-            wp.from_torch(self.sample_pts, dtype=wp.vec3))
-        self.sample_B.nnz_sync()
-
-        # Don't create this expensive autodiffed dFdz matrix for kinematic objects TODO: Make analytical dFdz 
-        # But B matrix is cheap to compute, leave it alone
-        if self.is_kinematic:
-            num_rows = 9*self.sample_pts.shape[0]
-            num_cols = 12*self.sample_skinning_weights.shape[1]
-            self.sample_dFdz = wps.bsr_zeros(
-                num_rows, num_cols, wp.float32)
-        else:
-            self.sample_dFdz = sparse_dFdz_matrix_from_dense(
-                self.simplicits_object.skinning_weight_function, self.sample_pts)
-        
-        self.sample_dFdz.nnz_sync()
-        
-        self.sample_B_dense = warp_utilities._bsr_to_torch(
-            self.sample_B).to_dense()
-        
-        # Check if dFdz is zeros (for kinematic objects). 
-        # Bsr_to_torch sometimes fails when mat.values is all empty list.
-        if self.is_kinematic:
-            self.sample_dFdz_dense = torch.zeros(self.sample_dFdz.shape, device=self.sample_pts.device, dtype=self.sample_pts.dtype)
-        else:
-            self.sample_dFdz_dense = warp_utilities._bsr_to_torch(
-                self.sample_dFdz).to_dense()
-
-    def reset_sim_state(self):
-        r"""Reset the simulation state. Object's handle transforms are set back to initial deformations.  
-        This does not reset any material parameters or simplicits object parameters.
-        """
-
-        self.z = torch.zeros((self.num_handles) * 12,
-                             dtype=self.simplicits_object.dtype, device=self.simplicits_object.device)
-        # Sets the final (constant) handle 
-        if self.init_transform is not None:
-            self.z[-12:] = self.init_transform.flatten()
-        
-        self.z_prev = self.z.clone().detach()
-        self.z_dot = torch.zeros_like(
-            self.z, device=self.simplicits_object.device)
+        super_str = super().__str__()[:-1]
+        return f"{super_str}, kinematic={self.is_kinematic}, init_transform={self.init_transform})"
 
 class SimplicitsScene:
     def __init__(self, device='cuda', 
         dtype=torch.float, 
-        direct_solve=True, 
-        use_cuda_graphs=False,
+        direct_solve=True, # TODO(vismay): this arg is not used
+        use_cuda_graphs=False,  # TODO(vismay): this arg is not used
         timestep=0.03, 
         max_newton_steps=5, 
         max_ls_steps=10, 
-        newton_hessian_regularizer=1e-4,
-        cg_tol=1e-4, 
-        cg_iters=100, 
-        conv_tol=1e-4):
+        newton_hessian_regularizer=1e-4,  # TODO(vismay): this arg is not used
+        cg_tol=1e-4,                      # TODO(vismay): this arg is not used
+        cg_iters=100,                     # TODO(vismay): this arg is not used
+        conv_tol=1e-4):                   # TODO(vismay): this arg is not used
         r"""Initializes a simplicits scene. SimplicitsObjects can be added to the scene. Scene forces such as floor and gravity can be set on the scene
 
         Args:
@@ -512,7 +203,7 @@ class SimplicitsScene:
         self.conv_tol = 1e-4
 
         self.current_id = 0
-        self.sim_obj_dict = {}
+        self.sim_obj_dict = {}  # id: SimulatedObject
 
         #### Simulation Constants ####
         # Render constants
@@ -622,41 +313,43 @@ class SimplicitsScene:
 
         z_index = 0
         x_index = 0
-        for object in self.sim_obj_dict.values():
+        for object_id, object in self.sim_obj_dict.items():
             _num_qp.append(object.num_qp)
+            # TODO: here, need guidance on how collision points will/should be treated
             _num_cp.append(object.num_cp)
             _num_handles.append(object.num_handles)
 
             # Mapping from object to z and x indices
-            _object_to_z_map[object.id] = wp.array(
+            _object_to_z_map[object_id] = wp.array(
                 np.arange(z_index, z_index + object.num_handles * 12), dtype=wp.int32)
-            _object_to_qp_map[object.id] = wp.array(
+            _object_to_qp_map[object_id] = wp.array(
                 np.arange(x_index, x_index + object.num_qp), dtype=wp.int32)
             # Add torch array full of object id to list
             _qp_to_object_map.append(torch.full(
-                (object.num_qp,), object.id, dtype=torch.int32, device=self.device))
+                (object.num_qp,), object_id, dtype=torch.int32, device=self.device))
             _z_to_object_map.append(torch.full(
-                (object.num_handles * 12,), object.id, dtype=torch.int32))
+                (object.num_handles * 12,), object_id, dtype=torch.int32))
 
             if object.is_kinematic:
-                _kin_obj_list.append(object.id)
-                _kin_obj_to_z_map[object.id] = wp.array(
+                _kin_obj_list.append(object_id)
+                _kin_obj_to_z_map[object_id] = wp.array(
                     np.arange(z_index, z_index + object.num_handles * 12), dtype=wp.int32)
-                _kin_obj_to_qp_map[object.id] = wp.array(
+                _kin_obj_to_qp_map[object_id] = wp.array(
                     np.arange(x_index, x_index + object.num_qp), dtype=wp.int32)
 
             z_index += object.num_handles * 12
             x_index += object.num_qp
 
-            _stacked_pts.append(object.sample_pts)
-            _stacked_rhos.append(object.sample_rhos)
+            # Note: our object is already sampled; Scene does not need to keep **all** the pts.
+            _stacked_pts.append(object.pts)
+            _stacked_rhos.append(object.rhos)
             _stacked_vols.append(object.sample_vols)
             _stacked_masses.append(object.sample_masses)
-            _stacked_yms.append(object.sample_yms)
-            _stacked_prs.append(object.sample_prs)
-            _stacked_sparse_B.append(object.sample_B)
-            _stacked_sparse_dFdz.append(object.sample_dFdz)
-            _stacked_skinning_weights.append(object.sample_skinning_weights)
+            _stacked_yms.append(object.yms)
+            _stacked_prs.append(object.prs)
+            _stacked_sparse_B.append(object.B)
+            _stacked_sparse_dFdz.append(object.dFdz)
+            _stacked_skinning_weights.append(object.skinning_weights)
         
         self.object_to_z_map = _object_to_z_map
         self.object_to_qp_map = _object_to_qp_map
@@ -795,7 +488,7 @@ class SimplicitsScene:
             object_id (int): Id of the object to get the transforms of
 
         Returns:
-            torch.tensor: Torch tensor of size :math:`(\text{num_handles}, 4, 4)` for relative transforms.
+            torch.Tensor: Torch tensor of size :math:`(\text{num_handles}, 4, 4)` for relative transforms.
         """
         tfms = None
         
@@ -818,33 +511,53 @@ class SimplicitsScene:
         padded_tfms = torch.cat([tfms, padding], dim=1)
         return padded_tfms
 
-    def add_object(self, sim_object: SimplicitsObject, num_qp=1000, init_transform = None, is_kinematic=False):
-        r"""Adds a simplicits object to the scene as a SimulatedObject.
+    def _add_object(self, simulated_object: SimulatedObject):
+        if self._ready_for_forces:
+            raise RuntimeError("Cannot add object after a force is set, please create a complete scene with all objects first")
+
+        self.sim_obj_dict[self.current_id] = simulated_object
+        self.current_id += 1
+        return self.current_id - 1
+
+    def add_object(self, sim_object: SimplicitsObject | SkinnedPhysicsPoints, num_qp=None, init_transform=None, is_kinematic=False, renderable_pts=None):
+        r"""Adds a simplicits object to the scene as a SimulatedObject. Can add a just trained SimplicitsObject which
+        contains a skinning weight field, or can also accept a baked version, sufficient for simulation.
+
+        Optionally allows the scene to keep track of a rendered entity, such as all the Gaussian points.
 
         Args:
-            sim_object (SimplicitsObject): Simplicits object that will be wrapped into a SimulatedObject for this scene.
-            num_qp (float): Number of quadrature points (sample points to integrate over)
-            init_transform (torch.Tensor): 3x4 or 4x4 torch tensor specifying object's initial skinning transform. 
-                                            This argument takes a standard transformation, not a delta. 
+            sim_object (SimplicitsObject | SkinnedPhysicsPoints): trained simplicits object or already sampled skinned points, e.g. from USD file
+            num_qp (int, optional): Number of quadrature points (sample points to integrate over). If not provided, the object will not be subsampled.
+            init_transform (torch.Tensor): 3x4 or 4x4 torch tensor specifying object's initial skinning transform.
+                                            This argument takes a standard transformation, not a delta.
                                             Subsequently, the Identity matrix is subtracted from it and the delta transform is saved.
             is_kinematic (bool): Object is kinematic if it is not solved for during dynamics simulation.
+            renderable_pts (torch.Tensor, optional): Points for rendering (e.g. Gaussian splat positions).
+                When provided and sim_object is a SimplicitsObject, skinning weights are baked for these
+                points and stored in the SimulatedObject for use with get_object_deformed_pts(..., points='rendered').
+                This is not to be used with already baked SkinnedPhysicsPointsProtocol.
         """
-        num_cp = num_qp # TODO: Make this a separate parameter
-        if self._ready_for_forces:
-            raise RuntimeError("Cannot object after a force is set, please create a new scene")
-
         # Check if init transform is a 3x4 or 4x4 tensor, convert to 3x4 if necessary
-        # Subtract identity transform from init transform to get relative transform  
+        # Subtract identity transform from init transform to get relative transform
         if torch.is_tensor(init_transform):
             relative_transform = torch_utilities.standard_transform_to_relative(init_transform)
         else:
             relative_transform = torch.zeros(3, 4, device=self.device, dtype=self.dtype)
-            
-        self.sim_obj_dict[self.current_id] = SimulatedObject.create_from_object(
-            sim_object, self.current_id, num_qp, num_cp, relative_transform, is_kinematic)
-            
-        self.current_id += 1
-        return self.current_id - 1
+
+        if isinstance(sim_object, SimplicitsObject):
+            # For SimplicitsObject, bake directly with num_qp to avoid double subsampling
+            assert not num_qp is None, "'num_qp' must be provided with SimplicitsObject"
+            baked = sim_object.bake(num_qps=num_qp, renderable_pts=renderable_pts)
+            simulated_object = SimulatedObject.from_skinned_physics_points(
+                baked, init_transform=relative_transform, is_kinematic=is_kinematic)
+        else:
+            # For already baked SkinnedPhysicsPointsProtocol, subsample if needed
+            assert renderable_pts is None, "'renderable_pts' are not supported for already baked SkinnedPhysicsPointsProtocol"
+            sampled = sim_object.subsample(num_pts=num_qp) if num_qp is not None else sim_object
+            simulated_object = SimulatedObject.from_skinned_physics_points(
+                sampled, init_transform=relative_transform, is_kinematic=is_kinematic)
+
+        return self._add_object(simulated_object)
     
     def set_kinematic_object_transform(self, obj_idx, transform):
         r"""Sets the transform of a kinematic object. This can be done during simulation to script the kinematic object's motion.
@@ -913,33 +626,6 @@ class SimplicitsScene:
         self.force_dict["pt_wise"]["floor"]["object"] = floor_struct
         self.force_dict["pt_wise"]["floor"]["coeff"] = floor_penalty
 
-    # TODO(cfujitsang)
-    #def set_object_materials(self, obj_idx, yms=None, prs=None, rhos=None, elasticity_type="neohookean"):
-    #    r"""Sets object's material properties
-
-    #    Args:
-    #        obj_idx (int): Id of object
-    #        yms (torch.Tensor, optional): Sets Yms of simulated object. Pass in :math:`(n)` tensor or one value to get broadcasted. Defaults to None.
-    #        prs (torch.Tensor, optional): Sets Prs of simulated object. Pass in :math:`(n)` tensor or one value to get broadcasted. Defaults to None.
-    #        rhos (torch.Tensor, optional): Sets densities of simulated object. Pass in :math:`(n)` tensor or one value to get broadcasted. Defaults to None.
-    #    """
-    #    if not self._ready_for_forces:
-    #        self._get_scene_ready_for_forces()
-
-    #    simulated_object = self.sim_obj_dict[obj_idx]
-    #    if yms is not None:
-    #        simulated_object.sample_yms = torch.full(
-    #            (simulated_object.num_qp,), yms, device=self.device, dtype=self.dtype)
-    #    if prs is not None:
-    #        simulated_object.sample_prs = torch.full(
-    #            (simulated_object.num_qp,), prs, device=self.device, dtype=self.dtype)
-    #    if rhos is not None:
-    #        simulated_object.sample_rhos = torch.full(
-    #            (simulated_object.num_qp,), rhos, device=self.device, dtype=self.dtype)
-    #        simulated_object.sample_masses = (simulated_object.simplicits_object.appx_vol /
-    #                                          simulated_object.num_qp) * simulated_object.sample_rhos
-    #    self._ready_for_sim = False
-
     def set_object_boundary_condition(self, obj_idx, name, fcn, bdry_penalty=10000.0, pinned_x=None):
         r"""Sets boundary condition for object in scene
 
@@ -978,11 +664,11 @@ class SimplicitsScene:
         return pinned_x
 
     def enable_collisions(self, collision_particle_radius=0.1,
-                            detection_ratio=1.5,
-                            impenetrable_barrier_ratio=0.25,
-                            collision_penalty=1000.0, 
-                            max_contact_pairs=10000,
-                            friction=0.5):
+                          detection_ratio=1.5,
+                          impenetrable_barrier_ratio=0.25,
+                          collision_penalty=1000.0, 
+                          max_contact_pairs=10000,
+                          friction=0.5):
         r"""Sets collision for object in scene
 
         Args:
@@ -1255,13 +941,13 @@ class SimplicitsScene:
 
         # Assemble the Hessians into a list of (i,j,H_ij)
         hess_list = []
-        for obj in self.sim_obj_dict.values():
-            qp_i = wp.to_torch(self.object_to_qp_map[obj.id])
+        for obj_id, obj in self.sim_obj_dict.items():
+            qp_i = wp.to_torch(self.object_to_qp_map[obj_id])
 
-            H_ii = torch_utilities.hess_reduction(obj.sample_B_dense, scene_d2Edx2[qp_i, :, :]) + torch_utilities.hess_reduction(
-                obj.sample_dFdz_dense, scene_d2EdF2[qp_i, :, :])
+            H_ii = torch_utilities.hess_reduction(obj.B_dense, scene_d2Edx2[qp_i, :, :]) + torch_utilities.hess_reduction(
+                obj.dFdz_dense, scene_d2EdF2[qp_i, :, :])
 
-            hess_list.append((obj.id, obj.id, H_ii))
+            hess_list.append((obj_id, obj_id, H_ii))
 
         # this is a sparse matrix
         # H = warp_utilities._assemble_global_hessian(
@@ -1412,49 +1098,69 @@ class SimplicitsScene:
         """
         return self.sim_obj_dict[obj_idx]
 
-    def get_object_deformed_pts(self, obj_idx, points=None):
-        r"""Applies linear blend skinning using object's transformation to points provided. By default, points = sim_object.pts
+    def get_object_deformed_pts(self, obj_idx, points: Literal['rendered', 'simulated'] = 'simulated'):
+        r"""Applies linear blend skinning using object's transformation to points provided.
 
         Args:
             obj_idx (int): Id of object being transformed
-            points (torch.Tensor, optional): Points on the object to be transformed.
-                                            Defaults to None, which means using *all* object's points.
+            points (str, optional): Which point set to transform. One of 'simulated' (default)
+                or 'rendered'. For 'rendered', the object must have been added with renderable_pts.
 
         Returns:
             torch.Tensor: Transformed points
         """
-        obj = self.get_object(obj_idx)
-        if points == None:
-            points = obj.sample_pts
-            
-        tfms = self.get_object_transforms(obj_idx)[:, :3, :] # make 4x4 to 3x4
+        sim_obj = self.get_object(obj_idx)
 
-        return weight_function_lbs(points, tfms.unsqueeze(0), obj.simplicits_object.skinning_weight_function).squeeze()
+        if points == 'rendered':
+            if sim_obj.renderable is None:
+                raise ValueError(
+                    f'Object {obj_idx} has no renderable points. '
+                    f'Pass renderable_pts when calling add_object().')
+            pts = sim_obj.renderable.pts
+            skinning_weights = sim_obj.renderable.skinning_weights
+        elif points == 'simulated':
+            pts = sim_obj.pts
+            skinning_weights = sim_obj.skinning_weights
+        else:
+            raise ValueError('Only supports "rendered" or "simulated" points')
 
-    def _get_object_deformation_gradient(self, obj_idx, points=None):  # pragma: no cover
-        r"""Applies linear blend skinning using object's transformation to points provided. By default, points = sim_object.pts
+        tfms = self.get_object_transforms(obj_idx)[:, :3, :]  # make 4x4 to 3x4
+        return standard_lbs(pts, tfms.unsqueeze(0), skinning_weights).squeeze()
+
+    def get_object_point_transforms(self, obj_idx,
+                                    points: Literal['rendered', 'simulated'] = 'simulated'):
+        r"""
+        Returns the absolute transform of the points of an object.
 
         Args:
-            obj_idx (int): Id of object being transformed
-            points (torch.Tensor, optional): Points on the object to be transformed.
-                                            Defaults to None, which means using *all* object's points.
+            obj_idx (int): Id of the object.
+            points (str, optional): Which point set to query. One of 'simulated' (default) or
+                'rendered'. For 'rendered', the object must have been added with renderable_pts.
 
         Returns:
-            torch.Tensor: Transformed points
+            torch.Tensor: Torch tensor of size :math:`(\text{num_points}, 4, 4)` for transforms.
         """
-        obj = self.get_object(obj_idx)
-        if points == None:
-            points = obj.sample_pts
+        sim_obj = self.get_object(obj_idx)
 
-        tfms = self.get_object_transforms(
-            obj_idx)[:, :3, :]  # make 4x4 to 3x4
+        if points == 'rendered':
+            if sim_obj.renderable is None:
+                raise ValueError(
+                    f'Object {obj_idx} has no renderable skinning weights. '
+                    f'Pass renderable skinning weights when calling add_object().')
+            skinning_weights = sim_obj.renderable.skinning_weights
+        elif points == 'simulated':
+            skinning_weights = sim_obj.skinning_weights
+        else:
+            raise ValueError('Only supports "rendered" or "simulated" points')
 
-        fcn_get_x = partial(weight_function_lbs, tfms=tfms.unsqueeze(0),
-                            fcn=obj.simplicits_object.skinning_weight_function)
-        
-        Fs = kaolin.physics.utils.finite_diff_jac(fcn_get_x, points, eps=1e-7)
+        transforms = self.get_object_transforms(obj_idx)
 
-        return Fs
+        # N x 4 x 4 = sum((N x H x 1 x 1) * (1 x H x 4 x 4), dim=1)
+        per_pt_transforms = torch.sum(skinning_weights.unsqueeze(-1).unsqueeze(-1) * transforms, dim=1)
+
+        per_pt_transforms[:, :3, :3] += torch.eye(3, 3, dtype=per_pt_transforms.dtype, device=per_pt_transforms.device).unsqueeze(0)
+
+        return per_pt_transforms
 
     def _get_scene_ready_for_forces(self):  # pragma: no cover
         r"""Prepares the scene for simulation. Updates any forces that have changed, or objects that have been added/removed.
@@ -1503,6 +1209,5 @@ class SimplicitsScene:
 
         self.sim_z_dot = wp.from_torch(
             (wp.to_torch(self.sim_z) - wp.to_torch(self.sim_z_prev)) / self.timestep)
-
 
         self.current_sim_step += 1
