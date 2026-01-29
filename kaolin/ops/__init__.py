@@ -1,6 +1,8 @@
 from . import batch
 from . import conversions
 from . import coords
+from . import gaussian
+from . import gaussians
 from . import gcn
 from . import mesh
 from . import pointcloud
@@ -8,4 +10,3 @@ from . import random
 from . import reduction
 from . import spc
 from . import voxelgrid
-from . import gaussian
