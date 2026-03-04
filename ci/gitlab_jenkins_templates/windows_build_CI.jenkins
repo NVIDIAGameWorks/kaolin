@@ -208,12 +208,11 @@ spec:
                 baseImage = docker.build(
                             "${targetImageTag}-base",
                             """-m 32g --no-cache -f ./tools/windows/Dockerfile.base \
-                                --build-arg CUDA_VERSION=${cudaVer} \
-                                --build-arg CUDA_URL=${cudaUrl} \
-                                --build-arg PYTHON_VERSION=${pythonVer} \
-                                --build-arg PYTORCH_VERSION=${torchVer} \
-                                --build-arg IGNORE_TORCH_VER=1 \
-                                .
+                               --build-arg CUDA_VERSION=${cudaVer} \
+                               --build-arg CUDA_URL=${cudaUrl} \
+                               --build-arg PYTHON_VERSION=${pythonVer} \
+                               --build-arg PYTORCH_VERSION=${torchVer} \
+                               .
                             """)
               }
 
@@ -222,8 +221,8 @@ spec:
                   targetImage = docker.build(
                               "${targetImageTag}",
                               """-m 32g --no-cache -f ./tools/windows/Dockerfile.install_wheel \
-                                --build-arg BASE_IMAGE=${targetImageTag}-base \
-                                .
+                                 --build-arg BASE_IMAGE=${targetImageTag}-base \
+                                 .
                               """
                           )
                 }
@@ -232,9 +231,9 @@ spec:
                   targetImage = docker.build(
                               "${targetImageTag}",
                               """-m 32g --no-cache -f ./tools/windows/Dockerfile.install \
-                                  --build-arg BASE_IMAGE=${targetImageTag}-base \
-                                  --build-arg IGNORE_TORCH_VER=1 \
-                                  .
+                                 --build-arg BASE_IMAGE=${targetImageTag}-base \
+                                 --build-arg IGNORE_TORCH_VER=1 \
+                                 .
                               """)
                 }
               }
