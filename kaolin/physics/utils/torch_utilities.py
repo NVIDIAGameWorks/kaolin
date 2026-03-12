@@ -34,8 +34,9 @@ def standard_transform_to_relative(transform):
         relative_transform = transform
     else:
         raise ValueError("standard transform must be a 3x4 or 4x4 tensor")
-    
-    relative_transform -= torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0],
+
+    # Important! We don't want to change transform in place, but return new one
+    relative_transform = relative_transform - torch.tensor([[1, 0, 0, 0], [0, 1, 0, 0],
                                     [0, 0, 1, 0]], device=transform.device, dtype=transform.dtype)
     
     return relative_transform

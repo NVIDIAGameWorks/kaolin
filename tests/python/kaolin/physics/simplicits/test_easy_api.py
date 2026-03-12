@@ -572,6 +572,25 @@ class TestEasyAPISimplicitsScene:
         assert torch.allclose(
             obj_2_tfms, expected_obj_2_tfms), f"Second object is not at 0, 0, 0"
 
+    def test_easy_api_scene_same_init_transform(self, example_rigid_cube, device, dtype):
+        # Create
+        rigid_obj_one = example_rigid_cube
+        rigid_obj_two = example_rigid_cube
+
+        # Create scene
+        scene = SimplicitsScene(device=device, dtype=dtype)
+
+        transform = torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0], [0, 0, 0, 1]], device=device, dtype=dtype)
+        # Add object to scene
+        id0 = scene.add_object(rigid_obj_one, init_transform=transform)
+        id1 =scene.add_object(rigid_obj_two, init_transform=transform)
+
+        assert torch.allclose(scene.get_object_transforms(id0), scene.get_object_transforms(1))
+        # Relative, not absolute
+        expected_obj_tfms = torch.tensor([[0, 0, 0, 0], [0, 0, 0, 10], [0, 0, 0, 0], [0, 0, 0, 1]], device=device, dtype=dtype)
+        assert torch.allclose(scene.get_object_transforms(id0), expected_obj_tfms)
+
+
     def test_easy_api_scene_set_object_initial_transform(self, example_rigid_cube, device, dtype):
         # Create
         rigid_obj_one = example_rigid_cube
