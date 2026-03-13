@@ -1,62 +1,11 @@
 import os
+from collections.abc import Sequence
+import math
 import torch
 import kaolin
 
 
 PHYS_NOTEBOOKS_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
-
-# TODO(shumash): all of these should move to core library; address in v0.19.0
-def transform_xyz(xyz: torch.Tensor, transform: torch.Tensor):
-    if len(transform.shape) == 2:  # single transform for all the gaussians
-        transform = transform.unsqueeze(0)
-    res = (transform[..., :3, :3] @ xyz[:, :, None] + transform[..., :3, 3:]).squeeze(-1)
-    return res
-
-
-def transform_rot(rot: torch.Tensor, transform: torch.Tensor):
-    if len(transform.shape) == 2:  # single transform for all the gaussians
-        transform = transform.unsqueeze(0)
-
-    rot_quat = kaolin.math.quat.quat_from_rot33(transform[..., :3, :3])
-    rot_unit = rot / torch.linalg.norm(rot, dim=-1).unsqueeze(-1)
-
-    # Note: gsplats use Hamiltonion convention [real, imag], whereas Kaolin uses the other convention[imag, real]
-    rot_unit = torch.cat([rot_unit[:, 1:], rot_unit[:, :1]], dim=-1)
-
-    result = kaolin.math.quat.quat_mul(rot_quat, rot_unit)
-    result = torch.cat([result[:, 3:], result[:, :3]], dim=-1)
-    return result
-
-
-def decompose_4x4_transform(transform):
-    """ Decompose 4x4 transform into translation, rotation, scale.
-    Returns:
-        translation, rotation, scale
-    """
-    translation = transform[..., :3, 3:]
-    scale = torch.linalg.norm(transform[..., :3, :3], dim=-2)
-    rotation = transform[..., :3, :3] / scale.unsqueeze(-2)
-
-    return translation, rotation, scale
-
-
-def transform_gaussians(xyz, rotations, raw_scales, transform, use_log_scales=True):
-    if len(transform.shape) == 2:  # single transform for all the gaussians
-        transform = transform.unsqueeze(0)
-
-    # transforms: n x 4 x 4, where 4 x 4 transform T is applied to pt as T @ pt.
-    translation, rotation, scale = decompose_4x4_transform(transform)
-
-    new_xyz = transform_xyz(xyz, transform)
-    new_rotations = transform_rot(rotations, rotation)
-
-    if not use_log_scales:
-        new_scales = raw_scales * scale
-    else:
-        scaling_norm_factor = torch.log(scale) / raw_scales + 1
-        new_scales = raw_scales * scaling_norm_factor
-
-    return new_xyz, new_rotations, new_scales
 
 def pad_transforms(obj_tfms):
     """
@@ -70,15 +19,81 @@ def pad_transforms(obj_tfms):
     padded_tensor = torch.cat([obj_tfms, padding_row], dim=1)
     return padded_tensor
 
-def transform_gaussians_lbs(xyz, rotations, raw_scales, skinning_weights, transforms):
-    # N x 4 x 4 = sum((N x H x 1 x 1) * (1 x H x 4 x 4), dim=1)
-    per_pt_transforms = torch.sum(skinning_weights.unsqueeze(-1).unsqueeze(-1) * transforms, dim=1)
-    # log_tensor(per_pt_transforms, 'pt transforms', logger)
+def transform_gaussians_lbs(xyz, rotations, raw_scales, skinning_weights, transforms, shs_feat=None):
+    with torch.no_grad():
+        # N x 4 x 4 = sum((N x H x 1 x 1) * (1 x H x 4 x 4), dim=1)
+        per_pt_transforms = torch.sum(skinning_weights.unsqueeze(-1).unsqueeze(-1) * transforms, dim=1)
+        # log_tensor(per_pt_transforms, 'pt transforms', logger)
+    
+        # convert relative transforms to absolute transforms
+        per_pt_transforms = per_pt_transforms + torch.eye(4, dtype=per_pt_transforms.dtype,
+                                                          device=per_pt_transforms.device).unsqueeze(0)
+    
+        new_xyz, new_rot, new_scales, new_shs_feat = kaolin.ops.gaussians.transform_gaussians(
+            xyz, rotations, raw_scales, per_pt_transforms, shs_feat=shs_feat)
+    
+        return new_xyz, new_rot, new_scales, new_shs_feat
 
-    # convert relative transforms to absolute transforms
-    per_pt_transforms = per_pt_transforms + torch.eye(4, dtype=per_pt_transforms.dtype,
-                                                      device=per_pt_transforms.device).unsqueeze(0)
+def concat_gaussians(gaussians):
+    from gaussian_renderer import GaussianModel
+    assert isinstance(gaussians, Sequence)
+    xyz = []
+    rotation = []
+    scaling = []
+    opacity = []
+    features_dc = []
+    features_rest = []
+    max_sh_degree = gaussians[0].max_sh_degree
+    for g in gaussians:
+        assert isinstance(g, GaussianModel) and g.max_sh_degree == max_sh_degree
+        xyz.append(g._xyz)
+        rotation.append(g._rotation)
+        scaling.append(g._scaling)
+        opacity.append(g._opacity)
+        features_dc.append(g._features_dc)
+        features_rest.append(g._features_rest)
+    output = GaussianModel(max_sh_degree)
+    output._xyz = torch.cat(xyz, dim=0).float()
+    output._rotation = torch.cat(rotation, dim=0).float()
+    output._scaling = torch.cat(scaling, dim=0).float()
+    output._opacity = torch.cat(opacity, dim=0).float()
+    output._features_dc = torch.cat(features_dc, dim=0).float()
+    output._features_rest = torch.cat(features_rest, dim=0).float()
+    return output
 
-    new_xyz, new_rot, new_scales = transform_gaussians(xyz, rotations, raw_scales, per_pt_transforms)
+def inverse_sigmoid(x):
+    return torch.log(x/(1-x))
 
-    return new_xyz, new_rot, new_scales
+def quat_wxyz2xyzw(quat):
+    return torch.cat([quat[:, 1:], quat[:, :1]], dim=-1)
+
+def quat_xyzw2wxyz(quat):
+    return torch.cat([quat[:, -1:], quat[:, :-1]], dim=-1)
+
+inria_fields = ['xyz', 'rotation', 'scaling', 'opacity', 'features_dc', 'features_rest']
+usd_fields = ['positions', 'orientations', 'scales', 'opacities', 'sh_coeff']
+
+def inria_to_usd(gaussians): #xyz, rotation, scaling, opacity, features_dc, features_rest):
+    return {
+        'positions': gaussians._xyz,
+        'orientations': quat_wxyz2xyzw(gaussians._rotation),
+        'scales': torch.exp(gaussians._scaling),
+        'opacities': torch.sigmoid(gaussians._opacity).unsqueeze(-1),
+        'sh_coeff': torch.cat([
+            gaussians._features_dc,
+            gaussians._features_rest
+        ], dim=1)
+    }
+
+def usd_to_inria(positions, orientations, scales, opacities, sh_coeff, **kwargs):
+    from gaussian_renderer import GaussianModel
+    degrees = math.isqrt(sh_coeff.shape[1]) - 1
+    gaussians = GaussianModel(degrees)
+    gaussians._xyz = positions.cuda()
+    gaussians._rotation = quat_xyzw2wxyz(orientations).cuda()
+    gaussians._scaling = torch.log(scales).cuda()
+    gaussians._opacity = inverse_sigmoid(opacities).cuda()
+    gaussians._features_dc = sh_coeff[:, :1].cuda()
+    gaussians._features_rest = sh_coeff[:, 1:].cuda()
+    return gaussians
+
