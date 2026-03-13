@@ -112,7 +112,7 @@ def transform_gaussians(xyz, rotations, raw_scales, transform, shs_feat=None, us
 _S_3DGS = [[1, -1, 1], [-1, 1, -1], [1, -1, 1]]
 
 def transform_sh(sh_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
-    """
+    r"""
     Rotate real SH coefficients (bands 1-3) in batch.
 
     Args:
