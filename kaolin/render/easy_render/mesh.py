@@ -1,4 +1,4 @@
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,9 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from enum import Enum
 import logging
 import torch
+import warnings
 
 import kaolin as kal
 from kaolin.render.camera import Camera
@@ -31,6 +33,8 @@ if nvdiffrast_is_available():
 __all__ = ['render_mesh', 'mesh_rasterize_interpolate_cuda', 'mesh_rasterize_interpolate_nvdiffrast',
            'texture_sample_materials', 'sg_shade', 'RenderPass']
 
+
+logger = logging.getLogger(__name__)
 
 class RenderPass(str, Enum):
     # TODO: add normals relative to camera, mask, anti-aliasing, depth, wireframe
@@ -77,6 +81,12 @@ def render_mesh(camera: Camera, mesh: SurfaceMesh, lighting: SgLightingParameter
     if len(mesh) > 1:
         raise NotImplementedError(f'Render is only implemented for mesh of length 1, not {len(mesh)}.')
     mesh = mesh[0]  # make sure mesh is not batched
+    if mesh.has_attribute('transform'):
+        mesh = mesh.as_transformed()
+        warnings.warn("Mesh has a transform attribute, transforming to world space. "
+                      "If you are rasterizing the mesh multiple times, "
+                      "consider transforming it once before rasterizing it.")
+
     materials = custom_materials or mesh.materials
     material_assignments = custom_material_assignments if custom_material_assignments is not None else mesh.material_assignments
     if lighting is None:
@@ -144,6 +154,12 @@ def mesh_rasterize_interpolate_cuda(
     Returns:
         (tuple of): face_idx, im_normals, im_tangents, im_uvs, im_features
     """
+    if mesh.has_attribute('transform'):
+        mesh = mesh.as_transformed()
+        warnings.warn("Mesh has a transform attribute, transforming to world space. "
+                      "If you are rasterizing the mesh multiple times, "
+                      "consider transforming it once before rasterizing it.")
+
     vertices_camera = camera.extrinsics.transform(mesh.vertices)
     vertices_image = camera.intrinsics.transform(vertices_camera)
 
@@ -196,8 +212,8 @@ def mesh_rasterize_interpolate_cuda(
 def mesh_rasterize_interpolate_nvdiffrast(
         mesh, camera, nvdiffrast_context,
         normals_required=True, uvs_required=True, tangents_required=True, features_required=True):
-    """ Performs rasterization and interpolation using nvdiffrast. Returns image-space values, given
-        camera resolution, for attributes that are required and available, and `None` for others.
+    """Performs rasterization and interpolation using nvdiffrast. Returns image-space values, given
+       camera resolution, for attributes that are required and available, and `None` for others.
 
         Args:
             mesh (SurfaceMesh): unbatched surface mesh
@@ -208,9 +224,14 @@ def mesh_rasterize_interpolate_nvdiffrast(
             tangents_required (bool): if True, will compute interpolated mesh tangents, else return None
             features_required (bool): if True, and present in mesh, will compute interpolated mesh features, else return None
 
-        Returns:
-            (tuple of): face_idx, im_normals, im_tangents, im_uvs, im_features
-        """
+       Returns:
+           (tuple of): face_idx, im_normals, im_tangents, im_uvs, im_features
+    """
+    if mesh.has_attribute('transform'):
+        mesh = mesh.as_transformed()
+        warnings.warn("Mesh has a transform attribute, transforming to world space. "
+                      "If you are rasterizing the mesh multiple times, "
+                      "consider transforming it once before rasterizing it.")
     vertices_camera = camera.extrinsics.transform(mesh.vertices)
     vertices_clip = camera.intrinsics.project(vertices_camera)
 
@@ -288,7 +309,7 @@ def texture_sample_materials(backend, face_idx, im_base_normals, materials=None,
 
         perturbation_normal = mapped_albedo = mapped_spec = mapped_metalic = mapped_roughness = None
         if uv_map is None:
-            logging.warning(f'Missing uvmap; cannot texturemap materials')
+            logger.warning('Missing uvmap; cannot texturemap materials')
         else:
             texcoords = uv_map[mask].reshape(1, 1, -1, 2).contiguous()
             if backend == 'nvdiffrast':

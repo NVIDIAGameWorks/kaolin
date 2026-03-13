@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2025 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -174,53 +174,95 @@ class TestMeshes:
                           face_normals=actual_face_normals_list,
                           overwrite=True)
 
-        # Test that we can read both meshes correctly with/without paths
-        args = {}
-        if with_paths:
-            args = {'scene_paths': scene_paths}
-
         path_or_stage = Usd.Stage.Open(out_path) if input_stage else out_path
 
         # TODO: once above is fixed use with_materials=True here
-        meshes_in = usd.import_meshes(path_or_stage, with_normals=True, **args)
+        meshes_in = usd.import_meshes(path_or_stage, scene_paths if with_paths else None, with_normals=True, return_list=False)
         assert len(meshes_in) == len(meshes)
         for i, orig_mesh in enumerate(meshes):
-            in_mesh = meshes_in[i]
+            in_mesh = meshes_in[scene_paths[i]]
             # DEBUG INFORMATION (uncomment when debugging)
             # print_namedtuple_attributes(orig_mesh, f'Orig mesh [{i}]')
             # print_namedtuple_attributes(in_mesh, f'Imported mesh [{i}]')
 
             # We check key attributes
-            assert contained_torch_equal(
-                {'vertices': orig_mesh.vertices, 'faces': orig_mesh.faces, 'uvs': orig_mesh.uvs,
-                 'face_uvs_idx': orig_mesh.face_uvs_idx, 'face_normals': actual_face_normals_list[i]},
-                {'vertices': in_mesh.vertices, 'faces': in_mesh.faces, 'uvs': in_mesh.uvs,
-                 'face_uvs_idx': in_mesh.face_uvs_idx, 'face_normals': in_mesh.face_normals},
-                approximate=True, rtol=1e-5, atol=1e-8)
+            assert contained_torch_equal({
+                'vertices': orig_mesh.vertices,
+                'faces': orig_mesh.faces,
+                'uvs': orig_mesh.uvs,
+                'face_uvs_idx': orig_mesh.face_uvs_idx,
+                'face_normals': actual_face_normals_list[i]
+            },
+            {
+                'vertices': in_mesh.vertices,
+                'faces': in_mesh.faces,
+                'uvs': in_mesh.uvs,
+                'face_uvs_idx': in_mesh.face_uvs_idx,
+                'face_normals': in_mesh.face_normals
+            })
 
-        # Test that can also read the flattened mesh and check that attributes are correctly shifted
+        # Test that import_mesh returns a NONE-batched (flattened) mesh with all meshes concatenated
         mesh_in = usd.import_mesh(path_or_stage, with_normals=True)
+        assert mesh_in.batching == SurfaceMesh.Batching.NONE
         assert len(mesh_in.vertices) == (len(mesh.vertices) + len(mesh_alt.vertices))
         assert len(mesh_in.faces) == (len(mesh.faces) + len(mesh_alt.faces))
-        assert contained_torch_equal(
-            {'vertices': torch.cat([mesh.vertices, mesh_alt.vertices], dim=0),
-             'faces': torch.cat([mesh.faces, mesh_alt.faces + mesh.vertices.shape[0]], dim=0),
-             'uvs': torch.cat([mesh.uvs, mesh_alt.uvs], dim=0),
-             'face_uvs_idx': torch.cat([mesh.face_uvs_idx, mesh_alt.face_uvs_idx + mesh.uvs.shape[0]], dim=0),
-             'face_normals': torch.cat(actual_face_normals_list, dim=0)
-             },
-            {'vertices': mesh_in.vertices,
-             'faces': mesh_in.faces,
-             'uvs': mesh_in.uvs,
-             'face_uvs_idx': mesh_in.face_uvs_idx,
-             'face_normals': mesh_in.face_normals
-             },
-            approximate=True, rtol=1e-5, atol=1e-8)
+        assert contained_torch_equal({
+            'vertices': torch.cat([mesh.vertices, mesh_alt.vertices], dim=0),
+            'faces': torch.cat([mesh.faces, mesh_alt.faces + mesh.vertices.shape[0]], dim=0),
+            'uvs': torch.cat([mesh.uvs, mesh_alt.uvs], dim=0),
+            'face_uvs_idx': torch.cat([mesh.face_uvs_idx, mesh_alt.face_uvs_idx + mesh.uvs.shape[0]], dim=0),
+            'face_normals': torch.cat(actual_face_normals_list, dim=0)
+        },
+        {
+            'vertices': mesh_in.vertices,
+            'faces': mesh_in.faces,
+            'uvs': mesh_in.uvs,
+            'face_uvs_idx': mesh_in.face_uvs_idx,
+            'face_normals': mesh_in.face_normals
+         })
 
     def test_import_bad_prim(self, scene_paths, mesh_path):
         """Test that import fails when reaching invalid prims"""
         with pytest.raises(ValueError):
-            usd.import_meshes(mesh_path, ['/foo'] + scene_paths)
+            usd.import_meshes(mesh_path, ['/foo'] + scene_paths, return_list=False)
+
+    def test_get_mesh_scene_paths(self, scene_paths, out_dir, mesh, mesh_alt):
+        """get_mesh_scene_paths returns expected paths from exported stage"""
+        out_path = os.path.join(out_dir, 'meshes_scene_paths.usda')
+        usd.export_meshes(out_path, scene_paths,
+                          vertices=[mesh.vertices, mesh_alt.vertices],
+                          faces=[mesh.faces, mesh_alt.faces], overwrite=True)
+        actual = usd.get_mesh_scene_paths(out_path)
+        assert set(str(p) for p in actual) == set(scene_paths)
+
+    def test_get_mesh_scene_paths_scene_path(self, out_dir, mesh, mesh_alt):
+        """get_mesh_scene_paths with scene_path returns only paths under that prefix"""
+        all_scene_paths = ['/World/Foo/mesh_0', '/World/Foo/mesh_1', '/World/Bar/mesh_0']
+        out_path = os.path.join(out_dir, 'meshes_scene_path.usda')
+        usd.export_meshes(out_path, all_scene_paths,
+                          vertices=[mesh.vertices, mesh_alt.vertices, mesh.vertices],
+                          faces=[mesh.faces, mesh_alt.faces, mesh.faces], overwrite=True)
+        actual = usd.get_mesh_scene_paths(out_path, scene_path='/World/Foo')
+        assert set(str(p) for p in actual) == {'/World/Foo/mesh_0', '/World/Foo/mesh_1'}
+
+    @pytest.mark.parametrize('input_stage', [False, True])
+    def test_import_meshes_auto_discover(self, homo_mesh_path, input_stage):
+        """import_meshes with scene_paths=None auto-discovers all mesh prims and returns a dict"""
+        all_scene_paths = usd.get_mesh_scene_paths(homo_mesh_path)
+        assert len(all_scene_paths) == 2
+
+        path_or_stage = Usd.Stage.Open(homo_mesh_path) if input_stage else homo_mesh_path
+        meshes_explicit = usd.import_meshes(homo_mesh_path, all_scene_paths, with_normals=True, return_list=False)
+        meshes_auto = usd.import_meshes(path_or_stage, with_normals=True, return_list=False)
+
+        assert set(meshes_auto.keys()) == set(str(p) for p in all_scene_paths)
+        for sp in all_scene_paths:
+            ref_mesh = meshes_explicit[str(sp)]
+            in_mesh = meshes_auto[str(sp)]
+            assert contained_torch_equal(
+                {'vertices': ref_mesh.vertices, 'faces': ref_mesh.faces},
+                {'vertices': in_mesh.vertices, 'faces': in_mesh.faces}
+            )
 
     @pytest.mark.parametrize('input_stage', [False, True])
     @pytest.mark.parametrize('triangulate', [False, True])
@@ -230,36 +272,73 @@ class TestMeshes:
 
         if not triangulate:
             with pytest.raises(utils.NonHomogeneousMeshError):
-                usd.import_meshes(file_path_or_stage=path_or_stage, scene_paths=['/Root'], triangulate=triangulate)
+                usd.import_meshes(file_path_or_stage=path_or_stage, scene_paths=['/Root/Rocket'], triangulate=triangulate, return_list=False)
 
             with pytest.raises(utils.NonHomogeneousMeshError):
                 usd.import_mesh(file_path_or_stage=path_or_stage, scene_path='/Root', triangulate=triangulate)
 
         else:
-            usd.import_meshes(file_path_or_stage=path_or_stage, scene_paths=['/Root'], triangulate=triangulate)
+            usd.import_meshes(file_path_or_stage=path_or_stage, scene_paths=['/Root/Rocket'], triangulate=triangulate, return_list=False)
             usd.import_mesh(file_path_or_stage=path_or_stage, scene_path='/Root', triangulate=triangulate)
 
     @pytest.mark.parametrize('input_stage', [False, True])
     @pytest.mark.parametrize('triangulate', [False, True])
-    def test_import_hetero_skip(self, scene_paths, hetero_mesh_path, homo_mesh_path, mixed_mesh_path, input_stage, triangulate):
+    def test_import_hetero_skip(self, scene_paths, hetero_mesh_path, homo_mesh_path,
+                                mixed_mesh_path, input_stage, triangulate):
         """Test that import skips mesh when importing heterogeneous mesh with skip handler"""
         path_or_stage = Usd.Stage.Open(hetero_mesh_path) if input_stage else hetero_mesh_path
-        meshes = usd.import_meshes(path_or_stage, ['/Root'],
-                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip,
-                                   triangulate=triangulate)
+        hetero_scene_paths = usd.get_mesh_scene_paths(hetero_mesh_path)
+        meshes = usd.import_meshes(path_or_stage, hetero_scene_paths,
+                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip, return_list=False)
         assert len(meshes) == 0
+        meshes2 = usd.import_meshes(path_or_stage,
+                                    heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip, return_list=False)
+        assert meshes.keys() == meshes2.keys()
+        for k in meshes.keys():
+            assert contained_torch_equal(meshes[k].as_dict(), meshes2[k].as_dict())
+                                   
+        # All sub-meshes are skipped, so import_mesh has nothing to return.
+        mesh = usd.import_mesh(path_or_stage,
+                               heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
+        assert mesh is None
 
+        # Test skip on a batch of homogeneous meshes
         path_or_stage = Usd.Stage.Open(homo_mesh_path) if input_stage else homo_mesh_path
-        meshes = usd.import_meshes(path_or_stage,
-                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
+        homo_scene_paths = usd.get_mesh_scene_paths(homo_mesh_path)
+        meshes = usd.import_meshes(path_or_stage, homo_scene_paths,
+                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip, return_list=False)
         assert len(meshes) == 2
+        meshes2 = usd.import_meshes(path_or_stage,
+                                    heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip, return_list=False)
+        assert meshes.keys() == meshes2.keys()
+        for k in meshes.keys():
+            assert contained_torch_equal(meshes[k].as_dict(), meshes2[k].as_dict())
+        # import_mesh must produce the same flattened result built from the per-prim meshes above.
+        mesh = usd.import_mesh(path_or_stage,
+                               heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
+        expected = SurfaceMesh.flatten(list(meshes.values()), group_materials_by_name=True)
+        assert mesh.batching == SurfaceMesh.Batching.NONE
+        assert contained_torch_equal(mesh.as_dict(), expected.as_dict())
 
         # Test skip on a batch of mixed homogeneous and heterogeneous meshes
         # Note we can't export heterogeneous meshes, so previous test did not work
         path_or_stage = Usd.Stage.Open(mixed_mesh_path) if input_stage else mixed_mesh_path
-        meshes = usd.import_meshes(path_or_stage,
-                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
+        mixed_scene_paths = usd.get_mesh_scene_paths(mixed_mesh_path)
+        meshes = usd.import_meshes(path_or_stage, mixed_scene_paths,
+                                   heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip, return_list=False)
         assert len(meshes) == 1
+        meshes2 = usd.import_meshes(path_or_stage,
+                                    heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip, return_list=False)
+        assert meshes.keys() == meshes2.keys()
+        for k in meshes.keys():
+            assert contained_torch_equal(meshes[k].as_dict(), meshes2[k].as_dict())
+        # Only the homogeneous sub-mesh survives; import_mesh returns it with its transform applied.
+        mesh = usd.import_mesh(path_or_stage,
+                               heterogeneous_mesh_handler=utils.heterogeneous_mesh_handler_skip)
+        expected = next(iter(meshes.values())).as_transformed()
+        assert mesh.batching == SurfaceMesh.Batching.NONE
+        assert contained_torch_equal(mesh.as_dict(), expected.as_dict())
+
 
     @pytest.mark.parametrize('use_triangulate_shortcut', [True, False])
     @pytest.mark.parametrize('input_stage', [False, True])
@@ -272,12 +351,12 @@ class TestMeshes:
             kwargs = {'triangulate': True}
         else:
             kwargs = {'heterogeneous_mesh_handler': utils.mesh_handler_naive_triangulate}
-        mesh = usd.import_meshes(path_or_stage, ['/Root'], **kwargs)
+        mesh = usd.import_meshes(path_or_stage, ['/Root/Rocket'], **kwargs, return_list=False)
         # Confirm we now have a triangle mesh
-        assert mesh[0].faces.size(1) == 3
+        assert mesh['/Root/Rocket'].faces.size(1) == 3
 
         out_path = os.path.join(out_dir, 'homogenized.usda')
-        usd.export_mesh(out_path, '/World/Rocket', vertices=mesh[0].vertices, faces=mesh[0].faces, overwrite=True)
+        usd.export_mesh(out_path, '/World/Rocket', vertices=mesh['/Root/Rocket'].vertices, faces=mesh['/Root/Rocket'].faces, overwrite=True)
 
         # Confirm exported USD matches golden file
         assert filecmp.cmp(homogenized_golden_path, out_path)
@@ -308,9 +387,9 @@ class TestMeshes:
 
     @pytest.mark.parametrize('input_stage', [False, True])
     def test_import_with_transform(self, scene_paths, out_dir, hetero_mesh_path, input_stage):
-        """Test that mesh transforms are correctly applied during import"""
+        """Test that import_mesh applies the local-to-world transform to vertices and import_meshes returns it separately"""
         path_or_stage = Usd.Stage.Open(hetero_mesh_path) if input_stage else hetero_mesh_path
-        mesh = usd.import_mesh(path_or_stage, '/Root',
+        mesh = usd.import_mesh(path_or_stage, scene_path='/Root',
                                heterogeneous_mesh_handler=utils.mesh_handler_naive_triangulate)
         out_path = os.path.join(out_dir, 'transformed.usda')
         stage = usd.create_stage(out_path)
@@ -318,8 +397,106 @@ class TestMeshes:
         UsdGeom.Xformable(prim).AddTranslateOp().Set((10, 10, 10))
         stage.Save()
 
+        # import_mesh applies the transform: vertices are in world space
         mesh_import = usd.import_mesh(out_path)
-        assert torch.allclose(mesh_import.vertices, mesh.vertices + 10.)
+        assert torch.allclose(mesh_import.vertices, mesh.vertices + torch.tensor([10., 10., 10.]))
+        assert mesh_import.transform is None
+
+        # import_meshes returns local-space vertices with the transform set
+        meshes_dict = usd.import_meshes(out_path, return_list=False)
+        mesh_local = meshes_dict['/World/Rocket']
+        assert torch.allclose(mesh_local.vertices, mesh.vertices)
+        assert mesh_local.transform is not None
+        assert mesh_local.transform.shape == (4, 4)
+        assert torch.allclose(mesh_local.transform[:3, 3], torch.tensor([10., 10., 10.]))
+
+    def test_export_import_roundtrip_with_transform(self, out_dir):
+        """Test that the local-to-world transform is preserved via import_meshes, and import_mesh applies it to vertices"""
+        vertices = torch.tensor([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]], dtype=torch.float32)
+        faces = torch.tensor([[0, 1, 2]], dtype=torch.int64)
+        transform = torch.tensor([[2., 0., 0., 0.5],
+                                  [0., 0., -2., 0.],
+                                  [0., 2., 0., 0.],
+                                  [0., 0., 0., 1.]], dtype=torch.float32)
+        out_path = os.path.join(out_dir, 'mesh_transform_roundtrip.usda')
+
+        usd.export_mesh(out_path, scene_path='/World/Meshes/mesh_0',
+                        vertices=vertices, faces=faces, local_to_world=transform, overwrite=True)
+
+        # import_meshes preserves the transform without applying it
+        meshes_dict = usd.import_meshes(out_path, ['/World/Meshes/mesh_0'], return_list=False)
+        mesh_local = meshes_dict['/World/Meshes/mesh_0']
+        assert torch.allclose(mesh_local.vertices, vertices)
+        assert mesh_local.transform is not None
+        assert torch.allclose(mesh_local.transform, transform, atol=1e-5)
+
+        # import_mesh applies the transform: vertices are in world space
+        mesh_import = usd.import_mesh(out_path, scene_path='/World/Meshes/mesh_0')
+        assert mesh_import.transform is None
+        # Verify world-space vertices: transform @ [x,y,z,1]^T
+        verts_h = torch.cat([vertices, torch.ones(vertices.shape[0], 1)], dim=1)
+        expected_verts = (verts_h @ transform.T)[:, :3]
+        assert torch.allclose(mesh_import.vertices, expected_verts, atol=1e-5)
+
+    def test_export_meshes_batched_local_to_world(self, out_dir):
+        """export_meshes accepts local_to_world as a (N, 4, 4) batched tensor (per-mesh)
+        and as a single (4, 4) tensor (broadcast to every mesh), aligned with SurfaceMesh.transform."""
+        vertices = [torch.tensor([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]], dtype=torch.float32),
+                    torch.tensor([[0., 0., 0.], [0., 1., 0.], [0., 0., 1.]], dtype=torch.float32)]
+        faces = [torch.tensor([[0, 1, 2]], dtype=torch.int64),
+                 torch.tensor([[0, 1, 2]], dtype=torch.int64)]
+        transform_0 = torch.tensor([[2., 0., 0., 0.5],
+                                    [0., 0., -2., 0.],
+                                    [0., 2., 0., 0.],
+                                    [0., 0., 0., 1.]], dtype=torch.float32)
+        transform_1 = torch.tensor([[1., 0., 0., 3.],
+                                    [0., 1., 0., -1.],
+                                    [0., 0., 1., 2.],
+                                    [0., 0., 0., 1.]], dtype=torch.float32)
+        scene_paths = ['/World/Meshes/mesh_0', '/World/Meshes/mesh_1']
+
+        # (N, 4, 4) per-mesh
+        per_mesh = torch.stack([transform_0, transform_1], dim=0)
+        out_path = os.path.join(out_dir, 'export_meshes_batched_per_mesh.usda')
+        usd.export_meshes(out_path, scene_paths, vertices=vertices, faces=faces,
+                          local_to_world=per_mesh, overwrite=True)
+        meshes_dict = usd.import_meshes(out_path, scene_paths, return_list=False)
+        assert torch.allclose(meshes_dict[scene_paths[0]].transform, transform_0, atol=1e-5)
+        assert torch.allclose(meshes_dict[scene_paths[1]].transform, transform_1, atol=1e-5)
+
+        # (4, 4) broadcast
+        out_path = os.path.join(out_dir, 'export_meshes_batched_broadcast.usda')
+        usd.export_meshes(out_path, scene_paths, vertices=vertices, faces=faces,
+                          local_to_world=transform_0, overwrite=True)
+        meshes_dict = usd.import_meshes(out_path, scene_paths, return_list=False)
+        assert torch.allclose(meshes_dict[scene_paths[0]].transform, transform_0, atol=1e-5)
+        assert torch.allclose(meshes_dict[scene_paths[1]].transform, transform_0, atol=1e-5)
+
+    def test_import_vertex_interpolation_normals(self, out_dir):
+        """Normals authored with interpolation='vertex' must round-trip into SurfaceMesh.vertex_normals.
+
+        Kaolin's own export only writes faceVarying normals, so this test authors a USD
+        with vertex-interpolated normals via the raw USD API to exercise the
+        vertex-interpolation branch of `_get_mesh_prim_attributes` / `set_normals`.
+        """
+        vertices = torch.tensor([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
+                                dtype=torch.float32)
+        faces = torch.tensor([[0, 1, 2], [0, 2, 3]], dtype=torch.int64)
+        vertex_normals = torch.tensor([[0., 0., 1.], [1., 0., 0.], [0., 1., 0.], [-1., 0., 0.]],
+                                      dtype=torch.float32)
+
+        out_path = os.path.join(out_dir, 'mesh_vertex_normals.usda')
+        stage = usd.create_stage(out_path)
+        prim = usd.add_mesh(stage, '/World/Mesh', vertices=vertices, faces=faces)
+        usd_mesh = UsdGeom.Mesh(prim)
+        usd_mesh.GetNormalsAttr().Set(vertex_normals.numpy())
+        UsdGeom.PointBased(usd_mesh).SetNormalsInterpolation('vertex')
+        stage.Save()
+
+        meshes_dict = usd.import_meshes(out_path, ['/World/Mesh'], with_normals=True, return_list=False)
+        mesh_local = meshes_dict['/World/Mesh']
+        assert mesh_local.vertex_normals is not None
+        assert torch.allclose(mesh_local.vertex_normals, vertex_normals)
 
     @pytest.mark.parametrize('function_variant', ['export_mesh', 'export_meshes'])
     @pytest.mark.parametrize('input_stage', [False, True])
@@ -580,24 +757,31 @@ class TestMeshes:
     @pytest.mark.parametrize('flatten', [True, False])
     def test_import_triangulate(self, with_normals, with_materials, flatten):
         input_path = io_data_path(f'amsterdam.usda')  # Multiple quad meshes
+        per_mesh_vertices = [4, 98, 98, 98, 386, 386, 98, 8, 98, 98, 98, 4, 4, 4, 386, 98, 4, 4]
+        per_mesh_quads = [1, 96, 96, 96, 384, 384, 96, 6, 96, 96, 96, 1, 1, 1, 384, 96, 1, 1]
         if flatten:
-            # Import as one mesh
+            # import_mesh auto-discovers all prims and flattens them into one NONE-batched mesh
             orig = [usd.import_mesh(input_path, with_materials=with_materials, with_normals=with_normals)]
-            triangulated = [usd.import_mesh(input_path, with_materials=with_materials, with_normals=with_normals,
-                                            triangulate=True)]
-            assert len(orig) == 1
-            assert len(triangulated) == 1
-            expected_num_vertices = [1974]
-            expected_num_quads = [1932]
+            triangulated = [usd.import_mesh(input_path, with_materials=with_materials,
+                                            with_normals=with_normals, triangulate=True)]
+            assert orig[0].batching == SurfaceMesh.Batching.NONE
+            assert triangulated[0].batching == SurfaceMesh.Batching.NONE
+            expected_num_vertices = [sum(per_mesh_vertices)]
+            expected_num_quads = [sum(per_mesh_quads)]
         else:
-            # Import as multiple meshes
-            orig = usd.import_meshes(input_path, with_materials=with_materials, with_normals=with_normals)
-            triangulated = usd.import_meshes(input_path, with_materials=with_materials, with_normals=with_normals,
-                                             triangulate=True)
+            # Import as multiple meshes individually; iterate in scene_paths order rather than dict order.
+            scene_paths = [str(p) for p in usd.get_mesh_scene_paths(input_path)]
+            orig_dict = usd.import_meshes(
+                input_path, scene_paths, with_materials=with_materials, with_normals=with_normals, return_list=False)
+            triangulated_dict = usd.import_meshes(
+                input_path, scene_paths, with_materials=with_materials, with_normals=with_normals,
+                triangulate=True, return_list=False)
+            orig = [orig_dict[p] for p in scene_paths]
+            triangulated = [triangulated_dict[p] for p in scene_paths]
             assert len(orig) == 18
             assert len(triangulated) == 18
-            expected_num_vertices = [4, 98, 98, 98, 386, 386, 98, 8, 98, 98, 98, 4, 4, 4, 386, 98, 4, 4]
-            expected_num_quads = [1, 96, 96, 96, 384, 384, 96, 6, 96, 96, 96, 1, 1, 1, 384, 96, 1, 1]
+            expected_num_vertices = per_mesh_vertices
+            expected_num_quads = per_mesh_quads
 
         for i in range(len(orig)):
             qmesh = orig[i]           # quad mesh
@@ -657,8 +841,10 @@ class TestDiverseInputs:
 
         fpath = io_data_path(fname)
         # import as multiple meshes
+        in_scene_paths = [str(p) for p in usd.get_mesh_scene_paths(fpath)]
+        in_dict = usd.import_meshes(fpath, in_scene_paths, with_normals=True, with_materials=True, return_list=False)
         read_usd_mesh = SurfaceMesh.cat(
-            usd.import_meshes(fpath, with_normals=True, with_materials=True), fixed_topology=False).to(device)
+            [in_dict[p] for p in in_scene_paths], fixed_topology=False).to(device)
         assert len(read_usd_mesh) == expected_mesh_counts[model_name]
         assert len(read_usd_mesh.materials[0]) != 0
 
@@ -673,11 +859,17 @@ class TestDiverseInputs:
                           materials=read_usd_mesh.materials,
                           overwrite=True)
 
+        out_scene_paths = [str(p) for p in usd.get_mesh_scene_paths(out_path)]
+        out_dict = usd.import_meshes(out_path, out_scene_paths, with_normals=True, with_materials=True, return_list=False)
         exported_usd_mesh = SurfaceMesh.cat(
-            usd.import_meshes(out_path, with_normals=True,  with_materials=True), fixed_topology=False).to(device)
+            [out_dict[p] for p in out_scene_paths], fixed_topology=False).to(device)
 
-        assert set(read_usd_mesh.get_attributes()) == set(exported_usd_mesh.get_attributes())
+        # transform is not preserved through export/reimport (transforms are not exported)
+        ignore_attrs = {'transform'}
+        assert set(read_usd_mesh.get_attributes()) - ignore_attrs == set(exported_usd_mesh.get_attributes()) - ignore_attrs
         for att in read_usd_mesh.get_attributes(only_tensors=True):
+            if att in ignore_attrs:
+                continue
             assert contained_torch_equal(read_usd_mesh.get_attribute(att),
                                          exported_usd_mesh.get_attribute(att),
                                          print_error_context=f'Failed for attribute {att}',
@@ -704,8 +896,10 @@ class TestDiverseInputs:
             fname = glob.glob(io_data_path(f'{bname}.usd') + '*')[0]
             out_path = os.path.join(out_dir, f'reexport_multi_{bname}.usda')
             # import as multiple meshes
+            in_scene_paths = [str(p) for p in usd.get_mesh_scene_paths(fname)]
+            in_dict = usd.import_meshes(fname, in_scene_paths, with_normals=True, with_materials=True, return_list=False)
             read_usd_mesh = SurfaceMesh.cat(
-                usd.import_meshes(fname, with_normals=True, with_materials=True), fixed_topology=False).to(device)
+                [in_dict[p] for p in in_scene_paths], fixed_topology=False).to(device)
 
             # Now write the USD to file, read it back and make sure attributes match the original mesh
             usd.export_meshes(out_path,
@@ -724,14 +918,22 @@ class TestDiverseInputs:
             out_path = os.path.join(out_dir, f'reexport_multi_{bname}.usda')
 
             # import as multiple meshes
+            in_scene_paths = [str(p) for p in usd.get_mesh_scene_paths(fname)]
+            in_dict = usd.import_meshes(fname, in_scene_paths, with_normals=True, with_materials=True, return_list=False)
             read_usd_mesh = SurfaceMesh.cat(
-                usd.import_meshes(fname, with_normals=True, with_materials=True), fixed_topology=False)
+                [in_dict[p] for p in in_scene_paths], fixed_topology=False)
 
+            out_scene_paths = [str(p) for p in usd.get_mesh_scene_paths(out_path)]
+            out_dict = usd.import_meshes(out_path, out_scene_paths, with_normals=True, with_materials=True, return_list=False)
             exported_usd_mesh = SurfaceMesh.cat(
-                usd.import_meshes(out_path, with_normals=True, with_materials=True), fixed_topology=False)
+                [out_dict[p] for p in out_scene_paths], fixed_topology=False)
 
-            assert set(read_usd_mesh.get_attributes()) == set(exported_usd_mesh.get_attributes())
+            # transform is not preserved through export/reimport (transforms are not exported)
+            ignore_attrs = {'transform'}
+            assert set(read_usd_mesh.get_attributes()) - ignore_attrs == set(exported_usd_mesh.get_attributes()) - ignore_attrs
             for att in read_usd_mesh.get_attributes(only_tensors=True):
+                if att in ignore_attrs:
+                    continue
                 assert contained_torch_equal(read_usd_mesh.get_attribute(att),
                                              exported_usd_mesh.get_attribute(att),
                                              approximate=True, rtol=1e-5, atol=1e-8), f'Failed for attribute {att}'
@@ -745,3 +947,43 @@ class TestDiverseInputs:
                 assert contained_torch_equal(
                     materials_orig, materials_exported,
                     approximate=True, rtol=1e-2, atol=1e-3, print_error_context=f'Material mismatch {bname} {mesh_idx}')
+
+
+class TestGoldenFiles:
+    def test_rocket_homogenized_materials_golden_equivalence(self):
+        """Old and new golden files for rocket_homogenized_materials differ only in signed-zero
+        text representation (-0 vs 0); verify they import identically."""
+        old_path = samples_data_path('golden', 'rocket_homogenized_materials_old.usda')
+        new_path = samples_data_path('golden', 'rocket_homogenized_materials.usda')
+
+        def _load(path):
+            m = usd.import_mesh(path, with_normals=True, with_materials=True)
+            m.unset_attributes_return_none = True
+            return m
+
+        old = _load(old_path)
+        new = _load(new_path)
+
+        assert contained_torch_equal(old.as_dict(), new.as_dict())
+
+
+class TestV018Deprecation:
+    """v0.18 call forms for mesh I/O keep working."""
+
+    def test_import_meshes_default_returns_list(self, out_dir, mesh, mesh_alt):
+        # v0.18 default: returns a list of SurfaceMesh.
+        out_path = os.path.join(out_dir, 'legacy_default_list.usda')
+        scene_paths = ['/World/mesh_0', '/World/mesh_1']
+        usd.export_meshes(out_path,
+                          scene_paths=scene_paths,
+                          vertices=[mesh.vertices, mesh_alt.vertices],
+                          faces=[mesh.faces, mesh_alt.faces],
+                          overwrite=True)
+        result = usd.import_meshes(out_path)
+        assert isinstance(result, list)
+        assert len(result) == 2
+        for got, src in zip(result, [mesh, mesh_alt]):
+            assert contained_torch_equal(
+                {'vertices': got.vertices, 'faces': got.faces},
+                {'vertices': src.vertices, 'faces': src.faces},
+                approximate=True, atol=1e-5)
