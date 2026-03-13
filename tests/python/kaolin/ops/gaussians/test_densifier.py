@@ -20,7 +20,7 @@ import math
 import torch
 from pathlib import Path
 import kaolin
-from kaolin.ops.gaussian import sample_points_in_volume
+from kaolin.ops.gaussians import sample_points_in_volume
 from kaolin.utils.testing import check_tensor
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
