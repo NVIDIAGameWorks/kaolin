@@ -1,4 +1,4 @@
-# Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -154,7 +154,7 @@ class CameraExtrinsics():
 
     @torch.no_grad()
     def _internal_switch_backend(self, backend_name: str):
-        """
+        r"""
         Switches the representation backend to a different implementation.
         'backend_name' must be a registered backend.
         
@@ -173,7 +173,7 @@ class CameraExtrinsics():
 
     @torch.no_grad()
     def switch_backend(self, backend_name: str):
-        """Switches the representation backend to a different implementation.
+        r"""Switches the representation backend to a different implementation.
 
         .. note::
 
@@ -266,6 +266,25 @@ class CameraExtrinsics():
             return data.to(dtype=dtype, device=device)
         else:
             return torch.tensor(data, device=device, dtype=dtype)
+
+    def as_dict(self):
+        r"""Returns parameters necessary to instantiate same `CameraExtrinsics` using `from_dict`; this dictionary
+        is writable to JSON or YAML.
+
+        Returns:
+            dict
+        """
+        return {'view_matrix': self.view_matrix().squeeze(0).detach().cpu().numpy().tolist()}
+
+    @classmethod
+    def from_dict(cls, in_dict):
+        r"""Constructs class from a simple dictionary, such as that returned from as_dict; uses default back end.
+
+        Returns:
+            CameraExtrinsics
+        """
+        view_matrix = torch.from_numpy(np.array(in_dict['view_matrix']))
+        return cls.from_view_matrix(view_matrix)
 
     @classmethod
     def from_camera_pose(cls,

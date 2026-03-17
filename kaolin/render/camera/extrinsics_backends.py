@@ -222,7 +222,7 @@ class _Matrix6DofRotationRep(ExtrinsicsRep):
         b1 = torch.nn.functional.normalize(a1, dim=1)
         b1_dot_a2 = torch.bmm(b1.view(-1, 1, 3), a2.view(-1, 3, 1)).view(batch_size, 1)    # Batched dot product
         b2 = torch.nn.functional.normalize(a2 - b1_dot_a2 * b1, dim=1)
-        b3 = torch.cross(b1, b2)
+        b3 = torch.linalg.cross(b1, b2)
 
         rotation = torch.stack([b1, b2, b3], dim=1)  # Stack row-wise
         extrinsics_mat = torch.cat([rotation, translation.unsqueeze(-1)], dim=2)  # Stack column-wise

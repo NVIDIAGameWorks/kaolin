@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +15,7 @@
 import copy
 import random
 import torch
+from abc import ABC, abstractmethod
 
 import kaolin.utils.testing
 
@@ -28,7 +29,7 @@ def _to_1d_tensor(data):
         return torch.tensor(data).reshape(-1).float()
 
 
-class Material:
+class Material(ABC):
     """Abstract material definition class.
     Defines material inputs and methods to export material properties.
     """
@@ -36,6 +37,19 @@ class Material:
         self.material_name = str(name)
         self.shader_name = str(shader_name)
 
+    @abstractmethod
+    def as_dict(self):
+        raise NotImplementedError
+
+    @staticmethod
+    def from_dict(in_dict):
+        name = in_dict.get('classname', None)
+        if name == 'pbr':
+            meta = {k: v for k, v in in_dict.items() if k != 'classname'}
+            return PBRMaterial.from_dict(meta)
+        else:
+            raise ValueError(f'Input dict "classname" value {name} not supported, expected "pbr"')
+        
 
 class PBRMaterial(Material):
     """Defines a PBR material; allows storing rendering material properties imported from USD, gltf, obj,
@@ -196,6 +210,10 @@ class PBRMaterial(Material):
         'material_name',
         'shader_name'
     ]
+
+    @classmethod
+    def supported_texture_attributes(cls):
+        return cls.__texture_attributes
 
     @classmethod
     def supported_tensor_attributes(cls):
@@ -481,6 +499,34 @@ class PBRMaterial(Material):
 
     def __str__(self):
         return self.to_string()
+
+    def as_dict(self):
+        """Convert the PBRMaterial to a dictionary representation.
+        
+        Returns:
+            dict: Dictionary containing all material attributes
+        """
+        result = {'classname': 'pbr'}
+        
+        # Add all attributes that are set (not None)
+        for attr in PBRMaterial.__slots__:
+            value = getattr(self, attr)
+            if value is not None:
+                result[attr] = value
+                    
+        return result
+
+    @classmethod
+    def from_dict(cls, in_dict):
+        """Create a PBRMaterial from a dictionary representation.
+        
+        Args:
+            in_dict (dict): Dictionary containing material attributes
+            
+        Returns:
+            PBRMaterial: New PBRMaterial instance
+        """
+        return cls(**in_dict)
 
 
 # Useful for testing
