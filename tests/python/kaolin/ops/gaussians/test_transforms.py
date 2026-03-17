@@ -87,17 +87,22 @@ def eval_sh(deg, sh, dirs):
     return result
 
 def naive_transform_rotation(rot: torch.Tensor, transform: torch.Tensor) -> torch.Tensor:
-    """Reimplementation of kaolin.ops.gaussians.transforms._transform_rot"""
+    """Basic reimplementation of kaolin.ops.gaussians.transforms._transform_rot (only support xyzw convention)"""
     scale = torch.linalg.norm(transform[..., :3, :3], dim=-2)
     rot_quat = quat_ops.quat_from_rot33(transform[..., :3, :3] / scale.unsqueeze(-2))
     rot_unit = rot / torch.linalg.norm(rot, dim=-1).unsqueeze(-1)
-
-    # Note: gsplats use Hamiltonian convention [real, imag], whereas Kaolin uses the other convention[imag, real]
-    rot_unit = torch.cat([rot_unit[:, 1:], rot_unit[:, :1]], dim=-1)
-
     result = quat_ops.quat_mul(rot_quat, rot_unit)
-    result = torch.cat([result[:, 3:], result[:, :3]], dim=-1)
     return result
+
+
+def _quat_wxyz_to_xyzw(q: torch.Tensor) -> torch.Tensor:
+    """Reorder [w, x, y, z] -> [x, y, z, w] for ops that use xyzw."""
+    return torch.cat([q[:, 1:], q[:, :1]], dim=-1)
+
+
+def _quat_xyzw_to_wxyz(q: torch.Tensor) -> torch.Tensor:
+    """Reorder [x, y, z, w] -> [w, x, y, z]."""
+    return torch.cat([q[:, -1:], q[:, :-1]], dim=-1)
 
 # TODO(cfujitsang): Add some rendering in the tests
 @pytest.mark.parametrize('device', ['cpu', 'cuda'])
@@ -111,12 +116,12 @@ class TestTransformGaussians:
 
     @pytest.fixture
     def rotations(self, device, dtype):
-        """Unit quaternions in gsplats convention [w, x, y, z]."""
+        """Unit quaternions in wxyz convention [w, x, y, z] (same orientations as former xyzw gsplat fixture)."""
         return torch.tensor(
             [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+                [1.0, 0.0, 0.0, 0.0],
             ],
             dtype=dtype,
             device=device,
@@ -230,9 +235,10 @@ class TestTransformGaussians:
         torch.testing.assert_close(rgb[2:], gt[2:], atol=1e-1, rtol=1e-2)
 
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_identity_transform(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_identity_transform(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Identity transform returns unchanged positions, rotations, and scales."""
         identity = torch.eye(4, dtype=dtype, device=device)
 
@@ -241,17 +247,21 @@ class TestTransformGaussians:
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations = _quat_wxyz_to_xyzw(rotations)
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, identity, shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations, scales, identity, shs_feat_input, use_log_scales=use_log_scales, use_xyzw=use_xyzw)
 
         torch.testing.assert_close(new_xyz, xyz)
         torch.testing.assert_close(new_rotations, rotations)
         torch.testing.assert_close(new_scales, scales)
         torch.testing.assert_close(new_shs_feat, shs_feat_input)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_translation_only(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_translation_only(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Translation transform only affects positions."""
         translation = torch.tensor([2.0, 3.0, 5.0], dtype=dtype, device=device)
         transform = torch.eye(4, dtype=dtype, device=device)
@@ -262,17 +272,21 @@ class TestTransformGaussians:
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations = _quat_wxyz_to_xyzw(rotations)
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, transform, shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations, scales, transform, shs_feat_input, use_log_scales=use_log_scales, use_xyzw=use_xyzw)
 
         torch.testing.assert_close(new_xyz, xyz + translation)
         torch.testing.assert_close(new_rotations, rotations)
         torch.testing.assert_close(new_scales, scales)
         torch.testing.assert_close(new_shs_feat, shs_feat_input)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_uniform_scale(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_uniform_scale(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Uniform scale transform scales positions and raw_scales."""
         s = 3.0
         transform = torch.eye(4, dtype=dtype, device=device)
@@ -283,8 +297,11 @@ class TestTransformGaussians:
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations = _quat_wxyz_to_xyzw(rotations)
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, transform, shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations, scales, transform, shs_feat_input, use_log_scales=use_log_scales, use_xyzw=use_xyzw)
 
         if use_log_scales:
             expected_scales = scales * (math.log(s) / scales + 1)
@@ -296,9 +313,10 @@ class TestTransformGaussians:
         torch.testing.assert_close(new_scales, expected_scales)
         torch.testing.assert_close(new_shs_feat, shs_feat_input)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_rotation_yaw_180(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_rotation_yaw_180(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Rotation transform only affects rotations."""
         yaw = math.pi
         transform = torch.tensor([[
@@ -313,27 +331,37 @@ class TestTransformGaussians:
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations_input = _quat_wxyz_to_xyzw(rotations)
+        else:
+            rotations_input = rotations
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, transform, shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations_input, scales, transform, shs_feat_input, use_log_scales=use_log_scales, use_xyzw=use_xyzw)
 
         expected_xyz = xyz.clone()
         expected_xyz[:, [0, 2]] = -expected_xyz[:, [0, 2]]
-        expected_rotations = torch.zeros_like(rotations)
-        expected_rotations[:, [1, 2]] = rotations[:, [3, 0]]
-        expected_rotations[:, [0, 3]] = -rotations[:, [2, 1]]
+
+        expected_rotations = naive_transform_rotation(_quat_wxyz_to_xyzw(rotations), transform)
+
+        if not use_xyzw:
+            expected_rotations = _quat_xyzw_to_wxyz(expected_rotations)
+
         if use_shs_feat:
             expected_shs_feat = shs_feat.clone()
             expected_shs_feat[:, [ 1,  2,  3,  4, 11, 12, 13, 14]] = -expected_shs_feat[:, [ 1,  2,  3,  4, 11, 12, 13, 14]]
         else:
             expected_shs_feat = None
+
         torch.testing.assert_close(new_xyz, expected_xyz)
         torch.testing.assert_close(new_rotations, expected_rotations)
         torch.testing.assert_close(new_scales, scales)
         torch.testing.assert_close(new_shs_feat, expected_shs_feat)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_rotation_pitch_180(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_rotation_pitch_180(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Rotation transform only affects rotations."""
         pitch = math.pi
         transform = torch.tensor([[
@@ -347,14 +375,22 @@ class TestTransformGaussians:
             shs_feat_input = shs_feat
         else:
             shs_feat_input = None
+
+        if use_xyzw:
+            rotations_input = _quat_wxyz_to_xyzw(rotations)
+        else:
+            rotations_input = rotations
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, transform, shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations_input, scales, transform, shs_feat_input, use_xyzw=use_xyzw, use_log_scales=use_log_scales)
 
         expected_xyz = xyz.clone()
         expected_xyz[:, [1, 2]] = -expected_xyz[:, [1, 2]]
-        expected_rotations = torch.zeros_like(rotations)
-        expected_rotations[:, [1, 3]] = rotations[:, [0, 2]]
-        expected_rotations[:, [0, 2]] = -rotations[:, [1, 3]]
+
+        expected_rotations = naive_transform_rotation(_quat_wxyz_to_xyzw(rotations), transform)
+        if not use_xyzw:
+            expected_rotations = _quat_xyzw_to_wxyz(expected_rotations)
+
         if use_shs_feat:
             expected_shs_feat = shs_feat.clone()
             expected_shs_feat[:, [ 0,  1,  3,  6,  8, 10, 11, 13]] = -expected_shs_feat[:, [ 0,  1,  3,  6,  8, 10, 11, 13]]
@@ -365,9 +401,10 @@ class TestTransformGaussians:
         torch.testing.assert_close(new_scales, scales)
         torch.testing.assert_close(new_shs_feat, expected_shs_feat)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_rotation_roll_180(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_rotation_roll_180(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Rotation transform only affects rotations."""
         roll = math.pi
         transform = torch.tensor([[
@@ -381,14 +418,22 @@ class TestTransformGaussians:
             shs_feat_input = shs_feat
         else:
             shs_feat_input = None
+
+        if use_xyzw:
+            rotations_input = _quat_wxyz_to_xyzw(rotations)
+        else:
+            rotations_input = rotations
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, transform, shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations_input, scales, transform, shs_feat_input, use_xyzw=use_xyzw, use_log_scales=use_log_scales)
 
         expected_xyz = xyz.clone()
         expected_xyz[:, [0, 1]] = -expected_xyz[:, [0, 1]]
-        expected_rotations = torch.zeros_like(rotations)
-        expected_rotations[:, [2, 3]] = rotations[:, [1, 0]]
-        expected_rotations[:, [0, 1]] = -rotations[:, [3, 2]]
+        expected_rotations = naive_transform_rotation(_quat_wxyz_to_xyzw(rotations), transform)
+
+        if not use_xyzw:
+            expected_rotations = _quat_xyzw_to_wxyz(expected_rotations)
+
         if use_shs_feat:
             expected_shs_feat = shs_feat.clone()
             expected_shs_feat[:, [ 0,  2,  4,  6,  8, 10, 12, 14]] = -expected_shs_feat[:, [ 0,  2,  4,  6,  8, 10, 12, 14]]
@@ -399,17 +444,24 @@ class TestTransformGaussians:
         torch.testing.assert_close(new_scales, scales)
         torch.testing.assert_close(new_shs_feat, expected_shs_feat)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
     def test_composed_trs_transform(self, xyz, rotations, scales, trs_transform, shs_feat,
-                                    use_log_scales, use_shs_feat, device, dtype):
+                                    use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Composed translation + rotation + scale on non-trivial gaussians."""
         if use_shs_feat:
             shs_feat_input = shs_feat
         else:
             shs_feat_input = None
+
+        if use_xyzw:
+            rotations_input = _quat_wxyz_to_xyzw(rotations)
+        else:
+            rotations_input = rotations
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, trs_transform, shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations_input, scales, trs_transform, shs_feat_input, use_log_scales=use_log_scales, use_xyzw=use_xyzw)
 
         # Positions: full 4x4 affine application
         R = trs_transform[:3, :3]
@@ -427,7 +479,10 @@ class TestTransformGaussians:
         else:
             expected_shs_feat = None
 
-        expected_rotations = naive_transform_rotation(rotations, trs_transform.unsqueeze(0))
+        expected_rotations = naive_transform_rotation(
+            _quat_wxyz_to_xyzw(rotations), trs_transform.unsqueeze(0))
+        if not use_xyzw:
+            expected_rotations = _quat_xyzw_to_wxyz(expected_rotations)
 
         torch.testing.assert_close(new_xyz, expected_xyz)
         torch.testing.assert_close(new_scales, expected_scales)
@@ -436,10 +491,11 @@ class TestTransformGaussians:
         torch.testing.assert_close(new_rotations, expected_rotations)
         torch.testing.assert_close(new_shs_feat, expected_shs_feat)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
     def test_inverse_transform_returns_original(self, xyz, rotations, scales, trs_transform,
-                                                shs_feat, use_log_scales, use_shs_feat, dtype):
+                                                shs_feat, use_log_scales, use_shs_feat, use_xyzw, dtype):
         """Applying the inverse transform after the forward transform recovers the original values."""
         if dtype == torch.half:
             inv_transform = torch.linalg.inv(trs_transform.float()).half()
@@ -450,11 +506,13 @@ class TestTransformGaussians:
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations = _quat_wxyz_to_xyzw(rotations)
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, trs_transform, shs_feat=shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations, scales, trs_transform, shs_feat=shs_feat_input, use_log_scales=use_log_scales, use_xyzw=use_xyzw)
         recovered_xyz, recovered_rotations, recovered_scales, recovered_shs_feat = transform_gaussians(
-            new_xyz, new_rotations, new_scales, inv_transform, new_shs_feat, use_log_scales=use_log_scales
-        )
+            new_xyz, new_rotations, new_scales, inv_transform, new_shs_feat, use_log_scales=use_log_scales, use_xyzw=use_xyzw)
 
         if dtype == torch.half:
             atol = 1e-3
@@ -471,9 +529,10 @@ class TestTransformGaussians:
     # Batched (Nx4x4) variants – each gaussian gets a different transform
     # -------------------------------------------------------------------
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_batched_identity_transform(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_batched_identity_transform(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Per-gaussian identity transforms leave all outputs unchanged."""
         n = xyz.shape[0]
         transforms = torch.eye(4, dtype=dtype, device=device).unsqueeze(0).expand(n, 4, 4).contiguous()
@@ -482,17 +541,22 @@ class TestTransformGaussians:
             shs_feat_input = shs_feat
         else:
             shs_feat_input = None
+
+        if use_xyzw:
+            rotations = _quat_wxyz_to_xyzw(rotations)
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, transforms, shs_feat=shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations, scales, transforms, shs_feat=shs_feat_input, use_log_scales=use_log_scales, use_xyzw=use_xyzw)
 
         torch.testing.assert_close(new_xyz, xyz)
         torch.testing.assert_close(new_rotations, rotations)
         torch.testing.assert_close(new_scales, scales)
         torch.testing.assert_close(new_shs_feat, shs_feat_input)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_batched_translation_only(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_batched_translation_only(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Different translation per gaussian only affects positions."""
         translations = torch.tensor([[2.0, 3.0, 5.0], [-1.5, 0.5, 2.0], [4.0, -2.5, 1.0]], dtype=dtype, device=device)
         n = xyz.shape[0]
@@ -504,8 +568,12 @@ class TestTransformGaussians:
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations = _quat_wxyz_to_xyzw(rotations)
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
             xyz, rotations, scales, transforms, shs_feat=shs_feat_input,
+            use_xyzw=use_xyzw,
             use_log_scales=use_log_scales)
 
         torch.testing.assert_close(new_xyz, xyz + translations)
@@ -513,9 +581,10 @@ class TestTransformGaussians:
         torch.testing.assert_close(new_scales, scales)
         torch.testing.assert_close(new_shs_feat, shs_feat_input)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_batched_uniform_scale(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_batched_uniform_scale(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Different uniform scale per gaussian scales positions and raw_scales independently."""
         scale_factors = torch.tensor([2.0, 0.5, 3.0], dtype=dtype, device=device)
         n = xyz.shape[0]
@@ -530,9 +599,13 @@ class TestTransformGaussians:
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations = _quat_wxyz_to_xyzw(rotations)
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
             xyz, rotations, scales, transforms, shs_feat=shs_feat_input,
-            use_log_scales=use_log_scales)
+            use_log_scales=use_log_scales,
+            use_xyzw=use_xyzw)
 
         torch.testing.assert_close(new_xyz, xyz * scale_factors.unsqueeze(-1))
         torch.testing.assert_close(new_rotations, rotations)
@@ -542,9 +615,10 @@ class TestTransformGaussians:
             torch.testing.assert_close(new_scales, scales * scale_factors.unsqueeze(-1))
         torch.testing.assert_close(new_shs_feat, shs_feat_input)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
-    def test_batched_rotation_180(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, device, dtype):
+    def test_batched_rotation_180(self, xyz, rotations, scales, shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Rotation transform only affects rotations."""
         yaw = math.pi
         pitch = math.pi
@@ -572,20 +646,23 @@ class TestTransformGaussians:
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations_input = _quat_wxyz_to_xyzw(rotations)
+        else:
+            rotations_input = rotations
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, transform, shs_feat_input, use_log_scales=use_log_scales)
+            xyz, rotations_input, scales, transform, shs_feat_input, use_log_scales=use_log_scales, use_xyzw=use_xyzw)
 
         expected_xyz = xyz.clone()
         expected_xyz[0, [0, 2]] = -expected_xyz[0, [0, 2]]  
         expected_xyz[1, [1, 2]] = -expected_xyz[1, [1, 2]]
         expected_xyz[2, [0, 1]] = -expected_xyz[2, [0, 1]]
-        expected_rotations = torch.zeros_like(rotations)
-        expected_rotations[0, [1, 2]] = rotations[0, [3, 0]]
-        expected_rotations[0, [0, 3]] = -rotations[0, [2, 1]]
-        expected_rotations[1, [1, 3]] = rotations[1, [0, 2]]
-        expected_rotations[1, [0, 2]] = -rotations[1, [1, 3]]
-        expected_rotations[2, [2, 3]] = rotations[2, [1, 0]]
-        expected_rotations[2, [0, 1]] = -rotations[2, [3, 2]]
+
+        expected_rotations = naive_transform_rotation(_quat_wxyz_to_xyzw(rotations), transform)
+        if not use_xyzw:
+            expected_rotations = _quat_xyzw_to_wxyz(expected_rotations)
+
         if use_shs_feat:
             expected_shs_feat = shs_feat.clone()
             expected_shs_feat[0, [ 1,  2,  3,  4, 11, 12, 13, 14]] = -expected_shs_feat[0, [ 1,  2,  3,  4, 11, 12, 13, 14]]
@@ -598,18 +675,25 @@ class TestTransformGaussians:
         torch.testing.assert_close(new_scales, scales)
         torch.testing.assert_close(new_shs_feat, expected_shs_feat)
 
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
     def test_batched_composed_trs_transform(self, xyz, rotations, scales, batched_trs_transforms,
-                                            shs_feat, use_log_scales, use_shs_feat, device, dtype):
+                                            shs_feat, use_log_scales, use_shs_feat, use_xyzw, device, dtype):
         """Composed translation + rotation + scale on non-trivial gaussians."""
         if use_shs_feat:
             shs_feat_input = shs_feat
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations_input = _quat_wxyz_to_xyzw(rotations)
+        else:
+            rotations_input = rotations
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
-            xyz, rotations, scales, batched_trs_transforms, shs_feat=shs_feat_input,
+            xyz, rotations_input, scales, batched_trs_transforms, shs_feat=shs_feat_input,
+            use_xyzw=use_xyzw,
             use_log_scales=use_log_scales)
 
         # Expected xyz: per-gaussian affine R_i @ xyz_i + t_i
@@ -626,7 +710,9 @@ class TestTransformGaussians:
             expected_shs_feat = transform_sh(shs_feat, R)
         else:
             expected_shs_feat = None
-        expected_rotations = naive_transform_rotation(rotations, batched_trs_transforms)
+        expected_rotations = naive_transform_rotation(_quat_wxyz_to_xyzw(rotations), batched_trs_transforms)
+        if not use_xyzw:
+            expected_rotations = _quat_xyzw_to_wxyz(expected_rotations)
         
         if dtype == torch.half:
             atol = 1e-3
@@ -643,10 +729,44 @@ class TestTransformGaussians:
         torch.testing.assert_close(norms, torch.ones(xyz.shape[0], dtype=dtype, device=device), atol=atol, rtol=rtol)
         torch.testing.assert_close(new_rotations, expected_rotations)
 
+    def test_default_batched_composed_trs_transform(self, xyz, rotations, scales, batched_trs_transforms,
+                                                    device, dtype):
+        """Composed translation + rotation + scale; default quaternion layout is wxyz."""
+
+        new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
+            xyz, rotations, scales, batched_trs_transforms)
+
+        # Expected xyz: per-gaussian affine R_i @ xyz_i + t_i
+        R = batched_trs_transforms[:, :3, :3] # (N, 3, 3)
+        S = torch.linalg.norm(R, dim=-2) # (N, 3)
+        R /= S.unsqueeze(-2) # (N, 3, 3)
+        t = batched_trs_transforms[:, :3, 3] # (N, 3)
+        expected_xyz = (R @ xyz.unsqueeze(-1)).squeeze(-1) * S + t
+        expected_scales = scales * S
+        expected_shs_feat = None
+        expected_rotations = _quat_xyzw_to_wxyz(
+            naive_transform_rotation(_quat_wxyz_to_xyzw(rotations), batched_trs_transforms))
+
+        if dtype == torch.half:
+            atol = 1e-3
+            rtol = 1e-3
+        else:
+            atol = 1e-5
+            rtol = 1e-5
+
+        torch.testing.assert_close(new_xyz, expected_xyz)
+        torch.testing.assert_close(new_scales, expected_scales)
+        torch.testing.assert_close(new_shs_feat, expected_shs_feat)
+        # Output quaternions must remain unit-norm
+        norms = torch.linalg.norm(new_rotations, dim=-1)
+        torch.testing.assert_close(norms, torch.ones(xyz.shape[0], dtype=dtype, device=device), atol=atol, rtol=rtol)
+        torch.testing.assert_close(new_rotations, expected_rotations)
+
+    @pytest.mark.parametrize("use_xyzw", [True, False])
     @pytest.mark.parametrize("use_shs_feat", [False, True])
     @pytest.mark.parametrize("use_log_scales", [True, False])
     def test_batched_inverse_transform_returns_original(self, xyz, rotations, scales, batched_trs_transforms,
-                                                        shs_feat, use_log_scales, use_shs_feat, dtype):
+                                                        shs_feat, use_log_scales, use_shs_feat, use_xyzw, dtype):
         """Per-gaussian inverse transform recovers original positions, rotations, and scales."""
         if dtype == torch.half:
             inv_transforms = torch.linalg.inv(batched_trs_transforms.float()).half()
@@ -657,11 +777,15 @@ class TestTransformGaussians:
         else:
             shs_feat_input = None
 
+        if use_xyzw:
+            rotations = _quat_wxyz_to_xyzw(rotations)
+
         new_xyz, new_rotations, new_scales, new_shs_feat = transform_gaussians(
             xyz, rotations, scales, batched_trs_transforms, shs_feat=shs_feat_input,
-            use_log_scales=use_log_scales)
+            use_log_scales=use_log_scales,
+            use_xyzw=use_xyzw)
         recovered_xyz, recovered_rotations, recovered_scales, recovered_shs_feat = transform_gaussians(
-            new_xyz, new_rotations, new_scales, inv_transforms, new_shs_feat, use_log_scales=use_log_scales
+            new_xyz, new_rotations, new_scales, inv_transforms, new_shs_feat, use_log_scales=use_log_scales, use_xyzw=use_xyzw
         )
 
         if dtype == torch.half:

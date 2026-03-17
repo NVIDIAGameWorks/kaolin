@@ -33,19 +33,20 @@ def _transform_xyz(xyz: torch.Tensor, transform: torch.Tensor):
     res = (transform[..., :3, :3] @ xyz[:, :, None] + transform[..., :3, 3:]).squeeze(-1)
     return res
 
-def _transform_rot(rot: torch.Tensor, transform: torch.Tensor):
-    """Apply rotation to quaternions. Input rot uses gsplats convention [w,x,y,z]; output same."""
+def _transform_rot(rot: torch.Tensor, transform: torch.Tensor, use_xyzw=False):
+    """Apply rotation to quaternions"""
     if len(transform.shape) == 2:  # single transform for all the gaussians
         transform = transform.unsqueeze(0)
 
-    rot_quat = quat_ops.quat_from_rot33(transform[..., :3, :3])
+    rot_quat = quat_ops.quat_from_rot33(transform[..., :3, :3]) # TODO(cfujitsang): get a wxyz version
     rot_unit = rot / torch.linalg.norm(rot, dim=-1).unsqueeze(-1)
 
-    # Note: gsplats use Hamiltonion convention [real, imag], whereas Kaolin uses the other convention[imag, real]
-    rot_unit = torch.cat([rot_unit[:, 1:], rot_unit[:, :1]], dim=-1)
+    if not use_xyzw:
+        rot_unit = torch.cat([rot_unit[:, 1:], rot_unit[:, :1]], dim=-1)
 
     result = quat_ops.quat_mul(rot_quat, rot_unit)
-    result = torch.cat([result[:, 3:], result[:, :3]], dim=-1)
+    if not use_xyzw:
+        result = torch.cat([result[:, -1:], result[:, :-1]], dim=-1)
     return result
 
 def _decompose_4x4_transform(transform):
@@ -59,27 +60,30 @@ def _decompose_4x4_transform(transform):
 
     return translation, rotation, scale
 
-def transform_gaussians(xyz, rotations, raw_scales, transform, shs_feat=None, use_log_scales=False):
+def transform_gaussians(xyz, rotations, scales, transform, shs_feat=None, use_log_scales=False,
+                        use_xyzw=False):
     r"""Apply a 4x4 affine transform to gaussian positions, rotations, and scales.
 
-    Transforms are applied as T @ pt for positions. Rotations use gsplats convention
-    [w, x, y, z] (Hamiltonian, real-first). Scale is decomposed from the transform
+    Transforms are applied as T @ pt for positions. Scale is decomposed from the transform
     and applied to raw_scales.
 
     Args:
         xyz (torch.Tensor): Positions of shape :math:`(N, 3)`.
-        rotations (torch.Tensor): Unit quaternions [w,x,y,z], shape :math:`(N, 4)`.
-        raw_scales (torch.Tensor): Scale per gaussian, shape :math:`(N, 3)`.
+        rotations (torch.Tensor):
+            Unit quaternions, shape :math:`(N, 4)`.
+            Follow wxyz convention, or xyzw convention if ``use_xyzw`` is True.
+        scales (torch.Tensor): Scale per gaussian, shape :math:`(N, 3)`.
         transform (torch.Tensor): Affine transform, shape :math:`(4, 4)` or :math:`(N, 4, 4)`.
             Single transform is broadcast to all gaussians.
         shs_feat (torch.Tensor): SH features of shape :math:`(N, \text{num_coeffs}, 3)`. Default: None.
         use_log_scales (bool): If True, use log-based scaling for scales. Default: False.
+        use_xyzw (bool): If True, use xyzw convention for quaternions. Default: False.
 
     Returns:
         tuple: (new_xyz, new_rotations, new_scales, Optional[new_shs_feat]) with same shapes as inputs.
     """
-    assert xyz.dtype == rotations.dtype == raw_scales.dtype == transform.dtype, f"xyz, rotations, raw_scales, and transform must have the same dtype, got xyz.dtype: {xyz.dtype}, rotations.dtype: {rotations.dtype}, raw_scales.dtype: {raw_scales.dtype}, transform.dtype: {transform.dtype}"
-    assert xyz.device == rotations.device == raw_scales.device == transform.device, f"xyz, rotations, raw_scales, and transform must be on the same device, got xyz.device: {xyz.device}, rotations.device: {rotations.device}, raw_scales.device: {raw_scales.device}, transform.device: {transform.device}"
+    assert xyz.dtype == rotations.dtype == scales.dtype == transform.dtype, f"xyz, rotations, scales, and transform must have the same dtype, got xyz.dtype: {xyz.dtype}, rotations.dtype: {rotations.dtype}, scales.dtype: {scales.dtype}, transform.dtype: {transform.dtype}"
+    assert xyz.device == rotations.device == scales.device == transform.device, f"xyz, rotations, scales, and transform must be on the same device, got xyz.device: {xyz.device}, rotations.device: {rotations.device}, scales.device: {scales.device}, transform.device: {transform.device}"
     if shs_feat is not None:
         assert shs_feat.dtype == xyz.dtype, f"shs_feat must have the same dtype as the other inputs, got shs_feat.dtype: {shs_feat.dtype}, xyz.dtype: {xyz.dtype}"
         assert shs_feat.device == xyz.device, f"shs_feat must be on the same device as the other inputs, got shs_feat.device: {shs_feat.device}, xyz.device: {xyz.device}"
@@ -88,23 +92,23 @@ def transform_gaussians(xyz, rotations, raw_scales, transform, shs_feat=None, us
         transform = transform.unsqueeze(0)
 
     # transforms: n x 4 x 4, where 4 x 4 transform T is applied to pt as T @ pt.
-    _, rotation, scale = _decompose_4x4_transform(transform)
+    _, tfm_rotation, tfm_scale = _decompose_4x4_transform(transform)
 
     new_xyz = _transform_xyz(xyz, transform)
-    new_rotations = _transform_rot(rotations, rotation)
+    new_rotations = _transform_rot(rotations, tfm_rotation, use_xyzw)
 
-    if raw_scales.dtype != scale.dtype:
-        scale = scale.to(raw_scales.dtype)
+    if scales.dtype != tfm_scale.dtype:
+        tfm_scale = tfm_scale.to(scales.dtype)
     if not use_log_scales:
-        new_scales = raw_scales * scale
+        new_scales = scales * tfm_scale
     else:
-        scaling_norm_factor = torch.log(scale) / raw_scales + 1
-        new_scales = raw_scales * scaling_norm_factor
+        scaling_norm_factor = torch.log(tfm_scale) / scales + 1
+        new_scales = scales * scaling_norm_factor
 
     if shs_feat is None:
         new_shs_feat = None
     else:
-        new_shs_feat = transform_sh(shs_feat, rotation)
+        new_shs_feat = transform_sh(shs_feat, tfm_rotation)
 
     return new_xyz, new_rotations, new_scales, new_shs_feat
 
