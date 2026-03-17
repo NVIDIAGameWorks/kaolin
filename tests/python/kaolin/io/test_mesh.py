@@ -52,33 +52,36 @@ class TestDiverseInputs:
 
     @pytest.fixture(scope='class')
     def expected_mesh_counts(self):
-        return {'ico_smooth': 1,
-                'ico_flat': 1,
-                'fox': 1,
-                'pizza': 1,
-                'armchair': 3,
-                'amsterdam': 18,
-                'avocado': 1}
+        return {
+            'ico_smooth': 1,
+            'ico_flat': 1,
+            'fox': 1,
+            'pizza': 1,
+            'armchair': 3,
+            'amsterdam': 18,
+            'avocado': 1,
+        }
 
     @pytest.mark.parametrize("triangulate", [True, False])
     @pytest.mark.parametrize("method_to_test", ["generic", "named"])
-    @pytest.mark.parametrize('bname', ['ico_flat', 'ico_smooth', 'fox', 'pizza', 'amsterdam', 'armchair', 'avocado'])
-    def test_read_usd_obj_consistency(self, bname, expected_sizes, expected_material_counts, method_to_test, triangulate):
+    @pytest.mark.parametrize('fname', ['ico_flat.usda', 'ico_flat.usdz', 'ico_smooth.usda', 'ico_smooth.usdz', 'fox.usdc', 'fox.usdz', 'pizza.usda', 'pizza.usdz', 'amsterdam.usda', 'amsterdam.usdz', 'armchair.usdc', 'armchair.usdz'])
+    def test_read_usd_obj_consistency(self, fname, expected_sizes, expected_material_counts, method_to_test, triangulate):
         # Read USD version, flattening all meshes into one
-        fname = glob.glob(io_data_path(f'{bname}.usd') + '*')[0]
+        model_name, input_ext = os.path.splitext(fname)
+        fpath = io_data_path(fname)
         if method_to_test == 'generic':
-            read_usd_mesh = import_mesh(fname, triangulate=triangulate)
+            read_usd_mesh = import_mesh(fpath, triangulate=triangulate)
         else:
-            read_usd_mesh = usd.import_mesh(fname, with_normals=True, with_materials=True, triangulate=triangulate)
+            read_usd_mesh = usd.import_mesh(fpath, with_normals=True, with_materials=True, triangulate=triangulate)
         if not triangulate:
-            assert check_tensor_attribute_shapes(read_usd_mesh, **expected_sizes[bname])
+            assert check_tensor_attribute_shapes(read_usd_mesh, **expected_sizes[model_name])
 
         # Read OBJ version
-        fname = io_data_path(f'{bname}.obj')
+        fpath = io_data_path(f'{model_name}.obj')
         if method_to_test == 'generic':
-            read_obj_mesh = import_mesh(fname, triangulate=triangulate)
+            read_obj_mesh = import_mesh(fpath, triangulate=triangulate)
         else:
-            read_obj_mesh = obj.import_mesh(fname, with_normals=True, with_materials=True, triangulate=triangulate)
+            read_obj_mesh = obj.import_mesh(fpath, with_normals=True, with_materials=True, triangulate=triangulate)
 
         # DEBUG INFORMATION (uncomment to help diagnose failures)
         # stage = Usd.Stage.Open(io_data_path(f'{bname}.usd'))
@@ -100,7 +103,7 @@ class TestDiverseInputs:
         assert torch.allclose(read_usd_mesh.face_normals, read_obj_mesh.face_normals, atol=1e-04, rtol=1e-03)
 
         # Check material consistency
-        assert len(read_usd_mesh.materials) == expected_material_counts[bname]
+        assert len(read_usd_mesh.materials) == expected_material_counts[model_name]
         assert len(read_usd_mesh.materials) == len(read_obj_mesh.materials)
         assert len(read_usd_mesh.material_assignments) > 0
         assert torch.equal(read_usd_mesh.material_assignments, read_obj_mesh.material_assignments)
@@ -109,7 +112,7 @@ class TestDiverseInputs:
     def test_read_usd_obj_gltf_consistency(self, expected_sizes, expected_material_counts, method_to_test):
         bname = 'avocado'
         # Read USD version
-        fname = glob.glob(io_data_path(f'{bname}.usd') + '*')[0]
+        fname = glob.glob(io_data_path(f'{bname}.usda'))[0]
         if method_to_test == 'generic':
             read_usd_mesh = import_mesh(fname, triangulate=True)
         else:
