@@ -583,6 +583,38 @@ class TestContainedTorchEqual:
         assert not testing.contained_torch_equal(elem, other)
         assert testing.contained_torch_equal(elem, other, approximate=True, atol=eps*2)
 
+    def test_flexible_number(self):
+        elem = [1, 2.01, 'a', {'b': 5.0}]
+        other = [1.0, np.float32(2.01), 'a', {'b': 5}]
+        assert testing.contained_torch_equal(elem, other)
+
+        # test a failing cases
+        other = [1.01, np.float32(2.01), 'a', {'b': 5}]
+        assert not testing.contained_torch_equal(elem, other)
+
+        other = [1.0, np.int32(2), 'a', {'b': 5}]
+        assert not testing.contained_torch_equal(elem, other)
+
+        other = [1.0, np.float32(2.01), 'a', {'b': float(5.001)}]
+        assert not testing.contained_torch_equal(elem, other)
+      
+
+    def test_ignore_device(self):
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        elem = {'a': torch.rand(3, 3, device=device), 'b': (torch.rand(3, 3, device='cpu') * 255).clip(0, 255).to(torch.uint8)}
+        other = {'a': copy.deepcopy(elem['a']).cpu(), 'b': copy.deepcopy(elem['b']).to(device)}
+
+        if device == 'cuda':
+            # can only test the failure case if cuda is available
+            with pytest.raises(RuntimeError, match='same device'):
+                testing.contained_torch_equal(elem, other)
+        assert testing.contained_torch_equal(elem, other, ignore_device=True)
+
+        # make sure still fails if values are different
+        other = {'a': copy.deepcopy(elem['a']).cpu() + 0.6, 'b': copy.deepcopy(elem['b']).to(device) + 1}
+        assert not testing.contained_torch_equal(elem, other, ignore_device=True)
+
+
 class TestCheckTensorAttributeShapes:
     @pytest.mark.parametrize("throw", [True, False])
     def test_checks_pass(self, throw):

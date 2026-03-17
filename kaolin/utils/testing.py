@@ -18,6 +18,7 @@ import collections
 import functools
 import logging
 import random
+import numbers
 import numpy as np
 import torch
 
@@ -259,8 +260,10 @@ def tensor_info(t, name='', print_stats=False, detailed=False):
                     torch.mean(t.to(torch.float32)).item())
         elif type(t) == np.ndarray:
             return ' - [min %0.4f, max %0.4f, mean %0.4f]' % (np.min(t), np.max(t), np.mean(t))
+        elif type(t) in [int, str, float]:
+            return f' - [value {t}]'
         else:
-            raise RuntimeError('Not implemented for {}'.format(type(t)))
+            return f' - cannot compute stats for type {type(t)}'
 
     def _get_details_str():
         if torch.is_tensor(t):
@@ -296,7 +299,7 @@ def tensor_info(t, name='', print_stats=False, detailed=False):
              (_get_stats_str() if print_stats else ''),
              (_get_details_str() if detailed else '')))
 
-def contained_torch_equal(elem, other, approximate=False, print_error_context=None, **allclose_args):
+def contained_torch_equal(elem, other, approximate=False, print_error_context=None, ignore_device=False, **allclose_args):
     """Check for equality (or allclose if approximate) of two objects potentially containing tensors.
 
     :func:`torch.equal` do not support data structure like dictionary / arrays
@@ -319,13 +322,18 @@ def contained_torch_equal(elem, other, approximate=False, print_error_context=No
             print(f'{prefix_string}{print_error_context}{extra_context}')
         return val
 
-    elem_type = type(elem)
-    if elem_type != type(other):
-        return _maybe_print(False)
+    both_numbers = isinstance(elem, numbers.Number) and isinstance(other, numbers.Number)
+    if not both_numbers:  # more strict type checking
+        elem_type = type(elem)
+        if elem_type != type(other):
+            return _maybe_print(False, extra_context=f' type {type(elem)} vs {type(other)}')
 
     def _tensor_compare(a, b):
         if list(a.shape) != list(b.shape):
             return False
+
+        if ignore_device and a.device != b.device:
+            b = b.to(a.device)
 
         if not approximate:
             return torch.equal(a, b)
@@ -333,7 +341,7 @@ def contained_torch_equal(elem, other, approximate=False, print_error_context=No
             return torch.allclose(a, b, **allclose_args)
 
     def _number_compare(a, b):
-        return _tensor_compare(torch.tensor([a]), torch.tensor([b]))
+        return _tensor_compare(torch.tensor([a]).float(), torch.tensor([b]).float())
 
     def _attrs_to_dict(a, attrs):
         return {k : getattr(a, k) for k in attrs if hasattr(a, k)}
@@ -345,13 +353,14 @@ def contained_torch_equal(elem, other, approximate=False, print_error_context=No
 
     recursive_args = copy.copy(allclose_args)
     recursive_args['approximate'] = approximate
+    recursive_args['ignore_device'] = ignore_device
 
     if isinstance(elem, torch.Tensor):
         return _maybe_print(_tensor_compare(elem, other),
                             extra_context=f': {tensor_info(elem)} vs. {tensor_info(other)}')
     elif isinstance(elem, str):
         return _maybe_print(elem == other, extra_context=f': {elem} vs {other}')
-    elif isinstance(elem, float):
+    elif isinstance(elem, numbers.Number):
         return _maybe_print(_number_compare(elem, other), extra_context=f': {elem} vs {other}')
     elif isinstance(elem, collections.abc.Mapping):
         if elem.keys() != other.keys():
