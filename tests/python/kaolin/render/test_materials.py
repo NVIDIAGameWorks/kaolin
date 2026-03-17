@@ -275,3 +275,69 @@ class TestPBRMaterial:
                 assert att in str_mat_partial, f'Missing {att} in {str_mat}'
             else:
                 assert f' {att}:' not in str_mat_partial, f'Should not print missing {att} in {str_mat}'
+
+    def test_to_from_dict(self):
+        """Test material serialization to/from dictionary."""
+        material_name = 'test_material'
+        
+        # Create a material with all attributes
+        input_attr = random_material_values()
+        input_attr.update(random_material_textures())
+        input_attr.update(random_material_colorspaces())
+        input_attr['material_name'] = material_name
+        
+        mat = PBRMaterial(**input_attr)
+        
+        # Convert to dict
+        mat_dict = mat.as_dict()
+        
+        # Check that dict contains expected keys
+        assert 'classname' in mat_dict
+        assert mat_dict['classname'] == 'pbr'
+        assert 'material_name' in mat_dict
+        assert mat_dict['material_name'] == material_name
+        
+        # Check that all non-None attributes are in the dict
+        for attr in mat.get_attributes():
+            assert attr in mat_dict, f"Attribute {attr} not found in dict"
+            # For tensors, verify they are the same object (not copied)
+            if torch.is_tensor(getattr(mat, attr)):
+                assert torch.equal(mat_dict[attr], getattr(mat, attr))
+        
+        # Test round-trip: material -> dict -> material
+        mat_reconstructed = PBRMaterial.from_dict({k: v for k, v in mat_dict.items() if k != 'classname'})
+        assert contained_torch_equal(mat, mat_reconstructed, approximate=True, print_error_context='round-trip')
+        
+        # Test round-trip via Material base class
+        from kaolin.render.materials import Material
+        mat_reconstructed2 = Material.from_dict(mat_dict)
+        assert contained_torch_equal(mat, mat_reconstructed2, approximate=True, print_error_context='base class round-trip')
+        
+        # Verify dict -> material -> dict produces same dict
+        mat_dict2 = mat_reconstructed.as_dict()
+        assert contained_torch_equal(mat_dict, mat_dict2, approximate=True, print_error_context='dict round-trip')
+        
+        # Test with partial material (only some attributes)
+        partial_material_name = 'simple_material'
+        partial_input = {
+            'diffuse_color': (0.8, 0.2, 0.3),
+            'roughness_value': 0.5,
+            'diffuse_texture': torch.rand((256, 256, 3)),
+            'material_name': partial_material_name
+        }
+        
+        mat_partial = PBRMaterial(**partial_input)
+        mat_partial_dict = mat_partial.as_dict()
+        
+        # Check that only set attributes are in dict
+        assert 'diffuse_color' in mat_partial_dict
+        assert 'roughness_value' in mat_partial_dict
+        assert 'diffuse_texture' in mat_partial_dict
+        assert 'material_name' in mat_partial_dict
+        # metallic_value should not be in dict (it's None)
+        assert 'metallic_value' not in mat_partial_dict or mat_partial_dict['metallic_value'] is None
+        
+        # Round-trip with partial material via Material base class
+        mat_partial_reconstructed = Material.from_dict(mat_partial_dict)
+        assert contained_torch_equal(mat_partial, mat_partial_reconstructed, approximate=True, 
+                                    print_error_context='partial round-trip')

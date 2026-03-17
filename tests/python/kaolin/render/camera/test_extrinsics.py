@@ -1,4 +1,4 @@
-# Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -654,7 +654,7 @@ class TestCameraExtrinsicsParams:
                                                   requires_grad=True, backend=backend)
         num_cams = sample_lookat_data['view_matrix'].shape[0]
         original_matrix = extrinsics.view_matrix()
-        target_matrix = torch.eye(4).to(device, dtype)
+        target_matrix = torch.eye(4).to(device, dtype).unsqueeze(0).expand(num_cams, -1, -1)
 
         optimizer = torch.optim.SGD([extrinsics.parameters()], lr=0.001, momentum=0.9)
         criterion = torch.nn.functional.mse_loss
@@ -679,7 +679,8 @@ class TestCameraExtrinsicsParams:
         extrinsics = CameraExtrinsics.from_lookat(eye, at, up, device=device, dtype=dtype,
                                                   requires_grad=False, backend=backend)
         original_matrix = extrinsics.view_matrix()
-        target_matrix = torch.eye(4).to(device, dtype)
+        num_cams = original_matrix.shape[0]
+        target_matrix = torch.eye(4).to(device, dtype).unsqueeze(0).expand(num_cams, -1, -1)
         optimizer = torch.optim.SGD([extrinsics.parameters()], lr=0.001, momentum=0.9)
         criterion = torch.nn.functional.mse_loss
         for i in range(5):
@@ -746,7 +747,7 @@ class TestCameraExtrinsicsTranslate:
 
         view_matrix = cam_pos_data['view_matrix'].to(device, dtype)
         translate_amnt = view_matrix.new_tensor([0.1, 1.0, 10.0])
-        cam_pos = torch.tensor(cam_pos, device=device, dtype=dtype)
+        cam_pos = torch.as_tensor(cam_pos, device=device, dtype=dtype)
         shifted_pos = cam_pos.squeeze(-1) + translate_amnt.to(cam_pos.device)
         translated_extrinsics = CameraExtrinsics.from_camera_pose(shifted_pos, cam_dir,
                                                                   dtype=dtype, device=device, backend=backend)
@@ -1012,7 +1013,7 @@ class TestCameraExtrinsicsCamPosDir:
         extrinsics = CameraExtrinsics.from_camera_pose(
             cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
         num_cams = view_matrix.shape[0]
-        expected = torch.tensor(cam_pos, device=device, dtype=dtype)
+        expected = torch.as_tensor(cam_pos, device=device, dtype=dtype)
         expected = expected.reshape(num_cams, 3, 1)
         extrinsics_result = extrinsics.cam_pos()
         assert torch.allclose(extrinsics_result, expected, rtol=1e-3, atol=1e-2)
@@ -1025,7 +1026,7 @@ class TestCameraExtrinsicsCamPosDir:
         extrinsics = CameraExtrinsics.from_camera_pose(
             cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
         num_cams = view_matrix.shape[0]
-        cam_dir = torch.tensor(cam_dir, device=device, dtype=dtype)
+        cam_dir = torch.as_tensor(cam_dir, device=device, dtype=dtype)
         if cam_dir.ndim == 2:
             cam_dir = cam_dir.unsqueeze(0)
 
@@ -1042,7 +1043,7 @@ class TestCameraExtrinsicsCamPosDir:
         extrinsics = CameraExtrinsics.from_camera_pose(
             cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
         num_cams = view_matrix.shape[0]
-        cam_dir = torch.tensor(cam_dir, device=device, dtype=dtype)
+        cam_dir = torch.as_tensor(cam_dir, device=device, dtype=dtype)
         if cam_dir.ndim == 2:
             cam_dir = cam_dir.unsqueeze(0)
         expected = cam_dir[:, :, 1]
@@ -1058,7 +1059,7 @@ class TestCameraExtrinsicsCamPosDir:
         extrinsics = CameraExtrinsics.from_camera_pose(
             cam_pos, cam_dir, device=device, dtype=dtype, backend=backend)
         num_cams = view_matrix.shape[0]
-        cam_dir = torch.tensor(cam_dir, device=device, dtype=dtype)
+        cam_dir = torch.as_tensor(cam_dir, device=device, dtype=dtype)
         if cam_dir.ndim == 2:
             cam_dir = cam_dir.unsqueeze(0)
         expected = cam_dir[:, :, 2]
@@ -1067,3 +1068,56 @@ class TestCameraExtrinsicsCamPosDir:
         assert torch.allclose(extrinsics_result, expected, rtol=1e-3, atol=1e-3)
         assert extrinsics_result.shape == (num_cams, 3, 1)
 
+class TestToFromDict:
+    def test_from_dict(self):
+        # Construct input dict matching as_dict() output; check view_matrix after from_dict.
+        view_matrix = [[1.0, 0.0, 0.0, 0.0],
+                      [0.0, 1.0, 0.0, 0.0],
+                      [0.0, 0.0, 1.0, -2.0],
+                      [0.0, 0.0, 0.0, 1.0]]
+        in_dict = {'view_matrix': view_matrix}
+        extrinsics = CameraExtrinsics.from_dict(in_dict)
+        expected = torch.tensor(view_matrix)
+        assert torch.allclose(extrinsics.view_matrix().squeeze(0), expected)
+
+    def test_to_dict(self):
+        # Create extrinsics, as_dict must contain matching view_matrix.
+        view_matrix = torch.tensor(
+            [[[-1.0, 0.0, 0.0, 0.0],
+              [0.0, 1.0, 0.0, 0.0],
+              [0.0, 0.0, -1.0, -3.0],
+              [0.0, 0.0, 0.0, 1.0]]],
+            dtype=torch.float32,
+        )
+        extrinsics = CameraExtrinsics.from_view_matrix(view_matrix)
+        d = extrinsics.as_dict()
+        assert 'view_matrix' in d
+        assert torch.allclose(
+            extrinsics.view_matrix().squeeze(0),
+            torch.tensor(d['view_matrix']),
+        )
+
+    def test_round_trip(self):
+        # Round-trip 3 extrinsics through as_dict / from_dict; view_matrix must match.
+        view_matrices = [
+            torch.tensor([[1.0, 0.0, 0.0, 0.0],
+                         [0.0, 1.0, 0.0, 0.0],
+                         [0.0, 0.0, 1.0, -2.0],
+                         [0.0, 0.0, 0.0, 1.0]], dtype=torch.float32),
+            torch.tensor([[-1.0, 0.0, 0.0, 0.0],
+                         [0.0, 1.0, 0.0, 0.0],
+                         [0.0, 0.0, -1.0, -5.0],
+                         [0.0, 0.0, 0.0, 1.0]], dtype=torch.float32),
+            torch.tensor([[0.0, -1.0, 0.0, 1.0],
+                         [1.0, 0.0, 0.0, 0.0],
+                         [0.0, 0.0, 1.0, -1.0],
+                         [0.0, 0.0, 0.0, 1.0]], dtype=torch.float32),
+        ]
+        for vm in view_matrices:
+            extrinsics = CameraExtrinsics.from_view_matrix(vm.unsqueeze(0))
+            d = extrinsics.as_dict()
+            extrinsics2 = CameraExtrinsics.from_dict(d)
+            assert torch.allclose(
+                extrinsics2.view_matrix().squeeze(0),
+                extrinsics.view_matrix().squeeze(0),
+            )

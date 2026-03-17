@@ -1,4 +1,4 @@
-# Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -83,6 +83,8 @@ IntrinsicsParamsDefEnum = IntEnum
 
 
 class CameraIntrinsics(ABC):
+    __registered_subclasses = {}
+
     r"""Holds the intrinsics parameters of a camera: how it should project from camera space to
     normalized screen / clip space.
 
@@ -127,6 +129,47 @@ class CameraIntrinsics(ABC):
             ndc_min=-1.0,              # Min value of NDC space
             ndc_max=1.0                # Max value of NDC space
         )
+
+    def __init_subclass__(cls, **kwargs):
+        """Called automatically when Base is subclassed"""
+        super().__init_subclass__(**kwargs)
+
+        name = cls.registered_name()
+        cls.__registered_subclasses[name] = cls
+
+    @abstractmethod
+    def _as_dict(self):
+        raise NotImplementedError
+
+    @classmethod
+    def registered_name(cls):
+        return cls.__name__
+
+    def as_dict(self):
+        r"""Returns parameters necessary to instantiate same `CameraInitrinsics` as a dictionary that is writable to
+            JSON or YAML.
+
+            Returns:
+                dict
+        """
+        res = self._as_dict()
+        res['classname'] = self.__class__.registered_name()
+        return res
+
+    @staticmethod
+    def from_dict(in_dict):
+        r"""Constructs intrinsics from a simple dictionary, such as that returned from `as_dict`; uses registered
+        subclasses to figure out which subclass to instantiate based on its `registered_name`.
+
+        Returns: CameraIntrinsics subclass instance.
+        """
+        name = in_dict.get('classname', None)
+        if name is None or name not in CameraIntrinsics.__registered_subclasses:
+            raise ValueError(f'Input dict "classname" value {name} not found in registered '
+                             f'CameraIntrinsics values: {CameraIntrinsics.__registered_subclasses.keys()}')
+        cls = CameraIntrinsics.__registered_subclasses[name]
+        meta = {k: v for k, v in in_dict.items() if k != 'classname'}
+        return cls.from_dict(meta)
 
     def aspect_ratio(self) -> float:
         """Returns the aspect ratio of the cameras held by this object."""

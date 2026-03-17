@@ -1,4 +1,4 @@
-# Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -233,6 +233,31 @@ class PinholeIntrinsics(CameraIntrinsics):
         focal = aspectScale / tanHalfAngle
         params = cls._allocate_params(x0, y0, focal, focal, num_cameras=num_cameras, device=device, dtype=dtype)
         return PinholeIntrinsics(width, height, params, near, far)
+
+    @classmethod
+    def registered_name(cls):
+        return 'pinhole'
+
+    def _as_dict(self):
+        return {
+            'width': self.width,
+            'height': self.height,
+            'focal_x': self.focal_x.item(),
+            'focal_y': self.focal_y.item(),
+            'x0': self.x0.item(),
+            'y0': self.y0.item(),
+            'near': self.near,
+            'far': self.far
+        }
+
+    @classmethod
+    def from_dict(cls, in_dict):
+        r"""Constructs pinhole intrinsics from a simple dictionary, such as that returned from `as_dict`.
+
+        Returns: PinholeIntrinsics instance.
+        """
+        meta = {k: v for k, v in in_dict.items() if k != 'classname'}
+        return cls.from_focal(**meta)
 
     def perspective_matrix(self) -> torch.Tensor:
         r"""Constructs a matrix which performs perspective projection from camera space to homogeneous clip space.
