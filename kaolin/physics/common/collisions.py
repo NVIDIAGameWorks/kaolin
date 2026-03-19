@@ -404,16 +404,16 @@ def _get_collision_bounds_wp_kernel(
     if delta_d_a < 0.0:  # getting closer
         t_max = wp.clamp(max_delta_d / delta_d_a, 0.0, 1.0)
         if t_max < 1.0:
-            dof_beg = jacobian_a_offsets[c]
-            dof_end = jacobian_a_offsets[c + 1]
+            dof_beg = jacobian_a_offsets[3*c]
+            dof_end = jacobian_a_offsets[3*c + 1]
             for dof in range(dof_beg, dof_end):
                 wp.atomic_min(dof_t_max, jacobian_a_columns[dof], t_max)
 
     if delta_d_b < 0.0:  # getting closer
         t_max = wp.clamp(max_delta_d / delta_d_b, 0.0, 1.0)
         if t_max < 1.0:
-            dof_beg = jacobian_b_offsets[c]
-            dof_end = jacobian_b_offsets[c + 1]
+            dof_beg = jacobian_b_offsets[3*c]
+            dof_end = jacobian_b_offsets[3*c + 1]
             for dof in range(dof_beg, dof_end):
                 wp.atomic_min(dof_t_max, jacobian_b_columns[dof], t_max)
 

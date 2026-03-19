@@ -41,6 +41,8 @@ todo_include_todos = True
 
 autodoc_typehints = "description"
 
+autodoc_mock_imports = ["newton"]
+
 intersphinx_mapping = {
     'python': ("https://docs.python.org/3", None),
     'numpy': ('https://numpy.org/doc/stable/', None),

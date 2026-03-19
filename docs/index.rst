@@ -45,3 +45,4 @@ See :ref:`Installation <installation>`, :ref:`API Overview <overview>` and :ref:
    modules/kaolin.utils
    modules/kaolin.visualize
    modules/kaolin.non_commercial
+   modules/kaolin.experimental

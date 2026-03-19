@@ -512,7 +512,7 @@ class TestEasyAPISimplicitsScene:
         
     def test_easy_api_enabled_collisions(self, scene_with_one_object, example_rigid_cube, device, dtype):
         scene = scene_with_one_object
-        scene.timestep = 0.03
+        scene.timestep = 0.01
         scene.newton_hessian_regularizer = 1e-5
         scene.add_object(example_rigid_cube,
                          init_transform=torch.tensor([[1, 0, 0, 0],
