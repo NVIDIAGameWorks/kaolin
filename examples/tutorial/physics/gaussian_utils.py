@@ -30,7 +30,7 @@ def transform_gaussians_lbs(xyz, rotations, raw_scales, skinning_weights, transf
                                                           device=per_pt_transforms.device).unsqueeze(0)
     
         new_xyz, new_rot, new_scales, new_shs_feat = kaolin.ops.gaussians.transform_gaussians(
-            xyz, rotations, raw_scales, per_pt_transforms, shs_feat=shs_feat)
+            xyz, rotations, raw_scales, per_pt_transforms, shs_feat=shs_feat, use_log_scales=True)
     
         return new_xyz, new_rot, new_scales, new_shs_feat
 
@@ -76,9 +76,9 @@ usd_fields = ['positions', 'orientations', 'scales', 'opacities', 'sh_coeff']
 def inria_to_usd(gaussians): #xyz, rotation, scaling, opacity, features_dc, features_rest):
     return {
         'positions': gaussians._xyz,
-        'orientations': quat_wxyz2xyzw(gaussians._rotation),
+        'orientations': gaussians._rotation,
         'scales': torch.exp(gaussians._scaling),
-        'opacities': torch.sigmoid(gaussians._opacity).unsqueeze(-1),
+        'opacities': torch.sigmoid(gaussians._opacity),
         'sh_coeff': torch.cat([
             gaussians._features_dc,
             gaussians._features_rest
@@ -90,9 +90,9 @@ def usd_to_inria(positions, orientations, scales, opacities, sh_coeff, **kwargs)
     degrees = math.isqrt(sh_coeff.shape[1]) - 1
     gaussians = GaussianModel(degrees)
     gaussians._xyz = positions.cuda()
-    gaussians._rotation = quat_xyzw2wxyz(orientations).cuda()
+    gaussians._rotation = orientations.cuda()
     gaussians._scaling = torch.log(scales).cuda()
-    gaussians._opacity = inverse_sigmoid(opacities).cuda()
+    gaussians._opacity = inverse_sigmoid(opacities).cuda().unsqueeze(-1)
     gaussians._features_dc = sh_coeff[:, :1].cuda()
     gaussians._features_rest = sh_coeff[:, 1:].cuda()
     return gaussians

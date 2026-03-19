@@ -2,6 +2,7 @@ from .utils import *
 from .materials import *
 from .mesh import *
 from .pointcloud import *
+from .transform import *
 from .voxelgrid import *
 from .gaussians import *
 

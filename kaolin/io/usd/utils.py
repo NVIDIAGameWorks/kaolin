@@ -94,7 +94,7 @@ def get_scene_paths(file_path_or_stage, scene_path_regex=None, prim_types=None,
         is_valid_scene_path = re.match(scene_path_regex, str(p.GetPath()))
         passes_conditional = conditional(p)
         if is_valid_prim_type and is_valid_scene_path and passes_conditional:
-            scene_paths.append(p.GetPath())
+            scene_paths.append(str(p.GetPath()))
     return scene_paths
 
 def get_authored_time_samples(file_path_or_stage):
