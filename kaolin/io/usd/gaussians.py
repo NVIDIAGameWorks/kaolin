@@ -172,9 +172,6 @@ def import_gaussiancloud(file_path_or_stage, root_path=None, time=None):
             * **sh_coeff** (torch.Tensor):
                 Spherical harmonics coefficients of each gaussian,
                 of shape :math:`(\text{num_gaussians}, (\text{num_degrees} + 1)^2, 3)`.
-            * **local_to_world** (torch.Tensor or None):
-                Local-to-world transform matrix of shape :math:`(4, 4)`,
-                or ``None`` if the prim has an identity transform.
     """
     scene_paths = get_gaussiancloud_scene_paths(file_path_or_stage, root_path=root_path)
     clouds = import_gaussianclouds(file_path_or_stage, scene_paths, times=time)
