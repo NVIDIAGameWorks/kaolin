@@ -26,6 +26,10 @@ try:
 except ImportError:
     pass
 
+__all__ = [
+    'set_local_to_world_transform',
+    'get_local_to_world_transform'
+]
 
 def set_local_to_world_transform(file_path_or_stage, prim_or_path, local_to_world, time=None):
     """Set a prim's local xform so that ComputeLocalToWorldTransform equals local_to_world.
