@@ -1,4 +1,4 @@
-# Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -53,6 +53,29 @@ class OrthographicIntrinsics(CameraIntrinsics):
     def __init__(self, width: int, height: int, params: torch.Tensor,
                  near: float = DEFAULT_NEAR, far: float = DEFAULT_FAR):
         super().__init__(width, height, params, near, far)
+
+    @classmethod
+    def registered_name(cls):
+        return 'orthographic'
+
+    def _as_dict(self):
+        return {
+            'width': self.width,
+            'height': self.height,
+            'fov_distance': self.fov_distance.item(),
+            'near': self.near,
+            'far': self.far,
+        }
+
+
+    @classmethod
+    def from_dict(cls, in_dict):
+        r"""Constructs orthographic intrinsics from a simple dictionary, such as that returned from `as_dict`.
+
+        Returns: OrthographicIntrinsics instance.
+        """
+        meta = {k: v for k, v in in_dict.items() if k != 'classname'}
+        return cls.from_frustum(**meta)
 
     @classmethod
     def param_types(cls) -> Type[IntrinsicsParamsDefEnum]:

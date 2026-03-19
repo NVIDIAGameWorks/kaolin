@@ -78,6 +78,7 @@ if (cudaMajor == "12" && cudaMinor > 2) {
             - "ipp1-2250.ipp1u1.colossus"
             - "ipp1-2255.ipp1u1.colossus"
             - "ipp1-2993.ipp1u1.colossus"
+            - "ipp2-0722.ipp2a1.colossus"
             - "ipp2-0946.ipp2u1.colossus"
             - "ipp2-0958.ipp2u1.colossus"
             - "ipp2-1688.ipp2u1.colossus"
@@ -88,12 +89,19 @@ if (cudaMajor == "12" && cudaMinor > 2) {
             - "s1019-0292.ipp1u1.colossus"
             - "s1019-0293.ipp1u1.colossus"
             - "s1019-0293.ipp1u1.colossus"
+            - "s4124-0126.ipp1u1.colossus"
+            - "s4124-0127.ipp1u1.colossus"
+            - "s4124-0133.ipp1u1.colossus"
             - "x11-0615.ipp1a1.colossus"
             - "x11-0619.ipp1a1.colossus"
     """
 } else {
     node_blacklist = """
             - "a4u8g-0031.ipp1u1.colossus"
+            - "ipp2-0722.ipp2a1.colossus"
+            - "s4124-0126.ipp1u1.colossus"
+            - "s4124-0127.ipp1u1.colossus"
+            - "s4124-0133.ipp1u1.colossus"
     """
 }
 
@@ -171,6 +179,7 @@ spec:
             export KAOLIN_TEST_MODELNET_PATH=/mnt/data/ModelNet
             export KAOLIN_TEST_SHREC16_PATH=/mnt/data/ci_shrec16
             export KAOLIN_TEST_GSPLATS_DIR=/mnt/gsplats
+            export KAOLIN_TEST_TOYS_DATASET_PATH=/mnt/data/toys/
             pytest --durations=50 --import-mode=importlib -rs --cov=/kaolin/kaolin \
                 --log-disable=PIL.PngImagePlugin \
                 --log-disable=PIL.TiffImagePlugin \

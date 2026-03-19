@@ -32,9 +32,6 @@ SUPPORTED_GSPLATS_DTYPES = [torch.float32]
 
 S3_MODEL_PATHS = [
     'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/dozer_minimal.pt',
-    'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/ficus_minimal.pt',
-    'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/hotdog_minimal.pt',
-    'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/materials_minimal.pt',
 ]
 
 

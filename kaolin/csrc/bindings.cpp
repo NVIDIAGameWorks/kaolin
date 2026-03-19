@@ -27,6 +27,7 @@
 #include "./render/sg/unbatched_reduced_sg_inner_product.h"
 #include "./ops/conversions/mesh_to_spc/mesh_to_spc.h"
 #include "./ops/conversions/gs_to_spc/gs_to_spc.h"
+#include "./ops/conversions/mise/mise.h"
 #include "./ops/mesh/triangle_hash.h"
 #include "./ops/spc/spc.h"
 #include "./ops/spc/feature_grids.h"
@@ -47,7 +48,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     py::module ops_mesh = ops.def_submodule("mesh");
     ops_mesh.def("unbatched_mesh_intersection_cuda", &unbatched_mesh_intersection_cuda);
     py::class_<TriangleHash>(ops_mesh, "TriangleHash")
-      .def(py::init<torch::Tensor, int>(),
+      .def(py::init<torch::Tensor, int32_t>(),
            py::arg("triangles"), py::arg("resolution"))
       .def("query", &TriangleHash::query, py::arg("points"));
     py::module ops_conversions = ops.def_submodule("conversions");
@@ -55,6 +56,13 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     ops_conversions.def("mesh_to_spc_cuda", &mesh_to_spc_cuda);
     ops_conversions.def("gs_to_spc_cuda", &gs_to_spc_cuda);
     ops_conversions.def("integrate_gs_cuda", &integrate_gs_cuda);
+    py::class_<MISE>(ops_conversions, "Mise")
+      .def(py::init<int32_t, int32_t, double>(),
+           py::arg("resolution_0"), py::arg("depth"), py::arg("threshold"))
+      .def("update", &MISE::update, py::arg("points"), py::arg("values"))
+      .def("query", &MISE::query)
+      .def("to_dense", &MISE::to_dense)
+      .def("get_resolution", &MISE::get_resolution);
     py::module ops_spc = ops.def_submodule("spc");
 #if WITH_CUDA
     ops_spc.def("query_cuda", &query_cuda);

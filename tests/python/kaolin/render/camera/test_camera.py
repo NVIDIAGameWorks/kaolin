@@ -1,4 +1,4 @@
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,8 @@ import numpy as np
 import torch
 import kaolin
 from kaolin.render.camera import Camera
+from kaolin.render.camera.intrinsics_pinhole import PinholeIntrinsics
+from kaolin.render.camera.intrinsics_ortho import OrthographicIntrinsics
 from kaolin.utils.testing import FLOAT_TYPES
 
 
@@ -222,3 +224,129 @@ class TestViewportMatrix:
         assert (verts_in_frustum[:, 1] <= cam.height).all()
         assert (verts_in_frustum[:, 2] >= 0).all()
         assert (verts_in_frustum[:, 2] <= 1).all()
+
+
+class TestToFromDict:
+    def test_to_dict(self):
+        # Pinhole camera
+        cam_pinhole = Camera.from_args(
+            eye=torch.tensor([4.0, 4.0, 4.0]),
+            at=torch.tensor([0.0, 0.0, 0.0]),
+            up=torch.tensor([0.0, 1.0, 0.0]),
+            fov=30 * np.pi / 180,
+            width=400, height=300,
+            dtype=torch.float32, device='cpu',
+        )
+        d = cam_pinhole.as_dict()
+        assert d['intrinsics']['classname'] == 'pinhole'
+        assert d['intrinsics']['width'] == 400
+        assert d['intrinsics']['height'] == 300
+        assert 'focal_x' in d['intrinsics']
+        assert 'view_matrix' in d['extrinsics']
+        assert len(d['extrinsics']['view_matrix']) == 4
+
+        # Orthographic camera
+        cam_ortho = Camera.from_args(
+            eye=torch.tensor([1.0, 2.0, 3.0]),
+            at=torch.tensor([0.0, 0.0, 0.0]),
+            up=torch.tensor([0.0, 1.0, 0.0]),
+            width=640, height=480,
+            fov_distance=2.0,
+            dtype=torch.float32, device='cpu',
+        )
+        d_ortho = cam_ortho.as_dict()
+        assert d_ortho['intrinsics']['classname'] == 'orthographic'
+        assert d_ortho['intrinsics']['width'] == 640
+        assert d_ortho['intrinsics']['fov_distance'] == 2.0
+        assert 'view_matrix' in d_ortho['extrinsics']
+
+    def test_from_dict(self):
+        # Pinhole camera from dict
+        pinhole_dict = {
+            'intrinsics': {
+                'classname': 'pinhole',
+                'width': 320, 'height': 240,
+                'focal_x': 300.0, 'focal_y': 300.0,
+                'x0': 0.0, 'y0': 0.0,
+                'near': 0.01, 'far': 100.0,
+            },
+            'extrinsics': {
+                'view_matrix': [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, -5], [0, 0, 0, 1]],
+            },
+        }
+        cam = Camera.from_dict(pinhole_dict)
+        assert isinstance(cam.intrinsics, PinholeIntrinsics)
+        assert cam.width == 320
+        assert cam.height == 240
+        assert cam.near == 0.01
+
+        # Orthographic camera from dict
+        ortho_dict = {
+            'intrinsics': {
+                'classname': 'orthographic',
+                'width': 640, 'height': 480,
+                'fov_distance': 1.5,
+                'near': 0.1, 'far': 500.0,
+            },
+            'extrinsics': {
+                'view_matrix': [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, -3], [0, 0, 0, 1]],
+            },
+        }
+        cam_ortho = Camera.from_dict(ortho_dict)
+        assert isinstance(cam_ortho.intrinsics, OrthographicIntrinsics)
+        assert cam_ortho.width == 640
+        assert torch.allclose(cam_ortho.fov_distance, torch.tensor(1.5))
+
+    def test_round_trip(self):
+        # Spot checks only: correct subclass and a couple of properties after round-trip.
+        # Detailed to/from dict behavior is tested in test_pinhole and test_ortho.
+        cameras = [
+            # Pinhole from fov
+            Camera.from_args(
+                eye=torch.tensor([4.0, 4.0, 4.0]),
+                at=torch.tensor([0.0, 0.0, 0.0]),
+                up=torch.tensor([0.0, 1.0, 0.0]),
+                fov=30 * np.pi / 180,
+                width=320, height=240,
+                dtype=torch.float32, device='cpu',
+            ),
+            # Pinhole with principal point offset
+            Camera.from_args(
+                eye=torch.tensor([1.0, 2.0, 3.0]),
+                at=torch.tensor([0.0, 0.0, 0.0]),
+                up=torch.tensor([0.0, 1.0, 0.0]),
+                fov=np.pi / 4,
+                x0=10.0, y0=20.0,
+                width=800, height=600,
+                dtype=torch.float64, device='cpu',
+            ),
+            # Orthographic
+            Camera.from_args(
+                eye=torch.tensor([0.0, 5.0, 0.0]),
+                at=torch.tensor([0.0, 0.0, 0.0]),
+                up=torch.tensor([0.0, 0.0, -1.0]),
+                width=400, height=300,
+                fov_distance=2.0,
+                near=-50.0, far=100.0,
+                dtype=torch.float32, device='cpu',
+            ),
+        ]
+        expected_classes = [PinholeIntrinsics, PinholeIntrinsics, OrthographicIntrinsics]
+        expected_classnames = ['pinhole', 'pinhole', 'orthographic']
+
+        for cam, expected_cls, expected_name in zip(cameras, expected_classes, expected_classnames):
+            d = cam.as_dict()
+            assert d['intrinsics']['classname'] == expected_name
+            assert 'view_matrix' in d['extrinsics']
+
+            cam2 = Camera.from_dict(d)
+            assert isinstance(cam2.intrinsics, expected_cls)
+            assert cam2.width == cam.width
+            assert cam2.height == cam.height
+            assert cam2.near == cam.near
+            assert cam2.far == cam.far
+            assert torch.allclose(
+                cam2.extrinsics.view_matrix().cpu().float(),
+                cam.extrinsics.view_matrix().cpu().float(),
+                atol=1e-5,
+            )

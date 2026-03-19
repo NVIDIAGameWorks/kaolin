@@ -18,6 +18,7 @@ Tensor batching operators are in :ref:`kaolin.ops.batch`, conversions of 3D mode
    kaolin.ops.gcn
    kaolin.ops.mesh
    kaolin.ops.gaussian
+   kaolin.ops.gaussians
    kaolin.ops.random
    kaolin.ops.reduction
    kaolin.ops.spc

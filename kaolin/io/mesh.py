@@ -46,7 +46,7 @@ def import_mesh(filename, triangulate=False):
     extension = filename.split('.')[-1].lower()
     if extension == 'obj':
         mesh = kaolin.io.obj.import_mesh(filename, **default_settings, raw_materials=False)
-    elif extension in ["usd", "usda", "usdc"]:
+    elif extension in ["usd", "usda", "usdc", "usdz"]:
         mesh = kaolin.io.usd.import_mesh(filename, **default_settings)
     elif extension in ['gltf', 'glb']:
         mesh = kaolin.io.gltf.import_mesh(filename)

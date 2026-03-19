@@ -1,4 +1,4 @@
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,8 +19,9 @@ import itertools
 import numpy as np
 import torch
 import kaolin
-from kaolin.render.camera import Camera
-from kaolin.utils.testing import FLOAT_TYPES
+from kaolin.render.camera import Camera, CameraExtrinsics
+from kaolin.render.camera.intrinsics_pinhole import PinholeIntrinsics
+from kaolin.utils.testing import FLOAT_TYPES, contained_torch_equal
 
 _CAM_DATA_IDX = (0, 1, 2, 3, 4)
 
@@ -189,3 +190,110 @@ class TestPinhole:
         assert (torch.allclose(cam.focal_y, (focal_y / 2), rtol=1e-3))
         assert (cam.width == width)
         assert (cam.height == (height * 0.5))
+
+
+class TestToFromDict:
+    def test_from_dict(self):
+        in_dict = {
+                'width': 100,
+                'height': 200,
+                'focal_x': 80.0,
+                'focal_y': 80.0,
+                'x0': 5.0,
+                'y0': 10.0,
+                'near': 0.1,
+                'far': 500.0,
+            }
+        expected_intrinsics = PinholeIntrinsics.from_focal(**in_dict)
+
+        intrinsics = PinholeIntrinsics.from_dict(in_dict)
+        in_dict['classname'] = 'pinhole'
+        intrinsics2 = PinholeIntrinsics.from_dict(in_dict)
+
+        assert contained_torch_equal(intrinsics, expected_intrinsics)
+        assert contained_torch_equal(intrinsics2, expected_intrinsics)
+
+
+    def test_to_dict(self):
+        intrinsics = PinholeIntrinsics.from_focal(
+            width=400,
+            height=300,
+            focal_x=400.0,
+            focal_y=400.0,
+            x0=10.0,
+            y0=20.0,
+            near=0.5,
+            far=200.0,
+            device='cpu',
+            dtype=torch.float32,
+        )
+        intrinsics_dict = intrinsics.as_dict()
+        assert intrinsics_dict['classname'] == 'pinhole'
+        assert intrinsics_dict['width'] == 400
+        assert intrinsics_dict['height'] == 300
+        assert intrinsics_dict['x0'] == 10.0
+        assert intrinsics_dict['y0'] == 20.0
+        assert intrinsics_dict['near'] == 0.5
+        assert intrinsics_dict['far'] == 200.0
+        assert 'focal_x' in intrinsics_dict and 'focal_y' in intrinsics_dict
+
+        # Camera with default properties; dict should still be valid and round-trippable.
+        intrinsics_default = PinholeIntrinsics.from_fov(
+            width=256,
+            height=256,
+            fov=np.pi / 4,
+            device='cpu',
+            dtype=torch.float32,
+        )
+        intrinsics_default_dict = intrinsics_default.as_dict()
+        assert intrinsics_default_dict['classname'] == 'pinhole'
+        assert intrinsics_default_dict['width'] == intrinsics_default.width
+        assert intrinsics_default_dict['height'] == intrinsics_default.height
+        assert intrinsics_default_dict['focal_x'] == intrinsics_default.focal_x
+        assert intrinsics_default_dict['focal_y'] == intrinsics_default.focal_y
+        assert intrinsics_default_dict['x0'] == intrinsics_default.x0
+        assert intrinsics_default_dict['y0'] == intrinsics_default.y0
+        assert intrinsics_default_dict['near'] == intrinsics_default.near
+        assert intrinsics_default_dict['far'] == intrinsics_default.far
+
+    def test_round_trip(self):
+        # Round-trip 3 single cameras through as_dict / from_dict; properties must match.
+        # Config 1
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+        intrinsics_all = [PinholeIntrinsics.from_fov(
+            width=320, height=240, fov=30 * np.pi / 180,
+            device=device, dtype=torch.float32,  # we'll use mixed devices
+        ),
+        # Config 2
+        PinholeIntrinsics.from_fov(
+            width=800, height=600, fov=np.pi / 6,
+            x0=50.0, y0=25.0,
+            device='cpu'
+        ),
+        # Config 3: from_focal (focal-length-based) for round-trip coverage
+        PinholeIntrinsics.from_focal(
+            width=640, height=480,
+            focal_x=520.0, focal_y=510.0,
+            x0=15.0, y0=20.0,
+            near=0.01, far=2000.0,
+            device='cpu'
+        )]
+
+        for intrinsics in intrinsics_all:
+            param_dict = intrinsics.as_dict()
+            reconstructed = PinholeIntrinsics.from_dict(param_dict).to(intrinsics.device)
+            param_dict2 = reconstructed.as_dict()
+
+            assert contained_torch_equal(intrinsics, reconstructed)
+            assert contained_torch_equal(param_dict, param_dict2)
+
+            assert torch.allclose(reconstructed.params.to(device), intrinsics.params.to(device))
+            assert reconstructed.width == intrinsics.width
+            assert reconstructed.height == intrinsics.height
+            assert reconstructed.near == intrinsics.near
+            assert reconstructed.far == intrinsics.far
+            assert reconstructed.x0 == intrinsics.x0
+            assert reconstructed.y0 == intrinsics.y0
+            assert reconstructed.focal_x == intrinsics.focal_x
+            assert reconstructed.focal_y == intrinsics.focal_y

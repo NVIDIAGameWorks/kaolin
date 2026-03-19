@@ -1,4 +1,4 @@
-# Copyright (c) 2019,21 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,9 +39,11 @@
 import torch
 import numpy as np
 
-from . import mise
+from kaolin import _C
 
-__all__ = ['sdf_to_voxelgrids']
+__all__ = [
+    'sdf_to_voxelgrids',
+]
 
 def sdf_to_voxelgrids(sdf, bbox_center=0., bbox_dim=1., init_res=32, upsampling_steps=0):
     r"""Converts SDFs to voxelgrids. 
@@ -136,21 +138,20 @@ def sdf_to_voxelgrids(sdf, bbox_center=0., bbox_dim=1., init_res=32, upsampling_
         if not callable(sdf[i_batch]):
             raise TypeError(f"Expected sdf[{i_batch}] to be callable "
                             f"but got {type(sdf[i_batch])}.")
-        mesh_extractor = mise.MISE(
+        mesh_extractor = _C.ops.conversions.Mise(
             init_res, upsampling_steps, .5)
 
         points = mesh_extractor.query()
         while points.shape[0] != 0:
             # Query points
-            pointsf = torch.FloatTensor(points)
+            pointsf = points.float()
             # Normalize to bounding box
-            pointsf = pointsf / (mesh_extractor.resolution)
+            pointsf = pointsf / (mesh_extractor.get_resolution())
             pointsf = bbox_dim * (pointsf - 0.5 + bbox_center)
-            values = sdf[i_batch](pointsf) <= 0
-            values = values.data.cpu().numpy().astype(np.float64)
+            values = (sdf[i_batch](pointsf) <= 0).double()
             mesh_extractor.update(points, values)
             points = mesh_extractor.query()
 
-        voxels.append(torch.FloatTensor(mesh_extractor.to_dense()))
+        voxels.append(mesh_extractor.to_dense())
 
     return torch.stack(voxels)

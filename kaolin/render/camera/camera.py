@@ -1,4 +1,4 @@
-# Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -88,7 +88,7 @@ def _gather_constructors(*cam_modules: CameraModuleType) -> Dict[FrozenSet, Tupl
     ctors = []
     for cam_module in cam_modules:
         # Constructors are @classmethod with a 'from_' prefix
-        is_ctor = lambda x: inspect.ismethod(x) and x.__name__.startswith('from_')
+        is_ctor = lambda x: inspect.ismethod(x) and x.__name__.startswith('from_') and x.__name__ != 'from_dict'
 
         # Get all methods that satisfy the constructor predicate.
         ctors.extend(inspect.getmembers(cam_module, predicate=is_ctor))
@@ -278,6 +278,32 @@ class Camera:
         assert extrinsics.device == intrinsics.device
         self.extrinsics: CameraExtrinsics = extrinsics
         self.intrinsics: CameraIntrinsics = intrinsics
+
+    def as_dict(self):
+        r"""Returns parameters necessary to instantiate same Camera as a dictionary that is writable to
+        JSON or YAML.
+
+        Returns:
+            dict
+        """
+        if len(self) > 1:
+            raise ValueError(f'Can only export a single camera as a dictionary, this camera batch size is {len(self)}')
+
+        return {'intrinsics': self.intrinsics.as_dict(),
+                'extrinsics': self.extrinsics.as_dict()}
+
+    @classmethod
+    def from_dict(cls, in_dict):
+        r"""Constructs camera from a simple dictionary, such as that returned from as_dict.
+
+        Returns: Camera
+        """
+        intrinsics_dict = in_dict.get('intrinsics', None)
+        extrinsics_dict = in_dict.get('extrinsics', None)
+        if intrinsics_dict is None or extrinsics_dict is None:
+            raise ValueError(f'Missing "intrinsics" or "extrinsics" in param dict with keys {in_dict.keys()}')
+        return Camera(extrinsics=CameraExtrinsics.from_dict(extrinsics_dict),
+                      intrinsics=CameraIntrinsics.from_dict(intrinsics_dict))
 
     @classmethod
     def from_args(cls, **kwargs):

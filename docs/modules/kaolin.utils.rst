@@ -8,3 +8,4 @@ kaolin.utils
    :titlesonly:
 
    kaolin.utils.testing
+   kaolin.utils.log
