@@ -223,6 +223,7 @@ class SimplicitsObject:
         
         return SimplicitsObject(pts, yms, prs, rhos, appx_vol, skinning_weight_function)
 
+
     @staticmethod
     def create_rigid(pts, yms, prs, rhos, appx_vol=1):
         r"""Creates a rigid SimplicitsObject with a single weight for affine deformations.
@@ -332,8 +333,16 @@ class SimplicitsObject:
 
         self.device = pts.device
         self.dtype = pts.dtype
-
+        
 class SimulatedObject:
+    @staticmethod
+    def create_from_object(obj: SimplicitsObject, id, num_qp, num_cp, init_transform, is_kinematic=False):
+        obj = SimulatedObject(obj, id, num_qp, num_cp, init_transform, is_kinematic)
+        obj._sample_cubatures()
+        obj.reset_sim_state()
+        obj._set_sim_constants()
+        return obj
+
     def __init__(self, obj: SimplicitsObject, id, num_qp, num_cp, init_transform, is_kinematic=False):
         r""" Initialize a simulated object from a simplicits object. Users should avoid direct access to this class.
             Instead object-wise getters/setters for its parameters, forces and materials in the Scene to update/modify this object.
@@ -375,9 +384,6 @@ class SimulatedObject:
         self.z_prev = None
         self.z_dot = None
 
-        self._sample_cubatures()
-        self.reset_sim_state()
-        self._set_sim_constants()
 
     def __str__(self):
         r"""String describing object.
@@ -460,7 +466,6 @@ class SimulatedObject:
         self.z_prev = self.z.clone().detach()
         self.z_dot = torch.zeros_like(
             self.z, device=self.simplicits_object.device)
-
 
 class SimplicitsScene:
     def __init__(self, device='cuda', 
@@ -835,7 +840,7 @@ class SimplicitsScene:
         else:
             relative_transform = torch.zeros(3, 4, device=self.device, dtype=self.dtype)
             
-        self.sim_obj_dict[self.current_id] = SimulatedObject(
+        self.sim_obj_dict[self.current_id] = SimulatedObject.create_from_object(
             sim_object, self.current_id, num_qp, num_cp, relative_transform, is_kinematic)
             
         self.current_id += 1

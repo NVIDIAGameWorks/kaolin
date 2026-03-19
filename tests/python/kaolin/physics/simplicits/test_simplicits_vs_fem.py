@@ -23,6 +23,7 @@ from kaolin.physics.simplicits.easy_api import SimplicitsScene, SimplicitsObject
 import pytest
 from kaolin.utils.testing import with_seed
 
+
 def run_regression_test(simplicits_scene, fem_data, tol=1e-2, test_name="fem_test"):
     faces = fem_data["mesh_faces"]  # beam faces
     start_verts = fem_data["v0"]  # beam start verts
@@ -67,115 +68,6 @@ def run_regression_test(simplicits_scene, fem_data, tol=1e-2, test_name="fem_tes
     assert cd[0].item() < tol, f"Chamfer distance at frame 100 is {cd[0].item()}. This is too high. Something is likely wrong in {test_name}."
 
 
-@pytest.fixture
-@with_seed(0,0,0)
-def cantilever_beam_setup(device, dtype):
-    """Fixture to set up cantilever beam scene for testing."""
-    mesh_file = os.path.dirname(os.path.realpath(
-        __file__)) + "/regression_test_data/beam_surf.obj"
-    mesh = kaolin.io.import_mesh(mesh_file, triangulate=True).cuda()
-
-    num_samples = 100000
-
-    uniform_pts = torch.rand(num_samples, 3, device=device) * (mesh.vertices.max(
-        dim=0).values - mesh.vertices.min(dim=0).values) + mesh.vertices.min(dim=0).values
-
-    boolean_signs = kaolin.ops.mesh.check_sign(mesh.vertices.unsqueeze(
-        0), mesh.faces, uniform_pts.unsqueeze(0), hash_resolution=512)
-
-    pts = uniform_pts[boolean_signs.squeeze()]  # m
-    yms = 1e5*torch.ones(pts.shape[0], device=device, dtype=dtype)  # kg/m/s^2
-    prs = 0.45*torch.ones(pts.shape[0], device=device, dtype=dtype)  # unitless
-    rhos = 500*torch.ones(pts.shape[0], device=device, dtype=dtype)  # kg/m^3
-    object_vol = (mesh.vertices.max(dim=0)[
-                  0] - mesh.vertices.min(dim=0)[0]).prod()  # m^3 #bbx volume
-    dt = 0.05  # s
-
-    # get simplicits object
-    weights_file = os.path.dirname(os.path.realpath(
-        __file__)) + "/regression_test_data/beam_weights_fcn_32_handles.pth"
-    weights = torch.load(weights_file, weights_only=False)
-    
-    simplicits_object = SimplicitsObject.create_from_function(
-        pts, yms, prs, rhos, object_vol, weights)
-
-
-    scene = SimplicitsScene(
-        device=device,
-        dtype=dtype,
-        timestep=dt,
-        max_newton_steps=10,  # run to near convergence
-        max_ls_steps=20,
-    )
-    scene.newton_hessian_regularizer = 0
-    scene.direct_solve = True
-    
-    scene.add_object(simplicits_object, num_qp=1024)
-
-    scene.set_scene_gravity(torch.tensor([0, 9.8, 0]))
-    scene.set_scene_floor(floor_height=-1.0, floor_axis=1,
-                          floor_penalty=10000.0, flip_floor=False)
-
-    scene.set_object_boundary_condition(
-        0, "right", lambda x: x[:, 0] >= 0.98, bdry_penalty=10000.0)
-
-    return mesh, scene
-
-
-@pytest.fixture
-@with_seed(0, 0, 0)
-def cube_drop_setup(device, dtype):
-    """Fixture to set up cube drop scene for testing."""
-    mesh_file = os.path.dirname(os.path.realpath(
-        __file__)) + "/regression_test_data/cube_surf.obj"
-    mesh = kaolin.io.import_mesh(mesh_file, triangulate=True).cuda()
-
-    num_samples = 100000
-
-    uniform_pts = torch.rand(num_samples, 3, device=device) * (mesh.vertices.max(
-        dim=0).values - mesh.vertices.min(dim=0).values) + mesh.vertices.min(dim=0).values
-
-    boolean_signs = kaolin.ops.mesh.check_sign(mesh.vertices.unsqueeze(
-        0), mesh.faces, uniform_pts.unsqueeze(0), hash_resolution=512)
-
-    pts = uniform_pts[boolean_signs.squeeze()]  # m
-    yms = 1e4*torch.ones(pts.shape[0], device=device, dtype=dtype)  # kg/m/s^2
-    prs = 0.45*torch.ones(pts.shape[0], device=device, dtype=dtype)  # unitless
-    rhos = 500*torch.ones(pts.shape[0], device=device, dtype=dtype)  # kg/m^3
-    object_vol = (mesh.vertices.max(dim=0)[
-                  0] - mesh.vertices.min(dim=0)[0]).prod()  # m^3 #bbx volume
-    dt = 0.05  # s
-
-    # get simplicits object
-    weights_file = os.path.dirname(os.path.realpath(
-        __file__)) + "/regression_test_data/cube_weights_fcn_32_handles.pth"
-    weights = torch.load(weights_file, weights_only=False)
-    simplicits_object = SimplicitsObject.create_from_function(
-        pts, yms, prs, rhos, object_vol, weights)
-
-    # simplicits_object = SimplicitsObject.create_trained(
-    #     pts, yms, prs, rhos, object_vol, num_handles=32, num_samples=1000, model_layers=10, training_batch_size=10, training_num_steps=15000, training_lr_start=1e-3, training_lr_end=1e-3, training_le_coeff=1e-1, training_lo_coeff=1e6, training_log_every=1000, normalize_for_training=True)
-    # torch.save(simplicits_object.skinning_weight_function, "cube_weights_fcn_32_handles.pth")
-
-    scene = SimplicitsScene(
-        device=device,
-        dtype=dtype,
-        timestep=dt,
-        max_newton_steps=10,  # run to near convergence
-        max_ls_steps=20,
-    )
-    scene.newton_hessian_regularizer = 0
-    scene.direct_solve = True
-
-    scene.add_object(simplicits_object, num_qp=1024)
-
-    scene.set_scene_gravity(torch.tensor([0, 9.8, 0]))
-    scene.set_scene_floor(floor_height=-1.0, floor_axis=1,
-                          floor_penalty=10000.0, flip_floor=False)
-
-    return mesh, scene
-
-
 @pytest.mark.parametrize("device", ["cuda"])
 @pytest.mark.parametrize("dtype", [torch.float32])
 def test_cantilever_beam(device, dtype, cantilever_beam_setup):
@@ -200,7 +92,7 @@ def test_cantilever_beam(device, dtype, cantilever_beam_setup):
     """
     
     # Load simplicits scene 
-    _, simplicits_scene = cantilever_beam_setup
+    simplicits_scene = cantilever_beam_setup
     
     # Load FEM beam results
     data = torch.load(os.path.dirname(os.path.realpath(
@@ -232,7 +124,7 @@ def test_cube_drop(device, dtype, cube_drop_setup):
     """
 
     # Load simplicits scene
-    _, simplicits_scene = cube_drop_setup
+    simplicits_scene = cube_drop_setup
 
     # Load FEM cube results
     data = torch.load(os.path.dirname(os.path.realpath(

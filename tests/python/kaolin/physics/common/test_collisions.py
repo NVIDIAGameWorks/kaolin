@@ -364,9 +364,6 @@ def test_collision_gradient(test_scenes):
     t_indices_a = wp.to_torch(collision.collision_indices_a)
     t_indices_b = wp.to_torch(collision.collision_indices_b)
 
-    t_obj_ids = wp.to_torch(obj_ids)
-    t_is_static = wp.to_torch(is_static)
-
     # Finite difference for collision gradients
     # loop through t_x pairs of points and calculate the distance between them
     E0 = wp.to_torch(collision.energy(dx, x0, coeff=1.0))
@@ -384,8 +381,109 @@ def test_collision_gradient(test_scenes):
 
 
     assert torch.allclose(gradient, dEdx_fd, rtol=1e-1), \
-        "Collision energy doesn't match analytical calculation"
+        "Collision gradients doesn't match analytical calculation"
         
+
+def test_collision_bounds_indexing():
+    """Regression test: Jacobian offsets must be indexed with 3*c (not c).
+
+    Each contact occupies 3 rows in the BSR Jacobian (x, y, z components).
+    The bug used offsets[c] instead of offsets[3*c], causing the wrong DOF
+    columns to be bounded for any contact c >= 1.
+
+    Strategy: construct a controlled scene with exactly 2 contacts between
+    distinct particle pairs, then move ONLY the particle from the SECOND
+    contact (c=1) toward its partner. Verify that the DOF columns linked to
+    that particle (via the correct 3*1 row offset) are bounded (< 1.0),
+    while the DOF columns only reachable via the buggy (c=1) indexing —
+    which would point to row 1 (y-component of contact 0) — are NOT bounded.
+
+    Particle layout (separation = 0.08, barrier rp = 0.05, detection = 0.15):
+      p0 (obj 0) at (0.0, 0, 0) -- close to --> p2 (obj 1) at (0.08, 0, 0)
+      p1 (obj 0) at (1.0, 0, 0) -- close to --> p3 (obj 1) at (1.08, 0, 0)
+    Both pairs are inside detection radius and outside the barrier, so
+    gap_cur = rp - 0.08 = -0.03 < 0, ensuring the bounds kernel proceeds.
+    """
+    device = 'cuda'
+    # separation chosen to be in (rp=0.05, detection=0.15)
+    SEP = 0.08
+
+    x0_t = torch.tensor([
+        [0.0, 0.0, 0.0],        # p0, object 0
+        [1.0, 0.0, 0.0],        # p1, object 0
+        [SEP, 0.0, 0.0],        # p2, object 1
+        [1.0 + SEP, 0.0, 0.0],  # p3, object 1
+    ], device=device)
+    dx_t = torch.zeros(4, 3, device=device)
+    obj_ids_t = torch.tensor([0, 0, 1, 1], device=device, dtype=torch.int32)
+    is_static_t = torch.zeros(4, device=device, dtype=torch.int32)
+    # One handle per particle (identity weights) so DOF block col == particle index
+    weights_t = torch.eye(4, device=device)
+
+    x0 = wp.array(x0_t, dtype=wp.vec3)
+    dx = wp.array(dx_t, dtype=wp.vec3)
+    obj_ids = wp.array(obj_ids_t, dtype=wp.int32)
+    is_static = wp.array(is_static_t, dtype=wp.int32)
+    weights = wp.from_torch(weights_t.contiguous())
+
+    collision_radius = 0.05
+    collision = collisions.Collision(dt=0.01,
+                                     collision_particle_radius=collision_radius,
+                                     detection_ratio=1.5,
+                                     impenetrable_barrier_ratio=0.5,
+                                     friction=0.0)
+
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+    assert collision.num_contacts == 2, \
+        f"Expected exactly 2 contacts, got {collision.num_contacts}"
+
+    collision.get_jacobian(weights, x0, is_static)
+
+    J_a = collision.collision_J_a
+    assert J_a.offsets.shape[0] >= 3 * 2 + 1
+
+    t_normals = wp.to_torch(collision.collision_normals)
+    t_indices_a = wp.to_torch(collision.collision_indices_a)
+
+    # Move ONLY the particle from contact c=1 toward its partner
+    t_delta_dx = torch.zeros(4, 3, device=device)
+    idx_a_1 = t_indices_a[1].item()
+    if idx_a_1 >= 0:
+        t_delta_dx[idx_a_1] = -t_normals[1] * 0.02  # toward partner → delta_d_a < 0
+
+    cp_delta_dx = wp.from_torch(t_delta_dx, dtype=wp.vec3)
+    cp_dx = wp.from_torch(torch.zeros(4, 3, device=device), dtype=wp.vec3)
+
+    bounds = collision.get_bounds(cp_delta_dx, cp_dx, x0)
+    t_bounds = wp.to_torch(bounds)
+
+    J_a_offsets = wp.to_torch(J_a.offsets)
+    J_a_columns = wp.to_torch(J_a.columns)
+
+    # DOF block columns that the CORRECT (3*c) indexing uses for contact c=1
+    correct_row = 3 * 1
+    correct_cols = J_a_columns[J_a_offsets[correct_row]:J_a_offsets[correct_row + 1]]
+
+    # DOF block columns the BUGGY (c) indexing would have used for c=1 (row 1 = y of contact 0)
+    buggy_row = 1
+    buggy_cols = J_a_columns[J_a_offsets[buggy_row]:J_a_offsets[buggy_row + 1]]
+
+    assert len(correct_cols) > 0, "No DOF columns for contact c=1 particle a"
+    # Only meaningful if the bug and fix target different DOF columns
+    if not torch.equal(correct_cols, buggy_cols):
+        for col in correct_cols.tolist():
+            s = col * J_a.block_shape[1]
+            e = s + J_a.block_shape[1]
+            assert (t_bounds[s:e] < 1.0).any(), \
+                f"DOF block col {col} should be bounded for contact c=1 (3*c indexing)"
+
+        buggy_only = set(buggy_cols.tolist()) - set(correct_cols.tolist())
+        for col in buggy_only:
+            s = col * J_a.block_shape[1]
+            e = s + J_a.block_shape[1]
+            assert (t_bounds[s:e] == 1.0).all(), \
+                f"DOF block col {col} should NOT be bounded (only reachable via buggy c indexing)"
+
 
 @pytest.mark.parametrize("test_scenes", [
     "one_object",
@@ -426,8 +524,6 @@ def test_collision_hessian(test_scenes):
     t_indices_a = wp.to_torch(collision.collision_indices_a)
     t_indices_b = wp.to_torch(collision.collision_indices_b)
 
-    t_obj_ids = wp.to_torch(obj_ids)
-    t_is_static = wp.to_torch(is_static)
     
     if weights.shape[1] == 1:
         # one object, no gradients since we have no self-collisions
