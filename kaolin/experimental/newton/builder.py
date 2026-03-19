@@ -99,7 +99,7 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
         """
         self._pending_boundary_conditions.append((obj_idx, name, fcn, bdry_penalty, pinned_x))
 
-    def finalize(self, device='cuda', requires_grad=False) -> SimplicitsModel:
+    def finalize(self, device='cuda', requires_grad=False, **kwargs) -> SimplicitsModel:
         r"""Finalize and build the SimplicitsModel instance.
 
         Registers Simplicits particles with Newton, finalizes the base model, and automatically
@@ -107,11 +107,15 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
 
         Args:
             device (str or torch.device): Target device for the model.
-            requires_grad (bool): Whether gradients are required.
+            requires_grad (bool): Whether gradients are required. Defaults to False. Error is raised if True since simplicits is not differentiable atm.
+            **kwargs: Forwarded to :meth:`newton.ModelBuilder.finalize` (e.g. validation skips).
 
         Returns:
             (SimplicitsModel): Fully constructed model ready for simulation.
         """
+        if requires_grad:
+            raise ValueError("Simplicits is not differentiable yet. SimplicitsModelBuilder.finalize(requires_grad=True) is not supported.")
+
         # Truncate any Simplicits particles appended by a previous finalize() call,
         # so each call starts from the same Newton-builder base state.
         if hasattr(self, '_simplicits_base_particle_count'):
@@ -169,7 +173,8 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
 
             self.simplicits_particle_end = len(self.particle_q)
 
-        base_m = super().finalize(device, requires_grad)
+        # Forward all ModelBuilder.finalize keyword-only options (skip_* validations, etc.).
+        base_m = super().finalize(device, requires_grad=False, **kwargs)
 
         # copy all attributes from base model
         model.__dict__.update(base_m.__dict__)
