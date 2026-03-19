@@ -10,14 +10,14 @@ Bridges Kaolin's [Simplicits](https://kaolin.readthedocs.io/en/latest/notes/simp
 
 | Package | Version | Notes |
 |---|---|---|
-| `newton` | Release 1.0 | [NVIDIA Newton](https://newton-physics.github.io/newton/stable/guide/overview.html) physics engine — see [Installing Newton](https://newton-physics.github.io/newton/stable/guide/installation.html) below |
+| `newton` | [Release 1.0](https://github.com/newton-physics/newton/releases/tag/v1.0.0) | [NVIDIA Newton](https://newton-physics.github.io/newton/stable/guide/overview.html) physics engine — see [Installing Newton](https://newton-physics.github.io/newton/stable/guide/installation.html) below |
 | `warp-lang` | ≥ 1.10 | Already installed as a Kaolin dependency |
 | Python | ≥ 3.10 | Required by Newton |
 ---
 
-## Installing Newton
+## Installing Newton 1.0
 
-**Supported version: Newton release tag `1.0` only.**
+**Supported version: Newton [release tag `1.0`](https://github.com/newton-physics/newton/releases/tag/v1.0.0) only.** 
 
 
 ### From source

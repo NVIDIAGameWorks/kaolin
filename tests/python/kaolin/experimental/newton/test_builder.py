@@ -34,6 +34,15 @@ def test_builder_initialization():
     assert model.simplicits_scene.sim_pts is None
 
 
+def test_builder_finalize_requires_grad_warns():
+    """finalize(requires_grad=True) emits UserWarning; build still completes without gradients."""
+    builder = SimplicitsModelBuilder()
+    with pytest.warns(UserWarning, match="not differentiable"):
+        model = builder.finalize(requires_grad=True)
+    assert model is not None
+    assert model.simplicits_scene is not None
+
+
 def test_builder_add_object(simplicits_object):
     """Test adding a simplicits object to builder.
 
@@ -152,7 +161,7 @@ def test_builder_add_object_init_transform_4x4(simplicits_object):
 
 
 def test_builder_add_object_bad_init_transform(simplicits_object):
-    """Test that an invalid init_transform shape raises ValueError during finalize."""
+    """Test that an invalid init_transform shape raises a warning during finalize."""
     bad_transform = torch.ones(2, 4, device='cuda')
 
     builder = SimplicitsModelBuilder()
