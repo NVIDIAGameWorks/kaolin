@@ -109,7 +109,7 @@ Current Team:
 - Or Perel
 - Alexander Zook
 
-Other Majors Contributors:
+Other Major Contributors:
 
 - Wenzheng Chen
 - Sanja Fidler
