@@ -5,7 +5,7 @@
 </p>
 
 ## Overview
-NVIDIA Kaolin library provides a PyTorch API for working with a variety of 3D representations and includes a growing collection of GPU-optimized operations such as modular differentiable rendering, fast conversions between representations, data loading, 3D checkpoints, differentiable camera API, differentiable lighting with spherical harmonics and spherical gaussians, powerful quadtree acceleration structure called Structured Point Clouds, interactive 3D visualizer for jupyter notebooks, convenient batched mesh container and more. Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest/) to get started!
+NVIDIA Kaolin library provides a PyTorch API for working with a variety of 3D representations and includes a growing collection of GPU-optimized operations such as modular differentiable rendering, fast conversions between representations, data loading, 3D checkpoints, differentiable camera API, differentiable lighting with spherical harmonics and spherical gaussians, powerful quadtree acceleration structure called Structured Point Clouds, interactive 3D visualizer for jupyter notebooks, convenient batched mesh containers, and more. Visit the [Kaolin Library Documentation](https://kaolin.readthedocs.io/en/latest/) to get started!
 
 Note that Kaolin library is part of the larger [NVIDIA Kaolin effort](https://developer.nvidia.com/kaolin) for 3D deep learning.
 
@@ -67,7 +67,7 @@ Please review our [contribution guidelines](CONTRIBUTING.md).
 
 ## Licenses
 
-Most of Kaolin's repository is under [Apache v2.0 license](LICENSE), except under [kaolin/non_commercial](kaolin/non_commercial/) which is under [NSCL license](LICENSE.NSCL) restricted to non commercial usage for research and evaluation purposes.
+Most of Kaolin's repository is under [Apache v2.0 license](LICENSE), except under [kaolin/non_commercial](kaolin/non_commercial/) which is under [NSCL license](LICENSE.NSCL), but this is restricted to non commercial usage for research and evaluation purposes.
 
 Default `kaolin` import includes Apache-licensed components:
 ```
@@ -109,7 +109,7 @@ Current Team:
 - Or Perel
 - Alexander Zook
 
-Other Majors Contributors:
+Other Major Contributors:
 
 - Wenzheng Chen
 - Sanja Fidler
