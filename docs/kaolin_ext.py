@@ -143,3 +143,7 @@ def run_apidoc(_):
 
 def setup(app):
     app.connect("builder-inited", run_apidoc)
+    return {
+        'parallel_read_safe': True,
+        'parallel_write_safe': True
+    }

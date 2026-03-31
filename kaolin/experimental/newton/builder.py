@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import warnings
+
 import torch
 import warp as wp
 import newton
@@ -99,7 +101,7 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
         """
         self._pending_boundary_conditions.append((obj_idx, name, fcn, bdry_penalty, pinned_x))
 
-    def finalize(self, device='cuda', requires_grad=False) -> SimplicitsModel:
+    def finalize(self, device='cuda', requires_grad=False, **kwargs) -> SimplicitsModel:
         r"""Finalize and build the SimplicitsModel instance.
 
         Registers Simplicits particles with Newton, finalizes the base model, and automatically
@@ -107,11 +109,21 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
 
         Args:
             device (str or torch.device): Target device for the model.
-            requires_grad (bool): Whether gradients are required.
+            requires_grad (bool): Whether gradients are required. Defaults to False. If True, a warning is
+                issued; Simplicits is not differentiable yet and finalize still runs with ``requires_grad=False``.
+            **kwargs: Forwarded to :meth:`newton.ModelBuilder.finalize` (e.g. validation skips).
 
         Returns:
             (SimplicitsModel): Fully constructed model ready for simulation.
         """
+        if requires_grad:
+            warnings.warn(
+                "Simplicits is not differentiable yet; SimplicitsModelBuilder.finalize() proceeds with "
+                "requires_grad=False.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         # Truncate any Simplicits particles appended by a previous finalize() call,
         # so each call starts from the same Newton-builder base state.
         if hasattr(self, '_simplicits_base_particle_count'):
@@ -169,7 +181,8 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
 
             self.simplicits_particle_end = len(self.particle_q)
 
-        base_m = super().finalize(device, requires_grad)
+        # Forward all ModelBuilder.finalize keyword-only options (skip_* validations, etc.).
+        base_m = super().finalize(device, requires_grad=False, **kwargs)
 
         # copy all attributes from base model
         model.__dict__.update(base_m.__dict__)
