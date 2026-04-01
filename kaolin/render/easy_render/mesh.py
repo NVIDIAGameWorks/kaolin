@@ -201,7 +201,7 @@ def mesh_rasterize_interpolate_nvdiffrast(
 
         Args:
             mesh (SurfaceMesh): unbatched surface mesh
-            nvdiffrast_context (render context): nvdiffrast context, either CUDA or OpenGL
+            nvdiffrast_context (render context): nvdiffrast context (CUDA)
             camera (Camera): single camera
             normals_required (bool): if True, will compute interpolated mesh normals, else return None
             uvs_required (bool): if True, and present in mesh, will compute interpolated mesh uvs, else return None
