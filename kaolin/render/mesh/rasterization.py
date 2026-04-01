@@ -388,9 +388,7 @@ def rasterize(height,
     `Learning to Predict 3D Objects with an Interpolation-based Differentiable Renderer`_ NeurIPS 2019.
 
     .. note::
-       `nvdiffrast library`_ is relying on OpenGL or a custom CUDA depending on selected context
-       (see :ref:`nvdiffrast context <kaolin.render.mesh.nvdiffrast_context>`) 
-       and is usually faster especially on larger mesh and resolution.
+       `nvdiffrast library`_ is relying on a custom CUDA context and is usually faster especially on larger meshes and resolution.
 
     Args:
         height (int):

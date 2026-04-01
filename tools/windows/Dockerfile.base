@@ -1,37 +1,43 @@
-# Note: Keep C:\Program Files (x86)\Microsoft Visual Studio\Installer directory.
-#       disutils/setuptools calls vswhere.exe from that location unconditionally.
-
-ARG BASE_IMAGE="mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2019"
+ARG BASE_IMAGE="mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2022"
 FROM ${BASE_IMAGE}
 
 # set up conda and python environment
 ARG CUDA_VERSION=11.1
 ENV CUDA_VERSION=${CUDA_VERSION}
-ARG PYTHON_VERSION=3.7
-ENV PYTHON_VERSION=${PYTHON_VERSION}
-ARG PYTORCH_VERSION=1.8
-ENV PYTORCH_VERSION=${PYTORCH_VERSION}
-ARG FORCE_CUDA=1
-ENV FORCE_CUDA=${FORCE_CUDA}
-
 ARG CUDA_URL="http://developer.download.nvidia.com/compute/cuda/11.1.1/local_installers/cuda_11.1.1_456.81_win10.exe"
 ENV CUDA_URL=${CUDA_URL}
 ARG CUDA_FILENAME=cuda_${CUDA_VERSION}_win10.exe
 ENV CUDA_FILENAME=${CUDA_FILENAME}
 
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 #### BUILD TOOLS ####
 
 # pulling downloads to top to not repeat
-# download & install VS build tools 2019
-RUN Invoke-WebRequest "https://aka.ms/vs/16/release/vs_buildtools.exe" -OutFile vs_buildtools.exe -UseBasicParsing; \
-    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Workload.VCTools'; \
-    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'; \
-    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Workload.MSBuildTools'; \
-    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.Component.VC.Runtime.UCRTSDK'; \
-    Start-Process -FilePath 'vs_buildtools.exe' -Wait -ArgumentList '--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools', '--add', 'Microsoft.VisualStudio.Component.Windows10SDK.18362'; \
-    Remove-Item .\vs_buildtools.exe
+# download & install VS build tools 17.x (Visual Studio 2022)
+RUN Invoke-WebRequest 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile vs_buildtools.exe -UseBasicParsing; \
+    $components = @( \
+        'Microsoft.VisualStudio.Workload.VCTools', \
+        'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', \
+        'Microsoft.VisualStudio.Component.VC.14.34.17.4.x86.x64', \
+        'Microsoft.VisualStudio.Workload.MSBuildTools', \
+        'Microsoft.Component.VC.Runtime.UCRTSDK', \
+        'Microsoft.VisualStudio.Component.Windows10SDK.17763' \
+    ); \
+    $args = @('--quiet', '--norestart', '--downloadThenInstall', '--nocache', '--wait', '--installPath', 'C:\BuildTools'); \
+    foreach ($c in $components) { $args += '--add'; $args += $c }; \
+    $p = Start-Process -FilePath 'vs_buildtools.exe' -Wait -PassThru -ArgumentList $args; \
+    if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw ('Install failed: ' + $p.ExitCode) }; \
+    Remove-Item .\vs_buildtools.exe; \
+    Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10' -Recurse -Filter 'basetsd.h' | Select-Object -ExpandProperty FullName
 
+RUN New-Item -ItemType Directory -Path 'C:\TEMP' -Force; \
+    Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/?linkid=2120843' -OutFile 'C:\TEMP\winsdksetup.exe' -UseBasicParsing; \
+    $p = Start-Process -FilePath 'C:\TEMP\winsdksetup.exe' -ArgumentList '/features', '+', '/quiet', '/norestart' -Wait -PassThru; \
+    Write-Host ('SDK installer exit code: ' + $p.ExitCode); \
+    if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw ('SDK install failed: ' + $p.ExitCode) }; \
+    Remove-Item 'C:\TEMP\winsdksetup.exe' -Force; \
+    Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10' -Recurse -Filter 'basetsd.h' | Select-Object -ExpandProperty FullName
 
 # The msvc version (subdir) has been shown to change over time.
 # The winsdk version (subdir) may change over time either through changes by MS or our own arguments to vs_buildtools.exe above.
@@ -42,6 +48,28 @@ RUN setx /M PATH $('c:\buildtools\vc\tools\msvc\' + $(Get-ChildItem -Path 'c:\bu
     + 'C:\Program Files (x86)\Windows Kits\10\bin\' + $(Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin\' -Force -Directory | Select-Object -First 1).Name + '\x64;' \
     + 'C:\BuildTools\VC\Auxiliary\Build;' \
     + $Env:PATH)
+
+RUN Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc\' -Directory | Select-Object -ExpandProperty Name
+
+RUN $msvcDir = $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc\' -Force -Directory | Where-Object { $_.Name -like '14.34*' } | Select-Object -First 1).FullName; \
+    $sdkVersion = $(Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\Include\' -Force -Directory | Sort-Object -Descending | Select-Object -First 1).Name; \
+    $sdkBinBase = 'C:\Program Files (x86)\Windows Kits\10\bin\' + $sdkVersion; \
+    $sdkIncBase = 'C:\Program Files (x86)\Windows Kits\10\Include\' + $sdkVersion; \
+    $sdkLibBase = 'C:\Program Files (x86)\Windows Kits\10\Lib\' + $sdkVersion; \
+    $pathValue = $msvcDir + '\bin\hostx64\x64;' + $msvcDir + '\lib\x64;' + $msvcDir + '\include;' + $sdkBinBase + '\x64;C:\BuildTools\VC\Auxiliary\Build;' + $Env:PATH; \
+    $incValue = $msvcDir + '\include;' + $sdkIncBase + '\ucrt;' + $sdkIncBase + '\shared;' + $sdkIncBase + '\um;' + $sdkIncBase + '\winrt'; \
+    $libValue = $msvcDir + '\lib\x64;' + $sdkLibBase + '\ucrt\x64;' + $sdkLibBase + '\um\x64'; \
+    Write-Host ('MSVC: ' + $msvcDir); \
+    Write-Host ('SDK: ' + $sdkVersion); \
+    [Environment]::SetEnvironmentVariable('PATH', $pathValue, 'Machine'); \
+    [Environment]::SetEnvironmentVariable('INCLUDE', $incValue, 'Machine'); \
+    [Environment]::SetEnvironmentVariable('LIB', $libValue, 'Machine')
+
+RUN $clPath = $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc\' -Force -Directory | Where-Object { $_.Name -like '14.34*' } | Select-Object -First 1).FullName + '\bin\hostx64\x64\cl.exe'; \
+    Write-Host ('CUDAHOSTCXX=' + $clPath); \
+    [Environment]::SetEnvironmentVariable('CUDAHOSTCXX', $clPath, 'Machine'); \
+    [Environment]::SetEnvironmentVariable('VCToolsVersion', '14.34.31933', 'Machine')
+
 
 #### CUDA ####
 
@@ -62,9 +90,31 @@ RUN setx /M PATH $('c:\buildtools\vc\tools\msvc\' + $(Get-ChildItem -Path 'c:\bu
 # TODO: may need to add more packages or alter names for later CUDA versions...
 # CUDA 11.3+ adds 'thrust' to the set of requirements we need to install
 RUN Invoke-WebRequest $Env:CUDA_URL -OutFile $Env:CUDA_FILENAME -UseBasicParsing; \
-    if ([convert]::ToDouble(${Env:CUDA_VERSION}) -ge 11.3) { Start-Process -FilePath \"$Env:CUDA_FILENAME\" -Wait -ArgumentList '-s', \"nvcc_${Env:CUDA_VERSION}\", \"cusparse_${Env:CUDA_VERSION}\", \"cusparse_dev_${Env:CUDA_VERSION}\", \"cublas_${Env:CUDA_VERSION}\", \"cublas_dev_${Env:CUDA_VERSION}\", \"curand_${Env:CUDA_VERSION}\", \"curand_dev_${Env:CUDA_VERSION}\", \"cudart_${Env:CUDA_VERSION}\", \"cusolver_${Env:CUDA_VERSION}\", \"cusolver_dev_${Env:CUDA_VERSION}\", \"thrust_${Env:CUDA_VERSION}\" } \
-    else { Start-Process -FilePath \"$Env:CUDA_FILENAME\" -Wait -ArgumentList '-s', \"nvcc_${Env:CUDA_VERSION}\", \"cusparse_${Env:CUDA_VERSION}\", \"cusparse_dev_${Env:CUDA_VERSION}\", \"cublas_${Env:CUDA_VERSION}\", \"cublas_dev_${Env:CUDA_VERSION}\", \"curand_${Env:CUDA_VERSION}\", \"curand_dev_${Env:CUDA_VERSION}\", \"cudart_${Env:CUDA_VERSION}\", \"cusolver_${Env:CUDA_VERSION}\", \"cusolver_dev_${Env:CUDA_VERSION}\"; } \
-    Remove-Item $Env:CUDA_FILENAME
+    Write-Host '=== Try 1: no version suffix ==='; \
+    $components1 = @( \
+        'cuda_nvcc', 'cuda_cudart', 'cuda_crt', 'cuda_cccl', \
+        'cuda_nvtx', 'cuda_nvrtc', 'cuda_profiler_api', \
+        'libcublas', 'libcusparse', 'libcurand', 'libcusolver', \
+        'visual_studio_integration' \
+    ); \
+    $p1 = Start-Process -FilePath $Env:CUDA_FILENAME -Wait -PassThru -ArgumentList (@('-s') + $components1); \
+    Write-Host ('Exit code (no suffix): ' + $p1.ExitCode); \
+    if ($p1.ExitCode -ne 0) { \
+        Write-Host '=== Try 2: _13.0.2 suffix ==='; \
+        $components2 = $components1 | ForEach-Object { $_ + '_13.0.2' }; \
+        Write-Host ($components2 -join ', '); \
+        $p2 = Start-Process -FilePath $Env:CUDA_FILENAME -Wait -PassThru -ArgumentList (@('-s') + $components2); \
+        Write-Host ('Exit code (13.0.2): ' + $p2.ExitCode); \
+        if ($p2.ExitCode -ne 0) { \
+            Write-Host '=== Try 3: just install everything ==='; \
+            $p3 = Start-Process -FilePath $Env:CUDA_FILENAME -Wait -PassThru -ArgumentList '-s'; \
+            Write-Host ('Exit code (full install): ' + $p3.ExitCode); \
+            if ($p3.ExitCode -ne 0) { throw ('All CUDA install attempts failed. Last: ' + $p3.ExitCode) }; \
+        }; \
+    }; \
+    Remove-Item $Env:CUDA_FILENAME; \
+    Write-Host '=== Verify crt/host_config.h ==='; \
+    Get-ChildItem -Path 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA' -Recurse -Filter 'host_config.h' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
 
 # TODO: can we use conda cuda install instead? only once we need cuda 11.3.0+
 # RUN conda install -y cuda cuda-nvcc -c nvidia/label/cuda-11.3.1
@@ -82,11 +132,3 @@ RUN Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Us
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main; \
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r; \
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/msys2; \
-    conda install -y python=$Env:PYTHON_VERSION
-
-# NOTE: update the install list (2 lines here) if SSL_CERTIFICATE errors crop up to pip install the related dependency
-RUN $Env:TORCH_STR = ${Env:PYTORCH_VERSION} + '+cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
-    $Env:TORCH_URL='https://download.pytorch.org/whl/cu' + ${Env:CUDA_VERSION}.Replace('.',''); \
-    pip install --no-cache-dir torch==${Env:TORCH_STR} torchvision --index-url ${Env:TORCH_URL};
-
-RUN pip install brotli

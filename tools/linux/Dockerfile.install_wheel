@@ -19,30 +19,23 @@ COPY ./tests ./tests
 COPY ./tools ./tools
 RUN apt-get -y update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        libgl1-mesa-dev \
-        libgles2-mesa-dev \
-        libegl1-mesa-dev \
         git \
         pkg-config \
         libatk1.0-0 \
         libatk-bridge2.0-0 \
-        libasound2 \
         libgtk2.0-0 \
         libgtk-3-0 \
         libnss3 \
-        libglvnd0 \
-        libgl1 \
-        libglx0 \
-        libegl1 \
-        libgles2 \
-        libglvnd-dev \
         curl \
         cmake \
         xvfb \
         wget \
+    && (apt-get install -y --no-install-recommends libasound2 || apt-get install -y --no-install-recommends libasound2t64) \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Remove PEP 668 restriction (safe in containers)
+RUN rm -f /usr/lib/python*/EXTERNALLY-MANAGED
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -66,10 +59,14 @@ RUN npm install
 
 RUN pip install --upgrade pip && pip install ninja
 
-RUN cd /tmp && \
+RUN if [ "$FORCE_CUDA" -eq "1" ]; then \
+    export TORCH_CUDA_ARCH_LIST=`python ./tools/get_nvdiffrast_compatible_arch.py` && \
+    /tmp && \
     git clone https://github.com/NVlabs/nvdiffrast && \
     cd nvdiffrast && \
-    cp ./docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json && \
-    pip install .
+    export MAX_JOBS=1 && \
+    pip install --no-build-isolation --break-system-packages .; fi
+
+
 
 RUN pip install ./${WHEEL_NAME}

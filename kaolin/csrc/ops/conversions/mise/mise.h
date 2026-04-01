@@ -43,26 +43,26 @@ namespace kaolin {
 struct MISE : torch::CustomClassHolder {
 private:
   struct Vector3D {
-    int x = 0;
-    int y = 0;
-    int z = 0;
+    int32_t x = 0;
+    int32_t y = 0;
+    int32_t z = 0;
 
     Vector3D() = default;
-    Vector3D(int in_x, int in_y, int in_z) : x(in_x), y(in_y), z(in_z) {}
+    Vector3D(int32_t in_x, int32_t in_y, int32_t in_z) : x(in_x), y(in_y), z(in_z) {}
   };
 
   struct Voxel {
     Vector3D loc{};
-    unsigned int level = 0;
+    uint32_t level = 0;
     bool is_leaf = true;
-    unsigned long children[2][2][2]{};
+    uint64_t children[2][2][2]{};
 
     Voxel() = default;
-    Voxel(const Vector3D& l, unsigned int lvl, bool leaf)
+    Voxel(const Vector3D& l, uint32_t lvl, bool leaf)
         : loc(l), level(lvl), is_leaf(leaf) {
-      for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 2; j++) {
-          for (int k = 0; k < 2; k++) {
+      for (int32_t i = 0; i < 2; i++) {
+        for (int32_t j = 0; j < 2; j++) {
+          for (int32_t k = 0; k < 2; k++) {
             children[i][j][k] = 0;
           }
         }
@@ -81,18 +81,18 @@ private:
 
   std::vector<Voxel> voxels;
   std::vector<GridPoint> grid_points;
-  std::map<long, long> grid_point_hash;
-  int resolution_0;
-  int depth;
+  std::map<int64_t, int64_t> grid_point_hash;
+  int32_t resolution_0;
+  int32_t depth;
   double threshold;
-  int voxel_size_0;
-  int resolution;
+  int32_t voxel_size_0;
+  int32_t resolution;
 
   void subdivide_voxels();
-  void subdivide_voxel(long idx);
-  long get_voxel_idx(Vector3D loc);
+  void subdivide_voxel(int64_t idx);
+  int64_t get_voxel_idx(Vector3D loc);
   void add_grid_point(Vector3D loc);
-  int get_grid_point_idx(Vector3D loc);
+  int32_t get_grid_point_idx(Vector3D loc);
 
 public:
   MISE(int32_t in_resolution_0, int32_t in_depth, double in_threshold);

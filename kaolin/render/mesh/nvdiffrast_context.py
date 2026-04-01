@@ -1,4 +1,4 @@
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,12 +20,10 @@ logger = logging.getLogger(__name__)
 
 _device2glctx = {}
 _has_nvdiffrast = False
-_default_context_fn = lambda device: None
 
 try:
     import nvdiffrast.torch as nvdiff
     _has_nvdiffrast = True
-    _default_context_fn = partial(nvdiff.RasterizeCudaContext)
 except ImportError:
     nvdiff = None
     logger.info("Cannot import nvdiffrast")
@@ -40,61 +38,14 @@ def nvdiffrast_is_available():
     return _has_nvdiffrast
 
 
-def nvdiffrast_use_cuda():
-    """ Configures nvdiffrast back end to use `nvdiffrast.torch.RasterizeCudaContext` by default.
-
-    This reset the cached nvdiffrast contexts.
-
-    .. note::
-        nvdiffrast only support a resolution multiple of 8.
-    """
-    global _default_context_fn
-    if nvdiffrast_is_available():
-        _default_context_fn = nvdiff.RasterizeCudaContext
-        _device2glctx.clear()
-    else:
-        _log_not_available()
-
-
-def nvdiffrast_use_opengl():
-    """ Configures nvdiffrast back end to use `nvdiffrast.torch.RasterizeGLContext` by default.
-
-
-    This reset the cached nvdiffrast contexts.
-    """
-    global _default_context_fn
-    if nvdiffrast_is_available():
-        _default_context_fn = partial(nvdiff.RasterizeGLContext, output_db=False)
-        _device2glctx.clear()
-    else:
-        _log_not_available()
-
-
-def set_default_nvdiffrast_context(context, device="cuda"):
-    """ Allows manually setting default nvdiffrast context to the given value for a specific device.
-
-    Args:
-        context (nvdiffrast.torch.RasterizeCudaContext or nvdiffrast.torch.RasterizeGLContext): context instance
-        device (str, torch.device): pytorch device
-    """
-    if nvdiffrast_is_available():
-        device_name = str(device)
-        if device_name in _device2glctx:
-            logger.warning(f'Replacing default nvdiffrast context for device {device_name}.')
-        _device2glctx[device_name] = context
-    else:
-        _log_not_available()
-
-
 def default_nvdiffrast_context(device, raise_error=False):
-    """ Returns existing context for device, or creates one. To configure nvdiffrast to use opengl or CUDA back
-    end by default call :func:`nvdiffrast_use_cuda` or func:`nvdiffrast_use_opengl`.
+    """Returns existing context for device, or creates one.
 
     Args:
         device (str or torch.device): device for the context
 
     Returns:
-        nvdiffrast.torch.RasterizeCudaContext or nvdiffrast.torch.RasterizeGLContext
+        nvdiffrast.torch.RasterizeCudaContext
     """
     if not nvdiffrast_is_available():
         if raise_error:
@@ -104,6 +55,6 @@ def default_nvdiffrast_context(device, raise_error=False):
 
     device_name = str(device)
     if device_name not in _device2glctx:
-        _device2glctx[device_name] = _default_context_fn(device=device)
+        _device2glctx[device_name] = nvdiff.RasterizeCudaContext(device=device)
     return _device2glctx[device_name]
 

@@ -17,7 +17,6 @@
 #define CUB_NS_POSTFIX }
 #define CUB_NS_QUALIFIER ::kaolin::cub
 
-#include <torch/extension.h>
 #include <stdio.h>
 #include <math_constants.h>
 

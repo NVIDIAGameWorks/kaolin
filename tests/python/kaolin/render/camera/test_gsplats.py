@@ -49,11 +49,11 @@ def gs_cam_cls():
 
     sys.path.append(LOCAL_GSPLATS_DIR)
     subprocess.check_call([
-        sys.executable, "-m", "pip", "install",
+        sys.executable, "-m", "pip", "install", "--no-build-isolation",
         os.path.join(LOCAL_GSPLATS_DIR, "submodules", "diff-gaussian-rasterization")
     ])
     subprocess.check_call([
-        sys.executable, "-m", "pip", "install",
+        sys.executable, "-m", "pip", "install", "--no-build-isolation",
         os.path.join(LOCAL_GSPLATS_DIR, "submodules", "simple-knn")
     ])
     from scene.cameras import Camera as GSCamera

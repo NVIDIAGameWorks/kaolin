@@ -15,40 +15,29 @@ RUN if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
         rm /etc/apt/sources.list.d/nvidia-ml.list; \
     fi
 
-WORKDIR /kaolin
-
-COPY . .
-
 RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-peer.conf \
     && apt-get -y update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated ca-certificates \
     && rm /etc/apt/apt.conf.d/99verify-peer.conf \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        libgl1-mesa-dev \
-        libgles2-mesa-dev \
-        libegl1-mesa-dev \
         git \
         pkg-config \
-	libatk1.0-0 \
-	libatk-bridge2.0-0 \
-	libasound2 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
         libgtk2.0-0 \
         libgtk-3-0 \
-	libnss3 \
-        libglvnd0 \
-        libgl1 \
-        libglx0 \
-        libegl1 \
-        libgles2 \
-        libglvnd-dev \
-	curl \
+        libnss3 \   
+        curl \
         cmake \
         xvfb \
-	wget \
-	software-properties-common \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+        wget \
+        software-properties-common \
+        && (apt-get install -y --no-install-recommends libasound2 || apt-get install -y --no-install-recommends libasound2t64) \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*
 
+# Remove PEP 668 restriction (safe in containers)
+RUN rm -f /usr/lib/python*/EXTERNALLY-MANAGED
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -56,32 +45,33 @@ ENV PYTHONUNBUFFERED=1
 # fix for a weird pytorch bug (see: https://discuss.pytorch.org/t/not-able-to-include-cusolverdn-h/169122/5)
 ENV PATH /usr/local/cuda/bin:$PATH
 
-# for GLEW
-ENV LD_LIBRARY_PATH /usr/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib:${LD_LIBRARY_PATH}
+WORKDIR /kaolin
 
-# nvidia-container-runtime
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES compute,utility,graphics
+COPY . .
 
-## Install Dash3D Requirements ###
+# Install Dash3D Requirements ###
 RUN curl -fsSL https://deb.nodesource.com/setup_16.x --insecure | bash - \
     && apt-get install -y nodejs
 
 RUN npm install -g npm@8.5.4
 RUN npm install 
 
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir ninja \
-        imageio imageio-ffmpeg && \
-    pip install --no-cache-dir \
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir \
+       	ninja \
+        imageio \
+	imageio-ffmpeg
+RUN pip install --ignore-installed --no-cache-dir \
         -r tools/viz_requirements.txt \
         -r tools/requirements.txt \
         -r tools/build_requirements.txt
 
-#RUN cd /tmp && \
-#    git clone https://github.com/NVlabs/nvdiffrast && \
-#    cd nvdiffrast && \
-#    cp ./docker/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json && \
-#    pip install .
+RUN if [ "$FORCE_CUDA" -eq "1" ]; then \
+    export TORCH_CUDA_ARCH_LIST=`python tools/get_nvdiffrast_compatible_arch.py` && \
+    cd /tmp && \
+    git clone https://github.com/NVlabs/nvdiffrast && \
+    cd nvdiffrast && \
+    export MAX_JOBS=1 && \
+    pip install --no-build-isolation --break-system-packages .; fi
 
 RUN export MAX_JOBS=1 && python setup.py develop

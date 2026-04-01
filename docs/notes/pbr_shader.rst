@@ -62,9 +62,7 @@ A Note on the Backends
 ======================
 
 See :ref:`Differentiable Rendering <diff_render>` for background on different backends. As noted above, the :any:`easy_render.render_mesh <kaolin.render.easy_render.render_mesh>`
-supports two back ends. We recommend using `nvdiffrast <https://github.com/NVlabs/nvdiffrast>`_. If this library is installed, a default OpenGL based context will be created
-and reused on the provided GPU device. It is also possible to pass in the desirable context, or to configure the behavior of devault context constructions through
-methods like :any:`nvdiffrast_use_cuda() <kaolin.render.mesh.nvdiffrast_context.nvdiffrast_use_cuda>`. See :py:mod:`kaolin.render.mesh.nvdiffrast_context`.
+supports two back ends. We recommend using `nvdiffrast <https://github.com/NVlabs/nvdiffrast>`_. If this library is installed, a default CUDA based context will be created and reused on the provided GPU device.
 Note that not all nvdiffrast capabilities (like anti-aliasing) are currently available through the high-level function.
 
 
