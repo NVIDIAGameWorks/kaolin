@@ -17,7 +17,7 @@ import pytest
 import torch
 import math
 
-from kaolin.ops.gaussians import transform_gaussians, transform_sh
+from kaolin.ops.gaussians import transform_gaussians, transform_shs
 import kaolin.math.quat as quat_ops
 
 C0 = 0.28209479177387814
@@ -177,10 +177,10 @@ class TestTransformGaussians:
         ])
     
     @pytest.mark.parametrize("degree", [1, 2, 3])
-    def test_transform_sh(self, shs_feat, trs_transform, degree, device, dtype):
-        """Test transform_sh by sampling the transformed SH vs transformed directions on original SH."""
+    def test_transform_shs(self, shs_feat, trs_transform, degree, device, dtype):
+        """Test transform_shs by sampling the transformed SH vs transformed directions on original SH."""
         shs_feat_input = shs_feat[:, :((degree + 1) ** 2) - 1, :]
-        new_shs_feat = transform_sh(shs_feat_input, trs_transform[:3, :3].unsqueeze(0)) # N x (degree + 1) ** 2 - 1 x 3
+        new_shs_feat = transform_shs(shs_feat_input, trs_transform[:3, :3].unsqueeze(0)) # N x (degree + 1) ** 2 - 1 x 3
         num_dirs = 100
         dirs = torch.randn(1, num_dirs, 3, device=device, dtype=dtype)
         dirs = dirs / torch.linalg.norm(dirs, dim=-1).unsqueeze(-1) # 1 x num_dirs x 3
@@ -205,10 +205,10 @@ class TestTransformGaussians:
         torch.testing.assert_close(rgb, gt, atol=atol, rtol=rtol)
 
     @pytest.mark.parametrize("degree", [1, 2, 3])
-    def test_batched_transform_sh(self, shs_feat, batched_trs_transforms, degree, device, dtype):
-        """Test transform_sh by sampling the transformed SH vs transformed directions on original SH."""
+    def test_batched_transform_shs(self, shs_feat, batched_trs_transforms, degree, device, dtype):
+        """Test transform_shs by sampling the transformed SH vs transformed directions on original SH."""
         shs_feat_input = shs_feat[:, :((degree + 1) ** 2) - 1, :]
-        new_shs_feat = transform_sh(shs_feat_input, batched_trs_transforms[..., :3, :3]) # N x (degree + 1) ** 2 - 1 x 3
+        new_shs_feat = transform_shs(shs_feat_input, batched_trs_transforms[..., :3, :3]) # N x (degree + 1) ** 2 - 1 x 3
         num_dirs = 100
         dirs = torch.randn(1, num_dirs, 3, device=device, dtype=dtype)
         dirs = dirs / torch.linalg.norm(dirs, dim=-1).unsqueeze(-1) # 1 x num_dirs x 3
@@ -475,7 +475,7 @@ class TestTransformGaussians:
             expected_scales = scales * S
     
         if use_shs_feat:
-            expected_shs_feat = transform_sh(shs_feat, R.unsqueeze(0))
+            expected_shs_feat = transform_shs(shs_feat, R.unsqueeze(0))
         else:
             expected_shs_feat = None
 
@@ -707,7 +707,7 @@ class TestTransformGaussians:
         else:
             expected_scales = scales * S
         if use_shs_feat:
-            expected_shs_feat = transform_sh(shs_feat, R)
+            expected_shs_feat = transform_shs(shs_feat, R)
         else:
             expected_shs_feat = None
         expected_rotations = naive_transform_rotation(_quat_wxyz_to_xyzw(rotations), batched_trs_transforms)

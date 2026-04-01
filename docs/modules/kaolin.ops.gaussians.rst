@@ -1,6 +1,6 @@
-.. _kaolin.ops.gaussian:
+.. _kaolin.ops.gaussians:
 
-kaolin.ops.gaussian
+kaolin.ops.gaussians
 ***********************
 
 `Gaussian Splats <https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/>`_ is a novel 3D representation consisting
@@ -25,10 +25,11 @@ and physics simulations now supported by kaolin paves the way to new and excitin
 To improve the accuracy of such simulations, kaolin includes a CUDA based densification module which
 attempts to sample additional points within the volume of shapes represented with 3D Gaussians.
 
+
 API
 ---
 
-.. automodule:: kaolin.ops.gaussian
+.. automodule:: kaolin.ops.gaussians
    :members:
    :undoc-members:
    :show-inheritance:

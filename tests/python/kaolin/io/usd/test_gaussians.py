@@ -20,6 +20,8 @@ import math
 import torch
 import pytest
 import wget
+import hashlib
+import zipfile
 from pxr import Usd
 
 from kaolin.io import usd
@@ -32,6 +34,24 @@ TOYS_DATASET_PATH = os.getenv('KAOLIN_TEST_TOYS_DATASET_PATH')
 # And a compressed usdc file that contains the same two BluehairRagdoll gaussian clouds as the combined usdc file
 # but in float16 and spherical harmonics degree 0
 TOYS_NAMES = ['BluehairRagdoll', 'bublik_octopus', 'knit_meow', 'mer_elephant', 'stink_raccoon', 'sunflower_baby']
+TOYS_USDC_CHECKSUMS = {
+    'BluehairRagdoll.usdc': '194fc1779ed4a2c3c310c3dfc4fb7063',
+    'bublik_octopus.usdc': '87c678debbc4c1dbbbd109cf14a8af66',
+    'knit_meow.usdc': '23a80128a84d9c489c5a5a1f20fc42e7',
+    'mer_elephant.usdc': '220c8ae6c73efb93cabeddb13b9b759e',
+    'stink_raccoon.usdc': '7b9a9c05f080e4526dac45d2d7faac11',
+    'sunflower_baby.usdc': 'afb4d81f5c8c63ffd9778cfae608c138',
+    'BluehairRagdoll_multi.usdc': '7ca53e1b359cc8ce04d272c132ea4fd8',
+    'BluehairRagdoll_compressed.usdc': '8813ce84ab6a349a98aa922e79053b67'
+}
+TOYS_PT_CHECKSUMS = {
+    'BluehairRagdoll.pt': '7e84a773e5402a4cc8e84e8c8544ae0a',
+    'bublik_octopus.pt': '7f34c1e5f0a7ea6634ea4a92b81835e7',
+    'knit_meow.pt': 'b917ddd7485b4cf7e9414164e71e3707',
+    'mer_elephant.pt': '3cee58ef3933166f5a7f60934362c3da',
+    'stink_raccoon.pt': 'dfb63443a8c12649c16fe8f364caee86',
+    'sunflower_baby.pt': 'b93bc44375d115aa5cebaf3c3c68cdec',
+}
 
 def make_synthetic_gaussian_cloud(n=8, seed=0):
     """Create minimal valid gaussian cloud data for testing."""
@@ -459,18 +479,37 @@ class TestGaussianImportFromToys:
         """Download toys dataset if it doesn't exist."""
         if not os.path.exists(TOYS_DATASET_PATH):
             os.makedirs(TOYS_DATASET_PATH, exist_ok=True)
-        for toy_name in TOYS_NAMES:
-            path = os.path.join(TOYS_DATASET_PATH, toy_name)
-            if not os.path.exists(path + '.usdc'):
-                wget.download(f'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/{toy_name}.usdc', path + '.usdc')
-            if not os.path.exists(path + '.pt'):
-                wget.download(f'https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/{toy_name}.pt', path + '.pt')
-        if not os.path.exists(os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll_multi.usdc')):
-            wget.download('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/BluehairRagdoll_multi.usdc',
-                          os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll_multi.usdc'))
-        if not os.path.exists(os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll_compressed.usdc')):
-            wget.download('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/BluehairRagdoll_compressed.usdc',
-                          os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll_compressed.usdc'))
+        need_download = False
+        for toy_file_name, md5_checksum in TOYS_USDC_CHECKSUMS.items():
+            path = os.path.join(TOYS_DATASET_PATH, toy_file_name)
+            if not os.path.exists(path):
+                need_download = True
+                break
+            with open(path, 'rb') as f:
+                if md5_checksum != hashlib.md5(f.read()).hexdigest():
+                    need_download = True
+                    break
+        if need_download:
+            wget.download('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/toys_gaussians.usdc.zip', os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.usdc.zip'))
+            with zipfile.ZipFile(os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.usdc.zip'), 'r') as zip_ref:
+                zip_ref.extractall(TOYS_DATASET_PATH)
+            os.remove(os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.usdc.zip'))
+
+        need_download = False        
+        for toy_file_name, md5_checksum in TOYS_PT_CHECKSUMS.items():
+            path = os.path.join(TOYS_DATASET_PATH, toy_file_name)
+            if not os.path.exists(path):
+                need_download = True
+                break
+            with open(path, 'rb') as f:
+                if md5_checksum != hashlib.md5(f.read()).hexdigest():
+                    need_download = True
+                    break
+        if need_download:
+            wget.download('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/toys_gaussians.pt.zip', os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.pt.zip'))
+            with zipfile.ZipFile(os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.pt.zip'), 'r') as zip_ref:
+                zip_ref.extractall(TOYS_DATASET_PATH)
+            os.remove(os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.pt.zip'))
 
     @pytest.mark.parametrize('toy_name', TOYS_NAMES)
     def test_import_toy_file(self, toy_name):

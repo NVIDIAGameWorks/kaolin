@@ -20,7 +20,7 @@ from kaolin.math import quat as quat_ops
 
 __all__ = [
     'transform_gaussians',
-    'transform_sh'
+    'transform_shs'
 ]
 
 logger = logging.getLogger(__name__)
@@ -108,43 +108,43 @@ def transform_gaussians(xyz, rotations, scales, transform, shs_feat=None, use_lo
     if shs_feat is None:
         new_shs_feat = None
     else:
-        new_shs_feat = transform_sh(shs_feat, tfm_rotation)
+        new_shs_feat = transform_shs(shs_feat, tfm_rotation)
 
     return new_xyz, new_rotations, new_scales, new_shs_feat
 
 # Q R Q^{-1} decomposes into permutation [1,2,0] + this sign pattern
 _S_3DGS = [[1, -1, 1], [-1, 1, -1], [1, -1, 1]]
 
-def transform_sh(sh_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
+def transform_shs(shs_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
     r"""
     Rotate real SH coefficients (bands 1-3) in batch.
 
     Args:
-        sh_feat (torch.Tensor): SH coefficients for bands l=1..3, RGB, of shape :math:`(N, \text{num_coeffs}, 3)`.
+        shs_feat (torch.Tensor): SH coefficients for bands l=1..3, RGB, of shape :math:`(N, \text{num_coeffs}, 3)`.
         R (torch.Tensor): rotation matrices (SO(3)), of shape :math:`(N, 3, 3)`.
 
     Returns:
         (torch.Tensor): rotated SH coefficients, of shape :math:`(N, \text{num_coeffs}, 3)`.
     """
-    assert sh_feat.dtype == R.dtype, f"sh and R must have the same dtype, got sh.dtype: {sh_feat.dtype}, R.dtype: {R.dtype}"
-    assert sh_feat.device == R.device, f"sh and R must be on the same device, got sh.device: {sh_feat.device}, R.device: {R.device}"
-    num_coeffs = sh_feat.shape[1]
+    assert shs_feat.dtype == R.dtype, f"sh and R must have the same dtype, got sh.dtype: {shs_feat.dtype}, R.dtype: {R.dtype}"
+    assert shs_feat.device == R.device, f"sh and R must be on the same device, got sh.device: {shs_feat.device}, R.device: {R.device}"
+    num_coeffs = shs_feat.shape[1]
     degree = math.isqrt(num_coeffs + 1) - 1
     assert ((degree + 1) ** 2) - 1 == num_coeffs
     if degree > 3:
-        raise NotImplementedError(f"transform_sh does not support degree > 3, got {degree}")
-    assert sh_feat.shape[2] == 3, f"sh must have 3 channels, got sh.shape: {sh_feat.shape}"
-    assert R.shape[0] == sh_feat.shape[0] or R.shape[0] == 1, f"R must have the same number of batches as sh, got R.shape: {R.shape}, sh.shape: {sh_feat.shape}"
+        raise NotImplementedError(f"transform_shs does not support degree > 3, got {degree}")
+    assert shs_feat.shape[2] == 3, f"sh must have 3 channels, got sh.shape: {shs_feat.shape}"
+    assert R.shape[0] == shs_feat.shape[0] or R.shape[0] == 1, f"R must have the same number of batches as sh, got R.shape: {R.shape}, sh.shape: {shs_feat.shape}"
     assert R.shape[1:] == (3, 3), f"R must be a rotation matrix, got R.shape: {R.shape}"
 
-    out = torch.empty_like(sh_feat)
+    out = torch.empty_like(shs_feat)
 
     # D^1 = Q R Q^{-1} = R[perm][:,perm] * S
     perm = [1, 2, 0]
     S = R.new_tensor(_S_3DGS)
     D1 = R[:, perm][:, :, perm] * S                        # (N, 3, 3)
 
-    out[:, :3] = (D1 @ sh_feat[:, :3])
+    out[:, :3] = (D1 @ shs_feat[:, :3])
 
     if degree == 1:
         return out
@@ -155,7 +155,7 @@ def transform_sh(sh_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
     D2 = torch.zeros(out_idx.shape[0], 5 * 5, device=products.device, dtype=products.dtype)
     D2.scatter_add_(1, out_idx, products)
     D2 = D2.view(-1, 5, 5)
-    out[:, 3:8] = (D2 @ sh_feat[:, 3:8])
+    out[:, 3:8] = (D2 @ shs_feat[:, 3:8])
 
     if degree == 2:
         return out
@@ -165,7 +165,7 @@ def transform_sh(sh_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
     D3 = torch.zeros(out_idx.shape[0], 7 * 7, device=products.device, dtype=products.dtype)
     D3.scatter_add_(1, out_idx, products)
     D3 = D3.view(-1, 7, 7)
-    out[:, 8:15] = (D3 @ sh_feat[:, 8:15])
+    out[:, 8:15] = (D3 @ shs_feat[:, 8:15])
     if degree == 3:
         return out
 
