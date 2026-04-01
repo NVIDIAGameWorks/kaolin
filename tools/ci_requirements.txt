@@ -9,5 +9,4 @@ nbmake==1.4.1
 jupyter
 plyfile
 gitpython
-wget
 polyscope>=2.2.0

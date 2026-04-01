@@ -179,7 +179,8 @@ spec:
             export KAOLIN_TEST_MODELNET_PATH=/mnt/data/ModelNet
             export KAOLIN_TEST_SHREC16_PATH=/mnt/data/ci_shrec16
             export KAOLIN_TEST_GSPLATS_DIR=/mnt/gsplats
-            export KAOLIN_TEST_TOYS_DATASET_PATH=/mnt/data/toys/
+            export KAOLIN_SCANNED_TOYS_PATH=/mnt/data/toys/
+            export KAOLIN_TEST_SCANNED_TOYS=1
             pytest --durations=50 --import-mode=importlib -rs --cov=/kaolin/kaolin \
                 --log-disable=PIL.PngImagePlugin \
                 --log-disable=PIL.TiffImagePlugin \
