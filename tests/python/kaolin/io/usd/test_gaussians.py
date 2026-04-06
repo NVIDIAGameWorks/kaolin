@@ -19,39 +19,16 @@ import shutil
 import math
 import torch
 import pytest
-import wget
-import hashlib
-import zipfile
 from pxr import Usd
 
 from kaolin.io import usd
+from kaolin.utils.bundled_data import SCANNED_TOYS_PATH, SCANNED_TOYS_NAMES, download_scanned_toys_dataset
+from kaolin.utils.env_vars import KaolinTestEnvVars
 from kaolin.utils.testing import contained_torch_equal
 from kaolin.ops.gaussians import transform_gaussians
 
-TOYS_DATASET_PATH = os.getenv('KAOLIN_TEST_TOYS_DATASET_PATH')
-# The Toys dataset contains individual usdc / torch files for each toy (in TOYS NAMES)
-# And a combined usdc file that contains two BluehairRagdoll gaussian clouds (1st is original, 2nd is transformed)
-# And a compressed usdc file that contains the same two BluehairRagdoll gaussian clouds as the combined usdc file
-# but in float16 and spherical harmonics degree 0
-TOYS_NAMES = ['BluehairRagdoll', 'bublik_octopus', 'knit_meow', 'mer_elephant', 'stink_raccoon', 'sunflower_baby']
-TOYS_USDC_CHECKSUMS = {
-    'BluehairRagdoll.usdc': '194fc1779ed4a2c3c310c3dfc4fb7063',
-    'bublik_octopus.usdc': '87c678debbc4c1dbbbd109cf14a8af66',
-    'knit_meow.usdc': '23a80128a84d9c489c5a5a1f20fc42e7',
-    'mer_elephant.usdc': '220c8ae6c73efb93cabeddb13b9b759e',
-    'stink_raccoon.usdc': '7b9a9c05f080e4526dac45d2d7faac11',
-    'sunflower_baby.usdc': 'afb4d81f5c8c63ffd9778cfae608c138',
-    'BluehairRagdoll_multi.usdc': '7ca53e1b359cc8ce04d272c132ea4fd8',
-    'BluehairRagdoll_compressed.usdc': '8813ce84ab6a349a98aa922e79053b67'
-}
-TOYS_PT_CHECKSUMS = {
-    'BluehairRagdoll.pt': '7e84a773e5402a4cc8e84e8c8544ae0a',
-    'bublik_octopus.pt': '7f34c1e5f0a7ea6634ea4a92b81835e7',
-    'knit_meow.pt': 'b917ddd7485b4cf7e9414164e71e3707',
-    'mer_elephant.pt': '3cee58ef3933166f5a7f60934362c3da',
-    'stink_raccoon.pt': 'dfb63443a8c12649c16fe8f364caee86',
-    'sunflower_baby.pt': 'b93bc44375d115aa5cebaf3c3c68cdec',
-}
+TEST_SCANNED_TOYS = os.getenv(KaolinTestEnvVars.TEST_SCANNED_TOYS)
+
 
 def make_synthetic_gaussian_cloud(n=8, seed=0):
     """Create minimal valid gaussian cloud data for testing."""
@@ -465,56 +442,25 @@ class TestGaussianExportImport:
 
 
 # -----------------------------------------------------------------------------
-# Tests that require TOYS dataset (skipped when KAOLIN_TEST_TOYS_DATASET_PATH unset)
+# Tests that require TOYS dataset (skipped when KAOLIN_TEST_SCANNED_TOYS is unset) # TODO: needed?
+# Note that default location for toys is either under sample_data or is set
+# using KAOLIN_SCANNED_TOYS_PATH env variable.
 # -----------------------------------------------------------------------------
 
 @pytest.mark.skipif(
-    TOYS_DATASET_PATH is None,
-    reason="'KAOLIN_TEST_TOYS_DATASET_PATH' environment variable is not set. (Will download files if set but has no files)",
+    TEST_SCANNED_TOYS is None,
+    reason="'KAOLIN_TEST_SCANNED_TOYS' environment variable is not set (will download files if needed).",
 )
 class TestGaussianImportFromToys:
     """Tests for importing gaussians from TOYS dataset usdc files."""
     @pytest.fixture(scope='class', autouse=True)
     def download_toys_dataset(self):
-        """Download toys dataset if it doesn't exist."""
-        if not os.path.exists(TOYS_DATASET_PATH):
-            os.makedirs(TOYS_DATASET_PATH, exist_ok=True)
-        need_download = False
-        for toy_file_name, md5_checksum in TOYS_USDC_CHECKSUMS.items():
-            path = os.path.join(TOYS_DATASET_PATH, toy_file_name)
-            if not os.path.exists(path):
-                need_download = True
-                break
-            with open(path, 'rb') as f:
-                if md5_checksum != hashlib.md5(f.read()).hexdigest():
-                    need_download = True
-                    break
-        if need_download:
-            wget.download('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/toys_gaussians.usdc.zip', os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.usdc.zip'))
-            with zipfile.ZipFile(os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.usdc.zip'), 'r') as zip_ref:
-                zip_ref.extractall(TOYS_DATASET_PATH)
-            os.remove(os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.usdc.zip'))
+        download_scanned_toys_dataset()
 
-        need_download = False        
-        for toy_file_name, md5_checksum in TOYS_PT_CHECKSUMS.items():
-            path = os.path.join(TOYS_DATASET_PATH, toy_file_name)
-            if not os.path.exists(path):
-                need_download = True
-                break
-            with open(path, 'rb') as f:
-                if md5_checksum != hashlib.md5(f.read()).hexdigest():
-                    need_download = True
-                    break
-        if need_download:
-            wget.download('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/toys_gaussians.pt.zip', os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.pt.zip'))
-            with zipfile.ZipFile(os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.pt.zip'), 'r') as zip_ref:
-                zip_ref.extractall(TOYS_DATASET_PATH)
-            os.remove(os.path.join(TOYS_DATASET_PATH, 'toys_gaussians.pt.zip'))
-
-    @pytest.mark.parametrize('toy_name', TOYS_NAMES)
+    @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
     def test_import_toy_file(self, toy_name):
         """Import gaussians from each toy usdc file and validate cloud structure."""
-        path = os.path.join(TOYS_DATASET_PATH, f'{toy_name}.usdc')
+        path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
         scene_paths = usd.get_gaussiancloud_scene_paths(path)
 
         gaussianclouds = usd.import_gaussianclouds(path, scene_paths)
@@ -536,10 +482,10 @@ class TestGaussianImportFromToys:
             assert cloud['sh_coeff'].shape[0] == n
             assert cloud['sh_coeff'].shape[2] == 3
 
-    @pytest.mark.parametrize('toy_name', TOYS_NAMES)
+    @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
     def test_import_gaussianclouds_all(self, toy_name):
         """import_gaussianclouds with default scene_pathsreturns dict mapping scene path to cloud."""
-        path = os.path.join(TOYS_DATASET_PATH, f'{toy_name}.usdc')
+        path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
         all_clouds = usd.import_gaussianclouds(path)
 
         scene_paths = usd.get_gaussiancloud_scene_paths(path)
@@ -548,10 +494,10 @@ class TestGaussianImportFromToys:
         for sp in scene_paths:
             assert str(sp) in all_clouds
 
-    @pytest.mark.parametrize('toy_name', TOYS_NAMES)
+    @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
     def test_import_export_roundtrip_from_toy(self, out_dir, toy_name):
         """Import cloud from toy, export to temp file, re-import and compare."""
-        path = os.path.join(TOYS_DATASET_PATH, f'{toy_name}.usdc')
+        path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
         scene_paths = usd.get_gaussiancloud_scene_paths(path)
 
         imported = usd.import_gaussianclouds(path, scene_paths)
@@ -581,10 +527,10 @@ class TestGaussianImportFromToys:
             atol=1e-5,
         )
 
-    @pytest.mark.parametrize('toy_name', TOYS_NAMES)
+    @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
     def test_import_from_stage_object(self, toy_name):
         """Import works when passing Usd.Stage instead of file path."""
-        path = os.path.join(TOYS_DATASET_PATH, f'{toy_name}.usdc')
+        path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
 
         stage = Usd.Stage.Open(path)
         scene_paths = usd.get_gaussiancloud_scene_paths(stage)
@@ -592,11 +538,11 @@ class TestGaussianImportFromToys:
         gaussianclouds = usd.import_gaussianclouds(stage, scene_paths)
         assert len(gaussianclouds) >= 1
 
-    @pytest.mark.parametrize('toy_name', TOYS_NAMES)
+    @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
     def test_import_gaussianclouds_vs_ground_truth(self, toy_name):
         """Compare import_gaussianclouds output against ground truth .pt file."""
-        path = os.path.join(TOYS_DATASET_PATH, f'{toy_name}.usdc')
-        gt_path = os.path.join(TOYS_DATASET_PATH, f'{toy_name}.pt')
+        path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
+        gt_path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.pt')
 
         expected = torch.load(gt_path, weights_only=True)
         scene_paths = ['/World/Gaussians/gaussian_0']
@@ -610,11 +556,11 @@ class TestGaussianImportFromToys:
             atol=1e-5,
         ), f'Mismatch for cloud {toy_name}'
 
-    @pytest.mark.parametrize('toy_name', TOYS_NAMES)
+    @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
     def test_import_gaussianclouds_all_vs_ground_truth(self, toy_name):
         """Compare import_gaussianclouds with default scene_paths output against ground truth .pt file."""
-        path = os.path.join(TOYS_DATASET_PATH, f'{toy_name}.usdc')
-        gt_path = os.path.join(TOYS_DATASET_PATH, f'{toy_name}.pt')
+        path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
+        gt_path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.pt')
 
         expected = torch.load(gt_path, weights_only=True)
         actual = usd.import_gaussianclouds(path)
@@ -628,7 +574,7 @@ class TestGaussianImportFromToys:
 
     def test_get_gaussiancloud_scene_paths_combined(self):
         """get_gaussiancloud_scene_paths returns BluehairRagdoll_0 and BluehairRagdoll_1 paths from BluehairRagdoll_multi.usdc."""
-        path = os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll_multi.usdc')
+        path = os.path.join(SCANNED_TOYS_PATH, 'BluehairRagdoll_multi.usdc')
 
         actual = usd.get_gaussiancloud_scene_paths(path)
         expected = {'/World/Gaussians/BluehairRagdoll_0', '/World/Gaussians/BluehairRagdoll_1'}
@@ -637,8 +583,8 @@ class TestGaussianImportFromToys:
 
     def test_import_gaussianclouds_partial_combined(self):
         """Import gaussianclouds from two BluehairRagdoll (2nd is transformed) usdc and compare to ground truth."""
-        path = os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll_multi.usdc')
-        gt = torch.load(os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll.pt'), weights_only=True)
+        path = os.path.join(SCANNED_TOYS_PATH, 'BluehairRagdoll_multi.usdc')
+        gt = torch.load(os.path.join(SCANNED_TOYS_PATH, 'BluehairRagdoll.pt'), weights_only=True)
 
         scene_paths = ['/World/Gaussians/BluehairRagdoll_0']
         output = usd.import_gaussianclouds(path, scene_paths)
@@ -649,8 +595,8 @@ class TestGaussianImportFromToys:
 
     def test_import_gaussianclouds_all_combined(self):
         """Import gaussianclouds with default scene_paths from two BluehairRagdoll (2nd is transformed) usdc and compare to ground truth."""
-        path = os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll_multi.usdc')
-        gt = torch.load(os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll.pt'), weights_only=True)
+        path = os.path.join(SCANNED_TOYS_PATH, 'BluehairRagdoll_multi.usdc')
+        gt = torch.load(os.path.join(SCANNED_TOYS_PATH, 'BluehairRagdoll.pt'), weights_only=True)
 
         transform = torch.tensor([[2, 0, 0, 0.5],
                                    [0, 0, -2, 0],
@@ -666,8 +612,8 @@ class TestGaussianImportFromToys:
 
     def test_import_gaussianclouds_partial_compressed(self):
         """Import gaussianclouds from two BluehairRagdoll (2nd is transformed) usdc and compare to ground truth."""
-        path = os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll_compressed.usdc')
-        gt = torch.load(os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll.pt'), weights_only=True)
+        path = os.path.join(SCANNED_TOYS_PATH, 'BluehairRagdoll_compressed.usdc')
+        gt = torch.load(os.path.join(SCANNED_TOYS_PATH, 'BluehairRagdoll.pt'), weights_only=True)
 
         gt['sh_coeff'] = gt['sh_coeff'][:, :1]
 
@@ -684,8 +630,8 @@ class TestGaussianImportFromToys:
 
     def test_import_gaussianclouds_all_compressed(self):
         """Import all gaussianclouds from two BluehairRagdoll (2nd is transformed) usdc and compare to ground truth."""
-        path = os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll_compressed.usdc')
-        gt = torch.load(os.path.join(TOYS_DATASET_PATH, 'BluehairRagdoll.pt'), weights_only=True)
+        path = os.path.join(SCANNED_TOYS_PATH, 'BluehairRagdoll_compressed.usdc')
+        gt = torch.load(os.path.join(SCANNED_TOYS_PATH, 'BluehairRagdoll.pt'), weights_only=True)
 
         gt['sh_coeff'] = gt['sh_coeff'][:, :1]
 
