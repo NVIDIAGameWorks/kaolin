@@ -68,6 +68,15 @@ _TOYS_PT_CHECKSUMS = {
     'sunflower_baby.pt': 'b93bc44375d115aa5cebaf3c3c68cdec',
 }
 
+# TODO: gingerbread was probably put in by mistake: 'gingerbread.ply': '9fa27afbc0e26bd933e156bb48254ff8',
+_TOYS_PLY_CHECKSUMS = {
+    'BluehairRagdoll.ply': 'f3a6591e7dc497d2fdbd1bb654f01baf',
+    'bublik_octopus.ply': '4bd216545854171ef69d5c62a0aea369',
+    'knit_meow.ply': 'f413b1f5c3cc7ccbc724643749f06d57',
+    'mer_elephant.ply': '613f87a424c9eba9ecafd8b91150330c',
+    'stink_raccoon.ply': 'e78798c1d2b6b4262b6c05636022fa15',
+    'sunflower_baby.ply': '5f464485ac524c09e3a9b8a9f7d2b7d5',
+}
 
 # TODO: document details, point to a whitepaper when available
 def download_scanned_toys_dataset():
@@ -113,5 +122,7 @@ def download_scanned_toys_dataset():
                         _TOYS_USDC_CHECKSUMS)
     _download_if_needed('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/toys_gaussians.pt.zip',
                         _TOYS_PT_CHECKSUMS)
+    _download_if_needed('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/toys_gaussians.ply.zip',
+                        _TOYS_PLY_CHECKSUMS)
 
     return SCANNED_TOYS_PATH
