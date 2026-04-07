@@ -34,9 +34,8 @@ def polyscope_camera_to_kaolin(
     dtype: torch.dtype = torch.get_default_dtype(),
     device: Union[torch.device, str] = 'cpu'
 ) -> Camera:
-    """ Converts a polyscope camera (polyscope.core.CameraParameters)
-    to kaolin Camera format (kaolin.render.camera.Camera).
-    The converted information includes the camera extrinsics, the image plane dimensions and field of view.
+    """ Converts a polyscope camera (``polyscope.core.CameraParameters``)
+    to Kaolin :ref:`Camera <kaolin.render.camera.Camera>`. The converted information includes the camera extrinsics, the image plane dimensions and field of view.
     Additional parameters that kaolin cameras assume and polyscope does not, such as near, far plane and device
     can be passed explicitly if needed.
 
@@ -44,12 +43,12 @@ def polyscope_camera_to_kaolin(
         ps_camera (ps.core.CameraParameters): A polyscope camera object.
         width (int): Image plane width in pixels.
         height (int): Image plane height in pixels.
-        near (optional, float): near clipping plane, defines the min depth of the view frustrum.
-        far (optional, float): far clipping plane, define the max depth of the view frustrum.
+        near (optional, float): near clipping plane, defines the min depth of the view frustum.
+        far (optional, float): far clipping plane, define the max depth of the view frustum.
         dtype (optional, torch.dtype): Datatype of the kaolin camera, converted from polyscope float32 precision.
         device (optional, torch.device or str): the device on which camera parameters will be allocated. Default: cpu
     Returns:
-        (kaolin.render.camera.Camera):
+        (Camera):
             A kaolin camera object.
     """
     return Camera.from_args(
@@ -63,14 +62,12 @@ def polyscope_camera_to_kaolin(
 
 
 def kaolin_camera_to_polyscope(camera: Camera): # -> ps.core.CameraParameters:
-    """ Converts a kaolin camera (kaolin.render.camera.Camera) to
-    a polyscope camera format (polyscope.core.CameraParameters).
-
-    polyscope cameras are always assumed to exist on a cpu device.
+    """ Converts Kaolin :ref:`Camera <kaolin.render.camera.Camera>` to
+    a polyscope camera (``polyscope.core.CameraParameters``). Polyscope cameras are always assumed to exist on a cpu device.
     The converted information includes the camera extrinsics, and intrinsics for the field of view.
 
     Args:
-        camera (kaolin.render.camera.Camera): A kaolin camera object.
+        camera (Camera): camera to convert.
     Returns:
         (ps.core.CameraParameters):
             A polyscope camera object.

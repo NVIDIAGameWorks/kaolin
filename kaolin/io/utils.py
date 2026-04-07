@@ -28,7 +28,8 @@ __all__ = [
     "mesh_handler_naive_triangulate",
     "read_image_from_buffer",
     "TextureExporter",
-    "write_image"
+    "write_image",
+    "read_image"
 ]
 
 
@@ -172,7 +173,7 @@ def write_image(img_tensor, path):
     img = Image.fromarray(img_tensor.squeeze().detach().cpu().numpy())
     img.save(path)
 
-def _read_image_file(path):
+def read_image(path):
     """ Reads image from path. Note that this way is order of magnitude faster than some other ways;
     use this function rather than writing your own.
 
@@ -183,11 +184,7 @@ def _read_image_file(path):
         (torch.FloatTensor) in range 0..1 with shape `(height, width, num_channels)`
     """
     img = Image.open(str(path))
-    # Note: > 10x faster than ((torch.FloatTensor(img.getdata())).reshape(*img.size, -1) / 255.).permute(2, 0, 1)
-    res = torch.from_numpy(np.array(img))
-    if len(res.shape) == 2:
-        res = res.unsqueeze(-1)
-    return res.float() / 255.
+    return _torch_img_from_pil(img)
 
 def read_image_from_buffer(buffer):
     """ Reads image from an in-memory buffer.
@@ -198,12 +195,16 @@ def read_image_from_buffer(buffer):
     Returns:
         (torch.FloatTensor) in range 0..1 with shape `(height, width, num_channels)`
     """
-
     img = Image.open(BytesIO(buffer))
+    return _torch_img_from_pil(img)
+
+def _torch_img_from_pil(img):
     # Note: > 10x faster than ((torch.FloatTensor(img.getdata())).reshape(*img.size, -1) / 255.).permute(2, 0, 1)
     res = torch.from_numpy(np.array(img))
     if len(res.shape) == 2:
         res = res.unsqueeze(-1)
+    if res.dtype == torch.bool:  # Skip normalization
+        return res.float()
     return res.float() / 255.
 
 class TextureExporter:

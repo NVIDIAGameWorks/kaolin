@@ -15,19 +15,43 @@
 
 from __future__ import annotations
 
+import warnings
 import torch
 from .camera import Camera
 from .intrinsics import CameraFOV
 
 __all__ = [
+    'kaolin_camera_to_gsplat_inria',
+    'gsplat_inria_camera_to_kaolin',
     'kaolin_camera_to_gsplats',
-    'gsplats_camera_to_kaolin'
+    'gsplats_camera_to_kaolin',
 ]
 
-
-
 def kaolin_camera_to_gsplats(kal_camera, gs_cam_cls):
-    """Convert Kaolin Camera to `INRIA gaussian splats`_ camera.
+    """Deprecated function name for INRIA camera conversion.
+
+    * for INRIA Gaussian Splats codebase, use: :py:func:`~kaolin.render.camera.kaolin_camera_to_gsplat_inria`
+    * for NerfStudio gsplat package, use: :py:func:`~kaolin.render.camera.kaolin_camera_to_gsplat_nerfstudio`
+    """
+    warnings.warn(
+        "kaolin_camera_to_gsplats has been renamed kaolin_camera_to_gsplat_inria",
+        DeprecationWarning, stacklevel=2)
+    return kaolin_camera_to_gsplat_inria(kal_camera, gs_cam_cls)
+
+
+def gsplats_camera_to_kaolin(gs_camera):
+    """Deprecated function name for INRIA camera conversion.
+
+    Use instead :py:func:`~kaolin.render.camera.gsplat_inria_camera_to_kaolin`
+    """
+    warnings.warn(
+        "gsplats_camera_to_kaolin has been renamed gsplat_inria_camera_to_kaolin",
+        DeprecationWarning, stacklevel=2)
+    return gsplat_inria_camera_to_kaolin(gs_camera)
+
+
+def kaolin_camera_to_gsplat_inria(kal_camera: Camera, gs_cam_cls):
+    """Converts Kaolin :ref:`Camera <kaolin.render.camera.Camera>` to `INRIA gaussian splats`_ camera (``gsplats.scene.cameras.Camera``).
 
     .. note::
        This has been tested with the version commit `472689c`_
@@ -39,7 +63,7 @@ def kaolin_camera_to_gsplats(kal_camera, gs_cam_cls):
             usually located in gsplats/scene/cameras.py.
 
     Returns:
-        (gsplats.scene.cameras.Camera): converted INRIA gsplats camera.
+        (gsplats.scene.cameras.Camera): converted INRIA gaussian splats camera.
 
     .. _INRIA gaussian splats:
         https://github.com/graphdeco-inria/gaussian-splatting
@@ -60,8 +84,9 @@ def kaolin_camera_to_gsplats(kal_camera, gs_cam_cls):
                       image_name='fake',
                       uid=0)
 
-def gsplats_camera_to_kaolin(gs_camera):
-    """Convert `INRIA gaussian splats`_ camera to Kaolin camera.
+
+def gsplat_inria_camera_to_kaolin(gs_camera) -> Camera:
+    """Convert `INRIA gaussian splats`_ camera (``gsplats.scene.cameras.Camera``) to Kaolin :ref:`Camera <kaolin.render.camera.Camera>`.
 
     .. note::
        This has been tested with the version commit `472689c`_

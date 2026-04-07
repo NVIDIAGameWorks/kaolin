@@ -69,6 +69,7 @@ _TOYS_PT_CHECKSUMS = {
 }
 
 # TODO: gingerbread was probably put in by mistake: 'gingerbread.ply': '9fa27afbc0e26bd933e156bb48254ff8',
+# Expected MD5 hex digests for toy PLY ``.ply`` files under ``SCANNED_TOYS_PATH``.
 _TOYS_PLY_CHECKSUMS = {
     'BluehairRagdoll.ply': 'f3a6591e7dc497d2fdbd1bb654f01baf',
     'bublik_octopus.ply': '4bd216545854171ef69d5c62a0aea369',
@@ -77,6 +78,17 @@ _TOYS_PLY_CHECKSUMS = {
     'stink_raccoon.ply': 'e78798c1d2b6b4262b6c05636022fa15',
     'sunflower_baby.ply': '5f464485ac524c09e3a9b8a9f7d2b7d5',
 }
+
+# Expected MD5 hex digests for toy mesh ``.usd`` files under ``SCANNED_TOYS_PATH``.
+_TOYS_MESH_CHECKSUMS = {
+    'mesh.BluehairRagdoll.usd': 'd0aea4fd69ec6857294451dbaaa62843',
+    'mesh.bublik_octopus.usd': '25fa5e9b39328b1211d7e9190875ec63',
+    'mesh.knit_meow.usd': 'd877c346f8b2396b0eea3b9702bd811f',
+    'mesh.mer_elephant.usd': '8c65fd782524c95f3f2ad7a81a69ac79',
+    'mesh.stink_raccoon.usd': '1f838b11799f0126a5bfd6953df58002',
+    'mesh.sunflower_baby.usd': '64f7e5a042dd4e0f76402d9819aedeaa',
+}
+
 
 # TODO: document details, point to a whitepaper when available
 def download_scanned_toys_dataset():
@@ -124,5 +136,7 @@ def download_scanned_toys_dataset():
                         _TOYS_PT_CHECKSUMS)
     _download_if_needed('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/toys_gaussians.ply.zip',
                         _TOYS_PLY_CHECKSUMS)
+    _download_if_needed('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/toys_mesh.usd.zip',
+                        _TOYS_MESH_CHECKSUMS)
 
     return SCANNED_TOYS_PATH

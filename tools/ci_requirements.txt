@@ -10,3 +10,4 @@ jupyter
 plyfile
 gitpython
 polyscope>=2.2.0
+gsplat>=1.4.0
