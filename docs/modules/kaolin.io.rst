@@ -18,6 +18,7 @@ and :ref:`materials module<kaolin.io.materials>` contains Materials definition t
    kaolin.io.gltf
    kaolin.io.obj
    kaolin.io.off
+   kaolin.io.ply
    kaolin.io.render
    kaolin.io.shapenet
    kaolin.io.usd
@@ -25,3 +26,4 @@ and :ref:`materials module<kaolin.io.materials>` contains Materials definition t
    kaolin.io.shrec
    kaolin.io.utils
    kaolin.io.mesh
+   kaolin.io.gaussians

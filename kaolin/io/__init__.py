@@ -3,6 +3,7 @@ from . import materials
 from . import gltf
 from . import obj
 from . import off
+from . import ply
 from . import render
 from . import shapenet
 from . import usd
@@ -10,5 +11,6 @@ from . import modelnet
 from . import shrec
 from . import utils
 from .mesh import import_mesh
+from .gaussians import import_gaussiancloud
 
 __all__ = [k for k in locals().keys() if not k.startswith('__')]
