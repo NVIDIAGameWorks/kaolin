@@ -23,7 +23,7 @@ from newton._src.sim.state import State
 from newton._src.math import orthonormal_basis as build_orthonormal_basis
 
 
-class mat32(wp.types.matrix(shape=(3, 2), dtype=wp.types.float32)):
+class mat32(wp.types.matrix(shape=(3, 2), dtype=wp.float32)):
     r"""Warp 3x2 float32 matrix type; used for tangent-plane basis (e.g. friction)."""
     pass
 

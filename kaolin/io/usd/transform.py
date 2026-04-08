@@ -32,7 +32,7 @@ __all__ = [
 ]
 
 def set_local_to_world_transform(file_path_or_stage, prim_or_path, local_to_world, time=None):
-    """Set a prim's local xform so that ComputeLocalToWorldTransform equals local_to_world.
+    r"""Set a prim's local xform so that ComputeLocalToWorldTransform equals local_to_world.
 
     Args:
         file_path_or_stage (Usd.Stage or str):
@@ -79,7 +79,7 @@ def set_local_to_world_transform(file_path_or_stage, prim_or_path, local_to_worl
 
 
 def get_local_to_world_transform(file_path_or_stage, prim_or_path, time=None):
-    """Get a prim's local xform so that ComputeLocalToWorldTransform equals local_to_world.
+    r"""Get a prim's local xform so that ComputeLocalToWorldTransform equals local_to_world.
 
     Args:
         file_path_or_stage (Usd.Stage or str):

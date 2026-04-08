@@ -21,6 +21,9 @@ in this directory and subdirectories without needing to import them.
 """
 
 import pytest
+
+pytest.importorskip("newton")
+
 import os
 import torch
 import kaolin

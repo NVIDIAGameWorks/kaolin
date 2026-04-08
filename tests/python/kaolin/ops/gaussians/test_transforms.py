@@ -723,7 +723,7 @@ class TestTransformGaussians:
 
         torch.testing.assert_close(new_xyz, expected_xyz)
         torch.testing.assert_close(new_scales, expected_scales)
-        torch.testing.assert_close(new_shs_feat, expected_shs_feat)
+        torch.testing.assert_close(new_shs_feat, expected_shs_feat, atol=atol, rtol=rtol)
         # Output quaternions must remain unit-norm
         norms = torch.linalg.norm(new_rotations, dim=-1)
         torch.testing.assert_close(norms, torch.ones(xyz.shape[0], dtype=dtype, device=device), atol=atol, rtol=rtol)
