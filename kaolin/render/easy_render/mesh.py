@@ -279,7 +279,7 @@ def texture_sample_materials(backend, face_idx, im_base_normals, materials=None,
 
     im_bitangents = None
     if im_tangents is not None and im_base_normals is not None:
-        im_bitangents = torch.nn.functional.normalize(torch.cross(im_tangents, im_base_normals), dim=-1)
+        im_bitangents = torch.nn.functional.normalize(torch.cross(im_tangents, im_base_normals, dim=-1), dim=-1)
 
     for i, material in enumerate(materials):
         mask = im_material_idx == i

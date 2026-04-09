@@ -108,7 +108,7 @@ class TestUtils:
             assert contained_torch_equal(new_face_assignments, expected_face_assignments)
 
     # No need to do all permutations
-    @pytest.mark.parametrize("device_dtype_format", zip(["cuda", "cpu"], ["uint8", "float"], ["chw", "hwc"]))
+    @pytest.mark.parametrize("device_dtype_format", zip(["cuda", "cpu", "cpu"], ["uint8", "float", "bool"], ["chw", "hwc", "chw"]))
     @pytest.mark.parametrize("random_image", [False])
     def test_read_write_image(self, out_dir, device_dtype_format, random_image):
         device, dtype, channel_format = device_dtype_format
@@ -117,9 +117,14 @@ class TestUtils:
         else:
             image_orig = torch.from_numpy(np.array(Image.open(os.path.join(_textures_path, 'toppings.png'))))
             image_orig = image_orig.to(torch.float32).to(device) / 255.0
-        image = image_orig
+        if dtype == "bool":
+            image_orig = (image_orig[..., :1] > 0.5).float()
+
+        image = image_orig  # float
         if dtype == "uint8":
             image = (image * 255).clamp(0, 255).to(torch.uint8)
+        elif dtype == "bool":
+            image = image > 0.5  # back to bool
         if channel_format == "chw":
             image = image.permute(2, 0, 1)
 

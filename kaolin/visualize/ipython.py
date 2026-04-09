@@ -1,4 +1,4 @@
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,6 +24,8 @@ from PIL import Image as PILImage
 import torch
 import torchvision
 
+import kaolin.utils.testing
+
 try:
     from ipyevents import Event
     from ipywidgets import Output
@@ -41,9 +43,82 @@ __all__ = [
     'BaseIpyVisualizer',
     'IpyTurntableVisualizer',
     'IpyFirstPersonVisualizer',
+    'quick_viz'
 ]
 
+
+def quick_viz(imgs, nrow=None, inches=15):
+    """Display a batch of images in a grid using matplotlib.
+
+    Args:
+        imgs (torch.Tensor): Images of shape (B, C, H, W) or (C, H, W), C in [1, 3, 4], with values in [0, 1].
+        nrow (int, optional): Images per row. Defaults to batch size.
+        inches (float): Image width multiplier, default: 15.
+
+    Returns:
+        matplotlib.axes.Axes: The axes containing the displayed image.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError as e:
+        warnings.warn('Install matplotlib to use quick_viz function', UserWarning)
+        return None
+
+    def _warn_shape():
+        _info_str = kaolin.utils.testing.tensor_info(imgs, 'imgs', print_stats=True)
+        warnings.warn(
+            f'Unexpected imgs shape: {_info_str} Expected: (B, C, H, W) or (C, H, W), C in [1, 3, 4], with values in [0, 1]',
+            UserWarning)
+
+    if len(imgs.shape) != 4 and len(imgs.shape) != 3:
+        _warn_shape()
+        return None
+
+    if len(imgs.shape) == 3:
+        imgs = imgs.unsqueeze(0)
+
+    if imgs.shape[1] not in [1, 3, 4]:
+        _warn_shape()
+        return None
+
+    if nrow is None:
+        nrow = imgs.shape[0]
+
+    nrow = min(nrow, imgs.shape[0])
+    res = torchvision.utils.make_grid(imgs.detach(), nrow=nrow, padding=0).permute(1, 2, 0)
+    res = (res * 255).clip(0, 255).to(torch.uint8).detach().cpu().numpy()
+    fig = plt.figure()
+
+    width = inches * nrow
+    height = int(width * res.shape[0] / res.shape[1])
+    fig.set_size_inches(width, height, forward=True)
+    ax = fig.add_subplot(1, 2, 1)
+    imgplot = plt.imshow(res)
+    _rm_axmarks(ax)
+
+    return ax
+
+
+def _rm_axmarks(in_ax):
+    """
+    Removes matplotlib axes to better visualize an image.
+    """
+    in_ax.set_xticklabels([])
+    in_ax.set_yticklabels([])
+    in_ax.set_xticks([])
+    in_ax.set_yticks([])
+    in_ax.axis("off")
+
+
 def update_canvas(canvas, image, format='PNG', quality=100):
+    """Update an ipycanvas Canvas with an image tensor.
+
+    Args:
+        canvas (ipycanvas.Canvas): Target canvas to update.
+        image (torch.Tensor): Image of shape (H, W, C) with dtype uint8.
+        format (str): Image encoding format ('PNG' or 'JPEG'). Default: 'PNG'.
+        quality (int): Compression quality (0-100). Default: 100.
+    """
     assert isinstance(image, torch.Tensor) and image.dtype == torch.uint8, \
            "image must be a torch.Tensor of uint8 "
     assert isinstance(canvas, Canvas)
@@ -59,9 +134,10 @@ def update_canvas(canvas, image, format='PNG', quality=100):
         PILImage.fromarray(image.cpu().numpy()).save(
             f, format, quality=quality)
         image = ImageWidget(value=f.getvalue())
-    with hold_canvas(canvas):
+    with hold_canvas():
         canvas.clear_rect(0, 0, canvas.width, canvas.height)
         canvas.draw_image(image, 0, 0, canvas.width, canvas.height)
+
 
 def _get_tensor_pixel_info(canvas, item, x, y):
     """helper function to get info of items produced by render"""
@@ -838,7 +914,8 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
                                         -math.pi / 2., math.pi / 2.)
         cam_right = rotate_around_axis(self.world_right, self.azimuth, self.world_up)
         cam_up = rotate_around_axis(self.world_up, self.elevation, cam_right)
-        cam_forward = torch.cross(cam_right, cam_up)
+
+        cam_forward = torch.cross(cam_right, cam_up, dim=1)
         world_rotation = torch.stack((cam_right, cam_up, cam_forward), dim=1)
         world_translation = -world_rotation @ self.camera.cam_pos()
         mat = self.camera.view_matrix()

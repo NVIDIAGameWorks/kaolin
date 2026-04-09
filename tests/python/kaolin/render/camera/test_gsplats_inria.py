@@ -24,7 +24,8 @@ import torch
 import shutil
 import numpy as np
 from git import Repo
-from kaolin.render.camera import kaolin_camera_to_gsplats, gsplats_camera_to_kaolin, Camera
+from kaolin.render.camera import Camera, \
+    kaolin_camera_to_gsplat_inria, gsplat_inria_camera_to_kaolin
 
 # dealing with nvcr
 if torch.version.cuda == '12.5':
@@ -73,8 +74,8 @@ class TestGsplats:
             fov=random.random() * math.pi,
             width=512, height=512,
         )
-        gs_cam = kaolin_camera_to_gsplats(kal_cam, gs_cam_cls)
-        out_cam = gsplats_camera_to_kaolin(gs_cam)
+        gs_cam = kaolin_camera_to_gsplat_inria(kal_cam, gs_cam_cls)
+        out_cam = gsplat_inria_camera_to_kaolin(gs_cam)
         assert torch.allclose(out_cam, kal_cam)
 
     def test_kaolin_to_gsplats_regression(self, gs_cam_cls):
@@ -85,7 +86,7 @@ class TestGsplats:
             fov=math.pi / 4,
             width=512, height=512,
         )
-        gs_cam = kaolin_camera_to_gsplats(kal_cam, gs_cam_cls)
+        gs_cam = kaolin_camera_to_gsplat_inria(kal_cam, gs_cam_cls)
         expected_R = np.array([[0.9701425, 0.13336042, -0.20257968],
                                [0., -0.83525735, -0.5498591],
                                [-0.24253562, 0.53344166, -0.8103187]])

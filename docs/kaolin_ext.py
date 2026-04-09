@@ -96,6 +96,8 @@ def run_apidoc(_):
             "kaolin/physics/utils/scene_forces.py",
             "kaolin/physics/utils/torch_utilities.py",
             "kaolin/physics/utils/warp_utilities.py",
+            "kaolin/render/camera/gsplats_inria.py",
+            "kaolin/render/camera/gsplats_nerfstudio.py",
             "kaolin/render/lighting/sg.py",
             "kaolin/render/lighting/sh.py",
             "kaolin/render/easy_render/common.py",

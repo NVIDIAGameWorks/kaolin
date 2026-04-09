@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 import copy
 import math
 import random
+import matplotlib.pyplot as plt
 
 import torch
 import numpy as np
@@ -279,10 +280,10 @@ class TestVisualizers:
             dim=-1
         )
         assert torch.all(torch.abs(torch.cross(
-            cur_camera.cam_forward(), viz.camera.cam_forward())) < 1e-2), \
+            cur_camera.cam_forward(), viz.camera.cam_forward(), dim=1)) < 1e-2), \
             "After move forward: camera have changed cam_forward"
         assert torch.all(torch.abs(torch.cross(
-            cur_camera.cam_up(), viz.camera.cam_up())) < 1e-2), \
+            cur_camera.cam_up(), viz.camera.cam_up(), dim=1)) < 1e-2), \
             "After move forward: camera have changed cam_up"
         check_allclose(normalized_distance, cur_camera.cam_forward().squeeze(),
                               atol=1e-5, rtol=1e-5), \
@@ -647,4 +648,43 @@ class TestVisualizers:
             assert event_count == 1
         else:
             assert event_count == 0
+
+
+class TestQuickViz:
+    @pytest.mark.parametrize('nrow', [None, 2])
+    @pytest.mark.parametrize('nchannels', [1, 3, 4])
+    @pytest.mark.parametrize('batched', [True, False])
+    @pytest.mark.parametrize('inches', [5, 10])
+    def test_basic(self, nchannels, batched, nrow, inches):
+        height = 20
+        width = 40
+        if batched:
+            batch_size = 6
+            shape = (batch_size, nchannels, height, width)
+        else:
+            batch_size = 1
+            shape = (nchannels, height, width)
+
+        actual_nrow = min(nrow if nrow is not None else batch_size, batch_size)
+        expected_figure_width = inches * actual_nrow
+        expected_figure_height = int(inches * math.ceil(batch_size / actual_nrow) / 2)  # height is half the width
+
+        imgs = torch.rand(shape)
+        ax = kaolin.visualize.ipython.quick_viz(imgs, nrow=nrow, inches=inches)
+
+        assert ax is not None
+        assert ax.figure is not None
+        figure_size = ax.figure.get_size_inches()
+        expected_str = f'{figure_size} vs. expected {expected_figure_width} x {expected_figure_height}'
+        assert int(figure_size[0]) == expected_figure_width, f'Figure width mismatch: {expected_str}'
+        assert int(figure_size[1]) == expected_figure_height, f'Figure height mismatch: {expected_str}'
+        plt.close()
+
+    @pytest.mark.parametrize('wrong_shape', [(25, 25), (10, 10, 10, 10), (25, 30, 3), (5, 25, 30, 4), (5, 10, 25, 25)])
+    def test_graceful_fail_hwc(self, wrong_shape):
+        imgs = torch.rand(wrong_shape)
+        with pytest.warns(UserWarning) as record:
+            ax = kaolin.visualize.ipython.quick_viz(imgs)
+        assert ax is None
+        assert len(record) == 1
 

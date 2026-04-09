@@ -335,6 +335,14 @@ spec:
           build_passed = false
           echo e.toString()
         }
+        try {
+          stage("Nerfstudio Gsplat Interactive Visualizer") {
+            sh 'cd /kaolin/examples/tutorial && ipython nerfstudio_gsplat_interactive_visualizer.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
 
         // RECIPES
         try {
