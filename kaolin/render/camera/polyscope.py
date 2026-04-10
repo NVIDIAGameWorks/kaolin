@@ -73,9 +73,10 @@ def kaolin_camera_to_polyscope(camera: Camera): # -> ps.core.CameraParameters:
             A polyscope camera object.
     """
     import polyscope as ps
+    assert len(camera) == 1, "kaolin_camera_to_polyscope only support single camera as input"
     view_matrix = camera.view_matrix()
     ps_cam_param = ps.CameraParameters(
-        ps.CameraIntrinsics(fov_vertical_deg=camera.fov_y.detach().cpu().numpy(), aspect=camera.width / camera.height),
+        ps.CameraIntrinsics(fov_vertical_deg=camera.fov_y.item(), aspect=camera.width / camera.height),
         ps.CameraExtrinsics(mat=view_matrix[0].detach().cpu().numpy())
     )
     return ps_cam_param

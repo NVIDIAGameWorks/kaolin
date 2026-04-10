@@ -26,7 +26,6 @@ from kaolin.physics.simplicits import SimplicitsObject, SimplicitsScene
 
 
 import logging
-logging.disable(logging.INFO)
 
 ########### Global Settings ##############
 
@@ -117,138 +116,146 @@ class TestEasyAPISimplicitsObjectTraining:
 
     @with_seed(0, 0, 0)
     def test_training_loss_matches_reference(self, device, dtype, box_object):
-        logging.getLogger('kaolin.physics').setLevel(logging.DEBUG)
+        logging.disable(logging.INFO)
+        try:
+            logging.getLogger('kaolin.physics').setLevel(logging.DEBUG)
 
-        r"Step 1: Load and Setup Object"
-        pts, yms, prs, rhos, approx_volume, orig_vertices = box_object
+            r"Step 1: Load and Setup Object"
+            pts, yms, prs, rhos, approx_volume, orig_vertices = box_object
 
-        r"Step 2: Create Simplicits Object"
-        # Set up logging handler to capture training values
-        training_vals = []
+            r"Step 2: Create Simplicits Object"
+            # Set up logging handler to capture training values
+            training_vals = []
 
-        # Create custom handler to store logged values
-        class LogCaptureHandler(logging.Handler):
-            def emit(self, record):
-                msg = record.getMessage()
-                if 'le:' in msg and 'lo:' in msg:
-                    # Extract le and lo values from log message
-                    le_start = msg.find('le: ') + 4
-                    le_end = msg.find(', lo:')
-                    lo_start = msg.find('lo: ') + 4
-                    le = float(msg[le_start:le_end])
-                    lo = float(msg[lo_start:])
-                    training_vals.append((le, lo))
+            # Create custom handler to store logged values
+            class LogCaptureHandler(logging.Handler):
+                def emit(self, record):
+                    msg = record.getMessage()
+                    if 'le:' in msg and 'lo:' in msg:
+                        # Extract le and lo values from log message
+                        le_start = msg.find('le: ') + 4
+                        le_end = msg.find(', lo:')
+                        lo_start = msg.find('lo: ') + 4
+                        le = float(msg[le_start:le_end])
+                        lo = float(msg[lo_start:])
+                        training_vals.append((le, lo))
 
-        log_handler = LogCaptureHandler()
-        logger = logging.getLogger('kaolin.physics')
-        logger.addHandler(log_handler)
+            log_handler = LogCaptureHandler()
+            logger = logging.getLogger('kaolin.physics')
+            logger.addHandler(log_handler)
 
-        # Create object and capture training logs
-        sim_obj = kal.physics.simplicits.SimplicitsObject.create_trained(pts,
-                                                                        yms,
-                                                                        prs,
-                                                                        rhos,
-                                                                        torch.tensor(
-                                                                            [approx_volume], dtype=dtype, device=device),
-                                                                        num_handles=10,
-                                                                        num_samples=1000,
-                                                                        model_layers=6,
-                                                                        training_batch_size=10,
-                                                                        training_num_steps=4000,
-                                                                        training_lr_start=0.001,
-                                                                        training_lr_end=0.001,
-                                                                        training_le_coeff=0.1,
-                                                                        training_lo_coeff=1000000,
-                                                                        training_log_every=1000,
-                                                                        normalize_for_training=True)
-        
-        # NOTE: Take a look at this MLP if this test fails. Might help with debugging.
-        # torch.save(sim_obj.skinning_weight_function.model, os.path.dirname(os.path.realpath(__file__)) + "/regression_test_data/box_reference_weights_fcn_10_handles.pth")
+            # Create object and capture training logs
+            sim_obj = kal.physics.simplicits.SimplicitsObject.create_trained(pts,
+                                                                            yms,
+                                                                            prs,
+                                                                            rhos,
+                                                                            torch.tensor(
+                                                                                [approx_volume], dtype=dtype, device=device),
+                                                                            num_handles=10,
+                                                                            num_samples=1000,
+                                                                            model_layers=6,
+                                                                            training_batch_size=10,
+                                                                            training_num_steps=4000,
+                                                                            training_lr_start=0.001,
+                                                                            training_lr_end=0.001,
+                                                                            training_le_coeff=0.1,
+                                                                            training_lo_coeff=1000000,
+                                                                            training_log_every=1000,
+                                                                            normalize_for_training=True)
 
-        # Clean up logging handler
-        logger.removeHandler(log_handler)
-        assert isinstance(sim_obj, kal.physics.simplicits.SimplicitsObject)
+            # NOTE: Take a look at this MLP if this test fails. Might help with debugging.
+            # torch.save(sim_obj.skinning_weight_function.model, os.path.dirname(os.path.realpath(__file__)) + "/regression_test_data/box_reference_weights_fcn_10_handles.pth")
 
-        r"Step 3: Read Reference Train Vals"
-        filename = os.path.dirname(os.path.realpath(__file__)) + \
-            "/regression_test_data/box_training_reference_log_4k_steps.txt"
-        reference_training_val = torch.load(filename, weights_only=False)
+            # Clean up logging handler
+            logger.removeHandler(log_handler)
+            assert isinstance(sim_obj, kal.physics.simplicits.SimplicitsObject)
 
-        i = 0
-        r"Step 4: Asserts Training Match"
-        for tvals in training_vals:
-            le = reference_training_val[i][0]
-            lo = reference_training_val[i][1]
-            assert (abs(le - tvals[0]) < 0.005 * le)
-            assert (abs(lo - tvals[1]) < 0.005 * lo)
-            i += 1
+            r"Step 3: Read Reference Train Vals"
+            filename = os.path.dirname(os.path.realpath(__file__)) + \
+                "/regression_test_data/box_training_reference_log_4k_steps.txt"
+            reference_training_val = torch.load(filename, weights_only=False)
+
+            i = 0
+            r"Step 4: Asserts Training Match"
+            for tvals in training_vals:
+                le = reference_training_val[i][0]
+                lo = reference_training_val[i][1]
+                assert (abs(le - tvals[0]) < 0.005 * le)
+                assert (abs(lo - tvals[1]) < 0.005 * lo)
+                i += 1
+        finally:
+            logging.disable(logging.NOTSET)
 
     @with_seed(0, 0, 0)
     def test_training_loss_decrease(self, device, dtype, box_object):
-        logging.getLogger('kaolin.physics').setLevel(logging.DEBUG)
+        logging.disable(logging.INFO)
+        try:
+            logging.getLogger('kaolin.physics').setLevel(logging.DEBUG)
 
-        r"Step 1: Load and Setup Object"
-        pts, yms, prs, rhos, approx_volume, orig_vertices = box_object
+            r"Step 1: Load and Setup Object"
+            pts, yms, prs, rhos, approx_volume, orig_vertices = box_object
 
-        # Create object and capture training logs
-        sim_obj = kal.physics.simplicits.SimplicitsObject.create_trained(pts,
-                                                                        yms,
-                                                                        prs,
-                                                                        rhos,
-                                                                        torch.tensor(
-                                                                            [approx_volume], dtype=dtype, device=device),
-                                                                        num_handles=10,
-                                                                        num_samples=1000,
-                                                                        model_layers=6,
-                                                                        training_batch_size=10,
-                                                                        training_num_steps=1000,
-                                                                        training_lr_start=0.001,
-                                                                        training_lr_end=0.001,
-                                                                        training_le_coeff=0.1,
-                                                                        training_lo_coeff=1000000,
-                                                                        training_log_every=1000,
-                                                                        normalize_for_training=True)
+            # Create object and capture training logs
+            sim_obj = kal.physics.simplicits.SimplicitsObject.create_trained(pts,
+                                                                            yms,
+                                                                            prs,
+                                                                            rhos,
+                                                                            torch.tensor(
+                                                                                [approx_volume], dtype=dtype, device=device),
+                                                                            num_handles=10,
+                                                                            num_samples=1000,
+                                                                            model_layers=6,
+                                                                            training_batch_size=10,
+                                                                            training_num_steps=1000,
+                                                                            training_lr_start=0.001,
+                                                                            training_lr_end=0.001,
+                                                                            training_le_coeff=0.1,
+                                                                            training_lo_coeff=1000000,
+                                                                            training_log_every=1000,
+                                                                            normalize_for_training=True)
 
-        r"Step 3: Read Reference Train Vals"
-        filename = os.path.dirname(os.path.realpath(__file__)) + \
-            "/regression_test_data/box_training_reference_log_4k_steps.txt"
-        reference_training_val = torch.load(filename, weights_only=False)
+            r"Step 3: Read Reference Train Vals"
+            filename = os.path.dirname(os.path.realpath(__file__)) + \
+                "/regression_test_data/box_training_reference_log_4k_steps.txt"
+            reference_training_val = torch.load(filename, weights_only=False)
 
-        r"Step 5: Verify losses are low enough post-training a few thousand steps"
-        bb_max = torch.max(pts, dim=0).values
-        bb_min = torch.min(pts, dim=0).values
-        bb_vol = (bb_max[0] - bb_min[0]) * (bb_max[1] -
-                                            bb_min[1]) * (bb_max[2] - bb_min[2])
+            r"Step 5: Verify losses are low enough post-training a few thousand steps"
+            bb_max = torch.max(pts, dim=0).values
+            bb_min = torch.min(pts, dim=0).values
+            bb_vol = (bb_max[0] - bb_min[0]) * (bb_max[1] -
+                                                bb_min[1]) * (bb_max[2] - bb_min[2])
 
-        # Normalize the appx vol of object
-        norm_bb_max = torch.max((pts - bb_min) / (bb_max - bb_min),
-                                dim=0).values  # get the bb_max of the normalized pts
-        norm_bb_min = torch.min((pts - bb_min) / (bb_max - bb_min),
-                                dim=0).values  # get the bb_min of the normalized pts
+            # Normalize the appx vol of object
+            norm_bb_max = torch.max((pts - bb_min) / (bb_max - bb_min),
+                                    dim=0).values  # get the bb_max of the normalized pts
+            norm_bb_min = torch.min((pts - bb_min) / (bb_max - bb_min),
+                                    dim=0).values  # get the bb_min of the normalized pts
 
-        norm_bb_vol = (norm_bb_max[0] - norm_bb_min[0]) * (norm_bb_max[1] -
-                                                        norm_bb_min[1]) * (norm_bb_max[2] - norm_bb_min[2])
-        normalized_pts = (pts - bb_min) / (bb_max - bb_min)
-        norm_appx_vol = approx_volume * (norm_bb_vol / bb_vol)
+            norm_bb_vol = (norm_bb_max[0] - norm_bb_min[0]) * (norm_bb_max[1] -
+                                                            norm_bb_min[1]) * (norm_bb_max[2] - norm_bb_min[2])
+            normalized_pts = (pts - bb_min) / (bb_max - bb_min)
+            norm_appx_vol = approx_volume * (norm_bb_vol / bb_vol)
 
-        # Set pts, appx_vol, yms, prs, rhos to normalized values
-        training_pts = normalized_pts
+            # Set pts, appx_vol, yms, prs, rhos to normalized values
+            training_pts = normalized_pts
 
-        le, lo = kal.physics.simplicits.losses.compute_losses(sim_obj.skinning_weight_function.model,
-                                                            training_pts,
-                                                            yms.unsqueeze(-1),
-                                                            prs.unsqueeze(-1),
-                                                            rhos.unsqueeze(-1),
-                                                            1.0,
-                                                            le_coeff=0.1,
-                                                            lo_coeff=1000000,
-                                                            batch_size=10,
-                                                            num_handles=10,
-                                                            appx_vol=norm_appx_vol,
-                                                            num_samples=1000)
+            le, lo = kal.physics.simplicits.losses.compute_losses(sim_obj.skinning_weight_function.model,
+                                                                training_pts,
+                                                                yms.unsqueeze(-1),
+                                                                prs.unsqueeze(-1),
+                                                                rhos.unsqueeze(-1),
+                                                                1.0,
+                                                                le_coeff=0.1,
+                                                                lo_coeff=1000000,
+                                                                batch_size=10,
+                                                                num_handles=10,
+                                                                appx_vol=norm_appx_vol,
+                                                                num_samples=1000)
 
-        assert reference_training_val[0][0] > le
-        assert reference_training_val[0][1] > lo
+            assert reference_training_val[0][0] > le
+            assert reference_training_val[0][1] > lo
+        finally:
+            logging.disable(logging.NOTSET)
 
 class TestEasyAPISimplicitsScene:
     

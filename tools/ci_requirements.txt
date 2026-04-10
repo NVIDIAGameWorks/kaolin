@@ -9,5 +9,7 @@ nbmake==1.4.1
 jupyter
 plyfile
 gitpython
+wget
 polyscope>=2.2.0
 gsplat>=1.4.0
+newton[examples]==1.0.0  ; python_version > "3.9"

@@ -199,10 +199,10 @@ def fill(voxelgrids):
 
     output = []
     for i in range(voxelgrids.shape[0]): 
-        on = ndimage.binary_fill_holes(voxelgrids[i])
+        on = torch.tensor(ndimage.binary_fill_holes(voxelgrids[i]), dtype=torch.bool, device=device)
         output.append(on)
 
-    output = torch.tensor(output, dtype=torch.bool, device=device)
+    output = torch.stack(output, dim=0)
     return output
 
 def extract_odms(voxelgrids):
