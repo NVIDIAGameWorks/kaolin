@@ -97,8 +97,8 @@ conda deactivate
 conda activate $CONDA_ENV
 
 CUDA_VERSION=`python -c "import torch; print(torch.version.cuda)"`
-IFS=. read -r CUDA_MAJOR CUDA_MINOR <<< ${CUDA_VERSION}
 echo "CUDA_VERSION=${CUDA_VERSION}"
+IFS=. read -r CUDA_MAJOR CUDA_MINOR <<< ${CUDA_VERSION}
 
 # Make sure TORCH_CUDA_ARCH_LIST matches the pytorch wheel setting.
 # Reference: https://github.com/pytorch/pytorch/blob/main/.ci/manywheel/build_cuda.sh#L54
@@ -130,7 +130,7 @@ conda activate $CONDA_ENV
 
 
 # Initialize git submodules and install Python requirements
-pip install -r requirements.txt
-pip install -e .
+pip install --no-build-isolation -r requirements.txt
+pip install --no-build-isolation -e .
 
 echo "Setup completed successfully!"
