@@ -164,8 +164,11 @@ cudaArray* SetupProfileCurve(cudaTextureObject_t* ProfileCurve)
 
   cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
   cudaArray *cuArray;
-  cudaMallocArray(&cuArray, &channelDesc, num);
-  cudaMemcpyToArray(cuArray, 0, 0, BPSVals, num * sizeof(uint32_t), cudaMemcpyHostToDevice);
+  // cudaMallocArray with height=0 creates a 2D array (height=1) in CUDA 12+, which is incompatible
+  // with tex1D in the kernel. Use cudaMalloc3DArray to create a true 1D array.
+  cudaExtent extent = {num, 0, 0};
+  cudaMalloc3DArray(&cuArray, &channelDesc, extent);
+  cudaMemcpy2DToArray(cuArray, 0, 0, BPSVals, num * sizeof(uint32_t), num * sizeof(uint32_t), 1, cudaMemcpyHostToDevice);
 
   cudaResourceDesc resDescr;
   memset(&resDescr, 0, sizeof(cudaResourceDesc));
