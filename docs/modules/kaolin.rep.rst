@@ -13,6 +13,9 @@ Classes
 
 * :ref:`SurfaceMesh <kaolin.rep.SurfaceMesh>`
 * :ref:`Spc <kaolin.rep.Spc>`
+* :ref:`GaussianSplatModel <kaolin.rep.GaussianSplatModel>`
+* :ref:`PointSamples <kaolin.rep.PointSamples>`
+* :ref:`TensorContainerBase <kaolin.rep.TensorContainerBase>`
 
 Other
 ^^^^^^^^^
@@ -21,7 +24,10 @@ Other
    :members:
    :exclude-members:
        SurfaceMesh,
-       Spc
+       Spc,
+       GaussianSplatModel,
+       PointSamples,
+       TensorContainerBase
    :undoc-members:
    :show-inheritance:
 

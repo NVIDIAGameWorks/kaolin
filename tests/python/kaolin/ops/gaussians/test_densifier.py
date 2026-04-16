@@ -108,7 +108,7 @@ class TestVolumeDensifier:
         output = sample_points_in_volume(xyz=pos, scale=scale, rotation=rotation, opacity=opacity,
                                          octree_level=octree_level, jitter=False, post_scale_factor=1.0,
                                          clip_samples_to_input_bbox=True)
-        jittered_output = kaolin.ops.gaussian.densifier._jitter(output, octree_level)
+        jittered_output = kaolin.ops.gaussians.densifier._jitter(output, octree_level)
         spc_cell_length = 2.0 / 2**octree_level
         spc_diagonal_length = spc_cell_length * math.sqrt(3.0)
         max_allowed_pts_distance = 2.0 * spc_diagonal_length # two spc diagonals

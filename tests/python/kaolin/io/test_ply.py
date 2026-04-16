@@ -20,6 +20,7 @@ import torch
 import pytest
 
 from kaolin.io import ply
+from kaolin.rep import GaussianSplatModel
 from kaolin.utils.bundled_data import SCANNED_TOYS_PATH, SCANNED_TOYS_NAMES, download_scanned_toys_dataset
 from kaolin.utils.env_vars import KaolinTestEnvVars
 from kaolin.utils.testing import contained_torch_equal, with_seed
@@ -28,7 +29,8 @@ TEST_SCANNED_TOYS = os.getenv(KaolinTestEnvVars.TEST_SCANNED_TOYS)
 
 _GAUSSIAN_KEYS = ('positions', 'orientations', 'scales', 'opacities', 'sh_coeff')
 
-
+# TODO: sh degree should be randomized
+# TODO: remove manual seed
 def make_synthetic_gaussian_cloud(n=8, seed=0):
     """Create minimal valid gaussian cloud data for testing."""
     torch.manual_seed(seed)
@@ -79,7 +81,7 @@ class TestGaussianExportImportPly:
 
         imported = ply.import_gaussiancloud(out_path)
 
-        assert contained_torch_equal(data, imported, approximate=True, print_error_context='')
+        assert contained_torch_equal(data, imported.as_dict(only_tensors=True), approximate=True, print_error_context='')
 
     def test_export_overwrite_raises_without_flag(self, out_dir):
         """Export to an existing file without overwrite should raise RuntimeError."""
@@ -91,8 +93,7 @@ class TestGaussianExportImportPly:
             orientations=data['orientations'],
             scales=data['scales'],
             opacities=data['opacities'],
-            sh_coeff=data['sh_coeff'],
-            overwrite=True,
+            sh_coeff=data['sh_coeff']
         )
 
         with pytest.raises(RuntimeError):
@@ -105,6 +106,16 @@ class TestGaussianExportImportPly:
                 sh_coeff=data['sh_coeff'],
                 overwrite=False,
             )
+
+        ply.export_gaussiancloud(
+            out_path,
+            positions=data['positions'],
+            orientations=data['orientations'],
+            scales=data['scales'],
+            opacities=data['opacities'],
+            sh_coeff=data['sh_coeff'],
+            overwrite=True,
+        )
 
 
 @pytest.mark.skipif(
@@ -123,27 +134,15 @@ class TestGaussianImportFromToysPly:
         """Import gaussians from each toy PLY file and validate cloud structure."""
         path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.ply')
         cloud = ply.import_gaussiancloud(path)
-
-        assert 'positions' in cloud
-        assert 'orientations' in cloud
-        assert 'scales' in cloud
-        assert 'opacities' in cloud
-        assert 'sh_coeff' in cloud
-        n = cloud['positions'].shape[0]
-        assert cloud['positions'].shape == (n, 3)
-        assert cloud['orientations'].shape == (n, 4)
-        assert cloud['scales'].shape == (n, 3)
-        assert cloud['opacities'].shape == (n,)
-        assert cloud['sh_coeff'].shape[0] == n
-        assert cloud['sh_coeff'].shape[2] == 3
+        assert cloud.check_sanity()
 
     @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
     def test_import_gaussiancloud_default(self, toy_name):
         """``import_gaussiancloud`` returns a single cloud dict for the file."""
         path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.ply')
         cloud = ply.import_gaussiancloud(path)
-        assert isinstance(cloud, dict)
-        assert {'positions', 'orientations', 'scales', 'opacities', 'sh_coeff'}.issubset(cloud.keys())
+        assert isinstance(cloud, GaussianSplatModel)
+        assert cloud.check_sanity()
 
     @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
     def test_import_export_roundtrip_from_toy(self, out_dir, toy_name):
@@ -154,18 +153,14 @@ class TestGaussianImportFromToysPly:
         out_path = os.path.join(out_dir, f'gaussian_roundtrip_{toy_name}.ply')
         ply.export_gaussiancloud(
             out_path,
-            positions=cloud['positions'],
-            orientations=cloud['orientations'],
-            scales=cloud['scales'],
-            opacities=cloud['opacities'],
-            sh_coeff=cloud['sh_coeff'],
+            **cloud.as_dict(only_tensors=True),
             overwrite=True,
         )
 
         reimported = ply.import_gaussiancloud(out_path)
 
-        assert contained_torch_equal(cloud, reimported, approximate=True, print_error_context=''), \
-            f'Mismatch for toy {toy_name}'
+        assert contained_torch_equal(cloud.as_dict(), reimported.as_dict(),
+                                     approximate=True, print_error_context=''), f'Mismatch for toy {toy_name}'
 
     @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
     def test_import_vs_ground_truth_pt(self, toy_name):
@@ -178,5 +173,5 @@ class TestGaussianImportFromToysPly:
         del expected['local_to_world']
         actual = ply.import_gaussiancloud(ply_path)
 
-        assert contained_torch_equal(actual, expected, approximate=True, print_error_context=''), \
-            f'Mismatch for toy {toy_name}'
+        assert contained_torch_equal(actual.as_dict(only_tensors=True), expected,
+                                     approximate=True, print_error_context=''), f'Mismatch for toy {toy_name}'

@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
 from kaolin.io import usd, ply
 
 __all__ = [ 'import_gaussiancloud' ]
@@ -28,30 +27,14 @@ def import_gaussiancloud(filename: str):
         filename (str): path to the filename
 
     Returns:
-        (dict or None):
-        A single gaussian cloud dict, or ``None`` if no gaussian clouds are found (USD only).
-        The dict has the following fields:
-
-            * **positions** (torch.Tensor):
-                Position of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`.
-            * **orientations** (torch.Tensor):
-                Orientation of each gaussian as quaternions, as :math:`(w, x, y, z)`,
-                of shape :math:`(\text{num_gaussians}, 4)`.
-            * **scales** (torch.Tensor):
-                Scale of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`.
-            * **opacities** (torch.Tensor):
-                Opacity of each gaussian, of shape :math:`(\text{num_gaussians})`.
-            * **sh_coeff** (torch.Tensor):
-                Spherical harmonics coefficients of each gaussian,
-                of shape :math:`(\text{num_gaussians}, (\text{num_degrees} + 1)^2, 3)`.
+        (GaussianSplatModel):
+        A single gaussian cloud instance, or ``None`` if no gaussian clouds are found (USD only).
     """
     extension = filename.split('.')[-1].lower()
     if extension == 'ply':
         res = ply.import_gaussiancloud(filename)
     elif extension in ["usd", "usda", "usdc", "usdz"]:
         res = usd.import_gaussiancloud(filename)
-        # TODO: remove once we switch to Gaussian class
-        res['orientations'] = torch.nn.functional.normalize(res['orientations'])
     else:
         raise ValueError(f'Unsupported Gaussian Splat filename extension {extension}')
     return res

@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, 2026 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -108,6 +109,8 @@ def run_apidoc(_):
             "kaolin/render/mesh/utils.py",
             "kaolin/render/spc/raytrace.py",
             "kaolin/rep/spc.py",
+            "kaolin/rep/gaussians.py",
+            "kaolin/rep/tensor_container.py",
             "kaolin/visualize/timelapse.py",
             "kaolin/visualize/ipython.py",
             "kaolin/framework/*",

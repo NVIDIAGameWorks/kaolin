@@ -122,12 +122,12 @@ class TestCameraConversionRoundTrip:
 
 def _render_with_gsplats(gsmodel, cam_params):
     render_colors, render_alphas, info = gsplat.rendering.rasterization(
-        gsmodel['positions'],  # [N, 3]
-        gsmodel['orientations'],  # [N, 4]
-        gsmodel['scales'],  # [N, 3]
-        gsmodel['opacities'],  # [N]
-        gsmodel['sh_coeff'],  # [N, S, 3]
-        sh_degree=3,  # TODO: fix HACK with gsmodel.sh_degree once we have gaussians class
+        gsmodel.positions,  # [N, 3]
+        gsmodel.orientations,  # [N, 4]
+        gsmodel.scales,  # [N, 3]
+        gsmodel.opacities,  # [N]
+        gsmodel.sh_coeff,  # [N, S, 3]
+        sh_degree=gsmodel.sh_degree,
         **cam_params)
     return render_colors, render_alphas
 
@@ -164,8 +164,7 @@ class TestCameraConversionRenderParity:
         mesh_path = os.path.join(SCANNED_TOYS_PATH, f'mesh.{toy_name}.usd')
         splat_path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
         mesh = kaolin.io.import_mesh(mesh_path).to(device)
-        splats = kaolin.io.import_gaussiancloud(splat_path)
-        splats = {k: v.to(device) for k, v in splats.items()}  # TODO: remove when we have class
+        splats = kaolin.io.import_gaussiancloud(splat_path).to(device)
 
         # render mesh with Kaolin camera
         mesh_silhouettes = []

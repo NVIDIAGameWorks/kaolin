@@ -100,14 +100,11 @@ class TestSyntheticGaussianImportExport:
 
         from_ply = ply.import_gaussiancloud(ply_path)
         from_usd = usd.import_gaussiancloud(usd_path)
-        from_usd['orientations'] = torch.nn.functional.normalize(from_usd['orientations'])
 
-        assert contained_torch_equal(data, from_ply, approximate=True, ignore_device=True,
-                                     print_error_context='Fail')
-        assert contained_torch_equal(data, from_usd, approximate=True, ignore_device=True,
-                                     print_error_context='Fail')
-        assert contained_torch_equal(from_ply, from_usd, approximate=True, ignore_device=True,
-                                     print_error_context='Fail')
+        compare_kwargs = {'approximate': True, 'ignore_device': True, 'print_error_context': 'Fail'}
+        assert contained_torch_equal(data, from_ply.as_dict(only_tensors=True), **compare_kwargs)
+        assert contained_torch_equal(data, from_usd.as_dict(only_tensors=True), **compare_kwargs)
+        assert contained_torch_equal(from_ply.as_dict(), from_usd.as_dict(), **compare_kwargs)
 
     def test_generic_import(self, out_dir):
         """Same as format-specific readers, but both loads use :func:`kaolin.io.import_gaussiancloud`."""
@@ -138,12 +135,11 @@ class TestSyntheticGaussianImportExport:
 
         from_ply = import_gaussiancloud(ply_path)
         from_usd = import_gaussiancloud(usd_path)
-        from_usd['orientations'] = torch.nn.functional.normalize(from_usd['orientations'])
 
-        assert contained_torch_equal(data, from_ply, approximate=True, print_error_context='Fail')
-        assert contained_torch_equal(data, from_usd, approximate=True, print_error_context='Fail')
-        assert contained_torch_equal(from_ply, from_usd, approximate=True, print_error_context='Fail')
-
+        compare_kwargs = {'approximate': True, 'print_error_context': 'Fail'}
+        assert contained_torch_equal(data, from_ply.as_dict(only_tensors=True), **compare_kwargs)
+        assert contained_torch_equal(data, from_usd.as_dict(only_tensors=True), **compare_kwargs)
+        assert contained_torch_equal(from_ply.as_dict(), from_usd.as_dict(), **compare_kwargs)
 
 @pytest.mark.skipif(
     TEST_SCANNED_TOYS is None,
@@ -164,9 +160,8 @@ class TestGaussianImportExportPlyUsd:
 
         ply_cloud = ply.import_gaussiancloud(ply_path)
         usd_cloud = usd.import_gaussiancloud(usd_path)
-        usd_cloud['orientations'] = torch.nn.functional.normalize(usd_cloud['orientations'])
 
-        assert contained_torch_equal(ply_cloud, usd_cloud, approximate=True,
+        assert contained_torch_equal(ply_cloud.as_dict(), usd_cloud.as_dict(), approximate=True,
                                      print_error_context=f'Mismatch for toy {toy_name}')
 
     @pytest.mark.parametrize('toy_name', SCANNED_TOYS_NAMES)
@@ -177,7 +172,6 @@ class TestGaussianImportExportPlyUsd:
 
         ply_cloud = import_gaussiancloud(ply_path)
         usd_cloud = import_gaussiancloud(usd_path)
-        usd_cloud['orientations'] = torch.nn.functional.normalize(usd_cloud['orientations'])
 
-        assert contained_torch_equal(ply_cloud, usd_cloud, approximate=True,
+        assert contained_torch_equal(ply_cloud.as_dict(), usd_cloud.as_dict(), approximate=True,
                                      print_error_context=f'Mismatch for toy {toy_name} (generic import)')

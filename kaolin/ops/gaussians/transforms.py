@@ -60,6 +60,7 @@ def _decompose_4x4_transform(transform):
 
     return translation, rotation, scale
 
+# TODO: use same naming as GaussianSplatModel and take full sh_coeff for ease of use
 def transform_gaussians(xyz, rotations, scales, transform, shs_feat=None, use_log_scales=False,
                         use_xyzw=False):
     r"""Apply a 4x4 affine transform to gaussian positions, rotations, and scales.

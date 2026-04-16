@@ -113,6 +113,10 @@ class SamplePointsTransform(object):
         }
         return outputs
 
+if args.shapenet_dir is None:
+    print(f'Set KAOLIN_TEST_SHAPENETV2_PATH or --shapenet_dir; skipping recipe')
+    exit()
+
 # Make ShapeNet dataset with preprocessing transform
 ds = kal.io.shapenet.ShapeNetV2(root=args.shapenet_dir,
                                 categories=['dishwasher'],
