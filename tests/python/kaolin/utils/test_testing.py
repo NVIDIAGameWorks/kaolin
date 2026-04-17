@@ -94,6 +94,34 @@ class TestCheckTensor:
         assert not testing.check_tensor(tensor, shape, dtype, wrong_device,
                                         throw=False)
 
+    def test_tensor_device_as_torch_device_object(self, tensor, shape, dtype):
+        # Regression: ``device`` may be a ``torch.device`` instance, not just a string.
+        assert testing.check_tensor(tensor, shape, dtype, torch.device('cpu'))
+        assert testing.check_tensor(tensor, shape, dtype, tensor.device)
+
+    def test_tensor_device_object_fail(self, tensor, shape, dtype):
+        with pytest.raises(TypeError,
+                           match="tensor device is cpu, should be cuda"):
+            testing.check_tensor(tensor, shape, dtype, torch.device('cuda'))
+        assert not testing.check_tensor(tensor, shape, dtype, torch.device('cuda'),
+                                        throw=False)
+
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason='requires CUDA')
+    @pytest.mark.parametrize("expected_device", ['cuda', torch.device('cuda')])
+    def test_tensor_device_indexless_matches_indexed(self, shape, dtype, expected_device):
+        # Index-less expected device should match a tensor with an explicit index.
+        cuda_tensor = random_tensor(0, 256, shape=shape, dtype=dtype, device='cuda:0')
+        assert testing.check_tensor(cuda_tensor, shape, dtype, expected_device)
+
+    @pytest.mark.skipif(torch.cuda.device_count() < 2, reason='requires >= 2 CUDA devices')
+    def test_tensor_device_index_mismatch(self, shape, dtype):
+        cuda_tensor = random_tensor(0, 256, shape=shape, dtype=dtype, device='cuda:0')
+        with pytest.raises(TypeError,
+                           match=r"tensor device is cuda:0, should be cuda:1"):
+            testing.check_tensor(cuda_tensor, shape, dtype, 'cuda:1')
+        assert not testing.check_tensor(cuda_tensor, shape, dtype, 'cuda:1',
+                                        throw=False)
+
 
 class TestCheckBatchedTensor:
     @pytest.fixture(autouse=True)

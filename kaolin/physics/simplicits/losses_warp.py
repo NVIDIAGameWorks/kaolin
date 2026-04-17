@@ -235,10 +235,10 @@ def loss_elastic_warp(model, pts, yms, prs, rhos, transforms, appx_vol, interp_s
 
     Args:
         model (nn.Module): Simplicits object network
-        pts (torch.Tensor): Tensor of sample points in :math:`\mathbb{R}^dim`, for now dim=3, of shape :math:`(\text{num_samples}, \text{dim})`
-        yms (torch.Tensor): Length pt-wise youngs modulus, of shape :math:`(\text{num_samples})`
+        pts (torch.Tensor): Tensor of sample points in :math:`\mathbb{R}^dim`, for now dim=3, of shape :math:`(\text{num_samples}, \text{dim})` (in :math:`m`)
+        yms (torch.Tensor): Length pt-wise youngs modulus, of shape :math:`(\text{num_samples})` (in :math:`kg/m/s^2`)
         prs (torch.Tensor): Length pt-wise poisson ratios, of shape :math:`(\text{num_samples})`
-        rhos (torch.Tensor): Length pt-wise density, of shape :math:`(\text{num_samples})`
+        rhos (torch.Tensor): Length pt-wise density, of shape :math:`(\text{num_samples})` (in :math:`kg/m^3`)
         transforms (torch.Tensor): Batch of sample transformations, of shape :math:`(\text{batch_size}, \text{num_handles}, \text{dim}, \text{dim}+1)`
         appx_vol (float): Approximate (or exact) volume of object (in :math:`m^3`)
         interp_step (float): Length interpolation schedule for neohookean elasticity (0%->100%)
@@ -273,13 +273,13 @@ def compute_losses_warp(model, normalized_pts, yms, prs, rhos, en_interp, batch_
     Args:
         model (nn.module): Simplicits network
         normalized_pts (torch.Tensor): Spatial points in :math:`\mathbb{R}^3`, of shape :math:`(\text{num_pts}, 3)`
-        yms (torch.Tensor): Point-wise youngs modulus, of shape :math:`(\text{num_pts})` 
+        yms (torch.Tensor): Point-wise youngs modulus, of shape :math:`(\text{num_pts})` (in :math:`kg/m/s^2`)
         prs (torch.Tensor): Point-wise poissons ratio, of shape :math:`(\text{num_pts})`
-        rhos (torch.Tensor): Point-wise density, of shape :math:`(\text{num_pts})`
+        rhos (torch.Tensor): Point-wise density, of shape :math:`(\text{num_pts})` (in :math:`kg/m^3`)
         en_interp (float): interpolation between energy at current step
         batch_size (int): Number of sample deformations
         num_handles (int): Number of handles
-        appx_vol (float): Approximate volume of object
+        appx_vol (float): Approximate volume of object (in :math:`m^3`)
         num_samples (int): Number of sample points. 
         le_coeff (float): floating point coefficient for elastic loss 
         lo_coeff (float): floating point coefficient for orthogonal loss

@@ -251,7 +251,7 @@ def sparse_dFdz_matrix_from_dense(enriched_weights_fcn, pts):
 
     Args:
         enriched_weights_fcn (function): Function that returns the skinning weights for a given point.
-        pts (torch.Tensor): Sample points.
+        pts (torch.Tensor): Sample points (in :math:`m`).
 
     Returns:
         wp.sparse.bsr_matrix: Sparse Jacobian matrix of size :math:`(9 \text{num_samples}, 12 \text{num_handles})`
@@ -276,7 +276,7 @@ def sparse_dFdz_matrix(sim_weights: np.ndarray, sim_weights_jac: np.ndarray, sim
         sim_weights (np.ndarray): Skinning weights, of shape :math:`(\text{num\_samples}, \text{num\_handles})`.
         sim_weights_jac (np.ndarray): Gradient of the skinning weights with respect to the sample points,
             of shape :math:`(\text{num\_samples}, \text{num\_handles}, 3)`.
-        sim_pts (np.ndarray): 3D positions of the sample points, of shape :math:`(\text{num\_samples}, 3)`.
+        sim_pts (np.ndarray): 3D positions of the sample points, of shape :math:`(\text{num\_samples}, 3)` (in :math:`m`).
 
     Returns:
         wp.sparse.bsr_matrix: Sparse Jacobian matrix of size :math:`(9 \text{num_samples}, 12 \text{num_handles})`
@@ -359,7 +359,7 @@ def sparse_mass_matrix(sim_rhos: np.ndarray):
     r"""Creates a sparse mass matrix from a set of densities.
 
     Args:
-        sim_rhos (np.ndarray): Densities.
+        sim_rhos (np.ndarray): Densities (in :math:`kg/m^3`).
 
     Returns:
         wp.sparse.bsr_matrix: Sparse mass matrix of size :math:`(3 \text{num_samples}, 3 \text{num_samples})`
@@ -378,8 +378,8 @@ def lumped_mass_matrix(rhos, total_volume, dim=3):
     r"""Calculate the lumped mass matrix of an object sampled via points with spatially uniform sampling, and potentially spatially varying density
 
     Args:
-        rhos (torch.Tensor): Point-wise vector of densities, of shape :math:`(\text{num_samples})`
-        total_volume (float): Total volume of object in :math:`m^3`
+        rhos (torch.Tensor): Point-wise vector of densities, of shape :math:`(\text{num_samples})` (in :math:`kg/m^3`)
+        total_volume (float): Total volume of object (in :math:`m^3`)
         dim (int, optional): Spatial dimensions. Defaults to 3.
 
     Returns:

@@ -21,10 +21,7 @@ from tqdm import tqdm
 
 import torch
 
-try:
-    from pxr import Usd, UsdGeom, Vt, Sdf, UsdShade
-except ImportError:
-    pass
+from pxr import Usd, UsdGeom, Vt, Sdf, UsdShade
 
 from kaolin.io.materials import MaterialLoadError, MaterialNotSupportedError, process_materials_and_assignments
 from kaolin.io import utils

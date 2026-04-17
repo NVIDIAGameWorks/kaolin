@@ -15,6 +15,7 @@
 
 import torch
 import numpy as np
+
 from pxr import Usd, UsdGeom, Vt
 
 __all__ = [
@@ -22,7 +23,7 @@ __all__ = [
     'import_subsets'
 ]
 
-def add_subset(file_path_or_stage, prim_or_path, name, indices, family_name='part', override=False):
+def add_subset(file_path_or_stage, prim_or_path, name, indices, family_name='part', overwrite=False):
     r"""Add subset to an existing Prim.
 
     Args:
@@ -38,7 +39,7 @@ def add_subset(file_path_or_stage, prim_or_path, name, indices, family_name='par
             The family groups subsets by purpose (e.g. ``'part'`` for segmentation
             parts, ``'materialBind'`` for material assignments).
             Default: ``'part'``.
-        override (bool):
+        overwrite (bool):
             If True, reassign the indices on an existing subset with the same name.
             If False (default), raise a ``ValueError`` if a subset with that name
             already exists.
@@ -61,10 +62,10 @@ def add_subset(file_path_or_stage, prim_or_path, name, indices, family_name='par
 
         existing_path = prim.GetPath().AppendChild(name)
         if stage.GetPrimAtPath(existing_path).IsValid():
-            if not override:
+            if not overwrite:
                 raise ValueError(
                     f"Subset '{name}' already exists at '{existing_path}'; "
-                    f"use override=True to replace it")
+                    f"use overwrite=True to replace it")
             existing_subset = UsdGeom.Subset(stage.GetPrimAtPath(existing_path))
             existing_subset.GetIndicesAttr().Set(Vt.IntArray.FromNumpy(indices.cpu().numpy()))
             existing_subset.GetFamilyNameAttr().Set(family_name)

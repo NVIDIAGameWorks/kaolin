@@ -1,0 +1,102 @@
+#usda 1.0
+# Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+(
+    subLayers = [
+        # To refer to schema types defined in schema.usda files from other
+        # libraries, simply add comma-separated lines of the form
+        # @<library name>/schema.usda@. In this example, we're referring
+        # to schema types from 'usd'. If you were adding sub-classes of
+        # UsdGeom schema types, you would use usdGeom/schema.usda instead.
+        @usd/schema.usda@,
+        @usdGeom/schema.usda@
+    ]
+)
+
+over "GLOBAL" (
+    customData = {
+        string libraryName       = "customUsd"
+        string libraryPath       = "."
+        bool skipCodeGeneration  = true
+    }
+) {
+}
+
+class "KaolinPhysicsMaterialAPI" (
+    doc = """An applied schema that provides physics materials properties.
+
+             Physics material are defined per geometry points."""
+    inherits = </APISchemaBase>
+    customData = {
+        string className = "PhysicsMaterialAPI"
+        string apiSchemaType = "multipleApply"
+        string propertyNamespacePrefix = "kaolin_physics_material"
+    }
+) {
+    point3f[] pts (
+        doc = "Points, representing the object's geometry, of shape (num_pts, 3) (in m)."
+    )
+    float[] yms (
+        doc = "Young's Moduli defining material stiffness, of shape (num_pts,) (in kg/m/s^2)."
+    )
+    float[] prs (
+        doc = "Poisson's ratios defining material compressibility, of shape (num_pts,)."
+    )
+    float[] rhos (
+        doc = "Density defining material density, of shape (num_pts,) (in kg/m^3)."
+    )
+    float appx_vol (
+        doc = "Approximate volume of the object (in m^3)."
+    )
+}
+
+class "KaolinSkinnedPhysicsAPI" (
+    doc = """An applied schema that provides skinned physics points properties.
+
+             Skinning weights are stored per cubature point or coordinate used for rendering
+             (for instance gaussians means for 3D gaussians)."""
+    inherits = </APISchemaBase>
+    customData = {
+        string className = "SkinnedPhysicsAPI"
+        string apiSchemaType = "multipleApply"
+        string propertyNamespacePrefix = "kaolin_skinned_physics"
+    }
+) {
+    point3f[] pts (
+        doc = "Cubature points, representing the object's geometry, of shape (num_pts, 3) (in m)."
+    )
+    float[] yms (
+        doc = "Young's Moduli defining material stiffness, of shape (num_pts,) (in kg/m/s^2)."
+    )
+    float[] prs (
+        doc = "Poisson's ratios defining material compressibility, of shape (num_pts,)."
+    )
+    float[] rhos (
+        doc = "Density defining material density, of shape (num_pts,) (in kg/m^3)."
+    )
+    float appx_vol (
+        doc = "Approximate volume of the object (in m^3)."
+    )
+    float[] skinning_weights (
+        doc = "Skinning weights of the points, of shape (num_pts, num_handles)."
+    )
+    float[] dwdx (
+        doc = "jacobian of skinning weights function w.r.t the pts, of shape (num_pts, num_handles, 3)."
+    )
+    float[] renderable_skinning_weights (
+        doc = "Skinning weights of the rendering points, of shape (num_render_pts, num_handles)."
+    )
+}
