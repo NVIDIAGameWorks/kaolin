@@ -44,6 +44,7 @@ def run_apidoc(_):
             "kaolin/io/usd/pointcloud.py",
             "kaolin/io/usd/transform.py",
             "kaolin/io/usd/gaussians.py",
+            "kaolin/io/usd/subset.py",
             "kaolin/math/quat/angle_axis.py",
             "kaolin/math/quat/euclidean.py",
             "kaolin/math/quat/matrix44.py",

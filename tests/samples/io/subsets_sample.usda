@@ -1,0 +1,57 @@
+#usda 1.0
+
+def "World"
+{
+    def Mesh "SimpleMesh"
+    {
+        int[] faceVertexCounts = [3, 3, 3, 3]
+        int[] faceVertexIndices = [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]
+        point3f[] points = [(0, 0, 0), (1, 0, 0), (0.5, 1, 0), (0.5, 0.5, 1)]
+
+        def GeomSubset "group_a"
+        {
+            uniform token elementType = "face"
+            uniform token familyName = "part"
+            int[] indices = [0, 1]
+        }
+
+        def GeomSubset "group_b"
+        {
+            uniform token elementType = "face"
+            uniform token familyName = "part"
+            int[] indices = [2, 3]
+        }
+
+        def GeomSubset "mat_a"
+        {
+            uniform token elementType = "face"
+            uniform token familyName = "materialBind"
+            int[] indices = [0, 2]
+        }
+    }
+
+    def ParticleField3DGaussianSplat "SimpleGaussians"
+    {
+        float[] opacities = [0.5, 0.5, 0.5, 0.5]
+        quatf[] orientations = [(-0.3250576, 0.88807386, 0, 0.3250576), (-0.3250576, 0.88807386, 0, 0.3250576), (-0.3250576, 0.88807386, 0, 0.3250576), (-0.3250576, 0.88807386, 0, 0.3250576)]
+        point3f[] positions = [(0.1506086, 0.9478657, 0.43888634), (0.36555707, 0.93541884, 0.33879548), (0.53755826, 0.31151628, 0.259332), (0.5528234, 0.63542664, 0.47506636)]
+        float3[] radiance:sphericalHarmonicsCoefficients = [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
+        uniform int radiance:sphericalHarmonicsDegree = 0
+        float3[] scales = [(0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1), (0.1, 0.1, 0.1)]
+
+        def GeomSubset "region_a"
+        {
+            uniform token elementType = "point"
+            uniform token familyName = "part"
+            int[] indices = [0, 1]
+        }
+
+        def GeomSubset "region_b"
+        {
+            uniform token elementType = "point"
+            uniform token familyName = "region"
+            int[] indices = [2, 3]
+        }
+    }
+}
+

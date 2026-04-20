@@ -196,7 +196,8 @@ def get_mesh_prim_materials(mesh_prim, time=None):
     if time is None:
         time = Usd.TimeCode.Default()
 
-    mesh_subsets = UsdGeom.Subset.GetAllGeomSubsets(UsdGeom.Imageable(mesh_prim)) or []
+    mesh_subsets = UsdGeom.Subset.GetGeomSubsets(
+        UsdGeom.Imageable(mesh_prim), familyName='materialBind') or []
     mesh_material = UsdShade.MaterialBindingAPI.Apply(mesh_prim).ComputeBoundMaterial()[0]
 
     # Parse mesh materials
