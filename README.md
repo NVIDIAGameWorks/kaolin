@@ -23,7 +23,7 @@ pip install kaolin==0.18.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/t
 
 ## About the Latest Release (0.18.0)
 
-In this version we added [collisions](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.simplicits.html#kaolin.physics.simplicits.SimplicitsScene.enable_collisions) to our [physics module](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.html).
+In this version we added [collision detection](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.simplicits.html#kaolin.physics.simplicits.SimplicitsScene.enable_collisions) to our [physics module](https://kaolin.readthedocs.io/en/latest/modules/kaolin.physics.html).
 
 
 https://github.com/user-attachments/assets/cfc24cca-b332-47a6-84d3-401489b681e9
