@@ -31,6 +31,7 @@ from kaolin.io import utils
 from kaolin.rep import SurfaceMesh
 
 from .materials import export_material, UsdMaterialIoManager
+from .subset import add_subset
 from .utils import _get_stage_from_maybe_file, get_scene_paths, create_stage
 
 
@@ -756,8 +757,9 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         for i, material in enumerate(materials):
             # Note: without int(x) for ... fails in Set with type mismatch
             face_idx = [int(x) for x in list((material_assignments == i).nonzero().reshape((-1,)).detach().cpu().numpy())]
-            subset_prim = stage.DefinePrim(f'{scene_path}/subset_{i}', 'GeomSubset')
-            subset_prim.GetAttribute('indices').Set(face_idx)
+            subset_prim = add_subset(stage, usd_mesh.GetPrim(), f'subset_{i}',
+                                     torch.tensor(face_idx, dtype=torch.int64),
+                                     family_name='materialBind')
             try:
                 # Note: this has the desirable property of always rewriting the materials under scene_path, but
                 # TODO: more thought is required on when it is desirable to overwrite textures vs. not;
