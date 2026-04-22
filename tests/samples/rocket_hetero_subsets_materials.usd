@@ -67,6 +67,7 @@ def Xform "Root" (
 
         def GeomSubset "Fins"
         {
+            uniform token familyName = "materialBind"
             int[] indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
             rel material:binding = </Root/Looks/PreviewSurface_01> (
                 bindMaterialAs = "weakerThanDescendants"
@@ -75,6 +76,7 @@ def Xform "Root" (
 
         def GeomSubset "Engine"
         {
+            uniform token familyName = "materialBind"
             int[] indices = [788, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800, 801, 802]
             rel material:binding = </Root/Looks/PreviewSurface_02> (
                 bindMaterialAs = "weakerThanDescendants"
