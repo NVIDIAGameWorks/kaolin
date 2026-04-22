@@ -27,8 +27,8 @@ def add_subset(file_path_or_stage, prim_or_path, name, indices, family_name='par
 
     Args:
         file_path_or_stage (str or Usd.Stage):
-            USD.Stage or path to file to stage to be opened.
-            If an USD.Stage is provided, the stage is not saved at the end.
+            USD.Stage or path to USD file to be opened.
+            If a USD.Stage is provided, the stage is not saved at the end.
         prim_or_path (str or Usd.Prim):
             Usd.Prim on which to add the subset, or absolute path within
             the USD file scene. Must be a valid ``Sdf.Path``.
@@ -89,7 +89,6 @@ def add_subset(file_path_or_stage, prim_or_path, name, indices, family_name='par
             indices=Vt.IntArray.FromNumpy(indices.cpu().numpy()),
             familyName=family_name
         )
-        # TODO(cfujitsang): Do we need stage.Save()?
         if not isinstance(file_path_or_stage, Usd.Stage):
             stage.Save()
     finally:
@@ -138,8 +137,7 @@ def import_subsets(file_path_or_stage, prim_or_path, family_name=None):
 
     Returns:
         (dict of dict):
-            dict list all the subset where keys are the path to subset and
-            the dict as values have the following fields:
+            dict mapping each subset's USD path to a dict with the following fields:
 
         * **indices** (torch.Tensor): indices of the subset.
         * **family_name** (str): family name.
