@@ -10,3 +10,11 @@ API
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: SimplicitsMLP
+
+.. autoclass:: kaolin.physics.simplicits.SimplicitsMLP
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :inherited-members: Module
+   :exclude-members: from_function

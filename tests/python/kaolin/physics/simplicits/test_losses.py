@@ -87,7 +87,6 @@ def test_compute_losses(device, dtype):
 
     partial_compute_losses = partial(compute_losses,
                                      batch_size=10,
-                                     num_handles=10,
                                      appx_vol=so_appx_vol,
                                      num_samples=NUM_SAMPLES,
                                      le_coeff=1e-1,

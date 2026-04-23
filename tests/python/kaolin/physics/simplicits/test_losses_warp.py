@@ -88,7 +88,7 @@ def test_compute_losses_warp(device, dtype):
     # compute_losses(step, model, optim, normalized_pts, yms, prs, rhos, BATCH_SIZE, NUM_HANDLES, APPX_VOL, NUM_SAMPLES, LE_COEFF, LO_COEFF)
     partial_compute_losses_warp = partial(compute_losses_warp,
                                           batch_size=10,
-                                          num_handles=10,
+                                          num_handles=NUM_HANDLES - 1,
                                           appx_vol=so_appx_vol,
                                           num_samples=NUM_SAMPLES,
                                           le_coeff=1e-1,

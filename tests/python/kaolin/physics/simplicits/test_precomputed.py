@@ -19,7 +19,7 @@ import torch
 import warp as wp
 from functools import partial
 
-from kaolin.physics.simplicits.precomputed import lumped_mass_matrix, lbs_matrix, jacobian_dF_dz, _jacobian_dF_dz_const_handle, jacobian_dx_dz, sparse_lbs_matrix, sparse_dFdz_matrix_from_dense
+from kaolin.physics.simplicits.precomputed import lumped_mass_matrix, lbs_matrix, jacobian_dF_dz, _jacobian_dF_dz_const_handle, jacobian_dx_dz, sparse_lbs_matrix, sparse_dFdz_matrix_from_dense, sparse_dFdz_matrix
 from kaolin.physics.simplicits.network import SimplicitsMLP
 from kaolin.physics.utils.warp_utilities import _bsr_to_torch
 
@@ -137,7 +137,7 @@ def test_sparse_dFdz_matrix_from_dense(device, dtype):
     H = 5
     B = 1
     points = torch.rand(N, 3, device=device, dtype=dtype)  # n x 3 points
-    transforms = torch.rand(B, H + 1, 3, 4, device=device,
+    transforms = torch.rand(B, H, 3, 4, device=device,
                             dtype=dtype)  # lbs transforms
 
     model = SimplicitsMLP(3, 64, H, 6).to(device)
@@ -154,6 +154,35 @@ def test_sparse_dFdz_matrix_from_dense(device, dtype):
     check_allclose(dF_dz, expected_dF_dz, rtol=0.01, atol=0.01)
 
 
+@pytest.mark.parametrize('device', ['cuda'])
+@pytest.mark.parametrize('dtype', [torch.float])
+def test_sparse_dFdz_matrix(device, dtype):
+    N = 10
+    H = 3
+    points = torch.rand(N, 3, device=device, dtype=dtype)
+
+    model = SimplicitsMLP(3, 64, H, 6).to(device)
+    if dtype == torch.double:
+        model.double()
+
+    def model_plus_rigid(pts):
+        return torch.cat((model(pts), torch.ones((pts.shape[0], 1), device=device)), dim=1)
+
+    weights = model_plus_rigid(points)  # (N, H+1)
+    jac_fn = torch.func.jacrev(lambda x: model_plus_rigid(x[None])[0])
+    dwdx = torch.vmap(jac_fn)(points)   # (N, H+1, 3)
+
+    dF_dz_new = _bsr_to_torch(sparse_dFdz_matrix(
+        weights.detach().cpu().numpy(),
+        dwdx.detach().cpu().numpy(),
+        points.detach().cpu().numpy())).to_dense().to(device)
+
+    dF_dz_ref = _bsr_to_torch(sparse_dFdz_matrix_from_dense(
+        enriched_weights_fcn=model_plus_rigid, pts=points)).to_dense().to(device)
+
+    check_allclose(dF_dz_new, dF_dz_ref, rtol=0.01, atol=0.01)
+
+
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float, torch.double])
 def test_jacobian_dF_dz(device, dtype):
@@ -164,8 +193,7 @@ def test_jacobian_dF_dz(device, dtype):
     B = 1
     points = torch.rand(N, 3, device=device, dtype=dtype)  # n x 3 points
 
-    # H handles + 1 for the constant handle
-    transforms = torch.rand(H + 1, 3, 4, device=device,
+    transforms = torch.rand(H, 3, 4, device=device,
                             dtype=dtype).unsqueeze(0)
     model = SimplicitsMLP(3, 64, H, 6).to(device)
     if dtype == torch.double:
@@ -190,7 +218,7 @@ def test_jacobian_dx_dz(device, dtype):
     H = 5
     B = 1
     points = torch.rand(N, 3, device=device, dtype=dtype)  # n x 3 points
-    transforms = torch.rand(B, H + 1, 3, 4, device=device,
+    transforms = torch.rand(B, H, 3, 4, device=device,
                             dtype=dtype)  # lbs transforms
 
     model = SimplicitsMLP(3, 64, H, 6).to(device)
@@ -215,7 +243,7 @@ def test_jacobian_dx_dz(device, dtype):
         pt4_i = torch.cat(
             (pt_i, torch.tensor([[1]], device=device, dtype=dtype)), dim=1)
         expect_pt_i = pt_i.T
-        for j in range(H + 1):
+        for j in range(H):
             expect_pt_i += weights[i, j] * transforms[0, j] @ pt4_i.T
 
         expected_points[i, :] = expect_pt_i.T

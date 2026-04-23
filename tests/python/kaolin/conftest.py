@@ -1,3 +1,5 @@
+import sys
+import types
 import pytest
 import torch
 import kaolin
@@ -5,6 +7,28 @@ from kaolin.physics.simplicits import SimplicitsObject, SimplicitsScene
 from kaolin.utils.testing import with_seed
 from pathlib import Path
 
+
+def _load_old_simplicits_mlp(path):
+    class _SkinningWeightFcnStub:
+        pass
+
+    easy_api = types.ModuleType("kaolin.physics.simplicits.easy_api")
+    for _name in ('SkinningWeightFcn', 'SkinningWeightsFcn', 'NormalizedSkinningWeightsFcn'):
+        setattr(easy_api, _name, _SkinningWeightFcnStub)
+    sys.modules["kaolin.physics.simplicits.easy_api"] = easy_api
+    kaolin.physics.simplicits.easy_api = easy_api
+
+    obj = torch.load(path, weights_only=False)
+    simplicits_mlp = kaolin.physics.simplicits.SimplicitsMLP(
+        spatial_dimensions=obj._modules['model'].linear_elu_stack[0].in_features,
+        layer_width=1, num_handles=2, num_layers=1, bb_min=obj.bb_min, bb_max=obj.bb_max
+    )
+    simplicits_mlp.linear_elu_stack = obj._modules['model'].linear_elu_stack
+
+    del sys.modules["kaolin.physics.simplicits.easy_api"]
+    del kaolin.physics.simplicits.easy_api
+
+    return simplicits_mlp
 
 @pytest.fixture
 def device():
@@ -26,59 +50,60 @@ def cube_drop_mesh():
     mesh = kaolin.io.import_mesh(str(mesh_file_path), triangulate=True).cuda()
     return mesh
 
+@pytest.fixture
+def cantilever_beam_simplicits_mlp():
+    path = Path(__file__).resolve().parent / "physics" / "simplicits" / "regression_test_data" / "beam_weights_fcn_32_handles.pth"
+    return _load_old_simplicits_mlp(str(path))
+
+@pytest.fixture
+def cube_drop_simplicits_mlp():
+    path = Path(__file__).resolve().parent / "physics" / "simplicits" / "regression_test_data" / "cube_weights_fcn_32_handles.pth"
+    return _load_old_simplicits_mlp(str(path))
 
 @pytest.fixture 
 @with_seed(0,0,0)
-def cantilever_beam_object(device, dtype, cantilever_beam_mesh):
+def cantilever_beam_object(device, dtype, cantilever_beam_mesh, cantilever_beam_simplicits_mlp):
     mesh = cantilever_beam_mesh
     num_samples = 100000
 
-    uniform_pts = torch.rand(num_samples, 3, device=device) * (mesh.vertices.max(
-        dim=0).values - mesh.vertices.min(dim=0).values) + mesh.vertices.min(dim=0).values
+    uniform_pts = torch.rand(num_samples, 3, device=device) * (
+        mesh.vertices.max(dim=0).values - mesh.vertices.min(dim=0).values
+    ) + mesh.vertices.min(dim=0).values
 
     boolean_signs = kaolin.ops.mesh.check_sign(mesh.vertices.unsqueeze(
         0), mesh.faces, uniform_pts.unsqueeze(0), hash_resolution=512)
 
-    pts = uniform_pts[boolean_signs.squeeze()]  # m
-    yms = 1e5*torch.ones(pts.shape[0], device=device, dtype=dtype)  # kg/m/s^2
-    prs = 0.45*torch.ones(pts.shape[0], device=device, dtype=dtype)  # unitless
-    rhos = 500*torch.ones(pts.shape[0], device=device, dtype=dtype)  # kg/m^3
-    object_vol = (mesh.vertices.max(dim=0)[
-                  0] - mesh.vertices.min(dim=0)[0]).prod()  # m^3 #bbx volume
-    dt = 0.05  # s
+    pts = uniform_pts[boolean_signs.squeeze()]                                       # m
+    yms = torch.full(pts.shape[:1], 1e5, device=device, dtype=dtype)                   # kg/m/s^2
+    prs = torch.full(pts.shape[:1], 0.45, device=device, dtype=dtype)                  # unitless
+    rhos = torch.full(pts.shape[:1], 500, device=device, dtype=dtype)                  # kg/m^3
+    object_vol = (mesh.vertices.max(dim=0)[0] - mesh.vertices.min(dim=0)[0]).prod()  # m^3 #bbx volume
 
-    # get simplicits object
-    weights_file_path = Path(__file__).resolve().parent / "physics" / "simplicits" / "regression_test_data" / "beam_weights_fcn_32_handles.pth"
-    weights = torch.load(str(weights_file_path), weights_only=False)
-    
-    simplicits_object = SimplicitsObject.create_from_function(
-        pts, yms, prs, rhos, object_vol, weights)
-    return simplicits_object 
+    simplicits_object = SimplicitsObject(pts, yms, prs, rhos, object_vol,
+                                         skinning_mod=cantilever_beam_simplicits_mlp)
+    return simplicits_object
 
 @pytest.fixture
 @with_seed(0,0,0)
-def cube_drop_object(device, dtype, cube_drop_mesh):
+def cube_drop_object(device, dtype, cube_drop_mesh, cube_drop_simplicits_mlp):
     mesh = cube_drop_mesh
     num_samples = 100000
 
-    uniform_pts = torch.rand(num_samples, 3, device=device) * (mesh.vertices.max(
-        dim=0).values - mesh.vertices.min(dim=0).values) + mesh.vertices.min(dim=0).values
+    uniform_pts = torch.rand(num_samples, 3, device=device) * (
+        mesh.vertices.max(dim=0).values - mesh.vertices.min(dim=0).values
+    ) + mesh.vertices.min(dim=0).values
 
     boolean_signs = kaolin.ops.mesh.check_sign(mesh.vertices.unsqueeze(
         0), mesh.faces, uniform_pts.unsqueeze(0), hash_resolution=512)
 
     pts = uniform_pts[boolean_signs.squeeze()]  # m
-    yms = 1e4*torch.ones(pts.shape[0], device=device, dtype=dtype)  # kg/m/s^2
-    prs = 0.45*torch.ones(pts.shape[0], device=device, dtype=dtype)  # unitless
-    rhos = 500*torch.ones(pts.shape[0], device=device, dtype=dtype)  # kg/m^3
-    object_vol = (mesh.vertices.max(dim=0)[
-                  0] - mesh.vertices.min(dim=0)[0]).prod()  # m^3 #bbx volume
+    yms = torch.full(pts.shape[:1], 1e4, device=device, dtype=dtype)  # kg/m/s^2
+    prs = torch.full(pts.shape[:1], 0.45, device=device, dtype=dtype)  # unitless
+    rhos = torch.full(pts.shape[:1], 500, device=device, dtype=dtype)  # kg/m^3
+    object_vol = (mesh.vertices.max(dim=0)[0] - mesh.vertices.min(dim=0)[0]).prod()  # m^3 #bbx volume
 
-    # get simplicits object
-    weights_file_path = Path(__file__).resolve().parent / "physics" / "simplicits" / "regression_test_data" / "cube_weights_fcn_32_handles.pth"
-    weights = torch.load(str(weights_file_path), weights_only=False)
-    simplicits_object = SimplicitsObject.create_from_function(
-        pts, yms, prs, rhos, object_vol, weights)
+    simplicits_object = SimplicitsObject(pts, yms, prs, rhos, object_vol,
+                                         skinning_mod=cube_drop_simplicits_mlp)
     return simplicits_object
 
 
@@ -99,8 +124,10 @@ def cantilever_beam_setup(cantilever_beam_object):
     )
     scene.newton_hessian_regularizer = 0
     scene.direct_solve = True
-    
-    scene.add_object(simplicits_object, num_qp=1024)
+
+    fem_data_path = Path(__file__).resolve().parent / "physics" / "simplicits" / "regression_test_data" / "wpfem_vertex_deformations_beam.pth"
+    fem_v0 = torch.load(str(fem_data_path), weights_only=False)["v0"]
+    scene.add_object(simplicits_object, num_qp=1024, renderable_pts=fem_v0)
 
     scene.set_scene_gravity(torch.tensor([0, 9.8, 0]))
     scene.set_scene_floor(floor_height=-1.0, floor_axis=1,
@@ -131,7 +158,9 @@ def cube_drop_setup(cube_drop_object):
     scene.newton_hessian_regularizer = 0
     scene.direct_solve = True
 
-    scene.add_object(simplicits_object, num_qp=1024)
+    fem_data_path = Path(__file__).resolve().parent / "physics" / "simplicits" / "regression_test_data" / "wpfem_vertex_deformations_cube.pth"
+    fem_v0 = torch.load(str(fem_data_path), weights_only=False)["v0"]
+    scene.add_object(simplicits_object, num_qp=1024, renderable_pts=fem_v0)
 
     scene.set_scene_gravity(torch.tensor([0, 9.8, 0]))
     scene.set_scene_floor(floor_height=-1.0, floor_axis=1,

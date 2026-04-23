@@ -46,7 +46,7 @@ class SimplicitsSolver(SolverBase):
         r"""Advance simulation by one timestep.
 
         If state includes simplicits DOFs, copies the state to Simplicits scene and runs
-        the simulation in the simplicits easy_api with collision handling. Only updates
+        the simulation in the Simplicits scene with collision handling. Only updates
         the Simplicits particle subset of the state's particle arrays.
 
         Args:
