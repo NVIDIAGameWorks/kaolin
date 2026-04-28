@@ -21,7 +21,7 @@ import newton
 from newton._src.core.types import AxisType, Axis
 from kaolin.experimental.newton.model import SimplicitsModel
 from kaolin.experimental.newton.collisions import SimplicitsParticleNewtonShapeSoftContact
-from kaolin.physics.simplicits.easy_api import SimplicitsObject
+from kaolin.physics.simplicits import SimplicitsObject
 import logging
 
 __all__ = [
@@ -47,7 +47,8 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
         self._pending_collisions = None           # tuple of collision kwargs, or None
 
 
-    def add_simplicits_object(self, sim_object: SimplicitsObject, num_qp=1000, init_transform=None, is_kinematic=False):
+    def add_simplicits_object(self, sim_object: SimplicitsObject, num_qp=1000, init_transform=None,
+                              is_kinematic=False, renderable_pts=None):
         r"""Add a Simplicits soft-body object to the model.
 
         Wraps SimplicitsScene.add_object() to add deformable objects to the simulation.
@@ -58,10 +59,12 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
             init_transform (torch.Tensor or None): 3x4 or 4x4 tensor for the object's initial skinning transform.
                 Takes a standard transformation, not a delta; the identity matrix is subtracted and the delta is saved.
             is_kinematic (bool): If True, object is kinematic and not solved during dynamics.
+            renderable_pts (torch.Tensor or None): Optional rest positions for a separate rendered point set
+                (see :meth:`kaolin.physics.simplicits.simulation.SimplicitsScene.add_object`).
 
         """
         # obj_id = self.model.simplicits_scene.add_object(sim_object, num_qp, init_transform, is_kinematic)
-        self._pending_objects.append((sim_object, num_qp, init_transform, is_kinematic))
+        self._pending_objects.append((sim_object, num_qp, init_transform, is_kinematic, renderable_pts))
 
     def add_simplicits_collisions(self, collision_particle_radius=0.1,
                                         detection_ratio=1.5,
@@ -137,8 +140,9 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
 
         model = SimplicitsModel(device)
 
-        for sim_object, num_qp, init_transform, is_kinematic in self._pending_objects:
-            obj_id = model.simplicits_scene.add_object(sim_object, num_qp, init_transform, is_kinematic)
+        for sim_object, num_qp, init_transform, is_kinematic, renderable_pts in self._pending_objects:
+            obj_id = model.simplicits_scene.add_object(
+                sim_object, num_qp, init_transform, is_kinematic, renderable_pts)
             logging.info(f"Added Simplicits object with ID {obj_id}")
 
         has_simplicits_objects = len(self._pending_objects) > 0

@@ -38,8 +38,7 @@ extensions = [
 ]
 
 todo_include_todos = True
-
-autodoc_typehints = "description"
+napoleon_include_init_with_doc = True
 
 autodoc_mock_imports = ["newton"]
 

@@ -162,65 +162,6 @@ class SurfaceMesh(object):
      .. note::
 
        ``SurfaceMesh`` will not sanity check consistency of manually set attributes.
-
-    .. method:: SurfaceMesh.__init__(vertices, faces, normals = None, uvs = None, face_uvs_idx = None, face_normals_idx = None, material_assignments = None, materials = None, vertex_normals = None, vertex_tangents = None, vertex_colors = None, vertex_features = None, face_normals = None, face_uvs = None, face_vertices = None, face_tangents = None, face_colors = None, face_features = None, strict_checks = True, unset_attributes_return_none = True, allow_auto_compute = True)
-
-    Initializes the object, while automatically detecting the batching strategy
-    (see above for expected tensor dimensions).
-    The ``vertices`` and ``faces`` tensors are required, but the number of faces/vertices can be 0.
-    Any or all of the other attributes can be also provided or set later. See :ref:`table above <rubric mesh attributes>`
-    for expected tensor dimensions for different :ref:`batching <rubric mesh batching>` strategies.
-
-    Args:
-        vertices:  xyz locations of vertices.
-        faces: indices into ``vertices`` array for each vertex of each face; this is
-           the only **fixed topology** item for ``Batching.FIXED``.
-        face_vertices: xyz locations for each vertex of each face; can be set directly
-           or is **auto-computable** by indexing ``vertices`` with ``faces``.
-        normals: xyz normal values, indexed by ``face_normals_idx``.
-        face_normals_idx: indices into ``normals`` for each vertex in each face.
-        face_normals: xyz normal values for each face; can be set directly
-           or is **auto-computable** by 1) indexing ``normals`` with ``face_normals_idx``,
-           or (if either is missing and mesh is triangular) by 2) using
-           vertex locations.
-        uvs: uv texture coordinates, indexed by ``face_uvs_idx``.
-        face_uvs_idx: indices into ``uvs`` for each vertex of each face.
-        face_uvs: uv coordinate values for each vertex of each face; can be set directly
-           or is **auto-computable** by indexing ``uvs`` with ``face_uvs_idx``.
-        vertex_normals: xyz normal values, corresponding to vertices; can be set directly
-           or is **auto-computable** by averaging ``face_normals`` of faces incident
-           to a vertex.
-        vertex_tangents: tangents values used to compute the orientation of normal perturbation,
-           corresponding to vertices; can be set directly or is **auto-computable**, from
-           ``vertices`` and ``face_uvs``.
-        vertex_colors: color values associated with every vertex, expected RGB in range is 0..1 float
-            tensor, but this will not be enforced; if ``face_colors`` are set instead this value will
-            **auto-compute** to average across all faces incident to each vertex.
-        vertex_features: custom features of any channel number associated to every vertex; if
-            ``face_features`` are set instead this value will **auto-compute** to average across all
-            faces incident to each vertex.
-        face_tangents: the vertex_tangents value mapped to every vertex of every face, typically
-            this and ``vertex_tangents`` would be **auto-computed**.
-        face_colors: per-face per-vertex color values; if only one color is available per face,
-            tile the tensor to provide one color for each face vertex; if ``vertex_colors`` are set instead, this
-            will **auto-compute**, but setting ``face_colors`` directly allows the same vertex to
-            have different color value within distinct faces (same property is true for ``face_uvs`` and
-            ``face_normals`` across several 3D formats). Expected color value is RGB in range is 0..1 float,
-            but this will not be enforced.
-        face_features: custom per-face per-vertex features of any channel; if ``vertex_features`` are
-            set instead, this will **auto-compute**, but setting ``face_features`` directly allows the same
-            vertex to have different features within distinct faces.
-        material_assignments: indices into ``materials`` list for each face.
-        materials: raw materials as output by the io reader.
-        strict_checks: if ``True``, will raise exception if any tensors passed to
-           the construcor have unexpected shapes (see :ref:`shapes matrix <rubric mesh attributes>` above);
-           note that checks are less strict for ``Batching.LIST`` batching (default: ``True``).
-        unset_attributes_return_none: if set to ``False`` exception will be raised when
-           accessing attributes that are not set (or cannot be computed), if ``True`` will simply
-           return ``None`` (default: ``True``).
-        allow_auto_compute: whether to allow auto-computation of attributes on mesh
-           attribute access; see :ref:`supported attributes <rubric mesh attributes>`
-           (default: ``True``).
     """
 
     class Batching(str, Enum):
@@ -342,9 +283,60 @@ class SurfaceMesh(object):
                  unset_attributes_return_none: bool = True,
                  allow_auto_compute: bool = True):
         r"""Initializes the surface mesh object, while automatically detecting a batching strategy
-         (see :ref:`supported attributes <rubric mesh attributes>` for expected tensor dimensions).
-         The `vertices` and `faces` tensors are required, but the number of faces/vertices can be 0.
-         Any or all of the other attributes can be also provided or set later.
+        (see :ref:`supported attributes <rubric mesh attributes>` for expected tensor dimensions).
+        The `vertices` and `faces` tensors are required, but the number of faces/vertices can be 0.
+        Any or all of the other attributes can be also provided or set later.
+
+        Args:
+            vertices:  xyz locations of vertices.
+            faces: indices into ``vertices`` array for each vertex of each face; this is
+               the only **fixed topology** item for ``Batching.FIXED``.
+            face_vertices: xyz locations for each vertex of each face; can be set directly
+               or is **auto-computable** by indexing ``vertices`` with ``faces``.
+            normals: xyz normal values, indexed by ``face_normals_idx``.
+            face_normals_idx: indices into ``normals`` for each vertex in each face.
+            face_normals: xyz normal values for each face; can be set directly
+               or is **auto-computable** by 1) indexing ``normals`` with ``face_normals_idx``,
+               or (if either is missing and mesh is triangular) by 2) using
+               vertex locations.
+            uvs: uv texture coordinates, indexed by ``face_uvs_idx``.
+            face_uvs_idx: indices into ``uvs`` for each vertex of each face.
+            face_uvs: uv coordinate values for each vertex of each face; can be set directly
+               or is **auto-computable** by indexing ``uvs`` with ``face_uvs_idx``.
+            vertex_normals: xyz normal values, corresponding to vertices; can be set directly
+               or is **auto-computable** by averaging ``face_normals`` of faces incident
+               to a vertex.
+            vertex_tangents: tangents values used to compute the orientation of normal perturbation,
+               corresponding to vertices; can be set directly or is **auto-computable**, from
+               ``vertices`` and ``face_uvs``.
+            vertex_colors: color values associated with every vertex, expected RGB in range is 0..1 float
+                tensor, but this will not be enforced; if ``face_colors`` are set instead this value will
+                **auto-compute** to average across all faces incident to each vertex.
+            vertex_features: custom features of any channel number associated to every vertex; if
+                ``face_features`` are set instead this value will **auto-compute** to average across all
+                faces incident to each vertex.
+            face_tangents: the vertex_tangents value mapped to every vertex of every face, typically
+                this and ``vertex_tangents`` would be **auto-computed**.
+            face_colors: per-face per-vertex color values; if only one color is available per face,
+                tile the tensor to provide one color for each face vertex; if ``vertex_colors`` are set instead, this
+                will **auto-compute**, but setting ``face_colors`` directly allows the same vertex to
+                have different color value within distinct faces (same property is true for ``face_uvs`` and
+                ``face_normals`` across several 3D formats). Expected color value is RGB in range is 0..1 float,
+                but this will not be enforced.
+            face_features: custom per-face per-vertex features of any channel; if ``vertex_features`` are
+                set instead, this will **auto-compute**, but setting ``face_features`` directly allows the same
+                vertex to have different features within distinct faces.
+            material_assignments: indices into ``materials`` list for each face.
+            materials: raw materials as output by the io reader.
+            strict_checks: if ``True``, will raise exception if any tensors passed to
+               the construcor have unexpected shapes (see :ref:`shapes matrix <rubric mesh attributes>` above);
+               note that checks are less strict for ``Batching.LIST`` batching (default: ``True``).
+            unset_attributes_return_none: if set to ``False`` exception will be raised when
+               accessing attributes that are not set (or cannot be computed), if ``True`` will simply
+               return ``None`` (default: ``True``).
+            allow_auto_compute: whether to allow auto-computation of attributes on mesh
+               attribute access; see :ref:`supported attributes <rubric mesh attributes>`
+               (default: ``True``).
 
          .. note::
 

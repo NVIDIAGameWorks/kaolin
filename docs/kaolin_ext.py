@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, 2026 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +45,7 @@ def run_apidoc(_):
             "kaolin/io/usd/pointcloud.py",
             "kaolin/io/usd/transform.py",
             "kaolin/io/usd/gaussians.py",
+            "kaolin/io/usd/subset.py",
             "kaolin/math/quat/angle_axis.py",
             "kaolin/math/quat/euclidean.py",
             "kaolin/math/quat/matrix44.py",
@@ -81,12 +83,13 @@ def run_apidoc(_):
             "kaolin/physics/materials/muscle_material.py",
             "kaolin/physics/materials/neohookean_elastic_material.py",
             "kaolin/physics/materials/utils.py",
-            "kaolin/physics/simplicits/easy_api.py",
             "kaolin/physics/simplicits/losses.py",
             "kaolin/physics/simplicits/network.py",
             "kaolin/physics/simplicits/precomputed.py",
             "kaolin/physics/simplicits/simplicits_scene_forces.py",
+            "kaolin/physics/simplicits/simulation.py",
             "kaolin/physics/simplicits/skinning.py",
+            "kaolin/physics/simplicits/training.py",
             "kaolin/physics/simplicits/losses_warp.py",
             "kaolin/physics/simplicits/utils.py",
             "kaolin/physics/utils/finite_diff.py",
@@ -108,6 +111,8 @@ def run_apidoc(_):
             "kaolin/render/mesh/utils.py",
             "kaolin/render/spc/raytrace.py",
             "kaolin/rep/spc.py",
+            "kaolin/rep/gaussians.py",
+            "kaolin/rep/tensor_container.py",
             "kaolin/visualize/timelapse.py",
             "kaolin/visualize/ipython.py",
             "kaolin/framework/*",
