@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
 import os
 import math
 import re
@@ -21,6 +20,8 @@ from tqdm import tqdm
 
 import numpy as np
 import torch
+
+from kaolin.rep import GaussianSplatModel
 
 try:
     from pxr import Usd, UsdGeom, UsdVol, Gf
@@ -30,10 +31,7 @@ except ImportError:
 from .utils import _get_stage_from_maybe_file, get_scene_paths, create_stage
 from .transform import set_local_to_world_transform, get_local_to_world_transform
 from kaolin.utils.testing import check_tensor
-from kaolin.ops.gaussians import transform_gaussians
 
-
-gaussiancloud_return_type = namedtuple('gaussiancloud_return_type', ['positions', 'orientations', 'scales', 'opacities', 'sh_coeff'])
 
 __all__ = [
     'add_gaussiancloud',
@@ -98,24 +96,10 @@ def import_gaussianclouds(file_path_or_stage, scene_paths=None, times=None):
             correspond to.
 
     Returns:
-        (A dict of dicts):
-            Where the key is the path to each gaussian and the value dict represent a gaussian cloud with the following fields:
-
-            * **positions** (torch.Tensor):
-                Position of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`.
-            * **orientations** (torch.Tensor):
-                Orientation of each gaussian as quaternions, as :math:`(w, x, y, z)`,
-                of shape :math:`(\text{num_gaussians}, 4)`.
-            * **scales** (torch.Tensor):
-                Scale of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`.
-            * **opacities** (torch.Tensor):
-                Opacity of each gaussian, of shape :math:`(\text{num_gaussians})`.
-            * **sh_coeff** (torch.Tensor):
-                Spherical harmonics coefficients of each gaussian,
-                of shape :math:`(\text{num_gaussians}, (\text{num_degrees} + 1)^2, 3)`.
-            * **local_to_world** (torch.Tensor or None):
-                Local-to-world transform matrix of shape :math:`(4, 4)`,
-                or ``None`` if the prim has an identity transform.
+        (dict of str to GaussianSplatModel):
+            Dictionary mapping each scene path to a :class:`~kaolin.rep.GaussianSplatModel`.
+            Each model's ``transform`` is set to the computed local-to-world matrix of shape
+            :math:`(4, 4)`, or ``None`` if the prim has an identity transform.
     """
     stage = _get_stage_from_maybe_file(file_path_or_stage)
     try:
@@ -132,8 +116,8 @@ def import_gaussianclouds(file_path_or_stage, scene_paths=None, times=None):
             assert prim.GetTypeName() == "ParticleField3DGaussianSplat", f"Prim at {scene_path} is not a ParticleField3DGaussianSplat"
             attrs = _get_gaussiancloud(prim, time)
             tfm = get_local_to_world_transform(stage, prim, time)
-            attrs['local_to_world'] = tfm.float() if tfm is not None else None
-            output[scene_path] = attrs
+            tfm = tfm.float() if tfm is not None else None
+            output[scene_path] = GaussianSplatModel(**attrs, transform=tfm, strict_checks=False)
     finally:
         del stage, file_path_or_stage
     return output
@@ -156,68 +140,17 @@ def import_gaussiancloud(file_path_or_stage, root_path=None, time=None):
             Positive integer defining the time at which the supplied parameters correspond to.
 
     Returns:
-        (dict or None):
-            A single merged gaussian cloud dict, or ``None`` if no gaussian clouds are found.
-            The dict has the following fields:
-
-            * **positions** (torch.Tensor):
-                Position of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`.
-            * **orientations** (torch.Tensor):
-                Orientation of each gaussian as quaternions, as :math:`(w, x, y, z)`,
-                of shape :math:`(\text{num_gaussians}, 4)`.
-            * **scales** (torch.Tensor):
-                Scale of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`.
-            * **opacities** (torch.Tensor):
-                Opacity of each gaussian, of shape :math:`(\text{num_gaussians})`.
-            * **sh_coeff** (torch.Tensor):
-                Spherical harmonics coefficients of each gaussian,
-                of shape :math:`(\text{num_gaussians}, (\text{num_degrees} + 1)^2, 3)`.
+        (GaussianSplatModel):
+            A single merged gaussian cloud object, or ``None`` if no gaussian clouds are found.
     """
     scene_paths = get_gaussiancloud_scene_paths(file_path_or_stage, root_path=root_path)
     clouds = import_gaussianclouds(file_path_or_stage, scene_paths, times=time)
     if len(clouds) == 0:
         return None
 
-    transformed = []
-    for cloud in clouds.values():
-        ltw = cloud['local_to_world']
-        if ltw is not None:
-            if cloud['sh_coeff'].shape[1] > 1:
-                new_positions, new_orientations, new_scales, new_sh_rest = transform_gaussians(
-                    _convert_if_half(cloud['positions']),
-                    _convert_if_half(cloud['orientations']),
-                    _convert_if_half(cloud['scales']),
-                    ltw, shs_feat=cloud['sh_coeff'][:, 1:],
-                )
-                new_sh = torch.cat([cloud['sh_coeff'][:, :1], new_sh_rest], dim=1)
-            else:
-                new_positions, new_orientations, new_scales, _ = transform_gaussians(
-                    _convert_if_half(cloud['positions']),
-                    _convert_if_half(cloud['orientations']),
-                    _convert_if_half(cloud['scales']),
-                    ltw
-                )
-                new_sh = cloud['sh_coeff']
+    # Note, transform is applied by default during GaussianSplatModel.cat
+    return GaussianSplatModel.cat(list(clouds.values()))
 
-            
-            transformed.append({
-                'positions': new_positions.to(cloud['positions'].dtype),
-                'orientations': new_orientations.to(cloud['orientations'].dtype),
-                'scales': new_scales.to(cloud['scales'].dtype),
-                'opacities': cloud['opacities'],
-                'sh_coeff': new_sh.to(cloud['sh_coeff'].dtype),
-            })
-        else:
-            transformed.append({k: cloud[k] for k in ('positions', 'orientations', 'scales', 'opacities', 'sh_coeff')})
-
-    min_coeffs = min(c['sh_coeff'].shape[1] for c in transformed)
-    return {
-        'positions':    torch.cat([c['positions']                for c in transformed], dim=0),
-        'orientations': torch.cat([c['orientations']             for c in transformed], dim=0),
-        'scales':       torch.cat([c['scales']                   for c in transformed], dim=0),
-        'opacities':    torch.cat([c['opacities']                for c in transformed], dim=0),
-        'sh_coeff':     torch.cat([c['sh_coeff'][:, :min_coeffs] for c in transformed], dim=0),
-    }
 
 def get_gaussiancloud_scene_paths(file_path_or_stage, root_path=None):
     r"""Returns all gaussian cloud scene paths contained in specified file.
@@ -259,9 +192,11 @@ def add_gaussiancloud(stage, scene_path, positions, orientations, scales,
             Orientation of each gaussian as quaternions, as :math:`(w, x, y, z)`,
             of shape :math:`(\text{num_gaussians}, 4)`.
         scales (torch.Tensor):
-            Scale of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`.
+            Scale of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`,
+            post activation.
         opacities (torch.Tensor):
-            Opacity of each gaussian, of shape :math:`(\text{num_gaussians})`.
+            Opacity of each gaussian, of shape :math:`(\text{num_gaussians})`,
+            post activation.
         sh_coeff (torch.Tensor):
             Spherical harmonics coefficients of each gaussian,
             of shape :math:`(\text{num_gaussians}, (\text{num_degrees} + 1)^2, 3)`.

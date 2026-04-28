@@ -343,7 +343,14 @@ spec:
           build_passed = false
           echo e.toString()
         }
-
+        try {
+          stage("Working with Gaussian Splats Tutorial") {
+            sh 'cd /kaolin/examples/tutorial && ipython working_with_gaussians.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
         // RECIPES
         try {
           stage("SPC from Pointcloud Recipe") {

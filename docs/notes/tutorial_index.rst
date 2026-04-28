@@ -44,6 +44,13 @@ Detailed Tutorials
     * loading and constructing :class:`kaolin.rep.SurfaceMesh` objects
     * batching of meshes
     * auto-computing common attributes (like ``face_normals``)
+* `Working with 3D Gaussian Splat Models <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/working_with_gaussians.ipynb>`_:
+    * reading and writing :class:`kaolin.rep.GaussianSplatModel` from PLY and USD formats
+    * inspecting model contents and per-tensor statistics
+    * moving tensors between devices and dtypes
+    * applying affine transforms with ``as_transformed()``
+    * concatenating multiple Gaussian models into a single scene
+    * filtering Gaussians by opacity mask and saving to disk
 * `Understanding Structured Point Clouds (SPCs) <https://github.com/NVIDIAGameWorks/kaolin/blob/master/examples/tutorial/understanding_spcs_tutorial.ipynb>`_: walks through SPC features, covering:
     * under-the-hood explanation of SPC, why it's useful and key ops
     * loading a mesh

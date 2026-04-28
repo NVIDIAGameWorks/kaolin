@@ -21,31 +21,14 @@ import torch
 
 from plyfile import PlyData, PlyElement
 
-
-# TODO: switch to
-gaussiancloud_return_type = namedtuple('gaussiancloud_return_type', ['positions', 'orientations', 'scales', 'opacities', 'sh_coeff'])
-
+from kaolin.rep import GaussianSplatModel
 
 __all__ = [
     'import_gaussiancloud',
     'export_gaussiancloud',
 ]
 
-
-def _check_num_features(num_extra_features, sh_degree, comment=''):
-    expected_val = 3 * (sh_degree + 1) ** 2 - 3
-    if num_extra_features != expected_val:
-        raise RuntimeError(f'Extra features {num_extra_features} != expected {expected_val} for sh degree {sh_degree} {comment}')
-
-def _guess_sh_degree(num_extra_features):
-    # num_extra_features // 3 = num_speculars
-    # num_extra_features // 3 = (sh_degree + 1) ** 2 - 1
-    # num_extra_features // 3 + 1 = (sh_degree + 1) ** 2
-
-    sh_guess = int(round(math.sqrt(num_extra_features // 3 + 1))) - 1
-    return sh_guess
-
-def import_gaussiancloud(filename: str, device='cpu', dtype=torch.float32, sh_degree=None,
+def import_gaussiancloud(filename: str, device='cpu', dtype=torch.float32, #sh_degree=None,
                          apply_activations=True,
                          scale_activation=torch.exp,
                          rotation_activation=torch.nn.functional.normalize,
@@ -57,29 +40,13 @@ def import_gaussiancloud(filename: str, device='cpu', dtype=torch.float32, sh_de
         filename (str): path to the PLY file.
         device (str, optional): device to load the data onto. Defaults to 'cpu'.
         dtype (torch.dtype, optional): data type to load the data as. Defaults to torch.float32.
-        sh_degree (int, optional): spherical harmonics degree to use. Defaults to None, in which case it is guessed from the data.
         apply_activations (bool, optional): whether to apply the activations to the data. Defaults to True.
         scale_activation (callable, optional): activation function to apply to the scale. Defaults to torch.exp.
         rotation_activation (callable, optional): activation function to apply to the rotation. Defaults to torch.nn.functional.normalize.
         density_activation (callable, optional): activation function to apply to the density. Defaults to torch.sigmoid.
 
     Returns:
-        (dict or None):
-            A single gaussian cloud dict, with the following fields:
-
-            * **positions** (torch.Tensor):
-                Position of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`.
-            * **orientations** (torch.Tensor):
-                Orientation of each gaussian as quaternions, as :math:`(w, x, y, z)`,
-                of shape :math:`(\text{num_gaussians}, 4)`.
-            * **scales** (torch.Tensor):
-                Scale of each gaussian, of shape :math:`(\text{num_gaussians}, 3)`.
-            * **opacities** (torch.Tensor):
-                Opacity of each gaussian, of shape :math:`(\text{num_gaussians})`.
-            * **sh_coeff** (torch.Tensor):
-                Spherical harmonics coefficients of each gaussian,
-                of shape :math:`(\text{num_gaussians}, (\text{num_degrees} + 1)^2, 3)`.
-
+        (GaussianSplatModel): A single gaussian cloud object.
     """
     # Source: nvidia 3dgrut
     # https://github.com/nv-tlabs/3dgrut/blob/3f00f3242891907ccba5b3c558ec1e870498f67e/threedgrut/model/model.py#L671
@@ -99,11 +66,7 @@ def import_gaussiancloud(filename: str, device='cpu', dtype=torch.float32, sh_de
     extra_f_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("f_rest_")]
     extra_f_names = sorted(extra_f_names, key=lambda x: int(x.split('_')[-1]))
 
-    guessed_sh = False
-    if sh_degree is None:
-        guessed_sh = True
-        sh_degree = _guess_sh_degree(len(extra_f_names))
-    _check_num_features(len(extra_f_names), sh_degree, '(guessed sh)' if guessed_sh else '(user-provided sh)')
+    sh_degree = GaussianSplatModel.compute_sh_degree(len(extra_f_names) // 3 + 1)
 
     num_speculars = (sh_degree + 1) ** 2 - 1
     mogt_specular = np.zeros((num_gaussians, len(extra_f_names)))
@@ -136,20 +99,21 @@ def import_gaussiancloud(filename: str, device='cpu', dtype=torch.float32, sh_de
     sh_coeff = torch.cat([torch.tensor(mogt_albedo, **tensor_kwargs).transpose(1, 2),
                         torch.tensor(mogt_specular, **tensor_kwargs).transpose(1, 2)], dim=1)
 
-    return {
+    kwargs = {
         'positions': torch.tensor(mogt_pos, **tensor_kwargs),
         'orientations': rotations,
         'scales': scales,
         'opacities': densities.squeeze(-1),
         'sh_coeff': sh_coeff
     }
+    return GaussianSplatModel(**kwargs)
 
 
 # TODO: should design Gaussian class such that can do the following:
 # cloud = GaussianCloud(...)
 # export_gaussiancloud('/tmp/cloud.ply', **cloud.as_dict())
 def export_gaussiancloud(file_path, positions, orientations, scales, opacities,
-                         sh_coeff, overwrite=False):
+                         sh_coeff, sh_degree=None, overwrite=False):
     """Write a 3D Gaussian splatting-style PLY (``f_dc_*``, ``f_rest_*``, ``opacity``, ``scale_*``, ``rot_*``).
 
     Values are stored in the same raw space expected by :func:`import_gaussiancloud` when
@@ -164,6 +128,7 @@ def export_gaussiancloud(file_path, positions, orientations, scales, opacities,
         opacities (torch.Tensor): opacity of each gaussian, of shape :math:`(\text{num_gaussians})`.
         sh_coeff (torch.Tensor): spherical harmonics coefficients of each gaussian,
             of shape :math:`(\text{num_gaussians}, (\text{num_degrees} + 1)^2, 3)`.
+        sh_degree (int): optionally pass for sanity checking, otherwise will guess the value
         overwrite (bool, optional): whether to overwrite the file if it already exists. Defaults to False.
 
     Raises:
@@ -175,11 +140,12 @@ def export_gaussiancloud(file_path, positions, orientations, scales, opacities,
     n, num_sh, three = sh_coeff.shape
     if three != 3:
         raise ValueError('sh_coeff last dim must be 3 (RGB)')
-    sh_degree = int(round(math.sqrt(num_sh))) - 1
-    if (sh_degree + 1) ** 2 != num_sh:
-        raise ValueError(f'sh_coeff.shape[1]={num_sh} must be (sh_degree+1)^2 for integer sh_degree')
-    num_speculars = num_sh - 1
-    _check_num_features(3 * num_speculars, sh_degree, '')
+
+    if sh_degree is None:
+        sh_degree = GaussianSplatModel.compute_sh_degree(num_sh)
+    expected_num_features = GaussianSplatModel.compute_num_sh_coeff(sh_degree)
+    if expected_num_features != num_sh:
+        raise ValueError(f'sh_coeff.shape[1]={num_sh} must be {expected_num_features} for sh degree {sh_degree}')
 
     # Inverse of import_gaussiancloud activations (sigmoid, exp, normalize).
     op_t = opacities.detach().float().view(n, -1).squeeze(-1)

@@ -273,6 +273,9 @@ def tensor_info(t, name='', print_stats=False, detailed=False):
     if t is None:
         return '%s: None' % name
 
+    if type(t) in [int, str, float]:
+        return f'{name}: {t}'
+
     if type(t) is dict:
         return '\n'.join([tensor_info(v, name=f'{name}[{k}]:', print_stats=print_stats, detailed=detailed)
                           for k, v in t.items()])
