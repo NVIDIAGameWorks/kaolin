@@ -132,6 +132,7 @@ spec:
       }
     }
 
+    try {
     node(VM_LABEL) {
         // Let's check we can connect with everything important
         stage('DNS Check') {
@@ -197,6 +198,41 @@ spec:
                   """)
               }
 
+              if (buildWheel.toBoolean()) {
+                stage('Build wheel') {
+                  targetImage.inside() {
+                    bat """
+                      call "C:\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat" x64 -vcvars_ver=%MSVC_VER_PREFIX%
+                      if %errorlevel% neq 0 exit /b %errorlevel%
+                      set DISTUTILS_USE_SDK=1
+                      set FORCE_CUDA=1
+                      for /d %%d in (c:\\buildtools\\vc\\tools\\msvc\\%MSVC_VER_PREFIX%*) do set CUDAHOSTCXX=%%d\\bin\\hostx64\\x64\\cl.exe
+                      python setup.py bdist_wheel -v --dist-dir .
+                    """
+                  }
+                  kaolinVer = bat(script: "@type version.txt", returnStdout: true).trim()
+                  pythonVerTag = pythonVer.split('\\.').join('')
+                  Integer minorVal = pythonVer.split('\\.')[1].toInteger()
+                  pythonVerAbiTag = (minorVal < 8) ? pythonVerTag + 'm' : pythonVerTag
+                  wheelName = "kaolin-${kaolinVer}-cp${pythonVerTag}-cp${pythonVerAbiTag}-win_amd64.whl"
+                }
+                stage('Reinstall from wheel') {
+                  targetImage = docker.build(
+                    "${targetImageTag}",
+                    """-m 32g --no-cache -f ./tools/windows/Dockerfile.install_wheel \
+                        --build-arg BASE_IMAGE=${windowsBaseImage} \
+                        --build-arg PYTHON_VERSION=${pythonVer} \
+                        --build-arg PYTORCH_VERSION=${torchVer} \
+                        --build-arg IGNORE_TORCH_VER=1 \
+                        --build-arg WHEEL_NAME=${wheelName} \
+                        .
+                    """)
+                }
+                stage('Push wheel to artifact') {
+                  archiveArtifacts artifacts: "${wheelName}"
+                }
+              }
+
               stage('Push') {
                 targetImage.push()
               }
@@ -218,22 +254,57 @@ spec:
           }
           throw e
         } // Try/Catch
+        stage("Launch tests") {
+          jobMap = [:]
+          if (buildWheel.toBoolean()) {
+            jobMap["test"] = prepareWindowsWheelTestJob()
+          } //else { 
+          //  for (arch in archsToTest.split(';')) {
+          //    jobMap["${arch}"] = prepareWindowsTestJob(arch)
+          //  }
+          parallel jobMap
+        }
       }
+    } finally {
+      stage('cleanup') {
+        container('vm-cleaner') {
+          script {
+            def jenkinsUrl = "${JENKINS_INSTANCE}"
+            def jenkinsCliJarUrl = "${jenkinsUrl}/jnlpJars/jenkins-cli.jar"
+            sh "curl -O ${jenkinsCliJarUrl} > /dev/null 2>&1"
+            withCredentials([usernamePassword(credentialsId: 'svc-blossom-creds', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+              sh "echo 'Running command with password ********'"
 
-        stage('cleanup') {
-          container('vm-cleaner') {
-            script {
-              def jenkinsUrl = "${JENKINS_INSTANCE}"
-              def jenkinsCliJarUrl = "${jenkinsUrl}/jnlpJars/jenkins-cli.jar"
-              sh "curl -O ${jenkinsCliJarUrl} > /dev/null 2>&1"
-              withCredentials([usernamePassword(credentialsId: 'svc-blossom-creds', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                sh "echo 'Running command with password ********'"
-
-                sh "java -jar jenkins-cli.jar -s ${jenkinsUrl} -auth ${USERNAME}:${PASSWORD} delete-node ${VM_LABEL}"
-              }
+              sh "java -jar jenkins-cli.jar -s ${jenkinsUrl} -auth ${USERNAME}:${PASSWORD} delete-node ${VM_LABEL}"
             }
           }
         }
+      }
+    }
+    }
+  }
+}
+
+def prepareWindowsWheelTestJob() {
+  return {
+    stage("Test") {
+      def cudaTag = cudaVer.split('\\.')[0..<2].join('')
+      build job: "windows_wheels_template_CI",
+      parameters: [
+        string(name: 'sourceBranch', value: "${sourceBranch}"),
+        string(name: 'configName', value: "${configName}"),
+        string(name: 'imageTag', value: "${targetImageTag}"),
+        string(name: 'commitHash', value: "${commitHash}"),
+        string(name: 'folderName', value: "torch-${torchVer}_cu${cudaTag}"),
+        string(name: 'repoUrl', value: "${repoUrl}")
+        //string(name: 'torchVer', value: "${torchVer}"),
+        //string(name: 'cudaVer', value: "${cudaVer}"),
+      ],
+      // This node doesn't need to be held while tests run.
+      wait: false,
+      // Success of this script depends only on successful build
+      // and launch of tests, not successful tests.
+      propagate: false
     }
   }
 }

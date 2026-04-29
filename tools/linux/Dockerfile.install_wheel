@@ -1,6 +1,10 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+# used for cross-compilation in docker build
+ARG FORCE_CUDA=1
+ENV FORCE_CUDA=${FORCE_CUDA}
+
 RUN if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
         rm /etc/apt/sources.list.d/cuda.list; \
     fi \
@@ -12,7 +16,7 @@ WORKDIR /kaolin
 
 ARG WHEEL_NAME
 
-COPY ./package.json ./package-lock.json ./${WHEEL_NAME} ./
+COPY ./package.json ./package-lock.json ./${WHEEL_NAME} ./pytest.ini ./
 COPY ./examples ./examples
 COPY ./sample_data ./sample_data
 COPY ./tests ./tests
@@ -77,13 +81,11 @@ RUN npm install
 RUN pip install --upgrade pip && pip install ninja
 
 RUN if [ "$FORCE_CUDA" -eq "1" ]; then \
-    export TORCH_CUDA_ARCH_LIST=`python ./tools/get_nvdiffrast_compatible_arch.py` && \
-    /tmp && \
+    export TORCH_CUDA_ARCH_LIST=`python tools/get_nvdiffrast_compatible_arch.py` && \
+    cd /tmp && \
     git clone https://github.com/NVlabs/nvdiffrast && \
     cd nvdiffrast && \
     export MAX_JOBS=1 && \
     pip install --no-build-isolation --break-system-packages .; fi
-
-
 
 RUN pip install ./${WHEEL_NAME}

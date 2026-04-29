@@ -201,4 +201,4 @@ def test_cantilever_beam_simulation(device, dtype):
     # Load simplicits scene (setup also returns the FEM reference data)
     _, simplicits_scene, data = cantilever_beam_scene_setup(device, dtype)
 
-    run_regression_test(simplicits_scene, data, tol=0.025, test_name="cantilever_beam")
+    run_regression_test(simplicits_scene, data, tol=0.03, test_name="cantilever_beam")

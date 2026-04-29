@@ -1,0 +1,6 @@
+{
+  "extensions": ["ts"],
+  "spec": [
+        "tests/ts/**/*.ts"
+    ]
+}

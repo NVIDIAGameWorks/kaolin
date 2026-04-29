@@ -1,0 +1,27 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "../kaolin/visualize/dash/components/src/ts/index.ts"
+  ],
+  "out": "_build/html/typedoc",
+  "json": "_build/typedoc.json",
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "readme": "none",
+  "exclude": [
+    "**/node_modules/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
+  "sort": ["source-order"],
+  "treatWarningsAsErrors": false,
+  "treatValidationWarningsAsErrors": false,
+  "validation": {
+    "notExported": false,
+    "invalidLink": true,
+    "notDocumented": false
+  },
+  "groupOrder": ["Essential", "Behavior Registration", "Key Behavior Interfaces", "Behavior Base Classes", "*", "Internal Utilities"],
+  "name": "window.kaolin"
+}
+

@@ -1,0 +1,1009 @@
+# Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import copy
+from collections import defaultdict
+import os.path
+from pathlib import Path
+from dataclasses import dataclass
+import functools
+from dash import Dash, html, dcc, Input, Output, callback, State, no_update
+from dash.exceptions import PreventUpdate
+from dash.development.base_component import Component, ComponentRegistry
+import dash_bootstrap_components as dbc
+from flask import send_from_directory, abort
+import logging
+import threading
+from tornado.wsgi import WSGIContainer
+from tornado.web import Application, FallbackHandler, StaticFileHandler
+from tornado.ioloop import IOLoop
+from typing import Protocol, Dict, Any, Union, runtime_checkable, Callable, Iterable, Literal, get_args, Mapping, Optional
+
+from kaolin.visualize.web.sockets import WebSocketHandlerManager, TuidCallable
+import kaolin.visualize.dash.auto_ui as auto_ui
+from kaolin.visualize.dash.assets_helper import get_kaolin_assets_source_path, get_kaolin_assets_serve_path
+from kaolin.visualize.dash.layout import AppLayoutHelper
+from kaolin.visualize.web.naming import UniqueIdGenerator
+import kaolin.version
+
+logger = logging.getLogger(__name__)
+
+__all__ = [
+    'SessionRegistry',
+    'WebappBuilder',
+]
+
+
+
+class SessionRegistry:
+    """Process-wide registry mapping ``tab_uuid`` to a :class:`_SessionEntry`.
+
+    Bridges Dash (``@callback`` triggered by a ``dcc.Store`` change with
+    ``State('kaolin-tab-uuid', 'data')``) and the WebSocket transport
+    (``WebSocketHandlerManager.tab_uuid``). Both sides converge on the same
+    ``tab_uuid`` key so a setting written by a control reaches every WS
+    handler belonging to that browser tab.
+
+    NOTE: prototype-quality, app-level. Future improvements:
+      - Promote to a library helper (e.g. ``kaolin.visualize.dash.session_registry``).
+      - GC stale entries when the last WS handler for a tab disconnects (use
+        ``GlobalWebSocketConnectionManager.get_handlers_by_tab(tab_uuid)`` to
+        decide). Acceptable to leak for now -- short-lived dev runs.
+      - Make the per-entry payload pluggable (factory) instead of hard-coding
+        :class:`ServerSideUserSettings`.
+    """
+    _lock = threading.Lock()
+    _entries = {}
+
+    @classmethod
+    def _get_or_create(cls, tab_uuid: Optional[str], initial_session_data: Dict) -> Dict:
+        if tab_uuid not in cls._entries:
+            cls._entries[tab_uuid] = {}
+            for k, v in initial_session_data.items():
+                cls._entries[tab_uuid][k] = copy.deepcopy(v)
+        return cls._entries.get(tab_uuid)
+
+    @classmethod
+    def get_or_create(cls, tab_uuid: Optional[str], initial_session_data: Dict) -> Dict:
+        """Returns the session entry for a browser tab, creating it if absent.
+
+        Args:
+            tab_uuid (Optional[str]): per-browser-tab uuid to look up.
+            initial_session_data (Dict): values deep-copied into a newly created entry.
+
+        Return:
+            (Dict) session entry for ``tab_uuid``.
+
+        TODO: complete docstring.
+        """
+        with cls._lock:
+            return cls._get_or_create(tab_uuid, initial_session_data)
+
+    @classmethod
+    def get_or_create_and_update(cls, tab_uuid: Optional[str], initial_session_data: Dict,
+                                 update_func: Optional[Callable[[Dict], None]] = None) -> Dict:
+        """Returns the session entry for a browser tab, mutating it under the registry lock.
+
+        Args:
+            tab_uuid (Optional[str]): per-browser-tab uuid to look up.
+            initial_session_data (Dict): values deep-copied into a newly created entry.
+            update_func (Optional[Callable]): called with the session entry while the lock is held.
+
+        Return:
+            (Dict) session entry for ``tab_uuid``, after ``update_func`` has run.
+
+        TODO: complete docstring.
+        """
+        with cls._lock:
+            session = cls._get_or_create(tab_uuid, initial_session_data)
+            if update_func is not None:
+                update_func(session)
+            return session
+
+    @classmethod
+    def get(cls, tab_uuid: Optional[str]) -> Optional[Dict]:
+        """Returns the session entry for a browser tab, or None if not registered.
+
+        Args:
+            tab_uuid (Optional[str]): per-browser-tab uuid to look up.
+
+        Return:
+            (Optional[Dict]) session entry for ``tab_uuid``, or ``None``.
+
+        TODO: complete docstring.
+        """
+        with cls._lock:
+            return cls._entries.get(tab_uuid)
+
+    @classmethod
+    def remove(cls, tab_uuid: Optional[str]) -> None:
+        """Drop an entry. Idempotent. Intended for future GC; unused for now.
+
+        Args:
+            tab_uuid (Optional[str]): per-browser-tab uuid to drop.
+
+        TODO: complete docstring.
+        """
+        with cls._lock:
+            cls._entries.pop(tab_uuid, None)
+
+@dataclass
+class ImportmapItem:
+    """A single browser importmap entry, optionally also exposed on ``window``.
+
+    Args:
+        url (str): url the package name resolves to.
+        import_as_global (Optional[str]): if set, name to bind the module to on ``window``.
+
+    TODO: complete docstring.
+    """
+    url: str
+    import_as_global: str | None = None
+
+
+class WebappBuilder:
+    CUSTOM_FILES_PATH = "kaolin_custom"
+    RESERVED_PATHS = ["_kaolin_assets", "websocket"]
+    TAB_UUID_STORE_ID = "kaolin-tab-uuid"
+    """Id of the auto-injected ``dcc.Store`` that holds the per-browser-tab uuid.
+
+    The same uuid is also sent on every WebSocket as the ``tab`` query argument
+    (see :class:`kaolin.visualize.web.sockets.WebSocketHandlerManager.tab_uuid`)
+    and is reachable from app TS code via ``kaolin.util.getTabUuid()``.
+    Use it to correlate Dash ``@callback`` events with per-tab WebSocket handler
+    instances (e.g. read it as ``State(WebappBuilder.TAB_UUID_STORE_ID, 'data')``)."""
+
+    class _UserSettingInfo:
+        def __init__(self, instance: Any, name: str,
+                     field_specs: list[auto_ui.FieldSpec], store: dcc.Store):
+            self.instance = instance
+            self.name = name
+            self.field_specs = field_specs
+            self.store = store
+
+    def __init__(self, debug: bool,
+                 default_theme: str = dbc.themes.LUX,
+                 set_favicon: bool = True,
+                 log_dir: str = 'logs',
+                 log_prefix: str = 'kaolin',
+                 log_download_button: bool = False):
+        """ This class provides utilities for configuring various common aspects of
+        web prototypes built with the Kaolin Web Framework.
+
+        Typical usage:
+
+        from dataclasses import dataclass
+        import dash_bootstrap_components as dbc
+        from kaolin.visualize.dash import StandardLayoutHelper, WebappBuilder
+
+        @dataclass
+        class Settings:
+            scale: float = 1.0
+
+        app_builder = WebappBuilder(debug=False)
+
+        # add resources and settings
+        app_builder.add_extra_stylesheets([dbc.icons.FONT_AWESOME])
+        controls = app_builder.add_user_settings(Settings(), 'display')
+
+        # add the generated controls to the app layout
+        layout_helper = StandardLayoutHelper()
+        layout_helper.add_main_content(controls)
+        app_builder.set_layout_helper(layout_helper)
+
+        # build and run (no websocket handlers in this example)
+        app_builder.build(ws_handlers=[])
+        app_builder.start(port=8050)
+
+        Note: 🌱 this class is just a shortcut. Use custom Dash / tornado app setup
+        if it does not fit your use cases.
+
+        Args:
+            debug: if True, will enable hot reloading of code and some other features.
+                When ``True``, :meth:`unsafe_enable_log_download` and
+                :meth:`unsafe_write_websocket_errors` are called automatically.
+            default_theme: theme to use (default: dbc.themes.LUX)
+            set_favicon: if True, will set default kaolin favicon (default: True)
+            log_dir (str): Directory in which the log file is created immediately on
+                construction. All Python log records are written to it in addition to the
+                usual stdout handler. Defaults to ``'logs'`` relative to the current
+                working directory (created if absent).
+                See :func:`kaolin.utils.log.setup_log_file`.
+            log_prefix (str): Filename prefix for the log file (default: ``'kaolin'``).
+                Ignored when *log_dir* is ``None``.
+            log_download_button (bool): Forwarded as ``auto_add_download_button`` to
+                :meth:`unsafe_enable_log_download` when ``debug=True``. If ``True``,
+                a *Download Logs* button is automatically injected into the navbar at
+                :meth:`build` time (requires :meth:`set_layout_helper` to be called
+                first). Defaults to ``False``.
+        """
+        self.debug = debug
+        self.default_theme = default_theme
+        self.set_favicon = set_favicon
+        self.layout_helper: None | AppLayoutHelper = None
+
+        self.extra_stylesheets = []
+        self.extra_scripts = []
+        self.importmap = {}
+        self.served_files = {}
+        self.served_dirs = {}
+        self.user_setting_infos = {}  # name: _UserSettingInfo
+        self.extra_elements = []
+        self.extra_raw_html = []
+
+        # Only built once
+        self.app = None
+        self.server = None
+        self.default_user_session = None
+
+        # Logging
+        self.log_file_path: Optional[str] = None
+        if log_dir is not None:
+            from kaolin.utils.log import setup_log_file
+            self.log_file_path = setup_log_file(os.path.abspath(os.path.expanduser(log_dir)), prefix=log_prefix)
+            logger.info(f'WebappBuilder: server log file: {self.log_file_path}')
+
+        # Unsafe debug features — auto-enabled in debug mode; override via unsafe_* methods.
+        self._log_download_config: Optional[tuple] = None   # (url, auto_add_download_button)
+        self._write_errors_to_client: bool = False
+        if debug:
+            self.unsafe_enable_log_download(auto_add_download_button=log_download_button)
+            self.unsafe_write_websocket_errors()
+
+    def stylesheets(self) -> list[str]:
+        """Returns all stylesheet urls the built app should load.
+
+        Return:
+            (list) of str urls, theme first, then extra and layout stylesheets.
+
+        TODO: complete docstring.
+        """
+        layout_stylesheets = []
+        if self.layout_helper is not None:
+            layout_stylesheets = self.layout_helper.stylesheets()
+        return [self.default_theme] + self.extra_stylesheets + layout_stylesheets
+
+    def external_scripts(self) -> list[str]:
+        """Returns all external script urls the built app should load.
+
+        Return:
+            (list) of str urls.
+
+        TODO: complete docstring.
+        """
+        return self.extra_scripts
+
+    def add_extra_stylesheets(self, extra_stylesheets: Iterable[str]) -> None:
+        """Adds stylesheet urls to load in addition to the theme.
+
+        Args:
+            extra_stylesheets (Iterable[str]): stylesheet urls.
+
+        TODO: complete docstring.
+        """
+        self.extra_stylesheets.extend(extra_stylesheets)
+
+    def add_raw_body_html(self, custom_html: str) -> None:
+        """Adds raw html to inject at the start of the app's ``<body>``.
+
+        Args:
+            custom_html (str): html snippet to insert verbatim.
+
+        TODO: complete docstring.
+        """
+        self.extra_raw_html.append(custom_html)
+
+    def add_importmap_item(self, package_name: str, url: str,
+                           import_as_global: str | None = None) -> None:
+        """Maps a bare module name to a url in the page's importmap.
+
+        Args:
+            package_name (str): bare module specifier, e.g. ``"playcanvas"``.
+            url (str): url the specifier resolves to.
+            import_as_global (Optional[str]): if set, also bind the module to
+                ``window.<import_as_global>``.
+
+        TODO: complete docstring.
+        """
+        self.importmap[package_name] = ImportmapItem(url, import_as_global)
+
+    def add_extra_scripts(self, extra_scripts: Iterable[str]) -> None:
+        """Adds external script urls to load in the app.
+
+        Args:
+            extra_scripts (Iterable[str]): script urls.
+
+        TODO: complete docstring.
+        """
+        self.extra_scripts.extend(extra_scripts)
+
+    def set_layout_helper(self, layout_helper: AppLayoutHelper) -> None:
+        """Sets the helper providing the app layout, stylesheets and callbacks.
+
+        Args:
+            layout_helper (AppLayoutHelper): layout provider used at build time.
+
+        TODO: complete docstring.
+        """
+        self.layout_helper = layout_helper
+
+    @staticmethod
+    def __add_unique_url_mapping_or_die(mappings: Dict[str, str], url_path: str,
+                                        local_path: str) -> str:
+        # TODO: deal with slash already provided by user
+        url_path = WebappBuilder.CUSTOM_FILES_PATH + '/' + url_path
+
+        real_dir_path = os.path.realpath(os.path.abspath(local_path))
+        if url_path in mappings:
+            if mappings[url_path] != real_dir_path:
+                raise ValueError(f'Attempting to map url path {url_path} to {real_dir_path}, '
+                                 f'but it is already mapped to {mappings[url_path]}')
+        mappings[url_path] = real_dir_path
+        return url_path
+
+    def add_static_dir(self, dir_path: str, url_path: Optional[str] = None) -> str:
+        """ Adds all files in a directory as static files to be served. New files will be retrieved automatically
+        even if the server is already running.
+
+        Args:
+            dir_path (str): local directory where files should be served from, e.g. "/home/me/my_files".
+                All files will be served.
+            url_path (Optional[str]): path to the files in dir, e.g. "my_files"
+                (default: "kaolin_custom/(basename dir_path)")
+
+        Return:
+            (str) url path the directory is served under.
+
+        TODO: complete docstring.
+        """
+        assert os.path.isdir(dir_path), f'Not a directory: {dir_path}'
+
+        if url_path is None:
+            url_path =  Path(dir_path).name
+
+        assert url_path not in WebappBuilder.RESERVED_PATHS, f'Cannot assign reserved path {url_path} to custom static files dir'
+
+        return WebappBuilder.__add_unique_url_mapping_or_die(self.served_dirs, url_path, dir_path)
+
+    def add_static_file(self, file_path: str, url_path: Optional[str] = None) -> str:
+        """Adds a single local file to be served as a static file.
+
+        Args:
+            file_path (str): local path of the file to serve, e.g. "/home/me/my_file.ply".
+            url_path (Optional[str]): path to the file, e.g. "my_file.ply"
+                (default: "kaolin_custom/(basename file_path)")
+
+        Return:
+            (str) url path the file is served under.
+
+        TODO: complete docstring.
+        """
+        assert os.path.isfile(file_path), f'Not a file: {file_path}'
+
+        if url_path is None:
+            url_path = os.path.basename(file_path)
+
+        return WebappBuilder.__add_unique_url_mapping_or_die(self.served_files, url_path, file_path)
+
+
+    @staticmethod
+    def _insert_importmap(index_html_str: str, importmap: Mapping[str, ImportmapItem],
+                          add_globals: bool = True) -> str:
+        """Insert an importmap script tag before </head> in the HTML string.
+
+        Args:
+            index_html_str: HTML string containing a </head> tag
+            importmap: Mapping from package names to ImportmapItem
+
+        Returns:
+            Modified HTML string with importmap inserted
+        """
+        import json
+
+        if not importmap:
+            return index_html_str
+
+        importmap_json = json.dumps({"imports": {k: v.url for k, v in importmap.items()}}, indent=4)
+        importmap_script = f'\n<script type="importmap">\n{importmap_json}\n</script>\n'
+
+        # Generates something like:
+        # <script type="module">
+        #   import * as pc from 'playcanvas';
+        #   window.pc = pc;
+        # </script>
+        globals_script = ""
+        if add_globals:
+            for package_name, item in importmap.items():
+                global_package_name = item.import_as_global
+                if global_package_name is not None:
+                    globals_script += f"import * as {global_package_name} from '{package_name}';\n"
+                    globals_script += f"console.log('🍓->>>>>>> Setting window.{global_package_name}');"  # HACK
+                    globals_script += f"window.{global_package_name} = {global_package_name};\n"
+
+            if len(globals_script) > 0:
+                globals_script = f'<script type="module">\n{globals_script}</script>'
+
+                # START_OF_HACK
+                additional_script = ('<script>'
+                                     'console.log("🍓->>>>>>> Adding ondocument loaded event");'
+                                     'document.addEventListener("DOMContentLoaded", function() { console.log("🍓->>>>>>> Document loaded"); });'
+                                     '</script>')
+                globals_script += additional_script
+                # END_OF_HACK
+
+        return index_html_str.replace('</head>', f'{importmap_script}{globals_script}</head>')
+
+    @staticmethod
+    def _insert_at_body_start(index_html_str: str, custom_html: str) -> str:
+        return index_html_str.replace('<body>', f'<body>{custom_html}')
+
+    @staticmethod
+    def log_debug_info(app: Dash) -> None:
+        """Logs static paths, component registry and config of a Dash app.
+
+        Args:
+            app (Dash): app to introspect.
+
+        TODO: complete docstring.
+        """
+        logger.debug(f'Static folder: {app.server.static_folder}')
+        logger.debug(f'Static URL path: {app.server.static_url_path}')
+        logger.debug(f'Component registry: {len(ComponentRegistry.registry)} ' +
+                     f'{[x for x in ComponentRegistry.registry]}')
+        logger.debug(f'Config: {app.config}')
+        logger.debug(f'Registered paths: {app.registered_paths}')
+        # TODO: log the rest of the info, like served files and dirs, external scripts, etc.
+
+    def _setup_user_setting_sessions(self, app: Dash) -> None:
+        """Append a hidden ``dcc.Store(id=TAB_UUID_STORE_ID)`` to ``app.layout`` and
+        register a clientside callback that fills it from the TS ``tabSession`` module.
+
+        Triggering off the store's own immutable ``id`` causes the callback to fire
+        exactly once at layout mount. If the kaolin TS bundle hasn't finished loading
+        yet, we briefly retry via ``setTimeout`` + ``set_props`` rather than leave the
+        store at ``null``. Memory storage is fine because the source of truth lives in
+        ``sessionStorage`` on the JS side.
+        """
+        if app.layout is None:
+            return  # nothing to attach to; app likely won't render anyway
+
+        store = dcc.Store(id=WebappBuilder.TAB_UUID_STORE_ID,
+                          data=None, storage_type='memory')
+        dummy_id= UniqueIdGenerator.get_unique_id('dummy-output')
+        dummy_div = html.Div(id=dummy_id, style={'display': 'none'})
+
+        if isinstance(app.layout, list):
+            app.layout = list(app.layout) + [store, dummy_div]
+        else:
+            app.layout = html.Div([app.layout, store, dummy_div])
+
+        app.clientside_callback(
+            f"""
+            function(_id) {{
+                function readUuid() {{
+                    if (kaolin && kaolin.util && kaolin.util) {{
+                        return kaolin.util.getTabUuid();
+                    }}
+                    return null;
+                }}
+                const uuid = readUuid();
+                if (uuid !== null) {{
+                    console.log('>>> (0) Registered tab session' + uuid);
+                    return uuid;
+                }}
+                // kaolin.js still loading -- retry briefly via set_props.
+                let retries = 20;
+                const tick = function() {{
+                    const u = readUuid();
+                    if (u !== null) {{
+                        window.dash_clientside.set_props(
+                            '{WebappBuilder.TAB_UUID_STORE_ID}', {{ data: u }});
+                        console.log('>>> Registered tab session' + u);
+                        return;
+                    }}
+                    if (--retries > 0) {{
+                        setTimeout(tick, 50);
+                    }} else {{
+                        console.warn('{WebappBuilder.TAB_UUID_STORE_ID}: '
+                            + 'kaolin.util.tabSession never loaded');
+                    }}
+                }};
+                setTimeout(tick, 50);
+                return dash_clientside.no_update;
+            }}
+            """,
+            Output(WebappBuilder.TAB_UUID_STORE_ID, 'data'),
+            Input(WebappBuilder.TAB_UUID_STORE_ID, 'id'),
+        )
+
+        self.default_user_session = {}
+        for name, info in self.user_setting_infos.items():
+            session_instance = copy.deepcopy(info.instance)
+            # We will also use store to save session-level settings for a tab
+            auto_ui.apply_store_to_dataclass(info.store.data, session_instance, info.field_specs)
+            self.default_user_session[name] = session_instance
+
+        @app.callback(
+            Output(component_id=dummy_id, component_property='children', allow_duplicate=True),
+            Input(WebappBuilder.TAB_UUID_STORE_ID, "data"),
+            prevent_initial_call=True  # Prevent running when it initiates as False
+        )
+        def register_session(tab_uuid):
+            if tab_uuid is not None:
+                logger.info(f"Registering client session with id {tab_uuid}")
+                SessionRegistry.get_or_create(tab_uuid, self.default_user_session)
+            return "Still waiting..."
+
+    def _bind_controls_to_store_serverside(self, name, field_specs: list[auto_ui.FieldSpec], store_id: str) -> None:
+        for spec in field_specs:
+            @callback(
+                Output(spec.control_id, spec.value_prop),
+                Input(store_id, 'data'),
+                State(spec.control_id, spec.value_prop),
+            )
+            def _sync_ui_from_store(stored_data, current_ui_value, _name=spec.name):
+                """Restore control from session-backed store on reload; avoid store→UI→store loops."""
+                if stored_data is None or _name not in stored_data:
+                    return no_update
+                stored_val = stored_data[_name]
+                if stored_val == current_ui_value:
+                    return no_update
+                return stored_val
+
+            @callback(
+                Output(store_id, 'data', allow_duplicate=True),
+                Input(spec.control_id, spec.value_prop),
+                Input(WebappBuilder.TAB_UUID_STORE_ID, "data"),
+                State(store_id, 'data'),
+                prevent_initial_call=True,
+            )
+            def _update(value, tab_uuid, current, _name=spec.name, _spec=spec):
+                logger.debug(f'Updating session {tab_uuid} settings "{name}"[{_name}] to {value}')
+                if current is None:
+                    current = {}
+                current[_name] = value
+
+                def _session_update(session):
+                    session_settings = session.get(name)  # get setting instance by name
+                    if session_settings is not None:
+                        auto_ui.apply_store_value_to_dataclass(current, session_settings, _spec)
+
+                SessionRegistry.get_or_create_and_update(tab_uuid, self.default_user_session, _session_update)
+                return current
+
+    def add_user_settings(self, setting_instance: Any, name: str,
+                          storage_type: str = 'session') -> list[Component]:
+        """Builds per-session UI controls for a settings dataclass and binds them to the server.
+
+        Args:
+            setting_instance (Any): dataclass instance holding default setting values.
+            name (str): unique name for this group of settings.
+            storage_type (str): ``dcc.Store`` storage type backing the settings
+                (default: 'session').
+
+        Return:
+            (list) of dash Components: the generated controls plus their backing store.
+
+        TODO: complete docstring.
+        """
+        if name in self.user_setting_infos:
+            raise ValueError(f'Cannot add multiple settings with identical name {name}; use unique name')
+
+        controls, field_specs, store = auto_ui.controls_from_dataclass(
+            setting_instance, name, make_store=True, storage_type=storage_type)
+
+        info = WebappBuilder._UserSettingInfo(setting_instance, name, field_specs, store)
+        self.user_setting_infos[name] = info
+
+        self._bind_controls_to_store_serverside(name, field_specs, store.id)
+        return controls + [store]
+
+    def get_user_settings_func(self, name: str) -> TuidCallable:
+        """Returns an accessor resolving registered settings for a browser tab.
+
+        Args:
+            name (str): name the settings were registered under with :func:`add_user_settings`.
+
+        Return:
+            (TuidCallable) callable mapping a tab uuid to that tab's settings instance,
+            suitable to pass as a websocket handler argument.
+
+        TODO: complete docstring.
+        """
+        if name not in self.user_setting_infos:
+            raise ValueError(f'User settings with name {name} have not been registered; call add_user_settings to register')
+
+        def _get_settings(tab_uuid):
+            session = SessionRegistry.get_or_create(tab_uuid, self.default_user_session)
+            return session.get(name)  # get setting instance by name
+        return TuidCallable(_get_settings)
+
+    def unsafe_enable_log_download(self, url: str = '/_kaolin_logs',
+                                   auto_add_download_button: bool = False):
+        """Register a Flask endpoint to serve the server log file for download.
+
+        .. warning::
+            This exposes the server log file over HTTP to any client that can reach
+            the app.  Use only in trusted environments (e.g. a local development
+            machine or a private network).  Requires ``debug=True`` on the builder.
+
+        Must be called **before** :meth:`build`. The endpoint is registered at
+        construction of the Tornado/Flask server inside :meth:`build`.
+
+        Args:
+            url (str): URL path for the log-download endpoint
+                (default: ``'/_kaolin_logs'``).
+            auto_add_download_button (bool): If ``True``, a *Download Logs*
+                button is automatically injected into the navbar by
+                :class:`AppLayoutHelper` at :meth:`build` time.  Requires
+                :meth:`set_layout_helper` to be called before :meth:`build`.
+                Defaults to ``False`` — add your own UI element pointing to
+                ``url`` if you want a visible button.
+
+        Raises:
+            RuntimeError: if the builder was not initialized with ``debug=True``.
+        """
+        if not self.debug:
+            raise RuntimeError(
+                'unsafe_enable_log_download() requires debug=True on the builder.')
+        self._log_download_config = (url, auto_add_download_button)
+
+    def unsafe_write_websocket_errors(self):
+        """Forward exception details (type + message) to the client over WebSocket.
+
+        Without this call the client always receives a generic *"an error occurred"*
+        notification that includes the log-file basename (if configured) but never
+        the actual exception message or traceback.  With this call the full
+        ``error_type`` and ``message`` are forwarded, which is useful for
+        debugging but may leak sensitive information if the app is reachable by
+        untrusted clients.
+
+        Must be called **before** :meth:`build`. Applies to both WebSocket handler
+        errors (:meth:`~kaolin.visualize.web.sockets.WebSocketHandlerManager._send_error_to_client`)
+        and Dash callback errors (:meth:`callback`).
+
+        Raises:
+            RuntimeError: if the builder was not initialized with ``debug=True``.
+        """
+        if not self.debug:
+            raise RuntimeError(
+                'unsafe_write_websocket_errors() requires debug=True on the builder.')
+        self._write_errors_to_client = True
+
+    def callback(self, *dash_args, **dash_kwargs):
+        """Decorator equivalent to Dash's ``@callback`` that routes unhandled
+        exceptions to the client error overlay via WebSocket.
+
+        Usage is identical to ``@callback`` — just replace it::
+
+            @app_builder.callback(
+                Output('my-div', 'children'),
+                Input('my-btn', 'n_clicks'),
+            )
+            def my_callback(n_clicks):
+                ...
+
+        On an unhandled exception:
+
+        - The full traceback is logged at ERROR level.
+        - A ``kaolin_error`` WS message is sent to the originating tab so the
+          ``KaolinErrorOverlay`` appears (non-debug) or the Dash debug pane shows
+          it (debug).
+        - In non-debug mode ``PreventUpdate`` is raised to suppress Dash's own
+          error handling and leave all outputs unchanged.
+        - In debug mode the original exception is re-raised so Dash's debug pane
+          displays the full traceback.
+        """
+        def decorator(func):
+            # Appends tab_uuid as the final State so the originating browser tab
+            # can be identified and the error targeted to it specifically.
+            @callback(*dash_args, State(WebappBuilder.TAB_UUID_STORE_ID, 'data'), **dash_kwargs)
+            @functools.wraps(func)
+            def wrapper(*call_args):
+                *inner_args, tab_uuid = call_args
+                try:
+                    return func(*inner_args)
+                except Exception as exc:
+                    logger.exception(
+                        'Unhandled exception in Dash callback %r', func.__name__)
+                    if self.debug:
+                        raise  # Dash debug pane handles it; skip WS relay to avoid duplicate
+                    if tab_uuid:
+                        from kaolin.visualize.web.sockets import GlobalWebSocketConnectionManager
+                        GlobalWebSocketConnectionManager.instance().send_error_to_tab(
+                            tab_uuid, exc,
+                            write_errors_to_client=self._write_errors_to_client)
+                    raise PreventUpdate
+            return wrapper
+        return decorator
+
+    # ID of the app-level KaolinErrorOverlay component added to the layout by _setup_error_overlay.
+    ERROR_OVERLAY_ID = '_kaolin-error-overlay'
+
+    # ID of the hidden Store used to relay kaolin_error WS messages into Dash's
+    # debug pane in debug mode. KaolinErrorOverlay calls set_props on this store;
+    # the Python callback below re-raises so the debug pane catches it.
+    WS_ERROR_RELAY_STORE_ID = '_kaolin-ws-error-relay'
+
+    @staticmethod
+    def _append_to_layout(app: Dash, component) -> None:
+        """Append *component* to the Dash app layout regardless of its current shape.
+
+        Handles all legal ``app.layout`` / ``app.layout.children`` shapes:
+        - ``app.layout`` is a list → extend the list in-place.
+        - ``app.layout.children`` is ``None`` → initialize to ``[component]``.
+        - ``app.layout.children`` is a scalar component → wrap + append.
+        - ``app.layout.children`` is a list or tuple → convert to list + append.
+        - ``app.layout`` is ``None`` → set to ``[component]``.
+        """
+        if isinstance(app.layout, list):
+            app.layout = list(app.layout) + [component]
+        elif app.layout is not None:
+            children = app.layout.children
+            if children is None:
+                app.layout.children = [component]
+            elif isinstance(children, (list, tuple)):
+                app.layout.children = list(children) + [component]
+            else:
+                # scalar component — wrap into a list
+                app.layout.children = [children, component]
+        else:
+            app.layout = [component]
+
+    def _setup_ws_error_debug_relay(self, app: Dash) -> None:
+        """Add the relay Store + callback that surfaces WS handler errors in the
+        Dash debug pane (installed only when ``debug=True``).
+
+        Flow: WS error arrives at ``KaolinErrorOverlay`` → JS calls
+        ``dash_clientside.set_props`` on this Store → Dash triggers the callback
+        → callback re-raises → debug pane shows the exception.
+        """
+        relay_store = dcc.Store(id=WebappBuilder.WS_ERROR_RELAY_STORE_ID,
+                                data=None, storage_type='memory')
+        WebappBuilder._append_to_layout(app, relay_store)
+
+        dummy_id = UniqueIdGenerator.get_unique_id('ws-error-relay-dummy')
+        dummy_div = html.Div(id=dummy_id, style={'display': 'none'})
+        WebappBuilder._append_to_layout(app, dummy_div)
+
+        @callback(
+            Output(dummy_id, 'children'),
+            Input(WebappBuilder.WS_ERROR_RELAY_STORE_ID, 'data'),
+            prevent_initial_call=True,
+        )
+        def _relay_ws_error_to_debug_pane(data):
+            if not data:
+                raise PreventUpdate
+            error_type = data.get('error_type', 'Error')
+            message = data.get('message', '')
+            tb = data.get('traceback', '')
+            detail = f'{error_type}: {message}'
+            if tb:
+                detail += f'\n\nServer traceback:\n{tb}'
+            raise RuntimeError(f'[WS handler] {detail}')
+
+    def _setup_error_overlay(self, app: Dash, websocket_addresses=None) -> None:
+        """Add a ``KaolinErrorOverlay`` component to the layout.
+
+        The component opens its own WebSocket subscriptions (sharing the
+        physical sockets already opened by the viewer) and shows a dismissible
+        modal whenever a ``kaolin_error`` message arrives — entirely in React,
+        with no viewer code involved.
+
+        Args:
+            app: The Dash application instance.
+            websocket_addresses: WebSocket address specs to listen on, in the
+                same format as ``KaolinViewerInternal.websocket_addresses``
+                (list of ``str`` or ``[str, str]`` tuples).  Defaults to
+                ``['/websocket/']``, which is the standard kaolin WS path.
+        """
+        from kaolin.visualize.dash.components.autogen.KaolinErrorOverlay import KaolinErrorOverlay
+
+        if websocket_addresses is None:
+            # Match the standard kaolin WS address format so WebSocketConnectionsManager
+            # shares the viewer's existing physical connection rather than opening a second one.
+            websocket_addresses = ['ws://WINDOW_LOCATION/websocket/']
+
+        overlay = KaolinErrorOverlay(
+            id=WebappBuilder.ERROR_OVERLAY_ID,
+            websocket_addresses=websocket_addresses,
+            debug=self.debug,
+        )
+
+        WebappBuilder._append_to_layout(app, overlay)
+
+    def _setup_log_download(self, app: Dash) -> bool:
+        """Register the log-file download Flask route if configured.
+
+        Returns ``True`` if the endpoint was registered, ``False`` otherwise.
+        Called from :meth:`build`.
+        """
+        if not self.debug or self._log_download_config is None or self.log_file_path is None:
+            return False
+
+        log_url, auto_add_download_button = self._log_download_config
+        log_file_path = self.log_file_path  # capture for closure
+
+        @app.server.route(log_url)
+        def serve_log_file():
+            if not os.path.exists(log_file_path):
+                abort(404)
+            return send_from_directory(
+                os.path.dirname(log_file_path),
+                os.path.basename(log_file_path),
+                as_attachment=True,
+            )
+
+        if auto_add_download_button:
+            if self.layout_helper is None:
+                raise RuntimeError(
+                    'unsafe_enable_log_download(auto_add_download_button=True) requires a '
+                    'layout_helper; call set_layout_helper() before build().')
+            self.layout_helper.add_auto_add_download_button(log_url)
+
+        return True
+
+    def build(self, ws_handlers: list[tuple], **dash_kwargs) -> tuple[Dash, Application]:
+        """Creates the configured Dash app and the tornado application serving it; call once.
+
+        Args:
+            ws_handlers (list[tuple]): websocket handler specs, as accepted by
+                :meth:`kaolin.visualize.web.sockets.WebSocketHandlerManager.initialize`.
+            **dash_kwargs: extra keyword arguments forwarded to the ``Dash`` constructor.
+
+        Return:
+            (tuple) of (Dash app, tornado Application).
+
+        TODO: complete docstring.
+        """
+        # <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+        assert self.app is None, f'Can only call build once'
+
+        # TODO: should smart-complete dash_kwargs, adding to external_stylesheets and external_scripts if present
+        app = Dash(external_stylesheets=self.stylesheets(),
+                   external_scripts=self.external_scripts(),
+                   **dash_kwargs)
+        # external_scripts=["https://cdn.jsdelivr.net/npm/playcanvas@2.14.0/+esm"],
+        # external_scripts=["https://cdn.jsdelivr.net/npm/playcanvas@2.14.0/build/playcanvas.min.js"],
+        if self.debug:
+            app.enable_dev_tools(
+                debug=True,
+                dev_tools_hot_reload=True
+            )
+
+        # TODO: debug did not work
+
+        # self.add_importmap_item("playcanvas",
+        #                         "https://cdn.jsdelivr.net/npm/playcanvas@2.14.0/+esm",
+        #                         import_as_global="pc")
+        if len(self.importmap) > 0:
+            app.index_string = WebappBuilder._insert_importmap(app.index_string, self.importmap)
+
+        for custom_html in self.extra_raw_html:
+            app.index_string = WebappBuilder._insert_at_body_start(app.index_string, custom_html)
+
+        if self.layout_helper is not None:
+            app.layout = self.layout_helper.layout()
+            self.layout_helper.configure_app(app)
+
+        # Always set up the TAB_UUID store — callback() injects it as a State
+        # regardless of whether any user settings are registered.
+        self._setup_user_setting_sessions(app)
+
+        if self.debug:
+            self._setup_ws_error_debug_relay(app)
+
+        self._setup_error_overlay(app)
+
+        if len(self.served_files) > 0:
+            @app.server.route(f'/{WebappBuilder.CUSTOM_FILES_PATH}/<path:file_url>')
+            def serve_dynamic_file(file_url):
+                # Look up the actual absolute path based on the URL parameter
+                actual_path = self.served_files.get(f'{WebappBuilder.CUSTOM_FILES_PATH}/{file_url}')
+
+                if actual_path is None or not os.path.exists(actual_path):
+                    abort(404)  # Return 404 if the file isn't in the registry
+
+                return send_from_directory(
+                    os.path.dirname(actual_path),
+                    os.path.basename(actual_path)
+                )
+
+        log_download_enabled = self._setup_log_download(app)
+
+        WebappBuilder.log_debug_info(app)
+
+        # logger.info(f'-----> Now starting Dash App on port {args.port}')
+        # app.logger.setLevel(args.log_level)
+        # app.run(debug=False, port=args.port)  # if you want to debug, better debug=False, or else no stack trace
+
+        # Serve single dynamic file via Flask route
+        # import os
+        #
+        # splat_file_path = '/mnt/masha_prev_2/Experiments/GSplats/inria/output/knit_meow/extra/baked.knit_meow.ply'  # TODO: replace with actual absolute path
+        #
+        # @app.server.route('/_kaolin_dynamic/splat.ply')
+        # def serve_splat():
+        #     return send_from_directory(
+        #         os.path.dirname(splat_file_path),
+        #         os.path.basename(splat_file_path)
+        #     )
+
+
+
+        # Serve Kaolin library assets (CSS, JS, images, etc.)
+        handlers = [(r'/_kaolin_assets/(.*)', StaticFileHandler, {'path': get_kaolin_assets_source_path()})]
+
+        # WebSocket handlers
+        if len(ws_handlers) > 0:
+            handlers.append((r'/websocket/', WebSocketHandlerManager, dict(
+                handler_specs=ws_handlers,
+                write_errors_to_client=self._write_errors_to_client,
+            )))
+
+        # Custom static file directories
+        for dir_url, dir_path in self.served_dirs.items():
+            handlers.append((f'/{dir_url}/(.*)', StaticFileHandler, {'path': dir_path}))
+
+        # Default dash app as the last handler
+        container = WSGIContainer(app.server)
+        handlers.append((r'.*', FallbackHandler, dict(fallback=container)))
+
+        server = Application(handlers,
+                            debug=self.debug)  # debug=True enables Tornado's autoreload
+
+        # Explicitly watch custom dynamic files
+        if self.debug:
+            import tornado.autoreload
+            for file_url, file in self.served_files.items():
+                tornado.autoreload.watch(file)
+
+        if self.set_favicon:
+            app.clientside_callback(
+                """
+                function() {
+                   function updateFavicon(newHref, type = 'image/x-icon') {
+                        let link = document.querySelector('link[rel~="icon"]');
+                        if (link) {
+                            link.href = newHref;
+                        }
+                    }
+                    document.addEventListener('DOMContentLoaded', function() {
+                    updateFavicon('/_kaolin_assets/favicon.ico');
+                    });
+                    updateFavicon('/_kaolin_assets/favicon.ico');
+                    return dash_clientside.no_update;
+                }
+                """,
+                Output('kaolin-app', 'id'),
+                Input('kaolin-app', 'id'),
+            )
+        self.app = app
+        self.server = server
+        return app, server
+
+    def start(self, port: int) -> None:
+        """Serves the built app on a port and blocks running the tornado IO loop.
+
+        Args:
+            port (int): port to listen on, bound on all interfaces.
+
+        TODO: complete docstring.
+        """
+        assert self.server is not None, f'Must call build() first'
+        logger.info(f'-----> Now starting Dash App and Websocket Handler on port {port}')
+        self.server.listen(port, address='0.0.0.0')
+        IOLoop.instance().start()

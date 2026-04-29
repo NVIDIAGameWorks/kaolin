@@ -27,7 +27,6 @@ pytest.importorskip("newton")
 import os
 import torch
 import kaolin
-from examples.tutorial.tutorial_common import COMMON_DATA_DIR
 from kaolin.physics.simplicits import SimplicitsObject, PhysicsPoints
 
 # Constants for test objects
@@ -37,6 +36,9 @@ POISSON_RATIO = float(0.45)
 DENSITY = float(500.0)
 APPROX_VOLUME = float(0.5)
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_DIR = os.path.join(ROOT_DIR, os.pardir, os.pardir,
+                         os.pardir, os.pardir, 'samples', 'physics')
 
 @pytest.fixture(scope="session")
 def cube_mesh():
@@ -44,9 +46,10 @@ def cube_mesh():
 
     Fixture scope is 'session' to load mesh once for all tests.
     """
-    mesh_path = os.path.join(COMMON_DATA_DIR, "meshes")
     mesh = kaolin.io.import_mesh(
-        mesh_path + "/cube.obj", triangulate=True).to('cuda')
+        os.path.join(MODEL_DIR, "cube.obj"),
+        triangulate=True
+    ).to('cuda')
     mesh.vertices = kaolin.ops.pointcloud.center_points(
         mesh.vertices.unsqueeze(0), normalize=True).squeeze(0)
     return mesh

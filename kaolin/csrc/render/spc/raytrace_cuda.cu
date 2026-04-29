@@ -18,18 +18,19 @@
 #define CUB_NS_QUALIFIER ::kaolin::cub
 
 #include <stdio.h>
+#define CUB_STDERR
+#include <cub/device/device_scan.cuh>
+
 #include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 #ifdef EXPERIMENTAL
     #include <ATen/native/cuda/KernelUtils.cuh>
-#else 
+#else
     #include <THC/THCAtomics.cuh>
 #endif
-// TODO(ttakikawa): newer versions of PyTorch will migrate to <ATen/cuda/Atomics.cuh>. 
+// TODO(ttakikawa): newer versions of PyTorch will migrate to <ATen/cuda/Atomics.cuh>.
 // How do we manage these dependencies?
-
-#define CUB_STDERR
-#include <cub/device/device_scan.cuh>
 
 #include "../../spc_math.h"
 #include "../../spc_utils.cuh"
@@ -564,7 +565,7 @@ std::vector<at::Tensor> raytrace_cuda_impl(
     uint*  prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
 
     // set first element to zero
-    CubDebugExit(cudaMemcpy(prefix_sum_ptr, &buffer, sizeof(uint), cudaMemcpyHostToDevice));
+    AT_CUDA_CHECK(cudaMemcpy(prefix_sum_ptr, &buffer, sizeof(uint), cudaMemcpyHostToDevice));
 
     // set up memory for DeviceScan calls
     void* temp_storage_ptr = NULL;
@@ -573,7 +574,7 @@ std::vector<at::Tensor> raytrace_cuda_impl(
     at::Tensor temp_storage = at::empty({(int64_t)temp_storage_bytes}, octree.options());
     temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
 
-    CubDebugExit(cub::DeviceScan::InclusiveSum(
+    AT_CUDA_CHECK(cub::DeviceScan::InclusiveSum(
         temp_storage_ptr, temp_storage_bytes, info_ptr,
         prefix_sum_ptr + 1, num)); //start sum on second element
     cudaMemcpy(&cnt, prefix_sum_ptr + num, sizeof(uint), cudaMemcpyDeviceToHost);   
@@ -669,12 +670,13 @@ void inclusive_sum_cuda_impl(
     int* inclusive_sum_ptr = inclusive_sum.data_ptr<int>();
 
     void* temp_storage_ptr = NULL;
+    uint num_uint = static_cast<uint>(num);
     uint64_t temp_storage_bytes = get_cub_storage_bytes(
-            temp_storage_ptr, reinterpret_cast<uint*>(info_ptr), reinterpret_cast<uint*>(inclusive_sum_ptr), num);
+            temp_storage_ptr, reinterpret_cast<uint*>(info_ptr), reinterpret_cast<uint*>(inclusive_sum_ptr), num_uint);
     at::Tensor temp_storage = at::zeros({(int64_t)temp_storage_bytes}, device(at::DeviceType::CUDA).dtype(at::kByte));
     temp_storage_ptr = (void*)temp_storage.data_ptr<uint8_t>();
 
-    CubDebugExit(cub::DeviceScan::InclusiveSum(temp_storage_ptr, temp_storage_bytes, info_ptr, inclusive_sum_ptr, num));
+    AT_CUDA_CHECK(cub::DeviceScan::InclusiveSum(temp_storage_ptr, temp_storage_bytes, info_ptr, inclusive_sum_ptr, num_uint));
 }
 
 int sum_reduce_cuda_impl(
@@ -926,7 +928,7 @@ uint generate_shadow_rays_cuda_impl(
   uint cnt = 0;
   plane_intersect_rays_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(
       num, ray_o, ray_d, dst, plane, info);
-  CubDebugExit(cub::DeviceScan::ExclusiveSum(
+  AT_CUDA_CHECK(cub::DeviceScan::ExclusiveSum(
       temp_storage_ptr, temp_storage_bytes, info, prefix_sum, num));
   cudaMemcpy(&cnt, prefix_sum + num - 1, sizeof(uint), cudaMemcpyDeviceToHost);
   compactify_shadow_rays_cuda_kernel<<<(num + RT_NUM_THREADS - 1) / RT_NUM_THREADS, RT_NUM_THREADS>>>(

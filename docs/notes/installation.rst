@@ -116,8 +116,7 @@ Here is how to install the latest Pytorch version supported by Kaolin for cuda 1
 
 .. code-block:: bash
 
-    $ pip install torch==2.8.0 --extra-index-url https://download.pytorch.org/whl/cu128
-
+    $ python -m pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorch.org/whl/cu128
 
 4. Optional Environment Variables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -28,7 +28,8 @@ from .intrinsics_pinhole import PinholeIntrinsics
 
 __all__ = [
     'Camera',
-    'allclose'
+    'allclose',
+    'dimensions_to_max_resolution'
 ]
 
 
@@ -696,6 +697,54 @@ class Camera:
 
     def __repr__(self) -> str:
         return self.extrinsics.__repr__() + '\n' + self.intrinsics.__repr__()
+
+
+def dimensions_to_max_resolution(width, height, max_resolution=-1):
+    r"""Scales an image resolution so its largest dimension equals ``max_resolution``,
+    preserving aspect ratio.
+
+    This is useful for capping the resolution at which a camera is rendered (for
+    example to keep interactive remote rendering responsive): scale the camera
+    resolution down before rendering and let the result be upsampled on display.
+    To apply the result to a :class:`Camera`, copy it and assign the scaled
+    dimensions, e.g.::
+
+        import copy
+        w, h = dimensions_to_max_resolution(camera.width, camera.height, 512)
+        cam = copy.deepcopy(camera)
+        cam.width, cam.height = w, h
+
+    Args:
+        width (int): input image plane width, in pixels.
+        height (int): input image plane height, in pixels.
+        max_resolution (int): target size of the largest dimension, in pixels.
+            If negative (the default), the input dimensions are returned
+            unchanged.
+
+    Returns:
+        (tuple of int): the ``(width, height)`` scaled so the largest dimension
+        equals ``max_resolution`` (or the unchanged input when
+        ``max_resolution < 0``). The smaller dimension is rounded down.
+    """
+    if max_resolution < 0:
+        return width, height
+
+    max_dim = int(max(width, height))
+    width = int(width)
+    height = int(height)
+    max_resolution = int(max_resolution)
+
+    factor = max_resolution / max_dim
+    if width == max_dim and height == max_dim:
+        width = max_resolution
+        height = max_resolution
+    elif width == max_dim:
+        width = max_resolution
+        height = int(height * factor)
+    else:
+        height = max_resolution
+        width = int(width * factor)
+    return width, height
 
 
 @implements(torch.allclose)
