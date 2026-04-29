@@ -151,3 +151,5 @@ RUN Start-Process -FilePath 'miniconda3.exe' -Wait -ArgumentList '/S', '/D=C:\Us
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main; \
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r; \
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/msys2; \
+
+RUN conda install -y nodejs  # TODO: here or Dockerfile.install?

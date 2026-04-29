@@ -1,3 +1,5 @@
+.. _notes_visualizer:
+
 Interactive Jupyter 3D Viewer
 *****************************
 

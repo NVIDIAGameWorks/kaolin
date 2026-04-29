@@ -1,20 +1,24 @@
 version: 2
 
-python:
- install:
-  - requirements: docs/readthedocs_requirements.txt
-  - requirements: tools/doc_requirements.txt
-  - requirements: tools/build_requirements.txt
-  - requirements: tools/requirements.txt
-  - requirements: tools/doc_requirements.txt
-  - method: setuptools
-    path: '.'
-
+# We override the whole build with `build.commands` so readthedocs runs the *same*
+# docs/Makefile as internal CI (`make html` -> typedoc + sphinx). This is what pulls in
+# the TypeScript (TypeDoc) API docs, which RTD's native `sphinx:` builder would skip
+# (it calls sphinx-build directly and never triggers the Makefile's `html: typedoc`).
+#
+# NOTE: with `build.commands` the `python:` and `sphinx:` keys are ignored, so the
+# dependency install, the package build, and warnings-as-errors (-W, matching the old
+# `fail_on_warning: true`) are all handled explicitly below.
 build:
   os: "ubuntu-22.04"
   tools:
     python: "3.12"
-
-sphinx:
- configuration: docs/conf.py
- fail_on_warning: true
+    nodejs: "20"
+  commands:
+    - pip install -r docs/readthedocs_requirements.txt -r tools/doc_requirements.txt -r tools/build_requirements.txt -r tools/requirements.txt
+    - pip install .
+    - npm install
+    # Single Makefile build: TypeDoc first, then Sphinx with warnings treated as errors.
+    - make -C docs html SPHINXOPTS="-W --keep-going"
+    # Hand the generated site to readthedocs.
+    - mkdir -p $READTHEDOCS_OUTPUT/html
+    - cp -r docs/_build/html/. $READTHEDOCS_OUTPUT/html/

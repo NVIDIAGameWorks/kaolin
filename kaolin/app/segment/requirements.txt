@@ -1,0 +1,3 @@
+gsplat>=1.4.0
+transformers>=4.47.0
+simple-parsing

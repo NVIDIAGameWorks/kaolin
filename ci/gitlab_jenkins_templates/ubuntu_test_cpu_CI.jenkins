@@ -36,6 +36,11 @@ spec:
         stage("Install deps") {
           sh 'pip install -r /kaolin/tools/ci_requirements.txt "jupyter_client<8"'
           sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'
+          // Sphinx toolchain for the "Build docs" stage (see .readthedocs.yml). torch and
+          // the other runtime requirements are already in the image, so we only need the
+          // doc-specific deps here (not docs/readthedocs_requirements.txt, which pins a
+          // separate CPU torch wheel meant for the readthedocs builder).
+          sh 'pip install -r /kaolin/tools/doc_requirements.txt'
         }
         def build_passed = true
         try {
@@ -68,6 +73,19 @@ spec:
           echo e.toString()
         }
         try {
+          stage("TypeScript tests") {
+            // Framework-independent TS/Three.js unit tests (mocha + tsx). No GPU needed,
+            // so they run here in the CPU test config. node_modules is baked into the
+            // image (npm install in tools/linux/Dockerfile.install). --no-open skips
+            // launching the HTML coverage report in a browser; --v (verbose) dumps
+            // the per-stage log to stdout so it shows up in the pipeline.
+            sh 'bash /kaolin/tools/linux/run_tests.sh ts --no-open --v'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
           stage("Doc examples") {
             // using wheel you don't have /kaolin/kaolin
             sh '''
@@ -75,6 +93,19 @@ spec:
                 pytest --doctest-modules --ignore=/kaolin/kaolin/experimental /kaolin/kaolin
             fi
             '''
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Build docs") {
+            // run_tests.sh docs builds Sphinx with -W (fail_on_warning, matching
+            // .readthedocs.yml) into build_docs/ so the git tree stays clean, and exits
+            // non-zero on failure. --no-open skips launching the HTML docs in a browser;
+            // --v (verbose) dumps the docs build log to stdout so it shows
+            // up in the pipeline.
+            sh 'bash /kaolin/tools/linux/run_tests.sh docs --no-open --v'
           }
         } catch(e) {
           build_passed = false

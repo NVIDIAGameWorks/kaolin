@@ -16,6 +16,7 @@ kaolin.egg-info
 *.so
 *.egg
 .eggs/
+kaolin/cython/**/*.cpp
 node_modules/
 
 # byte-compiled python files
@@ -36,17 +37,19 @@ node_modules/
 *.ipynb_checkpoints
 
 # tests
-.test_logs/
-.test_coverage/
+.test_logs*
+.test_coverage*
 .coverage
 
 # example-output
 examples/tutorial/cache/
 examples/tutorial/output/
 examples/tutorial/logs/
+# TODO: these notebooks should use tutorial/output and tutorial/logs like the others
 examples/tutorial/physics/*.log
 examples/tutorial/physics/results/
 examples/tutorial/physics/inria/
+# TODO: these should not be committed -- looks like personal hacks
 kaolin/physics/material_properties/
 kaolin/physics/simplicits/output/
 kaolin/physics/sparsified/

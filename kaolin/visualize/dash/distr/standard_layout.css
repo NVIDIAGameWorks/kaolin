@@ -1,0 +1,241 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700&display=swap');
+
+body, html, #react-entry-point {
+    min-height: 100vh;
+    width: 100vw;
+    margin: 0;
+    padding: 0;
+}
+
+#react-entry-point {
+    position: relative;
+}
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Exo 2', sans-serif; /* Applied NVIDIA Sans substitute */
+}
+
+.w-5 { width: 5%; }
+.w-10 { width: 10%; }
+.w-15 { width: 15%; }
+.w-20 { width: 20%; }
+/** bootstrap has 25 */
+.w-30 { width: 30%; }
+.w-35 { width: 35%; }
+.w-40 { width: 40%; }
+.w-45 { width: 45%; }
+/** bootstrap has 50 */
+.w-55 { width: 55%; }
+.w-60 { width: 60%; }
+.w-65 { width: 65%; }
+.w-70 { width: 70%; }
+/** bootstrap has 75 */
+.w-80 { width: 80%; }
+.w-85 { width: 85%; }
+.w-90 { width: 90%; }
+.w-95 { width: 95%; }
+
+#kaolin-app {
+    width: 100%;
+    min-height: 100vh;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.kaolin-primary-container {
+    background-color: #eeeeee;
+    margin-left: 0;
+    padding: 0;
+    flex-grow: 1;
+    position: relative;
+}
+
+
+.kaolin-navbar-container {
+    flex-wrap: wrap;
+}
+
+.kaolin-navbar-container .kaolin-title-container {
+    margin-left: calc(var(--bs-gutter-x) * 0.5);
+
+}
+
+.kaolin-navbar-container .kaolin-menu-container {
+    margin-left: 0;
+}
+
+.navbar-toggler {
+    border: 1px solid var(--bs-navbar-color);
+    border-radius: .25rem;
+}
+
+.kaolin-navbar-container .kaolin-branding-container {
+    /*text-transform: none;
+    position: absolute;
+    top: 0;
+    right: 0;*/
+}
+
+.kaolin-branding-container a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.kaolin-branding-container .pw-by {
+    text-transform: none;
+    font-size: 80%;
+}
+
+.kaolin-branding-container .br-kaolin {
+    display: flex;
+    color: #aaa;
+}
+
+.kaolin-branding-container .br-version {
+    margin-left: auto;
+    padding-right: 5px;
+}
+
+.kaolin-navbar-title {
+    white-space: normal; /** wrap long titles */
+}
+
+.kaolin-sidebar {
+    box-shadow: 5px 0 2px 0px rgba(0, 0, 0, 0.3);
+    background-color: var(--bs-body-bg);
+    z-index: 10;
+}
+
+.kaolin-sidebar-content {
+    padding: 10px 5px;
+}
+
+.kaolin-section-header {
+    cursor: pointer;
+    user-select: none;
+    align-items: center;
+}
+
+.kaolin-section-caret {
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+}
+
+.kaolin-modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1050;
+    padding: 20px;
+}
+
+.kaolin-modal-panel {
+    position: relative;
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    overflow: auto;
+    border-radius: .5rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    padding: 30px;
+}
+
+.kaolin-modal-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    line-height: 1;
+}
+
+.kaolin-main-container {
+}
+
+.kaolin-sliding-sidebar {
+    position: absolute;
+    left: -100%;
+    transition: left 0.5s ease-out;
+    height: 100%;
+}
+
+.kaolin-button-like {
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.15s ease;
+    border-radius: .25rem;
+    padding: 8px 10px;
+}
+
+.kaolin-button-like:hover {
+    color: black;
+}
+
+.kaolin-button-like:active {
+}
+
+.kaolin-sidebar-hide {
+    position: relative;
+    width: 100%;
+}
+
+.kaolin-sidebar-hide i {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+.kaolin-sidebar-show {
+    position: absolute;
+    z-index: 5;
+    top: 0;
+    left: 0;
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+@media (min-width: 768px) {
+    .kaolin-sidebar {
+        box-shadow: 2px 0 5px 0px rgba(0, 0, 0, 0.3);
+        flex-grow: 0;
+        min-height: unset;
+    }
+
+    .kaolin-sidebar-content {
+        padding: 20px;
+    }
+
+    .kaolin-main-container {
+        flex-grow: 1;
+        overflow: hidden;
+    }
+
+    .kaolin-primary-container {
+        display: flex;
+        flex-direction: row;
+    }
+}
+
+@media (max-width: 767px) {
+    .kaolin-sidebar {
+        width: 100%;
+        min-height: 100%;
+        padding: 20px;
+    }
+
+    .kaolin-sliding-sidebar {
+        min-width: 300px;
+    }
+}
+
+/** When menu collapses, hide optional branding to avoid clutter. */
+@media (max-width: 992px) {
+    .kaolin-branding-container {
+        display: none;
+    }
+}
+

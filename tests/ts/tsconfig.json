@@ -1,0 +1,22 @@
+{
+  // Editor/typecheck-only config so tooling resolves the @kaolin/* and @test/*
+  // path aliases inside the test tree. The root tsconfig.json intentionally
+  // excludes tests from its `include`, and the runtime test runner uses tsx
+  // against that root config, so this file only affects IDE diagnostics.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "noEmit": true,
+    "paths": {
+      "@kaolin/*": [
+        "kaolin/visualize/dash/components/src/ts/*"
+      ],
+      "@test/*": [
+        "tests/ts/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*"
+  ]
+}

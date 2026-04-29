@@ -1,2 +1,3 @@
 recursive-include kaolin/experimental/dash3d/static *
 recursive-include kaolin/experimental/dash3d/templates *
+recursive-include kaolin/visualize/dash/components/autogen *.js *.js.map *.json

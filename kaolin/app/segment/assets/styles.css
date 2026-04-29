@@ -1,0 +1,32 @@
+:root {
+  --select-color-2d: #24B7BC;
+  --select-color-3d: #F7FF58;
+}
+
+.mask-canvas {
+    filter: url(#colorize-mask);
+}
+
+/* Segment list (SegmentList in custom.js). Items share single borders: every
+   item draws right/bottom/left, only the first also draws a top border, so
+   adjacent items meet on a single 1px line with a closed box top and bottom. */
+.kaolin-seg-container .list-group-item {
+    border-width: 0 1px 1px 1px;
+    cursor: pointer;
+}
+
+.kaolin-seg-container .list-group-item:first-child {
+    border-top-width: 1px;
+}
+
+/* The single active (highlighted) row. */
+.kaolin-seg-container .kaolin-seg-active {
+    background-color: var(--bs-secondary-bg, #e9ecef);
+}
+
+/* Always-visible segment subtitle: deliberately much smaller than Bootstrap's
+   `small`. */
+.kaolin-seg-container .kaolin-seg-info {
+    font-size: 0.7rem;
+    line-height: 1.15;
+}

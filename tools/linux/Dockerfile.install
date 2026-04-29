@@ -66,12 +66,22 @@ WORKDIR /kaolin
 
 COPY . .
 
-# Install Dash3D Requirements ###
-RUN curl -fsSL https://deb.nodesource.com/setup_16.x --insecure | bash - \
+# Install Dash Requirements ###
+RUN curl -fsSL https://deb.nodesource.com/setup_26.x --insecure | bash - \
     && apt-get install -y nodejs
 
+# Put the npm and Cypress caches in shared, world-writable locations. When the dash
+# build later runs as root over a bind mount owned by another uid (e.g. the host
+# user), npm de-escalates its scripts to that uid; the default caches under /root are
+# unreachable to it (/root is mode 700). The post-install chmod makes the entries
+# created here (as root) writable by that uid too.
+RUN mkdir -m 777 /opt/npm-cache /opt/cypress-cache
+ENV NPM_CONFIG_CACHE=/opt/npm-cache
+ENV CYPRESS_CACHE_FOLDER=/opt/cypress-cache
+
+
 RUN npm install -g npm@8.5.4
-RUN npm install 
+RUN npm install && chmod -R a+rwX /opt/npm-cache /opt/cypress-cache
 
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir \
@@ -91,4 +101,4 @@ RUN if [ "$FORCE_CUDA" -eq "1" ]; then \
     export MAX_JOBS=1 && \
     pip install --no-build-isolation --break-system-packages .; fi
 
-RUN export MAX_JOBS=1 && python setup.py develop
+RUN export MAX_JOBS=1 && pip install -e ".[app.splat_inpaint,app.segment]" --no-build-isolation

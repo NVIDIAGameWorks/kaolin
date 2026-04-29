@@ -1,12 +1,80 @@
 {
+  "name": "kaolin",
+  "version": "0.18.0",
+  "description": "Kaolin: A PyTorch library for accelerating 3D deep learning research",
+  "main": "index.ts",
+  "scripts": {
+    "build:dash": "npm run clean:dash && npm run build:dash:js && npm run build:dash:backends && npm run build:dash:backends-fix && npm run build:dash:manifest",
+    "clean:dash": "node -e \"require('fs').rmSync('build/ts_out', { recursive: true, force: true })\"",
+    "build:dash:js": "webpack --config webpack.config.js",
+    "build:dash:backends": "dash-generate-components kaolin/visualize/dash/components/src/ts/components kaolin/visualize/dash/components/autogen -p package-info.json --ignore \\.test\\.",
+    "build:dash:backends-fix": "find ./kaolin/visualize/dash/components/autogen -name '*.py' -exec sed -i 's|kaolin/visualize/dash/components/autogen|kaolin|g' {} +",
+    "build:dash:manifest": "tsx kaolin/visualize/dash/components/scripts/dump_behavior_manifest.ts",
+    "build:dash:watch": "webpack --config webpack.config.js --watch",
+    "install:dash": "cd kaolin/visualize/dash/components && npm install",
+    "test": "mocha --import=tsx --config tests/ts/.mocharc.jsonc",
+    "test:coverage": "nyc mocha --import=tsx --config tests/ts/.mocharc.jsonc"
+  },
+  "nyc": {
+    "report-dir": ".test_coverage_web/",
+    "temp-dir": ".test_logs_web/",
+    "reporter": [
+      "text",
+      "html"
+    ],
+    "extension": [
+      ".js",
+      ".ts",
+      ".tsx"
+    ],
+    "include": [
+      "kaolin/visualize/dash/components/src/ts/**/*"
+    ]
+  },
   "dependencies": {
-    "jquery": "^3.5.1",
+    "jquery": "^3.7.1",
+    "konva": "^10.3.0",
     "mustard-ui": "^1.0.4",
-    "three": "^0.137.0"
+    "three": "^0.180.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "cypress": "^9.5.2",
-    "mocha": "^9.2.2",
-    "uglify-js": "^3.15.3"
-  }
+    "@happy-dom/global-registrator": "^20.10.6",
+    "@happy-dom/node-canvas-adapter": "^20.10.6",
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "@types/react": "^19.2.2",
+    "@types/sinon": "^21.0.1",
+    "@types/three": "^0.180.0",
+    "canvas": "^3.2.3",
+    "chai": "^6.2.0",
+    "css-loader": "^7.1.2",
+    "cypress": "^15.5.0",
+    "happy-dom": "^20.10.6",
+    "jsdoc": "^4.0.5",
+    "mocha": "^11.7.4",
+    "npm-run-all": "^4.1.5",
+    "nyc": "^17.1.0",
+    "playcanvas": "^2.19.7",
+    "ramda": "^0.32.0",
+    "react": "19.2.0",
+    "react-docgen": "^8.0.2",
+    "react-dom": "19.2.0",
+    "sinon": "^22.0.0",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.4",
+    "tsx": "^4.15.8",
+    "typedoc": "^0.28.14",
+    "typedoc-material-theme": "^1.4.1",
+    "typescript": "^5.9.3",
+    "uglify-js": "^3.19.3",
+    "webpack": "^5.102.1",
+    "webpack-cli": "^6.0.1"
+  },
+  "peerDependencies": {
+    "react": "^16.13.0",
+    "react-dom": "^16.13.0"
+  },
+  "author": "NVIDIA",
+  "license": "Apache-2.0"
 }

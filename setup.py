@@ -15,6 +15,7 @@ import logging
 import glob
 import sys
 import subprocess  # Added import
+import shutil
 
 # Define version constraints
 TORCH_MIN_VER = '2.5.1'
@@ -59,7 +60,7 @@ from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDAExtensio
 # Setup logging and working directory
 cwd = os.path.dirname(os.path.abspath(__file__))
 logger = logging.getLogger()
-logging.basicConfig(format='%(levelname)s - %(message)s')
+logging.basicConfig(format='%(levelname)s - %(message)s', level=logging.DEBUG)
 
 def get_cuda_bare_metal_version(cuda_dir):
     """Get CUDA version from nvcc."""
@@ -143,9 +144,40 @@ def get_requirements():
         requirements.extend(line.strip() for line in f)
     return requirements
 
+def get_app_extras():
+    """Auto-discover optional app extras from kaolin/app/*/requirements.txt."""
+    extras = {}
+    app_dir = os.path.join(cwd, 'kaolin', 'app')
+    if not os.path.isdir(app_dir):
+        return extras
+    for app_name in sorted(os.listdir(app_dir)):
+        req_file = os.path.join(app_dir, app_name, 'requirements.txt')
+        if os.path.isfile(req_file):
+            with open(req_file) as f:
+                reqs = [l.strip() for l in f if l.strip() and not l.startswith('#')]
+            extras[f'app.{app_name}'] = reqs
+    return extras
+
 def get_scripts():
     """Return list of scripts to install."""
     return ['kaolin/experimental/dash3d/kaolin-dash3d']
+
+def get_package_data():
+    """Return package data files to include."""
+    return {
+        'kaolin.visualize.dash.components.kaolin_viewer': [
+            '*.js',
+            '*.js.map',
+            '*.json',
+            '*.py'
+        ],
+        # Behavior manifest emitted by `npm run build:dash:manifest`; the
+        # Python side (`kaolin.visualize.dash.behavior_manifest`) reads this
+        # file via importlib.resources at runtime.
+        'kaolin.visualize.dash.components.autogen': [
+            '*.json',
+        ],
+    }
 
 def get_extensions():
     """Define C++ and CUDA extensions."""
@@ -203,21 +235,85 @@ def get_include_dirs():
             include_dirs.append(os.path.join(cwd, 'third_party/cub'))
     return include_dirs
 
-if __name__ == '__main__':
-    setup(
-        name=PACKAGE_NAME,
-        version=version,
-        author=AUTHOR,
-        description=DESCRIPTION,
-        url=URL,
-        long_description=LONG_DESCRIPTION,
-        license=LICENSE,
-        python_requires='~=3.7',
-        packages=find_packages(exclude=('docs', 'tests', 'examples')),
-        scripts=get_scripts(),
-        include_package_data=True,
-        install_requires=get_requirements(),
-        zip_safe=False,
-        ext_modules=get_extensions(),
-        cmdclass={'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)}
-    )
+NODE_MIN_MAJOR = 25
+
+
+def check_node_version():
+    """Verify the installed Node.js major version is >= NODE_MIN_MAJOR.
+
+    Raises RuntimeError if `node` is missing or older than the required major.
+    Set KAOLIN_SKIP_DASH_BUILD=1 to skip the dash build (and this check) entirely.
+    """
+    try:
+        raw = subprocess.check_output(['node', '--version'], universal_newlines=True).strip()
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        raise RuntimeError(
+            f"node not found, failed to build dash components. "
+            f"Install Node.js >= {NODE_MIN_MAJOR}, "
+            "or set KAOLIN_SKIP_DASH_BUILD=1 to skip the dash component build."
+        ) from e
+
+    # `node --version` prints e.g. "v25.0.0"
+    version_str = raw.lstrip('v')
+    try:
+        major = int(version_str.split('.', 1)[0])
+    except ValueError as e:
+        raise RuntimeError(f"Could not parse node version from output {raw!r}") from e
+
+    if major < NODE_MIN_MAJOR:
+        raise RuntimeError(
+            f"Kaolin requires Node.js >= {NODE_MIN_MAJOR}, but found {raw}. "
+            "Upgrade Node.js, "
+            "or set KAOLIN_SKIP_DASH_BUILD=1 to skip the dash component build."
+        )
+
+
+def build_dash_components():
+    """Build the dash components before installation."""
+    if os.getenv('KAOLIN_SKIP_DASH_BUILD') is not None:
+        logger.info("KAOLIN_SKIP_DASH_BUILD is set, skipping dash component build.")
+        return
+
+    check_node_version()
+
+    dash_components_dir = os.path.join(cwd, 'kaolin', 'visualize', 'dash', 'components')
+    # TODO: maybe disable import if not built?
+
+    logger.info("Building dash components...")
+    try:
+        # Check if node_modules exists, if not run npm install
+        if not os.path.exists(os.path.join(cwd, 'node_modules')):
+            logger.info("Installing npm dependencies...")
+            subprocess.check_call(['npm', 'install'], cwd=cwd)
+            
+        # Build the components using root-level commands
+        logger.info("Building JavaScript bundle...")
+        subprocess.check_call(['npm', 'run', 'build:dash'], cwd=cwd)
+        logger.info(f"Dash components built successfully! See: {dash_components_dir}/autogen")
+    except subprocess.CalledProcessError as e:
+        logger.warning(f"Failed to build dash components (set KAOLIN_SKIP_DASH_BUILD=1 to skip; or install nodejs): {e}")
+        raise e
+    except FileNotFoundError:
+        raise RuntimeError("npm not found, failed to build dash components (set KAOLIN_SKIP_DASH_BUILD=1 to skip)")
+
+build_dash_components()
+
+setup(
+    name=PACKAGE_NAME,
+    version=version,
+    author=AUTHOR,
+    description=DESCRIPTION,
+    url=URL,
+    long_description=LONG_DESCRIPTION,
+    license=LICENSE,
+    python_requires='~=3.7',
+    packages=find_packages(exclude=('docs', 'tests', 'examples')),
+    scripts=get_scripts(),
+    include_package_data=True,
+    package_data=get_package_data(),
+    install_requires=get_requirements(),
+    extras_require=get_app_extras(),
+    zip_safe=False,
+    ext_modules=get_extensions(),
+    cmdclass={'build_ext': BuildExtension.with_options(no_python_abi_suffix=True)}
+)
