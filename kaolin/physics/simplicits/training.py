@@ -519,7 +519,7 @@ class SimplicitsObject(PhysicsPoints):
         return self._construct_apply(lambda t: t.to(*args, **kwargs), attributes)
 
     @classmethod
-    def create_rigid(cls, pts, yms, prs, rhos, appx_vol=1):
+    def create_rigid(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None, physics_points=None):
         r"""Creates a rigid SimplicitsObject with a single weight for affine deformations.
 
         This method creates a SimplicitsObject that behaves as a rigid body. At low stiffness values
@@ -527,23 +527,42 @@ class SimplicitsObject(PhysicsPoints):
         the object will act as rigid.
 
         Args:
-            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`)
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness (in :math:`kg/m/s^2`). Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density (in :math:`kg/m^3`). Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            appx_vol (Union[torch.Tensor, float], optional): Approximate volume (in :math:`m^3`). Can be either:
-                - A tensor of shape :math:`(1,)` or :math:`(0,)`
-                - A float value. Defaults to 1
+            pts (torch.Tensor, optional): Deprecated, use ``physics_points`` instead.
+                Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
+                Required unless ``physics_points`` is provided.
+            yms (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Young's moduli defining material stiffness (in :math:`kg/m/s^2`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            prs (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Poisson's ratios defining material compressibility; either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            rhos (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Density defining material density (in :math:`kg/m^3`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
+                Default: 1 if physics_points is not provided.
+            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
+                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
+                are taken from this object instead.
 
         Returns:
             (SimplicitsObject): A rigid SimplicitsObject with a constant weight function.
         """
+        if physics_points is not None:
+            assert pts is None and yms is None and prs is None and rhos is None and appx_vol is None, 'pts, yms, prs, rhos, and appx_vol must be None if physics_points is provided'
+            pts = physics_points.pts
+            yms = physics_points.yms
+            prs = physics_points.prs
+            rhos = physics_points.rhos
+            appx_vol = physics_points.appx_vol
+        else:
+            warnings.warn('pts, yms, prs, rhos, and appx_vol arguments are deprecated. Please use physics_points instead.', UserWarning, stacklevel=2)
+            if appx_vol is None:
+                appx_vol = 1
         return cls(
             pts=pts,
             yms=yms,
@@ -579,9 +598,6 @@ class SimplicitsObject(PhysicsPoints):
             both local detail preservation and global shape maintenance.
 
         Args:
-            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
-                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
-                are taken from this object instead.
             pts (torch.Tensor, optional): Deprecated, use ``physics_points`` instead.
                 Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
                 Required unless ``physics_points`` is provided.
@@ -600,6 +616,9 @@ class SimplicitsObject(PhysicsPoints):
             appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
                 Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
                 Required unless ``physics_points`` is provided.
+            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
+                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
+                are taken from this object instead.
             num_handles (int, optional): Number of control handles for deformation. Defaults to 10
             num_samples (int, optional): Number of samples used for training. Defaults to 1000
             model_layers (int, optional): Number of layers in the neural network. Defaults to 6
