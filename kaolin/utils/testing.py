@@ -98,10 +98,16 @@ def check_tensor(tensor, shape=None, dtype=None, device=None, throw=True):
         if throw:
             raise TypeError(f"tensor dtype is {tensor.dtype}, should be {dtype}")
         return False
-    if device is not None and device != tensor.device.type:
-        if throw:
-            raise TypeError(f"tensor device is {tensor.device.type}, should be {device}")
-        return False
+    if device is not None:
+        expected_device = torch.device(device)
+        actual_device = tensor.device
+        mismatch = (expected_device.type != actual_device.type) or (
+            expected_device.index is not None and expected_device.index != actual_device.index
+        )
+        if mismatch:
+            if throw:
+                raise TypeError(f"tensor device is {actual_device}, should be {expected_device}")
+            return False
     return True
 
 def check_packed_tensor(tensor, total_numel=None, last_dim=None, dtype=None, device=None,

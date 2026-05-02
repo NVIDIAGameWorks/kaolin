@@ -19,10 +19,7 @@ import re
 
 import torch
 
-try:
-    from pxr import Usd, UsdGeom, Sdf
-except ImportError:
-    pass
+from pxr import Usd, UsdGeom, Sdf
 
 __all__  = [
     'get_scene_paths',

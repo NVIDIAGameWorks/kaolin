@@ -15,7 +15,7 @@
 
 import logging
 import warnings
-from typing import Literal, Any
+from typing import Literal, Any, Union
 
 import warp as wp
 import warp.sparse as wps
@@ -519,7 +519,7 @@ class SimplicitsScene:
         self.current_id += 1
         return self.current_id - 1
 
-    def add_object(self, sim_object: SimplicitsObject | SkinnedPhysicsPoints, num_qp=None, init_transform=None, is_kinematic=False, renderable_pts=None):
+    def add_object(self, sim_object: Union[SimplicitsObject, SkinnedPhysicsPoints], num_qp=None, init_transform=None, is_kinematic=False, renderable_pts=None):
         r"""Adds a simplicits object to the scene as a SimulatedObject. Can add a just trained SimplicitsObject which
         contains a skinning weight field, or can also accept a baked version, sufficient for simulation.
 
@@ -532,7 +532,7 @@ class SimplicitsScene:
                                             This argument takes a standard transformation, not a delta.
                                             Subsequently, the Identity matrix is subtracted from it and the delta transform is saved.
             is_kinematic (bool): Object is kinematic if it is not solved for during dynamics simulation.
-            renderable_pts (torch.Tensor, optional): Points for rendering (e.g. Gaussian splat positions).
+            renderable_pts (torch.Tensor, optional): Points for rendering (e.g. Gaussian splat positions, in :math:`m`).
                 When provided and sim_object is a SimplicitsObject, skinning weights are baked for these
                 points and stored in the SimulatedObject for use with get_object_deformed_pts(..., points='rendered').
                 This is not to be used with already baked SkinnedPhysicsPointsProtocol.

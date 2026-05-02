@@ -17,10 +17,7 @@ import os
 import torch
 import numpy as np
 
-try:
-    from pxr import Usd, UsdGeom, Sdf
-except ImportError:
-    pass
+from pxr import Usd, UsdGeom, Sdf
 
 from .utils import _get_stage_from_maybe_file, get_scene_paths, create_stage
 

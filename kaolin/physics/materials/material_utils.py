@@ -25,7 +25,7 @@ def to_lame(yms, prs):
     r"""Converts youngs modulus and poissons ratio to lame parameters
 
     Args:
-        yms (torch.Tensor): tensor of youngs modulus
+        yms (torch.Tensor): tensor of youngs modulus (in :math:`kg/m/s^2`)
         prs (torch.Tensor): tensor of poisson ratios
 
     Returns:

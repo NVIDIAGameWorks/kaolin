@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,10 +22,7 @@ import posixpath
 import warnings
 import torch
 
-try:
-    from pxr import UsdShade, Sdf, Usd, Ar
-except ImportError:
-    warnings.warn('Warning: module pxr not found', ImportWarning)
+from pxr import UsdShade, Sdf, Usd, Ar
 
 import kaolin.io.utils
 from kaolin.io.materials import MaterialLoadError, MaterialWriteError, MaterialNotSupportedError, MaterialError
@@ -36,6 +33,14 @@ from .utils import _get_stage_from_maybe_file, get_scene_paths
 logging.getLogger("PIL.PngImagePlugin").propagate = False
 
 UNSUPPORTED_MATERIAL_INPUTS = ['transmittance']
+
+__all__ = [
+    'import_material',
+    'export_material',
+    'UsdMaterialIoManager',
+    'read_usd_preview_surface',
+    'write_usd_preview_surface'
+]
 
 # TODO: ensure this can also work for absolute texture paths
 def import_material(file_path_or_stage, scene_path, texture_path=None, time=None) -> Material:

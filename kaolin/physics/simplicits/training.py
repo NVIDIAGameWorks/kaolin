@@ -13,15 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from abc import ABC, abstractmethod
 import logging
 import warnings
-from typing import Protocol, runtime_checkable, Any
+import tqdm
+from typing import Protocol, runtime_checkable, Any, Optional, Sequence
 
 import torch
 import kaolin
 
 from .losses import compute_losses
 from .network import SimplicitsMLP, SkinningModule
+from kaolin.rep import TensorContainerBase
+import kaolin.utils.testing
 
 logger = logging.getLogger(__name__)
 
@@ -38,49 +42,46 @@ class PhysicsPointsProtocol(Protocol):
     Protocol that gives access to point-sampled object as well as its point-sampled material properties.
 
     Attributes:
-        pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry.
-        yms (torch.Tensor): Young's moduli defining material stiffness, of shape :math:`(N,)`.
+        pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
+        yms (torch.Tensor): Young's moduli defining material stiffness, of shape :math:`(N,)` (in :math:`kg/m/s^2`).
         prs (torch.Tensor): Poisson's ratios defining material compressibility, of shape :math:`(N,)`.
-        rhos (torch.Tensor): Density defining material density, of shape :math:`(N,)`.
-        appx_vol (torch.Tensor): Approximate volume, of shape :math:`(1,)`.
+        rhos (torch.Tensor): Density defining material density, of shape :math:`(N,)` (in :math:`kg/m^3`).
+        appx_vol (torch.Tensor): Approximate volume, of shape :math:`(1,)` (in :math:`m^3`).
     """
     pts: torch.Tensor
     yms: torch.Tensor
     prs: torch.Tensor
     rhos: torch.Tensor
     appx_vol: torch.Tensor
-    device: torch.device
-    dtype: torch.dtype
 
     def subsample(self, num_pts=None, sample_indices=None) -> Any:
         ...
 
-
-class PhysicsPoints(PhysicsPointsProtocol):
+class PhysicsPoints(PhysicsPointsProtocol, TensorContainerBase):
     """Point-sampled object with material properties.
 
     Attributes:
-        pts (torch.Tensor): Points tensor representing the object's geometry, of shape :math:`(N, 3)`.
-        yms (torch.Tensor): Young's moduli defining material stiffness, of shape :math:`(N,)`.
+        pts (torch.Tensor): Points tensor representing the object's geometry, of shape :math:`(N, 3)` (in :math:`m`).
+        yms (torch.Tensor): Young's moduli defining material stiffness, of shape :math:`(N,)` (in :math:`kg/m/s^2`).
         prs (torch.Tensor): Poisson's ratios defining material compressibility, of shape :math:`(N,)`.
-        rhos (torch.Tensor): Density defining material density, of shape :math:`(N,)`.
-        appx_vol (torch.Tensor): Approximate volume, as a scalar.
+        rhos (torch.Tensor): Density defining material density, of shape :math:`(N,)` (in :math:`kg/m^3`).
+        appx_vol (torch.Tensor): Approximate volume, as a scalar (in :math:`m^3`).
     """
-    def __init__(self, pts, yms, prs, rhos, appx_vol):
+    def __init__(self, pts, yms, prs, rhos, appx_vol, strict_checks=True):
         r"""Initialize the class.
 
         Args:
-            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
+            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`)
+            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness (in :math:`kg/m/s^2`). Can be either:
                 - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
             prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
                 - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
+            rhos (Union[torch.Tensor, float]): Density defining material density (in :math:`kg/m^3`). Can be either:
                 - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
-            appx_vol (Union[torch.Tensor, float]): Approximate volume. Can be either:
+            appx_vol (Union[torch.Tensor, float]): Approximate volume (in :math:`m^3`). Can be either:
                 - A tensor of shape :math:`(1,)`
                 - A float value
         """
@@ -96,16 +97,18 @@ class PhysicsPoints(PhysicsPointsProtocol):
             rhos = torch.full((pts.shape[0],), rhos, dtype=pts.dtype, device=pts.device)
         else:
             assert rhos.shape == (pts.shape[0],), 'rhos must be a tensor of shape (N,)'
-        if not torch.is_tensor(appx_vol):
-            appx_vol = torch.tensor([appx_vol], dtype=pts.dtype, device=pts.device)
+        if torch.is_tensor(appx_vol):
+            appx_vol = appx_vol.squeeze()
         else:
-            assert appx_vol.numel() == 1, 'appx_vol must be scalar tensor'
+            appx_vol = torch.tensor(appx_vol, dtype=pts.dtype, device=pts.device)
 
         self.pts = pts
         self.yms = yms
         self.prs = prs
         self.rhos = rhos
         self.appx_vol = appx_vol
+        if strict_checks:
+            assert self.check_sanity(log_error=True)
 
     def _get_subsample_indices(self, num_pts=None, sample_indices=None):
         r"""Compute or validate subsample indices.
@@ -164,6 +167,17 @@ class PhysicsPoints(PhysicsPointsProtocol):
         class_name = self.__class__.__name__
         return f"{class_name}(N_points={self.pts.shape[0]}, Densities={unique_densities}, Yms={unique_yms}, Prs={unique_prs}, AppxVol={appx_vol})"
 
+    @classmethod
+    def class_tensor_attributes(cls):
+        return ["pts", "yms", "prs", "rhos", "appx_vol"]
+
+    @classmethod
+    def class_other_attributes(cls):
+        return []
+
+    def __len__(self):
+        return self.pts.shape[0]
+
     @property
     def device(self):
         return self.pts.device
@@ -171,6 +185,29 @@ class PhysicsPoints(PhysicsPointsProtocol):
     @property
     def dtype(self):
         return self.pts.dtype
+
+    def check_tensor_attribute(self, attr, log_error=False):
+        """Checks tensor attribute validity; returns True if valid."""
+
+        def _maybe_log(msg):
+            if log_error:
+                logger.error(msg)
+
+        if attr == "pts":
+            expected_shape = (len(self), 3)
+        elif attr in ["yms", "prs", "rhos"]:
+            expected_shape = (len(self),)
+        elif attr == "appx_vol":
+            expected_shape = tuple()
+        else:
+            return False
+        try:
+            kaolin.utils.testing.check_tensor(getattr(self, attr), shape=expected_shape,
+                                              device=self.device, dtype=self.dtype,throw=True)
+        except Exception as e:
+            _maybe_log(f'Attribute {attr}: {e}')
+            return False
+        return True
 
 
 @runtime_checkable
@@ -185,16 +222,18 @@ class SkinnedPointsProtocol(Protocol):
     skinning_weights: torch.Tensor
 
 
-class SkinnedPoints(SkinnedPointsProtocol):
+class SkinnedPoints(SkinnedPointsProtocol, TensorContainerBase):
     r"""Points with skinning properties.
 
     Attributes:
-        pts (torch.Tensor): The skinned points, of shape :math:`(N, 3)`.
+        pts (torch.Tensor): The skinned points, of shape :math:`(N, 3)` (in :math:`m`).
         skinning_weights (torch.Tensor): The skinning weights of the points, of shape :math:`(N, \text{num_handles})`.
     """
-    def __init__(self, pts, skinning_weights):
+    def __init__(self, pts, skinning_weights, strict_checks=True):
         self.pts = pts
         self.skinning_weights = skinning_weights
+        if strict_checks:
+            assert self.check_sanity(log_error=True)
 
     @property
     def num_handles(self):
@@ -207,12 +246,54 @@ class SkinnedPoints(SkinnedPointsProtocol):
         Constructor from a :class:`SkinningModule` to be applied on the points.
 
         Args:
-            pts (torch.Tensor): The points to be skinned, of shape :math:`(N, 3)`
+            pts (torch.Tensor): The points to be skinned, of shape :math:`(N, 3)` (in :math:`m`)
             skinning_mod (SkinningModule): The SkinningModule to be used to compute the skinning weights.
         """
         assert isinstance(skinning_mod, SkinningModule), 'skinning_mod must be a SkinningModule'
         skinning_weights = skinning_mod.compute_skinning_weights(pts)
         return cls(pts=pts, skinning_weights=skinning_weights)
+
+    @classmethod
+    def class_tensor_attributes(cls):
+        return ["pts", "skinning_weights"]
+
+    @classmethod
+    def class_other_attributes(cls):
+        return []
+
+    def __len__(self):
+        return self.pts.shape[0]
+
+    @property
+    def device(self):
+        return self.pts.device
+
+    @property
+    def dtype(self):
+        return self.pts.dtype
+
+    def check_tensor_attribute(self, attr, log_error=False):
+        """Checks tensor attribute validity; returns True if valid."""
+
+        def _maybe_log(msg):
+            if log_error:
+                logger.error(msg)
+
+        if attr == "pts":
+            expected_shape = (len(self), 3)
+        elif attr == "skinning_weights":
+            expected_shape = (len(self), None)
+        else:
+            return False
+        try:
+            kaolin.utils.testing.check_tensor(getattr(self, attr), shape=expected_shape,
+                                              device=self.device, dtype=self.dtype,throw=True)
+        except Exception as e:
+            _maybe_log(f'Attribute {attr}: {e}')
+            return False
+        return True
+
+
 
 
 @runtime_checkable
@@ -229,38 +310,38 @@ class SkinnedPhysicsPointsProtocol(SkinnedPointsProtocol, PhysicsPointsProtocol,
     # Optional renderable points (separate from simulation quadrature points)
     renderable: SkinnedPointsProtocol  # Optional[SkinnedPoints]
 
-class SkinnedPhysicsPoints(PhysicsPoints, SkinnedPhysicsPointsProtocol):
+class SkinnedPhysicsPoints(PhysicsPoints, SkinnedPhysicsPointsProtocol, TensorContainerBase):
     r"""
     Points with skinning properties and material properties.
 
     Attributes:
-        pts (torch.Tensor): The skinned points, of shape :math:`(N, 3)`.
-        yms (torch.Tensor): The Young's moduli of the points, of shape :math:`(N,)`.
+        pts (torch.Tensor): The skinned points, of shape :math:`(N, 3)` (in :math:`m`).
+        yms (torch.Tensor): The Young's moduli of the points, of shape :math:`(N,)` (in :math:`kg/m/s^2`).
         prs (torch.Tensor): The Poisson's ratios of the points, of shape :math:`(N,)`.
-        rhos (torch.Tensor): The densities of the points, of shape :math:`(N,)`.
-        appx_vol (torch.Tensor): The approximate volume of the object, of shape :math:`(1,)`.
+        rhos (torch.Tensor): The densities of the points, of shape :math:`(N,)` (in :math:`kg/m^3`).
+        appx_vol (torch.Tensor): The approximate volume of the object, of shape :math:`(1,)` (in :math:`m^3`).
         skinning_weights (torch.Tensor): The skinning weights of the points, of shape :math:`(N, \text{num_handles})`.
         dwdx (torch.Tensor): Jacobian of the skinning weight function w.r.t. rest positions,
             of shape :math:`(N, \text{num_handles}, 3)`.
         renderable (SkinnedPoints): The renderable points, of shape :math:`(\text{num_renderable_pts}, 3)`.
     """
     def __init__(self, pts, yms, prs, rhos, appx_vol, skinning_weights, dwdx,
-                 renderable: SkinnedPointsProtocol = None):
+                 renderable: SkinnedPointsProtocol = None, strict_checks=True):
         r"""
         Constructor for making minimal simulatable data object from points, material properties, and skinning weights.
 
         Args:
-            pts (torch.Tensor): Cubature points tensor of shape :math:`(N, 3)` representing the object's geometry
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
+            pts (torch.Tensor): Cubature points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`)
+            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness (in :math:`kg/m/s^2`). Can be either:
                 - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
             prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
                 - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
+            rhos (Union[torch.Tensor, float]): Density defining material density (in :math:`kg/m^3`). Can be either:
                 - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
-            appx_vol (Union[torch.Tensor, float]): Approximate volume. Can be either:
+            appx_vol (Union[torch.Tensor, float]): Approximate volume (in :math:`m^3`). Can be either:
                 - A tensor of shape :math:`(1,)`
                 - A float value
             skinning_weights (torch.Tensor): Skinning weights tensor of shape :math:`(N, M)` representing the object's skinning weights
@@ -270,10 +351,13 @@ class SkinnedPhysicsPoints(PhysicsPoints, SkinnedPhysicsPointsProtocol):
             renderable (SkinnedPoints, optional): Skinned points used for rendering
                 (e.g. Gaussian splat positions with their skinning weights). Defaults to None.
         """
-        super().__init__(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+        super().__init__(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol,
+                         strict_checks=False)
         self.skinning_weights = skinning_weights
         self.dwdx = dwdx
         self.renderable = renderable
+        if strict_checks:
+            assert self.check_sanity(log_error=True)
 
     @property
     def num_handles(self):
@@ -318,13 +402,13 @@ class SkinnedPhysicsPoints(PhysicsPoints, SkinnedPhysicsPointsProtocol):
         Constructor from a :class:`SkinningModule` to be applied on the points.
 
         Args:
-            pts (torch.Tensor): The points to be skinned, of shape :math:`(N, 3)`
-            yms (torch.Tensor): The Young's moduli of the points, of shape :math:`(N,)`.
+            pts (torch.Tensor): The points to be skinned, of shape :math:`(N, 3)` (in :math:`m`)
+            yms (torch.Tensor): The Young's moduli of the points, of shape :math:`(N,)` (in :math:`kg/m/s^2`).
             prs (torch.Tensor): The Poisson's ratios of the points, of shape :math:`(N,)`.
-            rhos (torch.Tensor): The densities of the points, of shape :math:`(N,)`.
-            appx_vol (torch.Tensor): The approximate volume of the object, of shape :math:`(1,)`.
+            rhos (torch.Tensor): The densities of the points, of shape :math:`(N,)` (in :math:`kg/m^3`).
+            appx_vol (torch.Tensor): The approximate volume of the object, of shape :math:`(1,)` (in :math:`m^3`).
             skinning_mod (SkinningModule): The SkinningModule to be used to compute the skinning weights.
-            renderable_pts (torch.Tensor, optional): The renderable points, of shape :math:`(\text{num_renderable_pts}, 3)`.
+            renderable_pts (torch.Tensor, optional): The renderable points, of shape :math:`(\text{num_renderable_pts}, 3)` (in :math:`m`).
                 Defaults to None.
 
         Returns:
@@ -344,6 +428,48 @@ class SkinnedPhysicsPoints(PhysicsPoints, SkinnedPhysicsPointsProtocol):
             dwdx=dwdx,
             renderable=renderable
         )
+    
+    @classmethod
+    def class_tensor_attributes(cls):
+        return ["pts", "yms", "prs", "rhos", "appx_vol", "skinning_weights", "dwdx", "renderable"]
+
+    @classmethod
+    def class_other_attributes(cls):
+        return []
+
+    def __len__(self):
+        return self.pts.shape[0]
+
+    def check_tensor_attribute(self, attr, log_error=False):
+        """Checks tensor attribute validity; returns True if valid."""
+
+        def _maybe_log(msg):
+            if log_error:
+                logger.error(msg)
+
+        if attr == "pts":
+            expected_shape = (len(self), 3)
+        elif attr in ["yms", "prs", "rhos"]:
+            expected_shape = (len(self),)
+        elif attr == "appx_vol":
+            expected_shape = tuple()
+        elif attr == "skinning_weights":
+            expected_shape = (len(self), None)
+        elif attr == "dwdx":
+            expected_shape = (len(self), None, 3)
+        elif attr == "renderable":
+            if self.renderable is None:
+                return True
+            return self.renderable.check_sanity(log_error=log_error)
+        else:
+            return False
+        try:
+            kaolin.utils.testing.check_tensor(getattr(self, attr), shape=expected_shape,
+                                              device=self.device, dtype=self.dtype,throw=True)
+        except Exception as e:
+            _maybe_log(f'Attribute {attr}: {e}')
+            return False
+        return True
 
 class SimplicitsObject(PhysicsPoints):
     def __init__(self, pts, yms, prs, rhos, appx_vol, skinning_mod: SkinningModule):
@@ -356,17 +482,17 @@ class SimplicitsObject(PhysicsPoints):
         not solved for during simulation.
 
         Args:
-            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
+            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`)
+            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness (in :math:`kg/m/s^2`). Can be either:
                 - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
             prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
                 - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
+            rhos (Union[torch.Tensor, float]): Density defining material density (in :math:`kg/m^3`). Can be either:
                 - A tensor of shape :math:`(N,)` for per-point values
                 - A float value that will be applied to all points
-            appx_vol (Union[torch.Tensor, float]): Approximate volume. Can be either:
+            appx_vol (Union[torch.Tensor, float]): Approximate volume (in :math:`m^3`). Can be either:
                 - A tensor of shape :math:`(1,)` or :math:`(0,)`
                 - A float value
             skinning_mod (SkinningModule):
@@ -377,8 +503,23 @@ class SimplicitsObject(PhysicsPoints):
         self.skinning_mod = skinning_mod
         self.num_handles = self.skinning_mod.compute_skinning_weights(self.pts[:1]).shape[1]
 
+    def to(self, *args: Any, attributes: Optional[Sequence[str]] = None, **kwargs: Any):
+        """Moves or casts tensors like :meth:`torch.Tensor.to` / :meth:`torch.nn.Module.to`.
+
+        Args:
+            *args: forwarded to ``tensor.to(*args)``
+            attributes (list of str, optional): if set, only these tensor attributes are updated
+            **kwargs: forwarded to ``tensor.to(**kwargs)``
+
+        Returns:
+            PointSamples: shallow copy with converted tensors
+        """
+        if attributes is None:
+            attributes = self.get_attributes(only_tensors=True) + ["skinning_mod"]
+        return self._construct_apply(lambda t: t.to(*args, **kwargs), attributes)
+
     @classmethod
-    def create_rigid(cls, pts, yms, prs, rhos, appx_vol=1):
+    def create_rigid(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None, physics_points=None):
         r"""Creates a rigid SimplicitsObject with a single weight for affine deformations.
 
         This method creates a SimplicitsObject that behaves as a rigid body. At low stiffness values
@@ -386,23 +527,42 @@ class SimplicitsObject(PhysicsPoints):
         the object will act as rigid.
 
         Args:
-            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            appx_vol (Union[torch.Tensor, float], optional): Approximate volume. Can be either:
-                - A tensor of shape :math:`(1,)` or :math:`(0,)`
-                - A float value. Defaults to 1
+            pts (torch.Tensor, optional): Deprecated, use ``physics_points`` instead.
+                Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
+                Required unless ``physics_points`` is provided.
+            yms (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Young's moduli defining material stiffness (in :math:`kg/m/s^2`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            prs (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Poisson's ratios defining material compressibility; either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            rhos (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Density defining material density (in :math:`kg/m^3`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
+                Default: 1 if physics_points is not provided.
+            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
+                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
+                are taken from this object instead.
 
         Returns:
             (SimplicitsObject): A rigid SimplicitsObject with a constant weight function.
         """
+        if physics_points is not None:
+            assert pts is None and yms is None and prs is None and rhos is None and appx_vol is None, 'pts, yms, prs, rhos, and appx_vol must be None if physics_points is provided'
+            pts = physics_points.pts
+            yms = physics_points.yms
+            prs = physics_points.prs
+            rhos = physics_points.rhos
+            appx_vol = physics_points.appx_vol
+        else:
+            warnings.warn('pts, yms, prs, rhos, and appx_vol arguments are deprecated. Please use physics_points instead.', UserWarning, stacklevel=2)
+            if appx_vol is None:
+                appx_vol = 1
         return cls(
             pts=pts,
             yms=yms,
@@ -413,7 +573,7 @@ class SimplicitsObject(PhysicsPoints):
         )
 
     @classmethod
-    def create_trained(cls, pts, yms, prs, rhos, appx_vol,
+    def create_trained(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None, physics_points=None,
                        num_handles=10,
                        num_samples=1000,
                        model_layers=6,
@@ -424,7 +584,8 @@ class SimplicitsObject(PhysicsPoints):
                        training_le_coeff=1e-1,
                        training_lo_coeff=1e6,
                        training_log_every=1000,
-                       normalize_for_training=True):
+                       normalize_for_training=True,
+                       display_progress=False):
         r"""Constructs a SimplicitsObject by training a neural network to learn skinning weights.
 
         This method creates a SimplicitsObject by training a neural network to learn skinning weights
@@ -437,19 +598,27 @@ class SimplicitsObject(PhysicsPoints):
             both local detail preservation and global shape maintenance.
 
         Args:
-            pts (torch.Tensor): Points tensor of shape :math:`(N, 3)` representing the object's geometry
-            yms (Union[torch.Tensor, float]): Young's moduli defining material stiffness. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            prs (Union[torch.Tensor, float]): Poisson's ratios defining material compressibility. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            rhos (Union[torch.Tensor, float]): Density defining material density. Can be either:
-                - A tensor of shape :math:`(N,)` for per-point values
-                - A float value that will be applied to all points
-            appx_vol (torch.Tensor): Approximate volume. Can be either:
-                - A tensor of shape :math:`(1,)` or :math:`(0,)`
-                - A float value
+            pts (torch.Tensor, optional): Deprecated, use ``physics_points`` instead.
+                Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
+                Required unless ``physics_points`` is provided.
+            yms (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Young's moduli defining material stiffness (in :math:`kg/m/s^2`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            prs (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Poisson's ratios defining material compressibility; either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            rhos (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Density defining material density (in :math:`kg/m^3`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
+                Required unless ``physics_points`` is provided.
+            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
+                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
+                are taken from this object instead.
             num_handles (int, optional): Number of control handles for deformation. Defaults to 10
             num_samples (int, optional): Number of samples used for training. Defaults to 1000
             model_layers (int, optional): Number of layers in the neural network. Defaults to 6
@@ -461,11 +630,21 @@ class SimplicitsObject(PhysicsPoints):
             training_lo_coeff (float, optional): Coefficient for global energy term. Defaults to 1e6
             training_log_every (int, optional): Logging frequency during training. Defaults to 1000
             normalize_for_training (bool, optional): Whether to normalize points to unit cube for training. Defaults to True
+            display_progress (bool, optional): If True, display a tqdm progress bar during training. Defaults to False.
 
         Returns:
             (SimplicitsObject): A trained SimplicitsObject with learned skinning weights.
 
         """
+        if physics_points is not None:
+            assert pts is None and yms is None and prs is None and rhos is None and appx_vol is None, 'pts, yms, prs, rhos, and appx_vol must be None if physics_points is provided'
+            pts = physics_points.pts
+            yms = physics_points.yms
+            prs = physics_points.prs
+            rhos = physics_points.rhos
+            appx_vol = physics_points.appx_vol
+        else:
+            warnings.warn('pts, yms, prs, rhos, and appx_vol arguments are deprecated. Please use physics_points instead.', UserWarning, stacklevel=2)
         assert num_handles >= 1, 'Number of handles must be greater or equal than 1'
         if num_handles == 1:
             warnings.warn('Num Handles is 1. Simplicits Object will be created as rigid.',
@@ -511,7 +690,7 @@ class SimplicitsObject(PhysicsPoints):
 
         model.train()
         e_logs = []
-        for i in range(training_num_steps):
+        for i in tqdm.trange(training_num_steps, desc='Training SimplicitsObject', disable=not display_progress):
             optimizer.zero_grad()
             le, lo = compute_losses(model,
                                     training_pts,
@@ -588,7 +767,7 @@ class SimplicitsObject(PhysicsPoints):
                 Explicit quadrature point indices to use, of shape :math:`(\text{num_qps},)`.
                 Mutually exclusive with ``num_qps``.
             renderable_pts (torch.Tensor, optional): Additional points (e.g. Gaussian splat
-                positions) whose skinning weights should be baked for rendering. Defaults to None.
+                positions, in :math:`m`) whose skinning weights should be baked for rendering. Defaults to None.
 
         Returns:
             (SkinnedPhysicsPoints): Baked object suitable for simulation.
@@ -616,7 +795,7 @@ class SimplicitsObject(PhysicsPoints):
         Args:
             renderable_pts (torch.Tensor): Additional points (e.g. Gaussian splat
                 positions) whose skinning weights should be baked for rendering,
-                of shape :math:`(\text{num_renderable_pts}, 3)`.
+                of shape :math:`(\text{num_renderable_pts}, 3)` (in :math:`m`).
 
         Returns:
             (SkinnedPoints): Baked SkinnedPoints for renderable.

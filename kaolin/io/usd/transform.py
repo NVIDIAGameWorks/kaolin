@@ -16,15 +16,11 @@
 import torch
 import numpy as np
 
-try:
-    from pxr import Usd, UsdGeom, Gf
-    IDENTITY_TRANSFORM = Gf.Matrix4d(1.0, 0.0, 0.0, 0.0,
-                                     0.0, 1.0, 0.0, 0.0,
-                                     0.0, 0.0, 1.0, 0.0,
-                                     0.0, 0.0, 0.0, 1.0)
-
-except ImportError:
-    pass
+from pxr import Usd, UsdGeom, Gf
+IDENTITY_TRANSFORM = Gf.Matrix4d(1.0, 0.0, 0.0, 0.0,
+                                 0.0, 1.0, 0.0, 0.0,
+                                 0.0, 0.0, 1.0, 0.0,
+                                 0.0, 0.0, 0.0, 1.0)
 
 __all__ = [
     'set_local_to_world_transform',

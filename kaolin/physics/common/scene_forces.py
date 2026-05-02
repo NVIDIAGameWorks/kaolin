@@ -32,8 +32,8 @@ def gravity_energy_wp_func(g: wp.vec3,
 
     Args:
         g (wp.vec3): Gravity acceleration (0, -9.81, 0)
-        rho (wp.float32): Density
-        vol (wp.float32): Volume
+        rho (wp.float32): Density (in :math:`kg/m^3`)
+        vol (wp.float32): Volume (in :math:`m^3`)
         dx (wp.vec3): Delta in position
         x0 (wp.vec3): Rest position
 
@@ -53,8 +53,8 @@ def gravity_gradient_wp_func(g: wp.vec3,
 
     Args:
         g (wp.vec3): Gravity acceleration (0, -9.81, 0)
-        rho (wp.float32): Density
-        vol (wp.float32): Volume
+        rho (wp.float32): Density (in :math:`kg/m^3`)
+        vol (wp.float32): Volume (in :math:`m^3`)
         dx (wp.vec3): Delta in position
         x0 (wp.vec3): Rest position
 
@@ -74,8 +74,8 @@ def gravity_hessian_wp_func(g: wp.vec3,
 
     Args:
         g (wp.vec3): Gravity acceleration (0, -9.81, 0)
-        rho (wp.float32): Density
-        vol (wp.float32): Volume
+        rho (wp.float32): Density (in :math:`kg/m^3`)
+        vol (wp.float32): Volume (in :math:`m^3`)
         dx (wp.vec3): Delta in position
         x0 (wp.vec3): Rest position
 
@@ -408,8 +408,8 @@ class Gravity:
         
         Args:
             g (wp.vec3): Gravity acceleration (0, -9.81, 0)
-            integration_pt_density (wp.array): Density at each point of size :math:`(\text{num_pts})`
-            integration_pt_volume (wp.array): Volume at each point of size :math:`(\text{num_pts})`
+            integration_pt_density (wp.array): Density at each point of size :math:`(\text{num_pts})` (in :math:`kg/m^3`)
+            integration_pt_volume (wp.array): Volume at each point of size :math:`(\text{num_pts})` (in :math:`m^3`)
         """
 
         # warp constant [x, y, z] acceleration due to gravity

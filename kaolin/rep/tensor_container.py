@@ -149,11 +149,12 @@ class TensorContainerBase(ABC):
     def cuda(self, device: Optional[Union[int, torch.device, str]] = None,
              attributes: Optional[Sequence[str]] = None):
         """Calls ``cuda`` on all or selected tensor attributes; returns a shallow copy."""
-        return self._construct_apply(lambda t: t.cuda(device), attributes)
+        device2 = torch.device("cuda", device) if device else torch.device("cuda")
+        return self.to(device2, attributes=attributes)
 
     def cpu(self, attributes: Optional[Sequence[str]] = None):
         """Calls ``cpu`` on all or selected tensor attributes; returns a shallow copy."""
-        return self._construct_apply(lambda t: t.cpu(), attributes)
+        return self.to("cpu", attributes=attributes)
 
     def detach(self, attributes: Optional[Sequence[str]] = None):
         """Detaches all or selected tensor attributes; returns a shallow copy."""

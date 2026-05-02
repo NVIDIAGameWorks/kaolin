@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from kaolin.io import usd, ply
+from . import ply
 
 __all__ = [ 'import_gaussiancloud' ]
 
@@ -34,6 +34,10 @@ def import_gaussiancloud(filename: str):
     if extension == 'ply':
         res = ply.import_gaussiancloud(filename)
     elif extension in ["usd", "usda", "usdc", "usdz"]:
+        try:
+            from . import usd
+        except ImportError:
+            raise ImportError("Cannot use usd import features, usd-core is not installed")
         res = usd.import_gaussiancloud(filename)
     else:
         raise ValueError(f'Unsupported Gaussian Splat filename extension {extension}')

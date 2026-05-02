@@ -711,8 +711,8 @@ class GaussianSplatModel(PointSamples):
 
         kwargs = self.as_dict()
         if transform is not None:
-            kwargs['positions'], kwargs['orientations'], kwargs['scales'], kwargs['sh_coeff'][:, 1:, :] = transform_gaussians(
-                self.positions, self.orientations, self.scales, transform, shs_feat=self.sh_coeff[:, 1:, :],
+            kwargs['positions'], kwargs['orientations'], kwargs['scales'], kwargs['sh_coeff'] = transform_gaussians(
+                self.positions, self.orientations, self.scales, transform, sh_coeff=self.sh_coeff,
                 use_log_scales=False)
             kwargs['transform'] = None
         return GaussianSplatModel(**kwargs)

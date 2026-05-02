@@ -20,7 +20,7 @@ import os
 import kaolin as kal
 from kaolin.utils.testing import with_seed, check_allclose
 
-from kaolin.physics.simplicits import SimplicitsObject, SkinnedPhysicsPoints, SkinnedPoints, PhysicsPoints, SkinningModule
+from kaolin.physics.simplicits import SimplicitsObject, SkinnedPhysicsPoints, SkinnedPoints, PhysicsPoints, SkinningModule, SimplicitsMLP
 
 import logging
 
@@ -96,6 +96,71 @@ class TestSimplicitsObject:
         assert scaled.min().item() >= 0.0 - 1e-6
         assert scaled.max().item() <= 0.5 + 1e-6
 
+    def _make_cpu_simplicits_object(self):
+        # Use SimplicitsMLP so the skinning_mod has both buffers (bb_min/bb_max) and
+        # real nn.Linear parameters — tests that .to() / .cuda() / .cpu() move both.
+        pts = torch.rand(50, 3, dtype=torch.float32, device='cpu')
+        skinning_mod = SimplicitsMLP(
+            spatial_dimensions=3, layer_width=8, num_handles=4, num_layers=2,
+        ).to('cpu', dtype=torch.float32)
+        return SimplicitsObject(
+            pts=pts, yms=1e5, prs=0.45, rhos=500.0, appx_vol=1.0,
+            skinning_mod=skinning_mod,
+        )
+
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA not available')
+    def test_to_device_moves_skinning_mod(self):
+        obj = self._make_cpu_simplicits_object()
+        moved = obj.to('cuda')
+        for attr in ['pts', 'yms', 'prs', 'rhos', 'appx_vol']:
+            assert getattr(moved, attr).device.type == 'cuda'
+        for p in moved.skinning_mod.parameters():
+            assert p.device.type == 'cuda'
+        for b in moved.skinning_mod.buffers():
+            assert b.device.type == 'cuda'
+        weights = moved.skinning_mod.compute_skinning_weights(moved.pts)
+        assert weights.device.type == 'cuda'
+        assert weights.shape == (moved.pts.shape[0], moved.num_handles)
+
+    def test_to_dtype_casts_skinning_mod(self):
+        obj = self._make_cpu_simplicits_object()
+        moved = obj.to(dtype=torch.float64)
+        for attr in ['pts', 'yms', 'prs', 'rhos', 'appx_vol']:
+            assert getattr(moved, attr).dtype == torch.float64
+        for p in moved.skinning_mod.parameters():
+            assert p.dtype == torch.float64
+        for b in moved.skinning_mod.buffers():
+            assert b.dtype == torch.float64
+
+    def test_to_attributes_filter_leaves_skinning_mod(self):
+        obj = self._make_cpu_simplicits_object()
+        moved = obj.to(dtype=torch.float64, attributes=['pts'])
+        assert moved.pts.dtype == torch.float64
+        assert moved.yms.dtype == torch.float32
+        for p in moved.skinning_mod.parameters():
+            assert p.dtype == torch.float32
+        for b in moved.skinning_mod.buffers():
+            assert b.dtype == torch.float32
+
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA not available')
+    def test_cuda_cpu_roundtrip_moves_skinning_mod(self):
+        obj = self._make_cpu_simplicits_object()
+        on_cuda = obj.cuda()
+        for attr in ['pts', 'yms', 'prs', 'rhos', 'appx_vol']:
+            assert getattr(on_cuda, attr).device.type == 'cuda'
+        for p in on_cuda.skinning_mod.parameters():
+            assert p.device.type == 'cuda'
+        for b in on_cuda.skinning_mod.buffers():
+            assert b.device.type == 'cuda'
+
+        back_on_cpu = on_cuda.cpu()
+        for attr in ['pts', 'yms', 'prs', 'rhos', 'appx_vol']:
+            assert getattr(back_on_cpu, attr).device.type == 'cpu'
+        for p in back_on_cpu.skinning_mod.parameters():
+            assert p.device.type == 'cpu'
+        for b in back_on_cpu.skinning_mod.buffers():
+            assert b.device.type == 'cpu'
+
     @pytest.fixture
     @with_seed(0, 0, 0)
     def fox_object(self, device, dtype, samples_path):
@@ -118,10 +183,10 @@ class TestSimplicitsObject:
         uniform_pts = torch.rand(num_samples, 3, device=device) * (orig_vertices.max(dim=0).values -
                                                                    orig_vertices.min(dim=0).values) + orig_vertices.min(dim=0).values
         pts = uniform_pts
-        yms = torch.full((pts.shape[0],), soft_youngs_modulus, device=device)
-        prs = torch.full((pts.shape[0],), poisson_ratio, device=device)
-        rhos = torch.full((pts.shape[0],), rho, device=device)
-        appx_vol = torch.tensor([appx_vol], device=device)
+        yms = torch.full((pts.shape[0],), soft_youngs_modulus, dtype=dtype, device=device)
+        prs = torch.full((pts.shape[0],), poisson_ratio, dtype=dtype, device=device)
+        rhos = torch.full((pts.shape[0],), rho, dtype=dtype, device=device)
+        appx_vol = torch.tensor(appx_vol, dtype=dtype, device=device)
         return pts, yms, prs, rhos, appx_vol, orig_vertices
 
     @with_seed(0, 0, 0)
@@ -439,7 +504,7 @@ class TestPhysicsPoints:
         yms = torch.full((N,), 1e5, device=device, dtype=dtype)
         prs = torch.full((N,), 0.45, device=device, dtype=dtype)
         rhos = torch.full((N,), 500.0, device=device, dtype=dtype)
-        appx_vol = torch.tensor([1.0], device=device, dtype=dtype)
+        appx_vol = torch.tensor(1.0, device=device, dtype=dtype)
         obj = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
         assert torch.equal(obj.pts, pts)
         assert torch.equal(obj.yms, yms)
@@ -455,7 +520,7 @@ class TestPhysicsPoints:
         assert torch.equal(obj.yms, torch.full((N,), 1e5, device=device, dtype=dtype))
         assert torch.equal(obj.prs, torch.full((N,), 0.45, device=device, dtype=dtype))
         assert torch.equal(obj.rhos, torch.full((N,), 500.0, device=device, dtype=dtype))
-        assert torch.equal(obj.appx_vol, torch.tensor([1.0], device=device, dtype=dtype))
+        assert torch.equal(obj.appx_vol, torch.tensor(1.0, device=device, dtype=dtype))
 
 
 ########### Test SkinnedPoints ##############
