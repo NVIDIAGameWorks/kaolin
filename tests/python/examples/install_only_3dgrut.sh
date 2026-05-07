@@ -62,27 +62,43 @@ if [ "$WITH_GCC11" = true ]; then
 fi
 GCC_VERSION=$($GCC_11_PATH -dumpversion | cut -d '.' -f 1)
 
-# Create and activate conda environment
-eval "$(conda shell.bash hook)"
-
-# Finds the path of the environment if the environment already exists
-CONDA_ENV_PATH=$(conda env list | sed -E -n "s/^${CONDA_ENV}[[:space:]]+\*?[[:space:]]*(.*)$/\1/p")
-if [ -z "${CONDA_ENV_PATH}" ]; then
-  echo "Conda environment '${CONDA_ENV}' not found, creating it"
-  conda create --name ${CONDA_ENV} -y python=3.11
-else
-  echo "NOTE: Conda environment '${CONDA_ENV}' already exists at ${CONDA_ENV_PATH}, skipping environment creation"
+# Detect conda. Pytorch base images (pytorch/pytorch:*) ship without conda; in that
+# case we skip env management and use the system python/pip directly, exporting any
+# build env vars in the current shell so the in-script pip install picks them up.
+HAS_CONDA=false
+if command -v conda >/dev/null 2>&1; then
+    HAS_CONDA=true
 fi
-conda activate $CONDA_ENV
 
-# Set CC and CXX variables to gcc11 in the conda env
-if [ "$WITH_GCC11" = true ]; then
-    echo "Setting CC=$GCC_11_PATH and CXX=$GXX_11_PATH in conda environment"
+if [ "$HAS_CONDA" = true ]; then
+    # Create and activate conda environment
+    eval "$(conda shell.bash hook)"
 
-    conda env config vars set CC=$GCC_11_PATH CXX=$GXX_11_PATH
-
-    conda deactivate
+    # Finds the path of the environment if the environment already exists
+    CONDA_ENV_PATH=$(conda env list | sed -E -n "s/^${CONDA_ENV}[[:space:]]+\*?[[:space:]]*(.*)$/\1/p")
+    if [ -z "${CONDA_ENV_PATH}" ]; then
+      echo "Conda environment '${CONDA_ENV}' not found, creating it"
+      conda create --name ${CONDA_ENV} -y python=3.11
+    else
+      echo "NOTE: Conda environment '${CONDA_ENV}' already exists at ${CONDA_ENV_PATH}, skipping environment creation"
+    fi
     conda activate $CONDA_ENV
+else
+    echo "NOTE: conda not found on PATH; ignoring CONDA_ENV='${CONDA_ENV}' and using system python/pip"
+fi
+
+# Set CC and CXX to gcc-11 for nvcc compatibility
+if [ "$WITH_GCC11" = true ]; then
+    echo "Setting CC=$GCC_11_PATH and CXX=$GXX_11_PATH"
+
+    if [ "$HAS_CONDA" = true ]; then
+        conda env config vars set CC=$GCC_11_PATH CXX=$GXX_11_PATH
+        conda deactivate
+        conda activate $CONDA_ENV
+    else
+        export CC=$GCC_11_PATH
+        export CXX=$GXX_11_PATH
+    fi
 
     # Make sure it worked
     gcc_version=$($CC -dumpversion | cut -d '.' -f 1)
@@ -93,8 +109,10 @@ if [ "$WITH_GCC11" = true ]; then
     fi
 fi
 
-conda deactivate
-conda activate $CONDA_ENV
+if [ "$HAS_CONDA" = true ]; then
+    conda deactivate
+    conda activate $CONDA_ENV
+fi
 
 CUDA_VERSION=`python -c "import torch; print(torch.version.cuda)"`
 echo "CUDA_VERSION=${CUDA_VERSION}"
@@ -119,14 +137,21 @@ if [ -z ${TORCH_CUDA_ARCH_LIST+x} ]; then
         else
             TORCH_CUDA_ARCH_LIST="6.0;6.1;6.2;7.0;7.5;8.0;8.6;9.0;12.0;12.1"
         fi
+    elif [[ "${CUDA_MAJOR}" == "13" ]]; then
+        # CUDA 13 dropped Pascal/Volta support; mirrors kaolin/setup.py
+        TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0;12.0;12.1"
     fi
 fi
 
 echo "TORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST"
 
-conda env config vars set TORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST
-conda deactivate
-conda activate $CONDA_ENV
+if [ "$HAS_CONDA" = true ]; then
+    conda env config vars set TORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST
+    conda deactivate
+    conda activate $CONDA_ENV
+else
+    export TORCH_CUDA_ARCH_LIST=$TORCH_CUDA_ARCH_LIST
+fi
 
 
 # Initialize git submodules and install Python requirements

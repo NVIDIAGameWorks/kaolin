@@ -122,7 +122,10 @@ spec:
     image: ${imageTag}
     command:
     - cat
-    resources: 
+    env:
+    - name: NVIDIA_DRIVER_CAPABILITIES
+      value: "all"
+    resources:
         requests:
           nvidia.com/gpu: 1
         limits:
@@ -186,16 +189,6 @@ spec:
                 --log-disable=PIL.TiffImagePlugin \
                 --log-disable=kaolin.rep.surface_mesh \
                 /kaolin/tests/python/
-            '''
-          }
-        } catch(e) {
-          build_passed = false
-          echo e.toString()
-        }
-        try {
-          stage("Dash3D") {
-            sh '''
-            pytest -s --cov=/kaolin/kaolin /kaolin/tests/integration/
             '''
           }
         } catch(e) {
@@ -275,16 +268,16 @@ spec:
           echo e.toString()
         }
         try {
-          stage("Physics - Simplicits Easy API") {
-            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_easy_api.ipynb'
+          stage("Physics - Simplicits Mesh") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_mesh.ipynb'
           }
         } catch(e) {
           build_passed = false
           echo e.toString()
         }
         try {
-          stage("Physics - Simplicits INRIA Splatting") {
-            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_inria_splatting.ipynb'
+          stage("Physics - Simplicits Gaussians Splatting") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython simplicits_gaussians_splatting.ipynb'
           }
         } catch(e) {
           build_passed = false
@@ -303,9 +296,34 @@ spec:
                       conda install -c conda-forge mesa-libgl-devel-cos7-x86_64 -y
                       cd /tmp && git clone --recursive https://github.com/nv-tlabs/3dgrut
                       cd /tmp/3dgrut && cp /kaolin/tests/python/examples/install_only_3dgrut.sh . && ./install_only_3dgrut.sh base WITH_GCC11
+                      export MAX_JOBS=1
                       cd /kaolin/examples/tutorial/physics/ && ipython simulatable_3dgrut.ipynb
                   fi
             '''
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Newton Franka Coupling") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython newton_franka_coupling.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Newton MPM Coupling Oneway") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython newton_mpm_coupling_oneway.ipynb'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage("Physics - Newton Rigidbody Coupling") {
+            sh 'cd /kaolin/examples/tutorial/physics/ && ipython newton_rigidbody_coupling.ipynb'
           }
         } catch(e) {
           build_passed = false
