@@ -32,10 +32,9 @@ def run_regression_test(solver, model, tol=1e-2, test_name="fem_test"):
     p = Path(__file__).resolve().parent.parent.parent / "physics" / "simplicits" / "regression_test_data" / "wpfem_vertex_deformations_beam.pth"
     fem_data = torch.load(p, weights_only=False)
 
-    faces = fem_data["mesh_faces"]  # beam faces
-    start_verts = fem_data["v0"]  # beam start verts
-    frame_1_verts = fem_data["v1"]  # beam at frame 1
-    frame_100_verts = fem_data["v_end"]  # beam verts at frame 100
+    start_verts = fem_data["v0"]
+    frame_1_verts = fem_data["v1"]
+    frame_100_verts = fem_data["v_end"]
     dt = 0.05
 
     # Checking deformation at start (renderable_pts must match FEM rest vertices; see test setup)
@@ -86,7 +85,7 @@ def test_solver_initialization(simplicits_object):
     assert solver is not None
 
 def test_solver_regression_cantilever_beam(cantilever_beam_object):
-    """Test that solver can be created."""
+    """Test that solver regression matches FEM reference."""
     simplicits_object = cantilever_beam_object
 
     p = Path(__file__).resolve().parent.parent.parent / "physics" / "simplicits" / "regression_test_data" / "wpfem_vertex_deformations_beam.pth"

@@ -74,11 +74,10 @@ def cantilever_beam_object(device, dtype, cantilever_beam_mesh, cantilever_beam_
         0), mesh.faces, uniform_pts.unsqueeze(0), hash_resolution=512)
 
     pts = uniform_pts[boolean_signs.squeeze()]                                       # m
-    yms = torch.full(pts.shape[:1], 1e5, device=device, dtype=dtype)                   # kg/m/s^2
-    prs = torch.full(pts.shape[:1], 0.45, device=device, dtype=dtype)                  # unitless
-    rhos = torch.full(pts.shape[:1], 500, device=device, dtype=dtype)                  # kg/m^3
+    yms = torch.full((pts.shape[:1],) , 1e5, device=device, dtype=dtype)                   # kg/m/s^2
+    prs = torch.full((pts.shape[:1],) , 0.45, device=device, dtype=dtype)                  # unitless
+    rhos = torch.full((pts.shape[:1],) , 500.0, device=device, dtype=dtype)                  # kg/m^3
     object_vol = (mesh.vertices.max(dim=0)[0] - mesh.vertices.min(dim=0)[0]).prod()  # m^3 #bbx volume
-
     simplicits_object = SimplicitsObject(pts, yms, prs, rhos, object_vol,
                                          skinning_mod=cantilever_beam_simplicits_mlp)
     return simplicits_object
@@ -97,9 +96,9 @@ def cube_drop_object(device, dtype, cube_drop_mesh, cube_drop_simplicits_mlp):
         0), mesh.faces, uniform_pts.unsqueeze(0), hash_resolution=512)
 
     pts = uniform_pts[boolean_signs.squeeze()]  # m
-    yms = torch.full(pts.shape[:1], 1e4, device=device, dtype=dtype)  # kg/m/s^2
-    prs = torch.full(pts.shape[:1], 0.45, device=device, dtype=dtype)  # unitless
-    rhos = torch.full(pts.shape[:1], 500, device=device, dtype=dtype)  # kg/m^3
+    yms = torch.full((pts.shape[:1],) , 1e4, device=device, dtype=dtype)  # kg/m/s^2
+    prs = torch.full((pts.shape[:1],) , 0.45, device=device, dtype=dtype)  # unitless
+    rhos = torch.full((pts.shape[:1],) , 500.0, device=device, dtype=dtype)  # kg/m^3
     object_vol = (mesh.vertices.max(dim=0)[0] - mesh.vertices.min(dim=0)[0]).prod()  # m^3 #bbx volume
 
     simplicits_object = SimplicitsObject(pts, yms, prs, rhos, object_vol,
@@ -117,7 +116,6 @@ def cantilever_beam_setup(cantilever_beam_object):
 
     scene = SimplicitsScene(
         device=device,
-        dtype=dtype,
         timestep=dt,
         max_newton_steps=10,  # run to near convergence
         max_ls_steps=20,
@@ -150,7 +148,6 @@ def cube_drop_setup(cube_drop_object):
 
     scene = SimplicitsScene(
         device=device,
-        dtype=dtype,
         timestep=dt,
         max_newton_steps=10,  # run to near convergence
         max_ls_steps=20,

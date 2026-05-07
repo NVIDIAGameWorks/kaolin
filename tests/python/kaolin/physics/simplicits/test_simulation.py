@@ -87,18 +87,19 @@ class TestSimplicitsScene:
 
     @pytest.fixture(autouse=True)
     def example_rigid_cube(self, example_unit_cube_object, device, dtype):
-        x0, x0_sdfval, yms, prs, rhos, appx_vol = example_unit_cube_object
+        x0, _, yms, prs, rhos, appx_vol = example_unit_cube_object
         rigid_obj = SimplicitsObject.create_rigid(
             pts=x0, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
         return rigid_obj
 
     @pytest.fixture(autouse=True)
     def scene_with_one_object(self, example_rigid_cube, device, dtype):
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         scene.add_object(example_rigid_cube, num_qp=200,
                          init_transform=torch.tensor([[1, 0, 0, 0],
                                                       [0, 1, 0, 10],
-                                                      [0, 0, 1, 0]], device=device, dtype=dtype))
+                                                      [0, 0, 1, 0]], device=device, dtype=dtype),
+                                                      )
         return scene
     
     def test_easy_api_scene_add_object_error_no_objects(self, example_rigid_cube, device, dtype):
@@ -107,7 +108,7 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
 
         # TODO: This will be fixed in another release
         # Set force without any objects in scene
@@ -120,11 +121,11 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
 
         # Check Error: Add object to scene with incorrect init transform
         with pytest.raises(ValueError):
-            scene.add_object(rigid_obj_one,
+            scene.add_object(rigid_obj_one, num_qp=100,
                              init_transform=torch.tensor([[1, 0, 0, 0],
                                                           [0, 1, 0, 0]], device=device, dtype=dtype))
         
@@ -134,7 +135,7 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         
        
         #Add objects to scene with correct init transforms
@@ -144,7 +145,7 @@ class TestSimplicitsScene:
                                                          [0, 0, 1, 0]], device=device, dtype=dtype))
         
         scene.set_scene_gravity()
-        
+
         # Check error: Add object to scene after simulation has started
         scene.run_sim_step()
         with pytest.raises(RuntimeError):
@@ -171,7 +172,65 @@ class TestSimplicitsScene:
         dyn_pts = scene.get_object_deformed_pts(0)
         mean_dyn_y = dyn_pts[:, 1].mean()
         assert mean_dyn_y < 10.0, f"Mean y coordinate of object {mean_dyn_y} has moved lower than 10 under gravity."
-    
+
+    # def test_easy_api_add_object_scale(self, example_unit_cube_object, device, dtype):
+    #     x0, x0_sdfval, yms, prs, rhos, appx_vol = example_unit_cube_object
+    #     scale = 1.5
+
+    #     # Create RKPM object with 10 handles (non-trivial skinning weights + Jacobians)
+    #     from copy import deepcopy
+    #     obj1 = SimplicitsObject.create_with_rkpm(pts=x0, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol,
+    #                                         num_handles=10, num_nodes=128, num_points=512)
+
+    #     # Scene 1: unscaled (fix seed so both scenes get same quadrature points)
+    #     scene1 = SimplicitsScene(device=device)
+    #     torch.manual_seed(42)
+    #     scene1.add_object(obj1, num_qp=100,
+    #                       init_transform=torch.tensor([[1, 0, 0, 0],
+    #                                                    [0, 1, 0, 3],
+    #                                                    [0, 0, 1, 0]], device=device, dtype=dtype))
+    #     scene1.set_scene_gravity()
+    #     scene1.set_scene_floor(floor_height=0.0, floor_penalty=10000.0)
+
+    #     # Scene 2: scaled, density /= scale^3 to keep same total mass
+    #     # Use deepcopy + override density so the weight function is identical
+    #     scaled_rhos = rhos / (scale ** 3)
+    #     obj2 = deepcopy(obj1)
+    #     obj2.rhos = scaled_rhos
+    #     scene2 = SimplicitsScene(device=device)
+    #     torch.manual_seed(42)
+    #     scene2.add_object(obj2, num_qp=100, scale=scale,
+    #                       init_transform=torch.tensor([[1, 0, 0, 0],
+    #                                                    [0, 1, 0, 3],
+    #                                                    [0, 0, 1, 0]], device=device, dtype=dtype))
+    #     scene2.set_scene_gravity()
+    #     scene2.set_scene_floor(floor_height=0.0, floor_penalty=10000.0)
+
+    #     # Compare dFdz matrices: rotation/scale cols identical, translation cols scaled by 1/s
+    #     dFdz1 = scene1.get_object(0).dFdz_dense
+    #     dFdz2 = scene2.get_object(0).dFdz_dense
+    #     num_handles = dFdz1.shape[1] // 12
+    #     for h in range(num_handles):
+    #         base = 12 * h
+    #         for col_offset in [0, 1, 2, 4, 5, 6, 8, 9, 10]:
+    #             assert torch.allclose(dFdz1[:, base + col_offset], dFdz2[:, base + col_offset], atol=1e-4), \
+    #                 f"dFdz rotation/scale column {base + col_offset} differs"
+    #         for col_offset in [3, 7, 11]:
+    #             assert torch.allclose(dFdz1[:, base + col_offset], dFdz2[:, base + col_offset] * scale, atol=1e-4), \
+    #                 f"dFdz translation column {base + col_offset} differs: expected scaled by 1/{scale}"
+
+    #     for _ in range(30):
+    #         scene1.run_sim_step()
+    #         scene2.run_sim_step()
+
+    #     pts1 = scene1.get_object_deformed_pts(0)
+    #     pts2 = scene2.get_object_deformed_pts(0)
+    #     pts2_normalized = pts2 / scale
+
+    #     # Not exact, but approximately similar (same mass, gravity, loose tolerance)
+    #     assert torch.allclose(pts1, pts2_normalized, atol=5.0), \
+    #         f"Normalized scaled deformed pts deviate too much from unscaled: max diff={torch.max(torch.abs(pts1 - pts2_normalized))}"
+
     def test_easy_api_set_scene_floor(self, scene_with_one_object):
         scene = scene_with_one_object
         scene.set_scene_gravity()
@@ -310,7 +369,7 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         # Add object to scene
         scene.add_object(rigid_obj_one, num_qp=200,
                         init_transform=torch.tensor([[1, 0, 0, 0],
@@ -347,7 +406,7 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
 
         transform = torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0], [0, 0, 0, 1]], device=device, dtype=dtype)
         # Add object to scene
@@ -366,7 +425,7 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         # Add object to scene
         scene.add_object(rigid_obj_one, num_qp=200,
                         init_transform=torch.tensor([[1, 0, 0, 0],
@@ -437,7 +496,7 @@ class TestSimplicitsScene:
         rigid_obj_one = example_rigid_cube
         rigid_obj_two = example_rigid_cube
         
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         scene.timestep = 0.1
         scene.add_object(rigid_obj_one, num_qp=200,
                         init_transform=torch.tensor([[1, 0, 0, 0],
@@ -450,7 +509,7 @@ class TestSimplicitsScene:
                                     [0, 1, 0, 5],
                                     [0, 0, 1, 0],
                                     [0, 0, 0, 1]], device=device, dtype=dtype))
-        
+
         scene.set_scene_gravity()
         scene.set_scene_floor()
         
@@ -513,7 +572,7 @@ class TestSimplicitsScene:
         rigid_obj_one = example_rigid_cube
         rigid_obj_two = example_rigid_cube
 
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         scene.timestep = 0.1
         scene.add_object(rigid_obj_one, num_qp=200,
                         init_transform=torch.tensor([[1, 0, 0, 0],
@@ -582,7 +641,7 @@ class TestSimplicitsScene:
                              ids=["SimplicitsObject", "SkinnedPhysicsPoints"])
     def test_add_object_no_renderable_pts(self, example_rigid_cube, device, dtype, use_baked):
         """add_object without renderable_pts leaves renderable fields None for both input types."""
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             obj = example_rigid_cube.bake(num_qps=200)
             scene.add_object(obj)
@@ -598,7 +657,7 @@ class TestSimplicitsScene:
         """add_object with renderable_pts stores them on the SimulatedObject."""
         x0 = example_unit_cube_object[0]
         render_pts = x0[:20]
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             obj = example_rigid_cube.bake(num_qps=200, renderable_pts=render_pts)
             scene.add_object(obj)
@@ -619,7 +678,7 @@ class TestSimplicitsScene:
         """get_object_deformed_pts('rendered') returns correct shape after renderable_pts baked."""
         x0 = example_unit_cube_object[0]
         render_pts = x0[:20]
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             obj = example_rigid_cube.bake(num_qps=200, renderable_pts=render_pts)
             scene.add_object(obj, init_transform=torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0]],
@@ -639,7 +698,7 @@ class TestSimplicitsScene:
                              ids=["SimplicitsObject", "SkinnedPhysicsPoints"])
     def test_get_object_deformed_pts_rendered_error(self, example_rigid_cube, device, dtype, use_baked):
         """get_object_deformed_pts('rendered') raises ValueError when no renderable_pts were set."""
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             scene.add_object(example_rigid_cube.bake(num_qps=200))
         else:
@@ -667,7 +726,7 @@ class TestSimplicitsScene:
         """get_object_point_transforms('rendered') returns (n_render, 4, 4) tensors."""
         x0 = example_unit_cube_object[0]
         render_pts = x0[:20]
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             obj = example_rigid_cube.bake(num_qps=200, renderable_pts=render_pts)
             scene.add_object(obj, init_transform=torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0]],
@@ -685,7 +744,7 @@ class TestSimplicitsScene:
                              ids=["SimplicitsObject", "SkinnedPhysicsPoints"])
     def test_get_object_point_transforms_rendered_error(self, example_rigid_cube, device, dtype, use_baked):
         """get_object_point_transforms('rendered') raises ValueError when no renderable_pts were set."""
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             scene.add_object(example_rigid_cube.bake(num_qps=200))
         else:

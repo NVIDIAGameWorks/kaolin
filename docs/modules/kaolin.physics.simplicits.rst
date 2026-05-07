@@ -24,15 +24,9 @@ Other
    :show-inheritance:
    :exclude-members:
        SimplicitsMLP,
+       SimplicitsRKPM,
        PhysicsPoints,
        SkinnedPoints,
        SkinnedPhysicsPoints,
        SimplicitsObject,
        SimplicitsScene
-
-.. autoclass:: kaolin.physics.simplicits.SimplicitsMLP
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :inherited-members: Module
-   :exclude-members: from_function

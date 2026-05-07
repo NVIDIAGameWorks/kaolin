@@ -93,6 +93,7 @@ def run_apidoc(_):
             "kaolin/physics/simplicits/skinning.py",
             "kaolin/physics/simplicits/training.py",
             "kaolin/physics/simplicits/losses_warp.py",
+            "kaolin/physics/simplicits/rkpm.py",
             "kaolin/physics/simplicits/utils.py",
             "kaolin/physics/utils/finite_diff.py",
             "kaolin/physics/utils/force_wrapper.py",

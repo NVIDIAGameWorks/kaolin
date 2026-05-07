@@ -19,7 +19,7 @@ import torch
 import warp as wp
 from functools import partial
 
-from kaolin.physics.simplicits.precomputed import lumped_mass_matrix, lbs_matrix, jacobian_dF_dz, _jacobian_dF_dz_const_handle, jacobian_dx_dz, sparse_lbs_matrix, sparse_dFdz_matrix_from_dense, sparse_dFdz_matrix
+from kaolin.physics.simplicits.precomputed import lumped_mass_matrix, lbs_matrix, jacobian_dF_dz, _jacobian_dF_dz_const_handle, sparse_lbs_matrix, sparse_dFdz_matrix_from_dense, sparse_dFdz_matrix
 from kaolin.physics.simplicits.network import SimplicitsMLP
 from kaolin.physics.utils.warp_utilities import _bsr_to_torch
 
@@ -130,6 +130,40 @@ def test_sparse_lbs_matrix(device, dtype):
 
     check_allclose(expected_points, transformed_points)
 
+
+@pytest.mark.parametrize('dtype', [torch.float])
+@with_seed(0, 0, 0)
+def test_dFdz_from_weights_matches_autodiff(dtype):
+    """sparse_dFdz_matrix (analytical) matches sparse_dFdz_matrix_from_dense (autodiff)."""
+    N = 20
+    H = 5
+    device = 'cpu'
+
+    points = torch.rand(N, 3, device=device, dtype=dtype)
+    bb_min = points.min(dim=0).values
+    bb_max = points.max(dim=0).values
+    fcn = SimplicitsMLP(3, 64, H, 6, bb_min=bb_min, bb_max=bb_max).to(device)
+
+    # analytical path: sparse_dFdz_matrix takes enriched weights and their jacobian as numpy
+    weights = fcn.compute_skinning_weights(points)   # (N, H)
+    weights_jac = fcn.compute_dwdx(points)            # (N, H, 3)
+    dFdz_analytical = _bsr_to_torch(
+        sparse_dFdz_matrix(
+            wp.from_torch(weights.detach().contiguous()),
+            wp.from_torch(weights_jac.detach().contiguous()),
+            wp.from_torch(points.detach().contiguous(), dtype=wp.vec3),
+        )
+    ).to_dense().to(device)
+
+    # autodiff path
+    dFdz_autodiff = _bsr_to_torch(
+        sparse_dFdz_matrix_from_dense(enriched_weights_fcn=fcn.compute_skinning_weights, pts=points)
+    ).to_dense().to(device)
+
+    max_diff = (dFdz_analytical - dFdz_autodiff).abs().max().item()
+    assert torch.allclose(dFdz_analytical, dFdz_autodiff, atol=2e-4), \
+        f"Max diff between analytical and autodiff dFdz: {max_diff}"
+
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float])
 def test_sparse_dFdz_matrix_from_dense(device, dtype):
@@ -173,9 +207,9 @@ def test_sparse_dFdz_matrix(device, dtype):
     dwdx = torch.vmap(jac_fn)(points)   # (N, H+1, 3)
 
     dF_dz_new = _bsr_to_torch(sparse_dFdz_matrix(
-        weights.detach().cpu().numpy(),
-        dwdx.detach().cpu().numpy(),
-        points.detach().cpu().numpy())).to_dense().to(device)
+        wp.from_torch(weights.detach().contiguous()),
+        wp.from_torch(dwdx.detach().contiguous()),
+        wp.from_torch(points.detach().contiguous(), dtype=wp.vec3))).to_dense().to(device)
 
     dF_dz_ref = _bsr_to_torch(sparse_dFdz_matrix_from_dense(
         enriched_weights_fcn=model_plus_rigid, pts=points)).to_dense().to(device)
@@ -203,50 +237,7 @@ def test_jacobian_dF_dz(device, dtype):
         (model(pts), torch.ones((pts.shape[0], 1), device=device)), dim=1)
 
     dF_dz1 = _jacobian_dF_dz_const_handle(model, points, transforms.flatten())
-    # dF_dz2 = jacobian_dF_dz(model, points, transforms.flatten())
     dF_dz2 = jacobian_dF_dz(model=model_plus_rigid, x0=points, z=transforms[0])
 
     check_allclose(dF_dz1, dF_dz2, rtol=0.01, atol=0.01)
 
-
-
-
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-@pytest.mark.parametrize('dtype', [torch.float, torch.double])
-def test_jacobian_dx_dz(device, dtype):
-    N = 20
-    H = 5
-    B = 1
-    points = torch.rand(N, 3, device=device, dtype=dtype)  # n x 3 points
-    transforms = torch.rand(B, H, 3, 4, device=device,
-                            dtype=dtype)  # lbs transforms
-
-    model = SimplicitsMLP(3, 64, H, 6).to(device)
-    if dtype == torch.double:
-        model.double()
-
-    def model_plus_rigid(pts): return torch.cat(
-        (model(pts), torch.ones((pts.shape[0], 1), device=device)), dim=1)
-    weights = model_plus_rigid(points)
-
-    B = jacobian_dx_dz(model_plus_rigid, points,
-                       transforms.squeeze().flatten())
-
-    x = B @ transforms.squeeze().flatten() + points.flatten()
-
-    transformed_points = x.reshape(N, 3)
-
-    expected_points = torch.zeros_like(points)
-
-    for i in range(N):
-        pt_i = points[i].unsqueeze(0)
-        pt4_i = torch.cat(
-            (pt_i, torch.tensor([[1]], device=device, dtype=dtype)), dim=1)
-        expect_pt_i = pt_i.T
-        for j in range(H):
-            expect_pt_i += weights[i, j] * transforms[0, j] @ pt4_i.T
-
-        expected_points[i, :] = expect_pt_i.T
-        # checking 3D point by 3D point, so flattening should be ok
-
-    check_allclose(expected_points, transformed_points)

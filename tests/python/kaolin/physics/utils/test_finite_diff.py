@@ -41,14 +41,14 @@ def test_finite_diff_jac_2(device, dtype):
     transforms = torch.cat([
         torch.eye(3, device=device, dtype=dtype),
         torch.zeros(3, 1, device=device, dtype=dtype)
-    ], dim=1).repeat(H - 1, 1, 1).unsqueeze(0)
+    ], dim=1).repeat(H, 1, 1).unsqueeze(0)
     model = SimplicitsMLP(3, 64, H, 6).to(device)
     if dtype == torch.double:
         model.double()
-    weights = model(points)
-
+    # compute_skinning_weights returns (N, H): MLP's raw (N, H-1) padded with a constant column.
+    # standard_lbs expects weights with one column per handle in `transforms` (H here).
     partial_weight_fcn_lbs = partial(
-        weight_function_lbs, tfms=transforms, fcn=model)
+        weight_function_lbs, tfms=transforms, fcn=model.compute_skinning_weights)
 
     # N x 3 x 3 Deformation gradients
     transformed_points_jac = finite_diff_jac(

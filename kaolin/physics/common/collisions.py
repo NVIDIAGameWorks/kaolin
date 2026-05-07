@@ -395,7 +395,7 @@ def _get_collision_bounds_wp_kernel(
     MAX_PROGRESS = 0.75
     max_delta_d = 0.5 * MAX_PROGRESS * gap_cur
 
-    # TODO: Change this to use the cp_to_dof mapping? In case I don't have these J_a, J_b matrices
+    # TODO: Change this to use the cp_to_dof mapping in the future. In case I don't have these J_a, J_b matrices
     #
     # Jacobian tells me which dofs affect which colliding particles
     # Using two jacobians Ja, Jb you can tell which DOFs affect the first colliding particle
@@ -573,7 +573,6 @@ class Collision:
             # size (num_contacts, 2)
             object_pairs = torch.stack((obj_ids_a, obj_ids_b), dim=1)
             # size (num_unique_contacts, 2)
-            # TODO: Ask if .cpu() is necessary?
             unique_pairs = torch.unique(object_pairs, dim=0).cpu()
 
             # Flip-flop, reverse and self interaction pairs for the hessian matrix
@@ -587,8 +586,7 @@ class Collision:
                 )
             )
             # Get unique interaction pairs
-            unique_pairs = torch.unique(object_pairs, dim=0)
-            self.object_pairs = unique_pairs.numpy()  # TODO: Ask if .numpy() is necessary?
+            self.object_pairs = torch.unique(object_pairs, dim=0).numpy() # needed for indexing in the hessian matrix
         else:
             # If no collisions, empty list
             self.object_pairs = []
@@ -666,15 +664,6 @@ class Collision:
         """
         if self.num_contacts == 0 and not self.bounds:
             return None
-
-        # Notes:
-        # TODO: Remove later
-        # u_0 is dofs at start of newton step
-        # delta_du : current newton step
-        # du is accumulated update over the newton iterations
-        # du + delta_du : the updated dofs relative to start dofs
-        # u <- du + delta_du + u_0
-        # delta_du = -inv(H) *rhs..... dz = z - z_0  ..,  current dofs - start of dofs at newton step
 
         # Inputs: Position increments of the contact points
 
