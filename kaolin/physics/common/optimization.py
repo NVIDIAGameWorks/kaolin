@@ -151,6 +151,7 @@ def newtons_method(x,
     # Get the kinematic dofs
     t_x_kinematic = wp.to_torch(x) - wp.to_torch(_red_to_full(P, _full_to_red(Pt, x))) # x - P @ Pt @ x
 
+    converged = False
     for k in range(nm_max_iters):
         E_curr = energy_fcn(x)  # scalar
         G_curr = gradient_fcn(x).flatten()  # vector
@@ -173,7 +174,7 @@ def newtons_method(x,
             b = wp.to_torch(red_g)
             t_red_dx = -torch.linalg.solve(A, b)
         else:
-            # TODO:Change this to a block-wise preconditioner, so CG converges in 1 step when
+            # TODO: Change this to a block-wise preconditioner, so CG converges in 1 step when
             # The hessian is block-diagonal and there is no contact
             precond = preconditioner(
                 red_H, "diag") if preconditioner_fcn is None else preconditioner_fcn(red_H)
@@ -191,7 +192,7 @@ def newtons_method(x,
 
         # Converges if the directional update is small
         if (torch.abs(t_red_dx.t() @ t_red_g) < conv_tol):
-            logger.debug(f"Newton: Converged in {k} iterations")
+            converged = True
             break
 
         full_dx = _red_to_full(P, wp.from_torch(t_red_dx))
@@ -215,5 +216,5 @@ def newtons_method(x,
 
         t_x = wp.to_torch(_red_to_full(P, wp.from_torch(t_red_x))) + t_x_kinematic 
         x = wp.from_torch(t_x)
-    
+
     return x

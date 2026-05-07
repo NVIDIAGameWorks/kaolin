@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
 import logging
 import warnings
 import tqdm
@@ -26,6 +25,7 @@ from .losses import compute_losses
 from .network import SimplicitsMLP, SkinningModule
 from kaolin.rep import TensorContainerBase
 import kaolin.utils.testing
+from .rkpm import SimplicitsRKPM
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +203,7 @@ class PhysicsPoints(PhysicsPointsProtocol, TensorContainerBase):
             return False
         try:
             kaolin.utils.testing.check_tensor(getattr(self, attr), shape=expected_shape,
-                                              device=self.device, dtype=self.dtype,throw=True)
+                                              device=self.device, dtype=self.dtype, throw=True)
         except Exception as e:
             _maybe_log(f'Attribute {attr}: {e}')
             return False
@@ -287,7 +287,7 @@ class SkinnedPoints(SkinnedPointsProtocol, TensorContainerBase):
             return False
         try:
             kaolin.utils.testing.check_tensor(getattr(self, attr), shape=expected_shape,
-                                              device=self.device, dtype=self.dtype,throw=True)
+                                              device=self.device, dtype=self.dtype, throw=True)
         except Exception as e:
             _maybe_log(f'Attribute {attr}: {e}')
             return False
@@ -465,7 +465,7 @@ class SkinnedPhysicsPoints(PhysicsPoints, SkinnedPhysicsPointsProtocol, TensorCo
             return False
         try:
             kaolin.utils.testing.check_tensor(getattr(self, attr), shape=expected_shape,
-                                              device=self.device, dtype=self.dtype,throw=True)
+                                              device=self.device, dtype=self.dtype, throw=True)
         except Exception as e:
             _maybe_log(f'Attribute {attr}: {e}')
             return False
@@ -518,8 +518,38 @@ class SimplicitsObject(PhysicsPoints):
             attributes = self.get_attributes(only_tensors=True) + ["skinning_mod"]
         return self._construct_apply(lambda t: t.to(*args, **kwargs), attributes)
 
+    @staticmethod
+    def _resolve_physics_points(pts, yms, prs, rhos, appx_vol, physics_points, *, fn_name):
+        r"""Resolve old-style ``pts``/``yms``/``prs``/``rhos``/``appx_vol`` args or new-style
+        ``physics_points`` into a single :class:`PhysicsPoints` instance.
+
+        Raises:
+            ValueError: if ``physics_points`` is provided alongside any of the deprecated args,
+                or if any required deprecated arg is missing when ``physics_points`` is None.
+        """
+        if physics_points is not None:
+            if any(x is not None for x in (pts, yms, prs, rhos, appx_vol)):
+                raise ValueError(
+                    f"When passing physics_points to {fn_name}, "
+                    "do not also pass yms/prs/rhos/appx_vol."
+                )
+            return physics_points
+        missing = [n for n, v in (('pts', pts), ('yms', yms), ('prs', prs),
+                                  ('rhos', rhos), ('appx_vol', appx_vol)) if v is None]
+        if missing:
+            raise ValueError(
+                f"{fn_name} requires {missing} when physics_points is not provided."
+            )
+        warnings.warn(
+            'pts, yms, prs, rhos, and appx_vol arguments are deprecated. '
+            'Please use physics_points instead.',
+            UserWarning, stacklevel=3,
+        )
+        return PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+
     @classmethod
-    def create_rigid(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None, physics_points=None):
+    def create_rigid(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None,
+                     physics_points: Optional[PhysicsPointsProtocol] = None):
         r"""Creates a rigid SimplicitsObject with a single weight for affine deformations.
 
         This method creates a SimplicitsObject that behaves as a rigid body. At low stiffness values
@@ -544,36 +574,28 @@ class SimplicitsObject(PhysicsPoints):
                 Required unless ``physics_points`` is provided.
             appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
                 Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
-                Default: 1 if physics_points is not provided.
-            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
-                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
-                are taken from this object instead.
+                Required unless ``physics_points`` is provided.
+            physics_points (PhysicsPoints, optional): PhysicsPoints object describing the object's geometry
+                and material properties. Defaults to None. If provided, ``pts``, ``yms``, ``prs``, ``rhos``,
+                and ``appx_vol`` must all be ``None`` and the values are taken from this object instead.
 
         Returns:
             (SimplicitsObject): A rigid SimplicitsObject with a constant weight function.
         """
-        if physics_points is not None:
-            assert pts is None and yms is None and prs is None and rhos is None and appx_vol is None, 'pts, yms, prs, rhos, and appx_vol must be None if physics_points is provided'
-            pts = physics_points.pts
-            yms = physics_points.yms
-            prs = physics_points.prs
-            rhos = physics_points.rhos
-            appx_vol = physics_points.appx_vol
-        else:
-            warnings.warn('pts, yms, prs, rhos, and appx_vol arguments are deprecated. Please use physics_points instead.', UserWarning, stacklevel=2)
-            if appx_vol is None:
-                appx_vol = 1
+        phys = cls._resolve_physics_points(pts, yms, prs, rhos, appx_vol, physics_points,
+                                           fn_name='create_rigid')
         return cls(
-            pts=pts,
-            yms=yms,
-            prs=prs,
-            rhos=rhos,
-            appx_vol=appx_vol,
+            pts=phys.pts,
+            yms=phys.yms,
+            prs=phys.prs,
+            rhos=phys.rhos,
+            appx_vol=phys.appx_vol,
             skinning_mod=SkinningModule.from_function(lambda x: torch.zeros(x.shape[0], 0, device=x.device, dtype=x.dtype))
         )
 
     @classmethod
-    def create_trained(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None, physics_points=None,
+    def create_trained(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None,
+                       physics_points: Optional[PhysicsPointsProtocol] = None,
                        num_handles=10,
                        num_samples=1000,
                        model_layers=6,
@@ -636,22 +658,16 @@ class SimplicitsObject(PhysicsPoints):
             (SimplicitsObject): A trained SimplicitsObject with learned skinning weights.
 
         """
-        if physics_points is not None:
-            assert pts is None and yms is None and prs is None and rhos is None and appx_vol is None, 'pts, yms, prs, rhos, and appx_vol must be None if physics_points is provided'
-            pts = physics_points.pts
-            yms = physics_points.yms
-            prs = physics_points.prs
-            rhos = physics_points.rhos
-            appx_vol = physics_points.appx_vol
-        else:
-            warnings.warn('pts, yms, prs, rhos, and appx_vol arguments are deprecated. Please use physics_points instead.', UserWarning, stacklevel=2)
+        phys = cls._resolve_physics_points(pts, yms, prs, rhos, appx_vol, physics_points,
+                                           fn_name='create_trained')
+        pts, yms, prs, rhos, appx_vol = phys.pts, phys.yms, phys.prs, phys.rhos, phys.appx_vol
         assert num_handles >= 1, 'Number of handles must be greater or equal than 1'
+
         if num_handles == 1:
             warnings.warn('Num Handles is 1. Simplicits Object will be created as rigid.',
                           UserWarning, stacklevel=2)
+            return SimplicitsObject.create_rigid(physics_points=phys)
 
-            return SimplicitsObject.create_rigid(pts, yms, prs, rhos, appx_vol)
-        
         if not torch.is_tensor(yms):
             yms = torch.full((pts.shape[0],), yms, dtype=pts.dtype, device=pts.device)
         if not torch.is_tensor(prs):
@@ -722,6 +738,137 @@ class SimplicitsObject(PhysicsPoints):
         model.eval()
         ######### End of training #########
         return SimplicitsObject(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol, skinning_mod=model)
+
+    @classmethod
+    def create_with_rkpm(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None,
+                    physics_points: Optional[PhysicsPointsProtocol] = None,
+                    num_handles=10,
+                    num_nodes=1024,
+                    num_points=None,
+                    dtype=torch.float64):
+        r"""Constructs a SimplicitsObject using RKPM-based skinning weights as explained in
+        `Freeform <https://research.nvidia.com/labs/sil/projects/freeform/>`_. 
+        RKPM based simplicits shows more accurate behavior and better convergence than MLP based simplicits when compared to FEM with the same material parameters. 
+        This may appear as less stiffness in the object when compared to MLP based simplicits deformations.
+   
+
+        This method creates a SimplicitsObject by computing skinning weights via
+        Reproducing Kernel Particle Method (RKPM) eigenanalysis. RKPM nodes are
+        selected by Farthest Point Sampling and deformation modes are derived
+        from the generalized eigenvalue problem of the mass and stiffness matrices.
+
+        Note:
+            If num_handles is set to 0, the object will be created as rigid instead of deformable.
+
+        Args:
+            pts (torch.Tensor, optional): Deprecated, use ``physics_points`` instead.
+                Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
+                Required unless ``physics_points`` is provided.
+            yms (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Young's moduli defining material stiffness (in :math:`kg/m/s^2`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            prs (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Poisson's ratios defining material compressibility; either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            rhos (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Density defining material density (in :math:`kg/m^3`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
+                Required unless ``physics_points`` is provided.
+            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
+                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
+                are taken from this object instead.
+            num_handles (int, optional): Number of deformation handles (RKPM eigenvectors). Defaults to 10.
+            num_nodes (int, optional): Number of RKPM kernel nodes. Defaults to 1024.
+            num_points (int, optional): Number of *samples* from ``pts`` to use when constructing the mass and stiffness matrices for the RKPM
+                generalized eigenproblem (i.e., this controls the number of samples from the object's geometry fed into the basis construction;
+                it does not affect the input points used for the final object). This only affects **offline** mode construction; the returned
+                :class:`SimplicitsObject` still stores the full ``pts`` geometry, and skinning can be evaluated at any point.
+                Using a large number of samples may lead to high memory usage during basis construction.
+                Defaults to all points in ``pts`` being used as samples.
+           
+            dtype (torch.dtype, optional): Floating-point precision used for RKPM kernel evaluations
+                and eigenanalysis. Defaults to ``torch.float64`` for numerical stability.
+
+        Returns:
+            SimplicitsObject: A SimplicitsObject with RKPM-based skinning weights.
+        """
+        phys = cls._resolve_physics_points(pts, yms, prs, rhos, appx_vol, physics_points,
+                                           fn_name='create_with_rkpm')
+        pts, yms, prs, rhos, appx_vol = phys.pts, phys.yms, phys.prs, phys.rhos, phys.appx_vol
+
+        assert num_handles >= 1, 'Number of handles must be greater or equal than 1'
+        if num_handles == 1:
+            warnings.warn('Num Handles is 1. Simplicits Object will be created as rigid.',
+                          UserWarning, stacklevel=2)
+            return SimplicitsObject.create_rigid(physics_points=phys)
+
+        if not torch.is_tensor(yms):
+            yms = torch.full((pts.shape[0],), yms, dtype=pts.dtype, device=pts.device)
+        if not torch.is_tensor(prs):
+            prs = torch.full((pts.shape[0],), prs, dtype=pts.dtype, device=pts.device)
+        if not torch.is_tensor(rhos):
+            rhos = torch.full((pts.shape[0],), rhos, dtype=pts.dtype, device=pts.device)
+        if not torch.is_tensor(appx_vol):
+            appx_vol = torch.tensor([appx_vol], dtype=pts.dtype, device=pts.device)
+
+        model = SimplicitsRKPM(num_handles, num_nodes, num_points=num_points, dtype=dtype)
+        model.to(pts.device)
+
+        model.init(pts, yms, prs, rhos, appx_vol)
+
+        return cls(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol, skinning_mod=model)
+
+    @classmethod
+    def create_from_function(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None, fcn=None,
+                             physics_points: Optional[PhysicsPointsProtocol] = None):
+        r"""Creates a SimplicitsObject with a custom skinning weight function.
+
+        This method creates a SimplicitsObject using a user-provided function to compute skinning weights.
+        The function should take points as input and return a matrix of skinning weights.
+
+        Args:
+            pts (torch.Tensor, optional): Deprecated, use ``physics_points`` instead.
+                Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
+                Required unless ``physics_points`` is provided.
+            yms (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Young's moduli defining material stiffness (in :math:`kg/m/s^2`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            prs (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Poisson's ratios defining material compressibility; either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            rhos (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Density defining material density (in :math:`kg/m^3`); either a tensor of shape :math:`(N,)`
+                for per-point values, or a float value applied to all points.
+                Required unless ``physics_points`` is provided.
+            appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+                Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
+                Required unless ``physics_points`` is provided.
+            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
+                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
+                are taken from this object instead.
+            fcn (Union[SkinningModule, Callable]): Trained skinning module or callable returning per-point weights.
+
+        Returns:
+            SimplicitsObject: A SimplicitsObject with the provided skinning weight function.
+        """
+        if fcn is None:
+            raise ValueError(
+                "create_from_function requires a function to be provided.")
+        phys = cls._resolve_physics_points(pts, yms, prs, rhos, appx_vol, physics_points,
+                                           fn_name='create_from_function')
+        if isinstance(fcn, SkinningModule):
+            skinning_mod = fcn
+        else:
+            skinning_mod = SkinningModule.from_function(fcn)
+        return cls(pts=phys.pts, yms=phys.yms, prs=phys.prs, rhos=phys.rhos, appx_vol=phys.appx_vol,
+                   skinning_mod=skinning_mod)
 
     def subsample(self, num_pts=None, sample_indices=None):
         r"""Subsample into another SimplicitsObject sharing the same skinning module.

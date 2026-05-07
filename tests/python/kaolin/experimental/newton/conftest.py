@@ -67,9 +67,9 @@ def simplicits_object(cube_mesh):
     ) + orig_vertices.min(dim=0).values
 
     # Create material property tensors
-    yms = torch.full((NUM_SAMPLES,), SOFT_YOUNGS_MODULUS, device='cuda')
-    prs = torch.full((NUM_SAMPLES,), POISSON_RATIO, device='cuda')
-    rhos = torch.full((NUM_SAMPLES,), DENSITY, device='cuda')
+    yms = torch.full((NUM_SAMPLES,), float(SOFT_YOUNGS_MODULUS), dtype=torch.float32, device='cuda')
+    prs = torch.full((NUM_SAMPLES,), float(POISSON_RATIO), dtype=torch.float32, device='cuda')
+    rhos = torch.full((NUM_SAMPLES,), float(DENSITY), dtype=torch.float32, device='cuda')
 
     # Create rigid Simplicits object
     sim_obj = SimplicitsObject.create_rigid(
@@ -89,3 +89,32 @@ def simplicits_model_with_object(simplicits_object):
     model = SimplicitsModel()
     obj_idx = model.simplicits_scene.add_object(simplicits_object, num_qp=1024)
     return model, obj_idx
+
+
+@pytest.fixture
+def cantilever_beam_object():
+    """Create an RKPM-based Simplicits object from the cantilever beam mesh."""
+    from kaolin.utils.testing import with_seed
+    torch.manual_seed(0)
+
+    mesh_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+        "..", "..", "physics", "simplicits", "regression_test_data", "beam_surf.obj")
+    mesh = kaolin.io.import_mesh(mesh_file, triangulate=True).cuda()
+
+    num_samples = 100000
+    uniform_pts = torch.rand(num_samples, 3, device='cuda') * (
+        mesh.vertices.max(0).values - mesh.vertices.min(0).values
+    ) + mesh.vertices.min(0).values
+    signs = kaolin.ops.mesh.check_sign(
+        mesh.vertices.unsqueeze(0), mesh.faces,
+        uniform_pts.unsqueeze(0), hash_resolution=512)
+    pts = uniform_pts[signs.squeeze()]
+
+    yms = torch.full((pts.shape[0],) , 1e5, dtype=torch.float32, device='cuda')
+    prs = torch.full((pts.shape[0],) , 0.45, dtype=torch.float32, device='cuda')
+    rhos = torch.full((pts.shape[0],) , 500.0, dtype=torch.float32, device='cuda')
+    object_vol = (mesh.vertices.max(0)[0] - mesh.vertices.min(0)[0]).prod()
+
+    return SimplicitsObject.create_with_rkpm(
+        pts, yms, prs, rhos, object_vol,
+        num_handles=32, num_points=8192, num_nodes=1024, dtype=torch.float64)

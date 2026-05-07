@@ -62,13 +62,15 @@ class SimulatedObject(SkinnedPhysicsPoints):
         self.init_transform = init_transform
         self.is_kinematic = is_kinematic
 
-        # TODO(vismay): need guidance on qp vs. cp here (seems CP should be in scene, but are different from SimulatedObject,
-        # which is mostly concerned with pt energies; maybe SimulatedObject could optionally take cp_pts in addition,
+        # TODO(vismay):
+        # This is a live design question. We should discuss this with Gilles/Newton folks.
+        # For now, we use qp for both collision and integration.
+        # - Maybe SimulatedObject could optionally take cp_pts in addition,
         # or collision should be treated separately (e.g. what if we don't use a pt-based method?)
         self.num_qp = self.pts.shape[0]
         self.num_cp = self.pts.shape[0]
 
-        # TODO(vismay): should we allow non-uniform vols on construction instead?
+        # TODO(vismay): We should allow non-uniform vols on construction when we merge optimal cubature.
         self.sample_vols = torch.full(
             (self.num_qp,), float(self.appx_vol / self.num_qp),
             device=self.device, dtype=self.dtype)  # uniform integration sampling over vol
@@ -85,9 +87,9 @@ class SimulatedObject(SkinnedPhysicsPoints):
             self.dFdz = wps.bsr_zeros(num_rows, num_cols, wp.float32)
         else:
             self.dFdz = sparse_dFdz_matrix(
-                self.skinning_weights.detach().cpu().numpy(),
-                self.dwdx.detach().cpu().numpy(),
-                self.pts.detach().cpu().numpy())
+                wp.from_torch(self.skinning_weights),
+                wp.from_torch(self.dwdx),
+                wp.from_torch(self.pts, dtype=wp.vec3))
         self.dFdz.nnz_sync()
 
         self._B_dense = None
@@ -98,7 +100,6 @@ class SimulatedObject(SkinnedPhysicsPoints):
         self.z_prev = None
         self.z_dot = None
         self.reset_sim_state()
-
 
     @property
     def B_dense(self):
@@ -159,22 +160,25 @@ class SimulatedObject(SkinnedPhysicsPoints):
         return f"{super_str}, kinematic={self.is_kinematic}, init_transform={self.init_transform})"
 
 class SimplicitsScene:
-    def __init__(self, device='cuda', 
-        dtype=torch.float, 
-        direct_solve=True, # TODO(vismay): this arg is not used
-        use_cuda_graphs=False,  # TODO(vismay): this arg is not used
-        timestep=0.03, 
-        max_newton_steps=5, 
-        max_ls_steps=10, 
-        newton_hessian_regularizer=1e-4,  # TODO(vismay): this arg is not used
-        cg_tol=1e-4,                      # TODO(vismay): this arg is not used
-        cg_iters=100,                     # TODO(vismay): this arg is not used
-        conv_tol=1e-4):                   # TODO(vismay): this arg is not used
-        r"""Initializes a simplicits scene. SimplicitsObjects can be added to the scene. Scene forces such as floor and gravity can be set on the scene
+    def __init__(self, device='cuda',
+        direct_solve=True,
+        use_cuda_graphs=False,
+        timestep=0.03,
+        max_newton_steps=5,
+        max_ls_steps=10,
+        newton_hessian_regularizer=1e-4,
+        cg_tol=1e-4,
+        cg_iters=100,
+        conv_tol=1e-4):
+        r"""Initializes a simplicits scene. SimplicitsObjects can be added to the scene. 
+        Scene forces such as floor and gravity can be set on the scene. 
+        The scene defaults to using float32 for all computations.
 
         Args:
             device (str, optional): Defaults to 'cuda'.
-            dtype (torch.dtype, optional): Defaults to torch.float.
+            dtype (torch.dtype, optional): Defaults to torch.float. Must be torch.float32 — the
+                underlying warp sparse infrastructure (B, dFdz, mass matrix, sim state arrays)
+                is hard-coded to wp.float32, so float64 is unsupported.
             direct_solve (bool, optional): Whether to use direct solve for linear system. Defaults to True.
             use_cuda_graphs (bool, optional): Whether to use cuda graphs. Defaults to False.
             timestep (float, optional): Sim time-step. Defaults to 0.03.
@@ -187,20 +191,20 @@ class SimplicitsScene:
         """
 
         self.device = device
-        self.dtype = dtype
+        self.dtype = torch.float32
 
-        self.direct_solve = True # default to true
-        self.use_cuda_graphs = False # default to false
+        self.direct_solve = direct_solve
+        self.use_cuda_graphs = use_cuda_graphs
 
         self.timestep = timestep
         self.current_sim_step = 0
 
         self.max_newton_steps = max_newton_steps
         self.max_ls_steps = max_ls_steps
-        self.newton_hessian_regularizer = 1e-4
-        self.cg_tol = 1e-4
-        self.cg_iters = 100
-        self.conv_tol = 1e-4
+        self.newton_hessian_regularizer = newton_hessian_regularizer
+        self.cg_tol = cg_tol
+        self.cg_iters = cg_iters
+        self.conv_tol = conv_tol
 
         self.current_id = 0
         self.sim_obj_dict = {}  # id: SimulatedObject
@@ -315,7 +319,6 @@ class SimplicitsScene:
         x_index = 0
         for object_id, object in self.sim_obj_dict.items():
             _num_qp.append(object.num_qp)
-            # TODO: here, need guidance on how collision points will/should be treated
             _num_cp.append(object.num_cp)
             _num_handles.append(object.num_handles)
 
@@ -413,10 +416,9 @@ class SimplicitsScene:
         # [3 * scene_pts, 3 * scene_pts] sparse diagonal matrix
         self.sim_M = wps.bsr_diag(wp.array(np_sim_masses, dtype=wp.float32))
 
-        # LBS matrix and Simplicits mass matrix
+        # LBS matrix and mass matrix
         temp_B = warp_utilities._block_diagonalize(_stacked_sparse_B)
         self.sim_B = wps.bsr_copy(temp_B, block_shape=(1, self._dof_bs))
-
         self.sim_BMB = wps.bsr_transposed(self.sim_B)@self.sim_M@self.sim_B
 
         # Scene dFdz Matrix
@@ -433,7 +435,8 @@ class SimplicitsScene:
         elastic_struct = NeohookeanElasticMaterial(
             mu=self.sim_mus,
             lam=self.sim_lams,
-            integration_pt_volume=self.sim_vols
+            integration_pt_volume=self.sim_vols,
+            reparameterize_lame=True
         )
 
         self.force_dict["defo_grad_wise"]["material"] = {}
@@ -481,9 +484,8 @@ class SimplicitsScene:
         self.reset_scene() # quick way to update the scene's dofs
 
     def get_object_transforms(self, object_id):
-        """
-        Returns the current 4x4 padded *relative* transforms of the object's handles. Add identity to the result get standard transform.
-        
+        """Returns the current 4x4 padded *relative* transforms.
+
         Args:
             object_id (int): Id of the object to get the transforms of
 
@@ -491,25 +493,16 @@ class SimplicitsScene:
             torch.Tensor: Torch tensor of size :math:`(\text{num_handles}, 4, 4)` for relative transforms.
         """
         tfms = None
-        
-        # Sets tfms to the current objects transforms if sim_z is set, 
-        # otherwise sets it to the initial transforms (both are 3x4 tensors)
         if self.sim_z is not None:
             wp_tfms = wp.clone(self.sim_z[self.object_to_z_map[object_id]])
-            tfms = wp.to_torch(wp_tfms, requires_grad=False).reshape(
-                (-1, 3, 4))
+            tfms = wp.to_torch(wp_tfms, requires_grad=False).reshape((-1, 3, 4))
         else:
-            # Sets to the initial transforms
-            tfms = torch.zeros(self.sim_obj_dict[object_id].num_handles, 3, 4, device=self.device, dtype=self.dtype) 
-            tfms[-1] = self.sim_obj_dict[object_id].init_transform.reshape(-1, 3, 4) 
+            tfms = torch.zeros(self.sim_obj_dict[object_id].num_handles, 3, 4, device=self.device, dtype=self.dtype)
+            tfms[-1] = self.sim_obj_dict[object_id].init_transform.reshape(-1, 3, 4)
 
-        # Pad with 0,0,0,1 rows to make each transform 4x4
         padding = torch.zeros(tfms.shape[0], 1, 4, device=self.device, dtype=self.dtype)
         padding[:, 0, 3] = 1.0
-        
-        # Concatenate the padding to the bottom of each transform
-        padded_tfms = torch.cat([tfms, padding], dim=1)
-        return padded_tfms
+        return torch.cat([tfms, padding], dim=1)
 
     def _add_object(self, simulated_object: SimulatedObject):
         if self._ready_for_forces:
@@ -544,9 +537,10 @@ class SimplicitsScene:
         else:
             relative_transform = torch.zeros(3, 4, device=self.device, dtype=self.dtype)
 
+
         if isinstance(sim_object, SimplicitsObject):
             # For SimplicitsObject, bake directly with num_qp to avoid double subsampling
-            assert not num_qp is None, "'num_qp' must be provided with SimplicitsObject"
+            assert num_qp is not None, "'num_qp' must be provided with SimplicitsObject"
             baked = sim_object.bake(num_qps=num_qp, renderable_pts=renderable_pts)
             simulated_object = SimulatedObject.from_skinned_physics_points(
                 baked, init_transform=relative_transform, is_kinematic=is_kinematic)
@@ -644,7 +638,7 @@ class SimplicitsScene:
             integration_pt_volume=self.sim_vols)
 
         obj_global_indices = wp.to_torch(self.object_to_qp_map[obj_idx])
-        deformed_pts = self.get_object_deformed_pts(obj_idx)
+        deformed_pts = self.get_object_deformed_pts(obj_idx, points='simulated')
         # Get indices of points that are less than -0.4 in the x direction
         bdry_indx = torch.nonzero(
             fcn(deformed_pts), as_tuple=False).squeeze(1)  # squeeze dim 1 to get 1D tensor even if there is only one element
@@ -724,7 +718,6 @@ class SimplicitsScene:
         collision_struct = self.force_dict["collision"]["object"]
 
         # Sets the collision points dx at the start of the timestep
-        # TODO: Move this to a separate function if detect_collisions is called multiple times in a timestep
         dx0 = wp.array((self.sim_B@z), dtype=wp.vec3)
         collision_struct.cp_dx_at_nm_iteration_0 = dx0
         #-----------------------------------------------------------
@@ -1039,8 +1032,8 @@ class SimplicitsScene:
             wp_BMB (wp.sparse.bsr_matrix): Precomputed z-wise mass matrix.
             dt (float): Timestep
             wp_dFdz (wp.sparse.bsr_matrix): Precomputed jacobian
-            defo_grad_energies (list, optional): List of energies. Defaults to [].
-            pt_wise_energies (list, optional): List of energies. Defaults to [].
+            defo_grad_gradients (list, optional): List of gradients. Defaults to [].
+            pt_wise_gradients (list, optional): List of gradients. Defaults to [].
 
         Returns:
             wp.array: Backward's euler gradient.
@@ -1066,8 +1059,8 @@ class SimplicitsScene:
             wp_BMB (wp.sparse.bsr_matrix): Precomputed z-wise mass matrix.
             dt (float): Timestep
             wp_dFdz (wp.sparse.bsr_matrix): Precomputed jacobian
-            defo_grad_energies (list, optional): List of energies. Defaults to [].
-            pt_wise_energies (list, optional): List of energies. Defaults to [].
+            defo_grad_hessians (list, optional): List of hessians. Defaults to [].
+            pt_wise_hessians (list, optional): List of hessians. Defaults to [].
 
         Returns:
             wp.sparse.bsr_matrix: Backward's euler hessian.
@@ -1174,7 +1167,7 @@ class SimplicitsScene:
         """
         if not self._ready_for_forces:
             raise RuntimeError("Forces need to be set")
-        #### Todo: Detect Collisions here? Or Maybe in NM like Gilles ? ####
+
         self._detect_collision(self.sim_z)
         ###########################################################
 
@@ -1198,7 +1191,7 @@ class SimplicitsScene:
             more_partial_newton_G,
             more_partial_newton_H,
             bounds_fcn=self._compute_collision_bounds,
-            preconditioner_fcn= None, # TODO: Fix this cholesky preconditioner, sometimes you get Nans-> self._build_preconditioner,
+            preconditioner_fcn= None, # TODO (for Gilles): Fix this cholesky preconditioner, sometimes you get Nans-> self._build_preconditioner,
             Pt=self.sim_Pt,
             P=self.sim_P,
             nm_max_iters=self.max_newton_steps,

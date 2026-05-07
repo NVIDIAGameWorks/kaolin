@@ -38,8 +38,7 @@ def _neohookean_elastic_energy_wp_func(mu: wp.float32, lam: wp.float32, F: wp.ma
     """
     C1 = mu / 2.0
     D1 = lam / 2.0
-    F_transpose = wp.transpose(F)
-    I1 = wp.trace(F_transpose @ F)  # TODO: I1 = wp.ddot(F, F)
+    I1 = wp.ddot(F, F)
     J = wp.determinant(F)
     W = C1 * (I1 - 3.0) + D1 * (J - 1.0) * (J - 1.0) - mu * (J - 1.0)
     return W*vol
@@ -136,7 +135,7 @@ def _neohookean_elastic_hessian_wp_func(mu: wp.float32, lam: wp.float32, F: wp.m
     H = H1 + H2 + -dgamma*H3_reshaped
     return vol*H
 
-    # TODO: The following has math bugs
+    # TODO: The following has math bugs. We use the quad for loop instead.
 
     # # From matrixcookbook
     # dinvFdF = -kron3(FinvT, FinvT)
@@ -226,13 +225,20 @@ class NeohookeanElasticMaterial:
     def __init__(self,
                  mu,
                  lam,
-                 integration_pt_volume):
-        r""" Initializes a NeohookeanElasticMaterial object.
+                 integration_pt_volume,
+                 reparameterize_lame=False):
+        r"""Initializes a NeohookeanElasticMaterial object.
+
         Args:
             mu (wp.array(dtype=wp.float32)): Lame coefficient mu
             lam (wp.array(dtype=wp.float32)): Lame coefficient lambda
             integration_pt_volume (wp.array(dtype=wp.float32)): Volume distributed across each point
+            reparameterize_lame (bool): If True, reparameterize the Lame coefficients (:math:`\lambda \leftarrow \lambda + \mu`) so that the Neo-Hookean energy matches linear elasticity when linearized. See `Stable Neo-Hookean Flesh Simulation <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_ for details. Default: False.
         """
+
+        if reparameterize_lame:
+            lam = lam + mu
+
         self.mu = mu
         self.lam = lam
         self.integration_pt_volume = integration_pt_volume
@@ -320,18 +326,23 @@ class NeohookeanElasticMaterial:
         return self.hessians_blocks
 
 
-def _neohookean_energy(mu, lam, defo_grad):  # pragma: no cover
+def _neohookean_energy(mu, lam, defo_grad, reparameterize_lame=False):  # pragma: no cover
     r"""Implements a version of neohookean energy. Calculate energy per-integration primitive. For more background information, refer to `Ted Kim's Siggraph Course Notes\
     <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_
 
     Args:
         mu (torch.Tensor): Batched lame parameter mu, of shape :math:`(\text{batch_dims}, 1)`
-        lam (torch.Tensor): Batched lame parameter lambda, of shape, :math:`(\text{batch_dims}, 1)` 
+        lam (torch.Tensor): Batched lame parameter lambda, of shape, :math:`(\text{batch_dims}, 1)`
         defo_grad (torch.Tensor): Batched deformation gradients (denoted in literature as F) of 3 or more dimensions, :math:`(\text{batch_dims}, 3, 3)`
+        reparameterize_lame (bool): If True, reparameterize the Lame coefficients (:math:`\lambda \leftarrow \lambda + \mu`) so that the Neo-Hookean energy matches linear elasticity when linearized. See `Stable Neo-Hookean Flesh Simulation <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_ for details. Default: False.
 
     Returns:
         torch.Tensor: :math:`(\text{batch_dims}, 1)` vector of per defo-grad energy values
     """
+
+    if reparameterize_lame:
+        lam = lam + mu
+
     # Shape (batch_dims, 1)
     C1 = mu / 2
     # Shape (batch_dims, 1)
@@ -362,18 +373,23 @@ def _neohookean_energy(mu, lam, defo_grad):  # pragma: no cover
     return W
 
 
-def _neohookean_gradient(mu, lam, defo_grad):  # pragma: no cover
-    """Implements a batched version of the jacobian of neohookean elastic energy. Calculates gradients per-integration primitive. For more background information, refer to `Jernej Barbic's Siggraph Course Notes\
+def _neohookean_gradient(mu, lam, defo_grad, reparameterize_lame=False):  # pragma: no cover
+    r"""Implements a batched version of the jacobian of neohookean elastic energy. Calculates gradients per-integration primitive. For more background information, refer to `Jernej Barbic's Siggraph Course Notes\
     <https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf>`_ section 3.2.
 
     Args:
         mu (torch.Tensor): Batched lame parameter mu, of shape :math:`(\text{batch_dim}, 1)`
         lam (torch.Tensor): Batched lame parameter lambda, of shape :math:`(\text{batch_dim}, 1)`
         defo_grad (torch.Tensor): Batched deformation gradients (denoted in literature as F) of any dimension where the last 2 dimensions are 3 x 3, of shape :math:`(\text{batch_dim}, 3, 3)`
+        reparameterize_lame (bool): If True, reparameterize the Lame coefficients (:math:`\lambda \leftarrow \lambda + \mu`) so that the Neo-Hookean energy matches linear elasticity when linearized. See `Stable Neo-Hookean Flesh Simulation <https://www.tkim.graphics/DYNAMIC_DEFORMABLES/>`_ for details. Default: False.
 
     Returns:
         torch.Tensor: Vector of per-primitive jacobians of neohookean elastic energy w.r.t defo_grad values, of shape :math:`(\text{batch_dim}, 9)`
     """
+
+    if reparameterize_lame:
+        lam = lam + mu
+
     # Shape (batch_dims, 1)
     C1 = mu / 2
     # Shape (batch_dims, 1)

@@ -34,7 +34,6 @@ __all__ = [
     'lumped_mass_matrix',
     'lbs_matrix',
     'jacobian_dF_dz',
-    'jacobian_dx_dz'
 ]
 
 
@@ -268,15 +267,17 @@ def sparse_dFdz_matrix_from_dense(enriched_weights_fcn, pts):
     return _warp_csr_from_torch_dense(dense_dFdz)
 
 
-def sparse_dFdz_matrix(sim_weights: np.ndarray, sim_weights_jac: np.ndarray, sim_pts: np.ndarray):  # pragma: no cover
+def sparse_dFdz_matrix(sim_weights, sim_weights_jac, sim_pts):  # pragma: no cover
     r"""Creates a sparse Jacobian matrix of the deformation gradient with respect to the sample points,
     using precomputed skinning weights and their spatial Jacobian.
 
     Args:
-        sim_weights (np.ndarray): Skinning weights, of shape :math:`(\text{num\_samples}, \text{num\_handles})`.
-        sim_weights_jac (np.ndarray): Gradient of the skinning weights with respect to the sample points,
-            of shape :math:`(\text{num\_samples}, \text{num\_handles}, 3)`.
-        sim_pts (np.ndarray): 3D positions of the sample points, of shape :math:`(\text{num\_samples}, 3)` (in :math:`m`).
+        sim_weights (wp.array2d(dtype=wp.float32)): Skinning weights,
+            of shape :math:`(\text{num_samples}, \text{num_handles})`.
+        sim_weights_jac (wp.array3d(dtype=wp.float32)): Gradient of the skinning weights with respect to
+            the sample points, of shape :math:`(\text{num_samples}, \text{num_handles}, 3)`.
+        sim_pts (wp.array(dtype=wp.vec3)): 3D positions of the sample points,
+            of shape :math:`(\text{num_samples},)` of vec3.
 
     Returns:
         wp.sparse.bsr_matrix: Sparse Jacobian matrix of size :math:`(9 \text{num_samples}, 12 \text{num_handles})`
@@ -285,71 +286,32 @@ def sparse_dFdz_matrix(sim_weights: np.ndarray, sim_weights_jac: np.ndarray, sim
 
     num_samples = sim_weights.shape[0]
     num_handles = sim_weights.shape[1]
+    device = sim_weights.device
 
     nnz = 36 * num_samples * num_handles
 
-    rows = wp.zeros(nnz, dtype=wp.int32)
-    cols = wp.zeros(nnz, dtype=wp.int32)
-    vals = wp.zeros(nnz, dtype=wp.float32)
-    offset = wp.zeros(1, dtype=wp.int32)
+    rows = wp.zeros(nnz, dtype=wp.int32, device=device)
+    cols = wp.zeros(nnz, dtype=wp.int32, device=device)
+    vals = wp.zeros(nnz, dtype=wp.float32, device=device)
+    offset = wp.zeros(1, dtype=wp.int32, device=device)
 
     wp.launch(
         kernel=_get_dFdz_triplets_wp_kernel,
         dim=num_samples,
-        inputs=[wp.array(sim_weights, dtype=wp.float32),
-                wp.array(sim_weights_jac, dtype=wp.float32),
-                wp.array(sim_pts, dtype=wp.vec3),
+        inputs=[sim_weights,
+                sim_weights_jac,
+                sim_pts,
                 rows,
                 cols,
                 vals,
-                offset]
+                offset],
+        device=device,
     )
 
     num_rows = 9 * num_samples  # 9 per sample
     num_cols = 12 * num_handles  # 12 per handle
 
-    dFdz_csr_matrix = wps.bsr_zeros(num_rows, num_cols, block_type=wp.float32)
-    wps.bsr_set_from_triplets(dFdz_csr_matrix, rows, cols, vals)
-
-    return dFdz_csr_matrix
-
-
-def _sparse_dFdz_matrix(sim_weights: np.ndarray):  # pragma: no cover
-    r"""Creates a sparse Jacobian matrix of the deformation gradient with respect to the sample points.
-
-    Args:
-        sim_weights (wp.array2d(dtype=wp.float32)): Skinning weights.
-
-    Returns:
-        wp.sparse.bsr_matrix: Sparse Jacobian matrix of size :math:`(9 \text{num_samples}, 12 \text{num_handles})`
-    """
-    # TODO: UNUSED - only works for constant weights.
-    # Debug if the dFdz_from_dense is becoming slow or remove this function.
-
-    num_samples = sim_weights.shape[0]
-    num_handles = sim_weights.shape[1]
-
-    nnz = 9 * num_samples * num_handles
-
-    rows = wp.zeros(nnz, dtype=wp.int32)
-    cols = wp.zeros(nnz, dtype=wp.int32)
-    vals = wp.zeros(nnz, dtype=wp.float32)
-    offset = wp.zeros(1, dtype=wp.int32)
-
-    wp.launch(
-        kernel=_get_dFdz_triplets_wp_kernel,
-        dim=num_samples,
-        inputs=[wp.array(sim_weights, dtype=wp.float32),
-                rows,
-                cols,
-                vals,
-                offset]
-    )
-
-    num_rows = 9 * num_samples  # 9 per sample
-    num_cols = 12*num_handles  # 12 per handle
-
-    dFdz_csr_matrix = wps.bsr_zeros(num_rows, num_cols, block_type=wp.float32)
+    dFdz_csr_matrix = wps.bsr_zeros(num_rows, num_cols, block_type=wp.float32, device=device)
     wps.bsr_set_from_triplets(dFdz_csr_matrix, rows, cols, vals)
 
     return dFdz_csr_matrix
@@ -534,18 +496,3 @@ def jacobian_dF_dz(model, x0, z):
         lambda x: compute_defo_grad1(x).reshape(9 * num_samples), z.flatten())
     return dF_dz
 
-
-def jacobian_dx_dz(model, x0, z):
-    r"""Calculates jacobian :math:`\frac{\partial x}{\partial z}`
-
-    Args:
-        model (nn.Module): Simplicits object network + constant handle
-        x0 (torch.Tensor): Matrix of sample points, of shape :math:`(\text{num_samples}, 3)`
-        z (torch.Tensor): Vector of flattened transforms, of shape :math:`(12 \text{num_samples})`
-
-    Returns:
-        torch.Tensor: Jacobian matrix, of shape :math:`(3 \text{num_samples}, 12 \text{num_handles})`
-    """
-    dx_dz = torch.autograd.functional.jacobian(lambda x: weight_function_lbs(
-        x0, tfms=x.reshape(-1, 3, 4).unsqueeze(0), fcn=model).flatten(), z.flatten())
-    return dx_dz
