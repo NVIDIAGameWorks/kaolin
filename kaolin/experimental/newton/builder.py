@@ -14,14 +14,14 @@
 # limitations under the License.
 
 import warnings
-
+from typing import Union
 import torch
 import warp as wp
 import newton
 from newton._src.core.types import AxisType, Axis
 from kaolin.experimental.newton.model import SimplicitsModel
 from kaolin.experimental.newton.collisions import SimplicitsParticleNewtonShapeSoftContact
-from kaolin.physics.simplicits import SimplicitsObject
+from kaolin.physics.simplicits import SimplicitsObject, SkinnedPhysicsPoints
 import logging
 
 __all__ = [
@@ -47,23 +47,30 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
         self._pending_collisions = None           # tuple of collision kwargs, or None
 
 
-    def add_simplicits_object(self, sim_object: SimplicitsObject, num_qp=1000, init_transform=None,
-                              is_kinematic=False, renderable_pts=None):
+    def add_simplicits_object(self, sim_object: Union[SimplicitsObject, SkinnedPhysicsPoints], num_qp=None,
+                              init_transform=None, is_kinematic=False, renderable_pts=None):
         r"""Add a Simplicits soft-body object to the model.
 
         Wraps SimplicitsScene.add_object() to add deformable objects to the simulation.
 
         Args:
-            sim_object (SimplicitsObject): Simplicits object wrapped into a SimulatedObject for this scene.
-            num_qp (int): Number of quadrature points (sample points to integrate over).
+            sim_object (SimplicitsObject | SkinnedPhysicsPoints):
+                trained simplicits object or already sampled skinned points, e.g. from USD file.
+            num_qp (int):
+                Number of quadrature points (sample points to integrate over).
+                If not provided, the object will not be subsampled.
             init_transform (torch.Tensor or None): 3x4 or 4x4 tensor for the object's initial skinning transform.
                 Takes a standard transformation, not a delta; the identity matrix is subtracted and the delta is saved.
             is_kinematic (bool): If True, object is kinematic and not solved during dynamics.
-            renderable_pts (torch.Tensor or None): Optional rest positions for a separate rendered point set
+            renderable_pts (torch.Tensor or None):
+                Optional rest positions for a separate rendered point set
                 (see :meth:`kaolin.physics.simplicits.simulation.SimplicitsScene.add_object`).
-
+                This is not to be used with already baked SkinnedPhysicsPointsProtocol.
         """
-        # obj_id = self.model.simplicits_scene.add_object(sim_object, num_qp, init_transform, is_kinematic)
+        if isinstance(sim_object, SimplicitsObject):
+            assert num_qp is not None, "'num_qp' must be provided with SimplicitsObject"
+        elif isinstance(sim_object, SkinnedPhysicsPoints):
+            assert renderable_pts is None, "'renderable_pts' are not supported for already baked SkinnedPhysicsPointsProtocol"
         self._pending_objects.append((sim_object, num_qp, init_transform, is_kinematic, renderable_pts))
 
     def add_simplicits_collisions(self, collision_particle_radius=0.1,

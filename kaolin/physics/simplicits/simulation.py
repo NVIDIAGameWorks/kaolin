@@ -1158,6 +1158,8 @@ class SimplicitsScene:
     def _get_scene_ready_for_forces(self):  # pragma: no cover
         r"""Prepares the scene for simulation. Updates any forces that have changed, or objects that have been added/removed.
         """
+        if len(self.sim_obj_dict) == 0:
+            raise RuntimeError("SimplicitsScene doesn't have any object to apply forces on.")
         self._compute_sim_constants()
         self._create_sim_variables()
         self._ready_for_forces = True
