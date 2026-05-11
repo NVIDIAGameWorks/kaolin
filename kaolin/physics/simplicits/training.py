@@ -16,7 +16,7 @@
 import logging
 import warnings
 import tqdm
-from typing import Protocol, runtime_checkable, Any, Optional, Sequence
+from typing import Protocol, runtime_checkable, Any, Callable, Optional, Sequence
 
 import torch
 import kaolin
@@ -594,8 +594,7 @@ class SimplicitsObject(PhysicsPoints):
         )
 
     @classmethod
-    def create_trained(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None,
-                       physics_points: Optional[PhysicsPointsProtocol] = None,
+    def create_trained(cls, pts, yms, prs, rhos, appx_vol,
                        num_handles=10,
                        num_samples=1000,
                        model_layers=6,
@@ -610,37 +609,34 @@ class SimplicitsObject(PhysicsPoints):
                        display_progress=False):
         r"""Constructs a SimplicitsObject by training a neural network to learn skinning weights.
 
+        .. deprecated:: 0.19.0
+
+            This function is deprecated, use :meth:`create_with_mlp` instead.
+
         This method creates a SimplicitsObject by training a neural network to learn skinning weights
         that can be used for deformation. The network is trained to minimize a combination of
         local and global energy terms.
-        
-        Note:
+
+        .. note::
+
             If num_handles is set to 1, the object will be created as rigid instead of deformable.
             The training process uses a combination of local and global energy terms to ensure
             both local detail preservation and global shape maintenance.
 
         Args:
-            pts (torch.Tensor, optional): Deprecated, use ``physics_points`` instead.
+            pts (torch.Tensor):
                 Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
-                Required unless ``physics_points`` is provided.
-            yms (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+            yms (Union[torch.Tensor, float]):
                 Young's moduli defining material stiffness (in :math:`kg/m/s^2`); either a tensor of shape :math:`(N,)`
                 for per-point values, or a float value applied to all points.
-                Required unless ``physics_points`` is provided.
-            prs (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+            prs (Union[torch.Tensor, float]):
                 Poisson's ratios defining material compressibility; either a tensor of shape :math:`(N,)`
                 for per-point values, or a float value applied to all points.
-                Required unless ``physics_points`` is provided.
-            rhos (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+            rhos (Union[torch.Tensor, float]):
                 Density defining material density (in :math:`kg/m^3`); either a tensor of shape :math:`(N,)`
                 for per-point values, or a float value applied to all points.
-                Required unless ``physics_points`` is provided.
-            appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
+            appx_vol (Union[torch.Tensor, float]):
                 Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
-                Required unless ``physics_points`` is provided.
-            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
-                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
-                are taken from this object instead.
             num_handles (int, optional): Number of control handles for deformation. Defaults to 10
             num_samples (int, optional): Number of samples used for training. Defaults to 1000
             model_layers (int, optional): Number of layers in the neural network. Defaults to 6
@@ -658,24 +654,81 @@ class SimplicitsObject(PhysicsPoints):
             (SimplicitsObject): A trained SimplicitsObject with learned skinning weights.
 
         """
-        phys = cls._resolve_physics_points(pts, yms, prs, rhos, appx_vol, physics_points,
-                                           fn_name='create_trained')
-        pts, yms, prs, rhos, appx_vol = phys.pts, phys.yms, phys.prs, phys.rhos, phys.appx_vol
+        warnings.warn(
+            "'create_trained' is deprecated, use create_with_mlp instead.",
+            UserWarning, stacklevel=2,
+        )
+
+        return cls.create_with_mlp(
+            PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol),
+            num_handles=num_handles,
+            num_samples=num_samples,
+            model_layers=model_layers,
+            training_batch_size=training_batch_size,
+            training_num_steps=training_num_steps,
+            training_lr_start=training_lr_start,
+            training_lr_end=training_lr_end,
+            training_le_coeff=training_le_coeff,
+            training_lo_coeff=training_lo_coeff,
+            training_log_every=training_log_every,
+            normalize_for_training=normalize_for_training,
+            display_progress=display_progress
+        )
+
+    @classmethod
+    def create_with_mlp(cls,
+            physics_points: PhysicsPointsProtocol,
+            num_handles,
+            num_samples,
+            model_layers,
+            training_batch_size=10,
+            training_num_steps=10000,
+            training_lr_start=1e-3,
+            training_lr_end=1e-3,
+            training_le_coeff=1e-1,
+            training_lo_coeff=1e6,
+            training_log_every=1000,
+            normalize_for_training=True,
+            display_progress=False):
+        r"""Constructs a SimplicitsObject by training a neural network to learn skinning weights.
+
+        This method creates a SimplicitsObject by training a neural network to learn skinning weights
+        that can be used for deformation. The network is trained to minimize a combination of
+        local and global energy terms.
+
+        Note:
+            If num_handles is set to 1, the object will be created as rigid instead of deformable.
+            The training process uses a combination of local and global energy terms to ensure
+            both local detail preservation and global shape maintenance.
+
+        Args:
+            physics_points (PhysicsPoints): PhysicsPoints object to be used for training.
+            num_handles (int): Number of control handles for deformation.
+            num_samples (int): Number of samples used for training.
+            model_layers (int): Number of layers in the neural network.
+            training_batch_size (int, optional): Batch size for training. Defaults to 10
+            training_num_steps (int, optional): Number of training iterations. Defaults to 10000.
+            training_lr_start (float, optional): Starting learning rate. Defaults to 1e-3.
+            training_lr_end (float, optional): Final learning rate. Defaults to 1e-3
+            training_le_coeff (float, optional): Coefficient for local energy term. Defaults to 1e-1
+            training_lo_coeff (float, optional): Coefficient for global energy term. Defaults to 1e6
+            training_log_every (int, optional): Logging frequency during training. Defaults to 1000
+            normalize_for_training (bool, optional): Whether to normalize points to unit cube for training. Defaults to True
+            display_progress (bool, optional): If True, display a tqdm progress bar during training. Defaults to False.
+
+        Returns:
+            (SimplicitsObject): A trained SimplicitsObject with learned skinning weights.
+        """
+        pts, yms, prs, rhos, appx_vol = (
+            physics_points.pts, physics_points.yms, physics_points.prs,
+            physics_points.rhos, physics_points.appx_vol,
+        )
         assert num_handles >= 1, 'Number of handles must be greater or equal than 1'
 
         if num_handles == 1:
             warnings.warn('Num Handles is 1. Simplicits Object will be created as rigid.',
                           UserWarning, stacklevel=2)
-            return SimplicitsObject.create_rigid(physics_points=phys)
-
-        if not torch.is_tensor(yms):
-            yms = torch.full((pts.shape[0],), yms, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(prs):
-            prs = torch.full((pts.shape[0],), prs, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(rhos):
-            rhos = torch.full((pts.shape[0],), rhos, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(appx_vol):
-            appx_vol = torch.tensor([appx_vol], dtype=pts.dtype, device=pts.device)
+            return SimplicitsObject.create_rigid(physics_points=physics_points)
 
         device = pts.device
 
@@ -740,12 +793,12 @@ class SimplicitsObject(PhysicsPoints):
         return SimplicitsObject(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol, skinning_mod=model)
 
     @classmethod
-    def create_with_rkpm(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None,
-                    physics_points: Optional[PhysicsPointsProtocol] = None,
-                    num_handles=10,
-                    num_nodes=1024,
-                    num_points=None,
-                    dtype=torch.float64):
+    def create_with_rkpm(cls,
+            physics_points: PhysicsPointsProtocol,
+            num_handles,
+            num_nodes,
+            num_points=None,
+            dtype=torch.float64):
         r"""Constructs a SimplicitsObject using RKPM-based skinning weights as explained in
         `Freeform <https://research.nvidia.com/labs/sil/projects/freeform/>`_. 
         RKPM based simplicits shows more accurate behavior and better convergence than MLP based simplicits when compared to FEM with the same material parameters. 
@@ -761,60 +814,32 @@ class SimplicitsObject(PhysicsPoints):
             If num_handles is set to 0, the object will be created as rigid instead of deformable.
 
         Args:
-            pts (torch.Tensor, optional): Deprecated, use ``physics_points`` instead.
-                Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
-                Required unless ``physics_points`` is provided.
-            yms (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
-                Young's moduli defining material stiffness (in :math:`kg/m/s^2`); either a tensor of shape :math:`(N,)`
-                for per-point values, or a float value applied to all points.
-                Required unless ``physics_points`` is provided.
-            prs (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
-                Poisson's ratios defining material compressibility; either a tensor of shape :math:`(N,)`
-                for per-point values, or a float value applied to all points.
-                Required unless ``physics_points`` is provided.
-            rhos (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
-                Density defining material density (in :math:`kg/m^3`); either a tensor of shape :math:`(N,)`
-                for per-point values, or a float value applied to all points.
-                Required unless ``physics_points`` is provided.
-            appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
-                Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
-                Required unless ``physics_points`` is provided.
-            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
-                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
-                are taken from this object instead.
-            num_handles (int, optional): Number of deformation handles (RKPM eigenvectors). Defaults to 10.
-            num_nodes (int, optional): Number of RKPM kernel nodes. Defaults to 1024.
+            physics_points (PhysicsPoints): PhysicsPoints object to be used for training.
+            num_handles (int): Number of deformation handles (RKPM eigenvectors).
+            num_nodes (int): Number of RKPM kernel nodes.
             num_points (int, optional): Number of *samples* from ``pts`` to use when constructing the mass and stiffness matrices for the RKPM
                 generalized eigenproblem (i.e., this controls the number of samples from the object's geometry fed into the basis construction;
                 it does not affect the input points used for the final object). This only affects **offline** mode construction; the returned
                 :class:`SimplicitsObject` still stores the full ``pts`` geometry, and skinning can be evaluated at any point.
                 Using a large number of samples may lead to high memory usage during basis construction.
                 Defaults to all points in ``pts`` being used as samples.
-           
+
             dtype (torch.dtype, optional): Floating-point precision used for RKPM kernel evaluations
                 and eigenanalysis. Defaults to ``torch.float64`` for numerical stability.
 
         Returns:
             SimplicitsObject: A SimplicitsObject with RKPM-based skinning weights.
         """
-        phys = cls._resolve_physics_points(pts, yms, prs, rhos, appx_vol, physics_points,
-                                           fn_name='create_with_rkpm')
-        pts, yms, prs, rhos, appx_vol = phys.pts, phys.yms, phys.prs, phys.rhos, phys.appx_vol
+        pts, yms, prs, rhos, appx_vol = (
+            physics_points.pts, physics_points.yms, physics_points.prs,
+            physics_points.rhos, physics_points.appx_vol,
+        )
 
         assert num_handles >= 1, 'Number of handles must be greater or equal than 1'
         if num_handles == 1:
             warnings.warn('Num Handles is 1. Simplicits Object will be created as rigid.',
                           UserWarning, stacklevel=2)
-            return SimplicitsObject.create_rigid(physics_points=phys)
-
-        if not torch.is_tensor(yms):
-            yms = torch.full((pts.shape[0],), yms, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(prs):
-            prs = torch.full((pts.shape[0],), prs, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(rhos):
-            rhos = torch.full((pts.shape[0],), rhos, dtype=pts.dtype, device=pts.device)
-        if not torch.is_tensor(appx_vol):
-            appx_vol = torch.tensor([appx_vol], dtype=pts.dtype, device=pts.device)
+            return SimplicitsObject.create_rigid(physics_points=physics_points)
 
         model = SimplicitsRKPM(num_handles, num_nodes, num_points=num_points, dtype=dtype)
         model.to(pts.device)
@@ -824,50 +849,25 @@ class SimplicitsObject(PhysicsPoints):
         return cls(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol, skinning_mod=model)
 
     @classmethod
-    def create_from_function(cls, pts=None, yms=None, prs=None, rhos=None, appx_vol=None, fcn=None,
-                             physics_points: Optional[PhysicsPointsProtocol] = None):
+    def create_from_function(cls, physics_points: PhysicsPointsProtocol, fcn: Callable):
         r"""Creates a SimplicitsObject with a custom skinning weight function.
 
         This method creates a SimplicitsObject using a user-provided function to compute skinning weights.
         The function should take points as input and return a matrix of skinning weights.
 
         Args:
-            pts (torch.Tensor, optional): Deprecated, use ``physics_points`` instead.
-                Points tensor of shape :math:`(N, 3)` representing the object's geometry (in :math:`m`).
-                Required unless ``physics_points`` is provided.
-            yms (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
-                Young's moduli defining material stiffness (in :math:`kg/m/s^2`); either a tensor of shape :math:`(N,)`
-                for per-point values, or a float value applied to all points.
-                Required unless ``physics_points`` is provided.
-            prs (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
-                Poisson's ratios defining material compressibility; either a tensor of shape :math:`(N,)`
-                for per-point values, or a float value applied to all points.
-                Required unless ``physics_points`` is provided.
-            rhos (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
-                Density defining material density (in :math:`kg/m^3`); either a tensor of shape :math:`(N,)`
-                for per-point values, or a float value applied to all points.
-                Required unless ``physics_points`` is provided.
-            appx_vol (Union[torch.Tensor, float], optional): Deprecated, use ``physics_points`` instead.
-                Approximate volume (in :math:`m^3`); either a tensor of shape :math:`(1,)` or :math:`(0,)`, or a float value.
-                Required unless ``physics_points`` is provided.
-            physics_points (PhysicsPoints, optional): PhysicsPoints object to be used for training. Defaults to None.
-                If provided, ``pts``, ``yms``, ``prs``, ``rhos``, and ``appx_vol`` must all be ``None`` and the values
-                are taken from this object instead.
-            fcn (Union[SkinningModule, Callable]): Trained skinning module or callable returning per-point weights.
+            physics_points (PhysicsPoints): PhysicsPoints object to be used for training.
+            fcn (Callable): Trained skinning module or callable returning per-point weights.
 
         Returns:
             SimplicitsObject: A SimplicitsObject with the provided skinning weight function.
         """
-        if fcn is None:
-            raise ValueError(
-                "create_from_function requires a function to be provided.")
-        phys = cls._resolve_physics_points(pts, yms, prs, rhos, appx_vol, physics_points,
-                                           fn_name='create_from_function')
         if isinstance(fcn, SkinningModule):
             skinning_mod = fcn
         else:
             skinning_mod = SkinningModule.from_function(fcn)
-        return cls(pts=phys.pts, yms=phys.yms, prs=phys.prs, rhos=phys.rhos, appx_vol=phys.appx_vol,
+        return cls(pts=physics_points.pts, yms=physics_points.yms, prs=physics_points.prs,
+                   rhos=physics_points.rhos, appx_vol=physics_points.appx_vol,
                    skinning_mod=skinning_mod)
 
     def subsample(self, num_pts=None, sample_indices=None):

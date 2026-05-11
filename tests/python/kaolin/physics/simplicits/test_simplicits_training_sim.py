@@ -19,7 +19,7 @@ import warp as wp
 import kaolin
 import numpy as np
 from typing import Any
-from kaolin.physics.simplicits import SimplicitsScene, SimplicitsObject
+from kaolin.physics.simplicits import SimplicitsScene, SimplicitsObject, PhysicsPoints
 import pytest
 from kaolin.utils.testing import with_seed
 
@@ -132,22 +132,19 @@ def cantilever_beam_scene_setup(device, dtype):
     dt = 0.05  # s
 
     # train simplicits object
-    simplicits_object = SimplicitsObject.create_trained(
-                                        pts, 
-                                        yms, 
-                                        prs, 
-                                        rhos, 
-                                        object_vol, 
-                                        num_handles=32, 
-                                        num_samples=1000, 
-                                        model_layers=10, 
-                                        training_batch_size=10, 
-                                        training_num_steps=25000, 
-                                        training_lr_start=1e-3, 
-                                        training_lr_end=1e-3, 
-                                        training_le_coeff=1e-1, 
-                                        training_lo_coeff=1e6, 
-                                        training_log_every=1000, 
+    phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=object_vol)
+    simplicits_object = SimplicitsObject.create_with_mlp(
+                                        physics_points=phys,
+                                        num_handles=32,
+                                        num_samples=1000,
+                                        model_layers=10,
+                                        training_batch_size=10,
+                                        training_num_steps=25000,
+                                        training_lr_start=1e-3,
+                                        training_lr_end=1e-3,
+                                        training_le_coeff=1e-1,
+                                        training_lo_coeff=1e6,
+                                        training_log_every=1000,
                                         normalize_for_training=True)
 
 
