@@ -28,7 +28,7 @@ import os
 import torch
 import kaolin
 from examples.tutorial.tutorial_common import COMMON_DATA_DIR
-from kaolin.physics.simplicits import SimplicitsObject
+from kaolin.physics.simplicits import SimplicitsObject, PhysicsPoints
 
 # Constants for test objects
 NUM_SAMPLES = 10000
@@ -115,6 +115,7 @@ def cantilever_beam_object():
     rhos = torch.full((pts.shape[0],) , 500.0, dtype=torch.float32, device='cuda')
     object_vol = (mesh.vertices.max(0)[0] - mesh.vertices.min(0)[0]).prod()
 
+    phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=object_vol)
     return SimplicitsObject.create_with_rkpm(
-        pts, yms, prs, rhos, object_vol,
+        physics_points=phys,
         num_handles=32, num_points=8192, num_nodes=1024, dtype=torch.float64)

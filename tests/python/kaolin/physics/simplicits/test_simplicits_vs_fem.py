@@ -19,7 +19,7 @@ import warp as wp
 import kaolin
 import numpy as np
 from typing import Any
-from kaolin.physics.simplicits import SimplicitsScene, SimplicitsObject
+from kaolin.physics.simplicits import SimplicitsScene, SimplicitsObject, PhysicsPoints
 from kaolin.physics.simplicits.network import SkinningModule
 
 import pytest
@@ -94,9 +94,10 @@ def cantilever_beam_setup(request, device, dtype, cantilever_beam_data):
     """Fixture to set up cantilever beam scene for testing."""
     mesh, pts, yms, prs, rhos, object_vol, fem_data = cantilever_beam_data
 
+    phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=object_vol)
     if request.param == "rkpm":
         simplicits_object = SimplicitsObject.create_with_rkpm(
-            pts, yms, prs, rhos, object_vol,
+            physics_points=phys,
             num_handles=32, num_points=8192, num_nodes=1024, dtype=torch.float64)
     elif request.param == "trained":
         weights_file = os.path.dirname(os.path.realpath(
@@ -104,7 +105,7 @@ def cantilever_beam_setup(request, device, dtype, cantilever_beam_data):
         data = torch.load(weights_file, weights_only=False)
         fcn = SkinningModule.from_function(data['model'], data['bb_min'], data['bb_max'])
         simplicits_object = SimplicitsObject.create_from_function(
-            pts, yms, prs, rhos, object_vol, fcn)
+            physics_points=phys, fcn=fcn)
 
     rendered_pts = fem_data["v0"]
 
@@ -158,15 +159,18 @@ def cube_drop_setup(request, device, dtype):
     fem_data = torch.load(os.path.dirname(os.path.realpath(
         __file__)) + "/regression_test_data/wpfem_vertex_deformations_cube.pth", weights_only=False)
 
+    phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=object_vol)
     if request.param == "rkpm":
-        simplicits_object = SimplicitsObject.create_with_rkpm(pts, yms, prs, rhos, object_vol, num_handles=32, num_points=8192, num_nodes=1024, dtype=torch.float64)
+        simplicits_object = SimplicitsObject.create_with_rkpm(
+            physics_points=phys,
+            num_handles=32, num_points=8192, num_nodes=1024, dtype=torch.float64)
     elif request.param == "trained":
         weights_file = os.path.dirname(os.path.realpath(
             __file__)) + "/regression_test_data/cube_weights_fcn_32_handles.pth"
         data = torch.load(weights_file, weights_only=False)
         fcn = SkinningModule.from_function(data['model'], data['bb_min'], data['bb_max'])
         simplicits_object = SimplicitsObject.create_from_function(
-            pts, yms, prs, rhos, object_vol, fcn)
+            physics_points=phys, fcn=fcn)
 
     rendered_pts = fem_data["v0"]
 
@@ -255,8 +259,9 @@ def test_cube_drop(device, dtype, cube_drop_setup):
 def cantilever_beam_dFdz_setup(request, device, dtype, cantilever_beam_data):
     """Cantilever beam with rkpm object, analytical dFdz."""
     mesh, pts, yms, prs, rhos, object_vol, fem_data = cantilever_beam_data
+    phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=object_vol)
     simplicits_object = SimplicitsObject.create_with_rkpm(
-        pts, yms, prs, rhos, object_vol,
+        physics_points=phys,
         num_handles=32, num_points=8192, num_nodes=1024, dtype=torch.float64)
     rendered_pts = fem_data["v0"]
 

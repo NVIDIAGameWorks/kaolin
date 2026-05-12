@@ -35,12 +35,16 @@ torch.backends.cuda.matmul.allow_tf32 = False
 # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
 torch.backends.cudnn.allow_tf32 = False
 
-# The deprecated `pts/yms/prs/rhos/appx_vol` API on SimplicitsObject.create_* still has dedicated
-# tests in this file (see TestSimplicitsObjectDeprecation). Other tests use it incidentally and
-# don't care about the warning — silence it module-wide so it doesn't show up as test noise.
-pytestmark = pytest.mark.filterwarnings(
-    "ignore:.*are deprecated. Please use physics_points.*:UserWarning"
-)
+# `SimplicitsObject.create_rigid` keeps the deprecated `pts/yms/prs/rhos/appx_vol` API and
+# `create_trained` itself is deprecated in favor of `create_with_mlp`. Dedicated tests below
+# exercise both deprecation paths; other tests use them incidentally and don't care about the
+# warning — silence them module-wide so they don't show up as test noise.
+pytestmark = [
+    pytest.mark.filterwarnings(
+        "ignore:.*are deprecated. Please use physics_points.*:UserWarning"),
+    pytest.mark.filterwarnings(
+        "ignore:.*'create_trained' is deprecated.*:UserWarning"),
+]
 
 
 ########### Test Simplicits Easy API Training ##############
@@ -72,7 +76,7 @@ class TestSimplicitsObject:
         assert weights.shape == (5, 1)
         assert torch.allclose(weights, torch.ones(5, 1, device=device, dtype=dtype))
 
-    def test_create_with_rkpm_accepts_physics_points(self, device, dtype):
+    def test_create_with_rkpm(self, device, dtype):
         if device == 'cuda' and not torch.cuda.is_available():
             pytest.skip("CUDA not available")
         pts = torch.rand(128, 3, device=device, dtype=dtype)
@@ -94,12 +98,7 @@ class TestSimplicitsObject:
         assert torch.allclose(obj.appx_vol.reshape(-1), appx_vol.reshape(-1))
         assert obj.num_handles == 4 # 3 learned + 1 constant handle
 
-        with pytest.raises(ValueError, match="do not also pass yms/prs/rhos/appx_vol"):
-            _ = SimplicitsObject.create_with_rkpm(
-                physics_points=phys, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol,
-                num_handles=4, num_nodes=16, num_points=64, dtype=torch.float32)
-
-    def test_create_trained_accepts_physics_points(self, device, dtype):
+    def test_create_with_mlp(self, device, dtype):
         if device == 'cuda' and not torch.cuda.is_available():
             pytest.skip("CUDA not available")
         pts = torch.rand(50, 3, device=device, dtype=dtype)
@@ -110,7 +109,7 @@ class TestSimplicitsObject:
 
         phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
 
-        obj = SimplicitsObject.create_trained(
+        obj = SimplicitsObject.create_with_mlp(
             physics_points=phys,
             num_handles=3,
             num_samples=50,
@@ -127,10 +126,48 @@ class TestSimplicitsObject:
         assert torch.equal(obj.pts, pts)
         assert obj.num_handles == 3  # 2 learned + 1 constant handle
 
-        with pytest.raises(ValueError, match="do not also pass yms/prs/rhos/appx_vol"):
-            _ = SimplicitsObject.create_trained(
-                physics_points=phys, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol,
-                num_handles=3, num_samples=50, training_num_steps=5)
+    def test_create_with_mlp_no_normalize(self, device, dtype):
+        if device == 'cuda' and not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+        # Points outside the unit cube — if normalization were applied silently the
+        # MLP's bb_min/bb_max would be set to the bbox of `pts`, not (0, 1).
+        pts = torch.rand(50, 3, device=device, dtype=dtype) * 4.0 - 2.0
+        phys = PhysicsPoints(pts=pts, yms=1e4, prs=0.45, rhos=500.0, appx_vol=1.0)
+
+        obj = SimplicitsObject.create_with_mlp(
+            physics_points=phys,
+            num_handles=3, num_samples=50, model_layers=2,
+            training_num_steps=5, training_log_every=5,
+            normalize_for_training=False,
+        )
+        assert torch.equal(obj.pts, pts)
+        assert obj.num_handles == 3
+        # With normalize_for_training=False the skinning module is built with default
+        # bb_min=0 / bb_max=1, not the bbox of `pts`.
+        assert obj.skinning_mod.bb_min.item() == 0
+        assert obj.skinning_mod.bb_max.item() == 1
+
+    def test_create_trained_emits_deprecation_warning(self, device, dtype):
+        if device == 'cuda' and not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+        pts = torch.rand(50, 3, device=device, dtype=dtype)
+        yms = torch.full((pts.shape[0],), 1e4, device=device, dtype=dtype)
+        prs = torch.full((pts.shape[0],), 0.45, device=device, dtype=dtype)
+        rhos = torch.full((pts.shape[0],), 500.0, device=device, dtype=dtype)
+        appx_vol = torch.tensor([1.0], device=device, dtype=dtype)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", UserWarning)
+            obj = SimplicitsObject.create_trained(
+                pts, yms, prs, rhos, appx_vol,
+                num_handles=3, num_samples=50, model_layers=2,
+                training_num_steps=5, training_log_every=5)
+        deprecation_warnings = [w for w in caught
+                                if "'create_trained' is deprecated" in str(w.message)]
+        assert len(deprecation_warnings) == 1, \
+            f"Expected 1 deprecation warning, got: {[str(w.message) for w in caught]}"
+        assert torch.equal(obj.pts, pts)
+        assert obj.num_handles == 3  # 2 learned + 1 constant handle
 
     def test_create_rigid_accepts_physics_points(self, device, dtype):
         pts = torch.rand(50, 3, device=device, dtype=dtype)
@@ -152,7 +189,7 @@ class TestSimplicitsObject:
         with pytest.raises(ValueError, match="do not also pass yms/prs/rhos/appx_vol"):
             _ = SimplicitsObject.create_rigid(physics_points=phys, yms=yms)
 
-    def test_create_from_function_accepts_physics_points(self, device, dtype):
+    def test_create_from_function(self, device, dtype):
         pts = torch.rand(50, 3, device=device, dtype=dtype)
         yms = torch.full((pts.shape[0],), 1e5, device=device, dtype=dtype)
         prs = torch.full((pts.shape[0],), 0.45, device=device, dtype=dtype)
@@ -171,26 +208,18 @@ class TestSimplicitsObject:
         expected = torch.tensor([0.5, 0.5, 1.0], device=device, dtype=dtype).expand(5, -1)
         assert torch.allclose(weights, expected)
 
-        with pytest.raises(ValueError, match="do not also pass yms/prs/rhos/appx_vol"):
-            _ = SimplicitsObject.create_from_function(
-                physics_points=phys, yms=yms, fcn=base_fn)
-
-        # fcn=None still raises even when physics_points is provided
-        with pytest.raises(ValueError, match="requires a function to be provided"):
-            _ = SimplicitsObject.create_from_function(physics_points=phys)
-
-    @pytest.mark.parametrize("factory", ["create_rigid", "create_trained",
-                                         "create_with_rkpm", "create_from_function"])
+    @pytest.mark.parametrize("factory", ["create_rigid", "create_trained"])
     def test_create_missing_required_args_raises(self, factory):
         # No args at all — should error mentioning the missing args, not crash inside
-        # PhysicsPoints.__init__ with an AttributeError.
+        # PhysicsPoints.__init__ with an AttributeError. `create_with_mlp` / `create_with_rkpm` /
+        # `create_from_function` use the new physics_points-only API; bare Python TypeErrors from
+        # missing positional args are uninteresting, so they're not parametrized here.
         method = getattr(SimplicitsObject, factory)
-        if factory == "create_from_function":
-            # `fcn` is checked before _resolve_physics_points
-            with pytest.raises(ValueError, match="(requires|requires a function)"):
+        if factory == "create_rigid":
+            with pytest.raises(ValueError, match=f"{factory} requires"):
                 _ = method()
         else:
-            with pytest.raises(ValueError, match=f"{factory} requires"):
+            with pytest.raises(TypeError, match="missing .* required positional argument"):
                 _ = method()
 
     def test_create_rigid_emits_deprecation_warning_on_old_api(self, device, dtype):
@@ -201,8 +230,8 @@ class TestSimplicitsObject:
 
     def test_create_no_warning_on_new_api(self, device, dtype):
         # Confirms the new API does not emit any warnings, including the regression where
-        # internal create_rigid calls (e.g. when num_handles==1 in create_trained / create_with_rkpm)
-        # would re-trigger the deprecation warning.
+        # internal create_rigid calls (e.g. when num_handles==1 in create_with_mlp) would
+        # re-trigger the deprecation warning from create_rigid.
         pts = torch.rand(64, 3, device=device, dtype=dtype)
         yms = torch.full((pts.shape[0],), 1e4, device=device, dtype=dtype)
         prs = torch.full((pts.shape[0],), 0.45, device=device, dtype=dtype)
@@ -218,8 +247,8 @@ class TestSimplicitsObject:
         # UserWarning should remain — the deprecation warning must not fire.
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always", UserWarning)
-            _ = SimplicitsObject.create_trained(
-                physics_points=phys, num_handles=1, num_samples=10,
+            _ = SimplicitsObject.create_with_mlp(
+                physics_points=phys, num_handles=1, num_samples=10, model_layers=2,
                 training_num_steps=1, training_log_every=1)
         deprecation_warnings = [w for w in caught
                                 if "deprecated" in str(w.message)]
@@ -383,23 +412,21 @@ class TestSimplicitsObject:
             logger.addHandler(log_handler)
 
             # Create object and capture training logs
-            sim_obj = kal.physics.simplicits.SimplicitsObject.create_trained(pts,
-                                                                             yms,
-                                                                             prs,
-                                                                             rhos,
-                                                                             appx_vol,
-                                                                             num_handles=10,
-                                                                             num_samples=1000,
-                                                                             model_layers=6,
-                                                                             training_batch_size=10,
-                                                                             training_num_steps=4000,
-                                                                             training_lr_start=0.001,
-                                                                             training_lr_end=0.001,
-                                                                             training_le_coeff=0.1,
-                                                                             training_lo_coeff=1000000,
-                                                                             training_log_every=1000,
-                                                                             normalize_for_training=True)
-        
+            phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+            sim_obj = kal.physics.simplicits.SimplicitsObject.create_with_mlp(
+                physics_points=phys,
+                num_handles=10,
+                num_samples=1000,
+                model_layers=6,
+                training_batch_size=10,
+                training_num_steps=4000,
+                training_lr_start=0.001,
+                training_lr_end=0.001,
+                training_le_coeff=0.1,
+                training_lo_coeff=1000000,
+                training_log_every=1000,
+                normalize_for_training=True)
+
             # NOTE: Take a look at this MLP if this test fails. Might help with debugging.
             # torch.save(sim_obj.base_skinning_weight_function, os.path.dirname(os.path.realpath(__file__)) + "/regression_test_data/box_reference_weights_fcn_10_handles.pth")
 
@@ -433,22 +460,20 @@ class TestSimplicitsObject:
             pts, yms, prs, rhos, appx_vol, orig_vertices = fox_object
 
             # Create object and capture training logs
-            sim_obj = kal.physics.simplicits.SimplicitsObject.create_trained(pts,
-                                                                             yms,
-                                                                             prs,
-                                                                             rhos,
-                                                                             appx_vol,
-                                                                             num_handles=10,
-                                                                             num_samples=1000,
-                                                                             model_layers=6,
-                                                                             training_batch_size=10,
-                                                                             training_num_steps=1000,
-                                                                             training_lr_start=0.001,
-                                                                             training_lr_end=0.001,
-                                                                             training_le_coeff=0.1,
-                                                                             training_lo_coeff=1000000,
-                                                                             training_log_every=1000,
-                                                                             normalize_for_training=True)
+            phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+            sim_obj = kal.physics.simplicits.SimplicitsObject.create_with_mlp(
+                physics_points=phys,
+                num_handles=10,
+                num_samples=1000,
+                model_layers=6,
+                training_batch_size=10,
+                training_num_steps=1000,
+                training_lr_start=0.001,
+                training_lr_end=0.001,
+                training_le_coeff=0.1,
+                training_lo_coeff=1000000,
+                training_log_every=1000,
+                normalize_for_training=True)
 
             r"Step 3: Read Reference Train Vals"
             filename = os.path.dirname(os.path.realpath(__file__)) + \
