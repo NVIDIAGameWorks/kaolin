@@ -359,6 +359,84 @@ class BaseTests:
                 elif attr in self.ClassTested.class_other_attributes():
                     assert val == orig_val
 
+    @pytest.fixture()
+    def setitem_input_kwargs(self):
+        return {}
+
+    @with_seed(42)
+    def test_setitem(self, device, setitem_input_kwargs):
+        for with_features in [False, True, ["a", "b"]]:
+
+            kwargs = self.sample_input_kwargs(10, with_features=False, device=device, **setitem_input_kwargs)
+            feature_size = self.sample_feature_shape()
+            kwargs['features'] = self.sample_features_input(10, with_features, device=device, feature_shape=feature_size)
+
+            instance = self.ClassTested(**kwargs)
+            original = copy.deepcopy(instance)
+
+            mask = torch.zeros(10, dtype=torch.bool, device=device)
+            mask[::2] = True
+
+            replacement_kwargs = self.sample_input_kwargs(
+                int(mask.sum().item()), with_features=False, device=device, **setitem_input_kwargs)
+            replacement_kwargs['features'] = self.sample_features_input(
+                    int(mask.sum().item()), with_features, device=device, feature_shape=feature_size)
+            replacement = self.ClassTested(**replacement_kwargs)
+
+            instance[mask] = replacement
+
+            for attr in instance.class_point_attributes():
+                val = getattr(instance, attr, None)
+                if val is None:
+                    continue
+                orig = getattr(original, attr)
+                repl = getattr(replacement, attr)
+                if isinstance(val, dict):
+                    for k in val:
+                        assert contained_torch_equal(val[k][mask], repl[k], approximate=True), \
+                            f'{attr}[{k}] not updated to replacement at masked indices'
+                        assert contained_torch_equal(val[k][~mask], orig[k][~mask], approximate=True), \
+                            f'{attr}[{k}] should be unchanged at non-masked indices'
+                else:
+                    assert contained_torch_equal(val[mask], repl, approximate=True), \
+                        f'{attr} not updated to replacement at masked indices'
+                    assert contained_torch_equal(val[~mask], orig[~mask], approximate=True), \
+                        f'{attr} should be unchanged at non-masked indices'
+
+            for attr in instance.class_other_attributes():
+                assert getattr(instance, attr) == getattr(original, attr), \
+                    f'Non-point attribute {attr} should not be modified by __setitem__'
+
+            # Round-trip identity: assigning a slice back into itself should leave it unchanged.
+            roundtrip = copy.deepcopy(original)
+            roundtrip[mask] = roundtrip[mask]
+            for attr in roundtrip.get_attributes():
+                assert contained_torch_equal(
+                    getattr(roundtrip, attr), getattr(original, attr), approximate=True), \
+                    f'Round-trip __setitem__ changed {attr}'
+
+        # Validation errors
+        kwargs = self.sample_input_kwargs(10, device=device)
+        instance = self.ClassTested(**kwargs)
+        mask = torch.zeros(10, dtype=torch.bool, device=device)
+        mask[::2] = True
+        ok_replacement = self.ClassTested(
+            **self.sample_input_kwargs(int(mask.sum().item()), device=device))
+
+        with pytest.raises(TypeError):
+            instance[[True] * 10] = ok_replacement
+        with pytest.raises(TypeError):
+            instance[torch.zeros(10, dtype=torch.float32, device=device)] = ok_replacement
+        with pytest.raises(ValueError):
+            instance[torch.zeros(11, dtype=torch.bool, device=device)] = ok_replacement
+        with pytest.raises(TypeError):
+            instance[mask] = "not an instance"
+
+        wrong_len_replacement = self.ClassTested(
+            **self.sample_input_kwargs(int(mask.sum().item()) + 1, device=device))
+        with pytest.raises(ValueError):
+            instance[mask] = wrong_len_replacement
+
     @with_seed(42)
     def test_copy(self, device):
         kwargs = self.sample_input_kwargs(10, with_features=True, device=device)
@@ -672,6 +750,10 @@ class TestGaussians(BaseTests):
 
     def attributes_changed_by_transform(self):
         return ["positions", "orientations", "scales", "sh_coeff"]
+
+    @pytest.fixture()
+    def setitem_input_kwargs(self):
+        return {"sh_degree": 2}
 
     def sample_input_kwargs(self, num_pts, optional_attributes=None, with_features: bool | list[str] = False, device="cpu", dtype=torch.float32, sh_degree=None):
         if sh_degree is None:

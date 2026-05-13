@@ -9,7 +9,7 @@ API
 ---
 
 .. autoclass:: kaolin.rep.GaussianSplatModel
-   :special-members: __init__, __len__, __getitem__
+   :special-members: __init__, __len__, __getitem__, __setitem__
    :members:
    :inherited-members:
    :show-inheritance:
