@@ -25,6 +25,7 @@ class KaolinTestEnvVars(str, Enum):
     # TODO: replace hard-coded strings with these in all the tests --> we have too many hidden env vars controlling behavior
     # Test datasets and assets
     TEST_SCANNED_TOYS = 'KAOLIN_TEST_SCANNED_TOYS'
+    TEST_TENSOR_IR = 'KAOLIN_TEST_TENSOR_IR'
     TEST_GSPLATS_DIR = 'KAOLIN_TEST_GSPLATS_DIR'
     TEST_MODELNET_PATH = 'KAOLIN_TEST_MODELNET_PATH'
     TEST_SHAPENETV1_PATH = 'KAOLIN_TEST_SHAPENETV1_PATH'
@@ -44,3 +45,9 @@ class KaolinEnvVars(str, Enum):
     #: location exposed as :py:data:`~kaolin.utils.bundled_data.SCANNED_TOYS_PATH`
     #: (typically under ``sample_data`` in a source checkout).
     SCANNED_TOYS_PATH = 'KAOLIN_SCANNED_TOYS_PATH'
+
+    #: Filesystem path to the root directory of the tensor-IR sample dataset.
+    #: Set ``KAOLIN_TENSOR_IR_PATH`` in the shell to override the default location
+    #: exposed as :py:data:`~kaolin.utils.bundled_data.TENSOR_IR_PATH`
+    #: (typically under ``sample_data`` in a source checkout).
+    TENSOR_IR_PATH = 'KAOLIN_TENSOR_IR_PATH'

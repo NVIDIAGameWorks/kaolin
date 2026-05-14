@@ -24,7 +24,8 @@ import zipfile
 from kaolin.utils.env_vars import KaolinEnvVars
 
 __all__ = ['BUNDLED_DATA_PATH', 'SAMPLE_MESHES_PATH', 'SCANNED_TOYS_PATH', 'SCANNED_TOYS_NAMES',
-           'download_scanned_toys_dataset']
+           'TENSOR_IR_PATH', 'TENSOR_IR_NAMES',
+           'download_scanned_toys_dataset', 'download_tensor_ir_dataset']
 
 # TODO: add our meshes to manifest to make them available
 #: Absolute path to the ``sample_data`` tree shipped with Kaolin (meshes, scanned toys, etc.).
@@ -45,6 +46,14 @@ SCANNED_TOYS_PATH = os.getenv(KaolinEnvVars.SCANNED_TOYS_PATH) or os.path.join(B
 #: The dataset also includes a combined ``BluehairRagdoll_multi.usdc`` (two Gaussian clouds: original and transformed)
 #: and ``BluehairRagdoll_compressed.usdc`` (same clouds in float16, spherical harmonics degree 0).
 SCANNED_TOYS_NAMES = ['BluehairRagdoll', 'bublik_octopus', 'knit_meow', 'mer_elephant', 'stink_raccoon', 'sunflower_baby']
+
+#: Bundled tensor-IR assets directory: by default ``sample_data/tensor_ir`` relative to the
+#: repo root in a source checkout, unless overridden with ``KAOLIN_TENSOR_IR_PATH``.
+TENSOR_IR_PATH = os.getenv(KaolinEnvVars.TENSOR_IR_PATH) or os.path.join(BUNDLED_DATA_PATH, 'tensor_ir')  #: :meta hide-value:
+
+#: Tensor-IR sample identifiers matching ``.ply`` files under :py:data:`TENSOR_IR_PATH`.
+#: Prefixed with ``tensorir_`` so they don't collide with other ficus/lego variants kaolin tests use.
+TENSOR_IR_NAMES = ['tensorir_ficus', 'tensorir_lego']
 
 # Expected MD5 hex digests for toy Gaussian ``.usdc`` files under ``SCANNED_TOYS_PATH``.
 _TOYS_USDC_CHECKSUMS = {
@@ -89,6 +98,11 @@ _TOYS_MESH_CHECKSUMS = {
     'mesh.sunflower_baby.usd': '64f7e5a042dd4e0f76402d9819aedeaa',
 }
 
+# Expected MD5 hex digests for tensor-IR sample ``.ply`` files under ``TENSOR_IR_PATH``.
+_TENSOR_IR_PLY_CHECKSUMS = {
+    'tensorir_ficus.ply': '2c2c3bf45dd26038e84acca32cd95a74',
+    'tensorir_lego.ply': 'f382c20a563877b97a953537e90c8410',
+}
 
 # TODO: document details, point to a whitepaper when available
 def download_scanned_toys_dataset():
@@ -140,3 +154,48 @@ def download_scanned_toys_dataset():
                         _TOYS_MESH_CHECKSUMS)
 
     return SCANNED_TOYS_PATH
+
+
+def download_tensor_ir_dataset():
+    """Downloads Tensor-IR sample PLYs (real gaussians with per-point features)."""
+    def _have_expected_files(file_to_checksum, return_reason=False):
+        have_all = True
+        msg = ''
+        for file_name, md5_checksum in file_to_checksum.items():
+            path = os.path.join(TENSOR_IR_PATH, file_name)
+            if not os.path.exists(path):
+                if return_reason:
+                    msg = f'missing {path}'
+                have_all = False
+                break
+            with open(path, 'rb') as f:
+                if md5_checksum != hashlib.md5(f.read()).hexdigest():
+                    if return_reason:
+                        msg = f'md5 mismatch for {path}, expected: {md5_checksum}'
+                    have_all = False
+                    break
+        if return_reason:
+            return have_all, msg
+        return have_all
+
+    def _wget_unzip(url):
+        file_basename = os.path.basename(url)
+        target_filename = os.path.join(TENSOR_IR_PATH, file_basename)
+        wget.download(url, target_filename)
+        with zipfile.ZipFile(target_filename, 'r') as zip_ref:
+            zip_ref.extractall(TENSOR_IR_PATH)
+        os.remove(target_filename)
+
+    def _download_if_needed(url, expected_file_checksums):
+        if not _have_expected_files(expected_file_checksums):
+            _wget_unzip(url)
+            have_all, msg = _have_expected_files(expected_file_checksums, return_reason=True)
+            assert have_all, f'After download of {url}, still file mismatch: {msg}'
+
+    if not os.path.exists(TENSOR_IR_PATH):
+        os.makedirs(TENSOR_IR_PATH, exist_ok=True)
+
+    _download_if_needed('https://nvidia-kaolin.s3.us-east-2.amazonaws.com/data/tensor_ir.ply.zip',
+                        _TENSOR_IR_PLY_CHECKSUMS)
+
+    return TENSOR_IR_PATH

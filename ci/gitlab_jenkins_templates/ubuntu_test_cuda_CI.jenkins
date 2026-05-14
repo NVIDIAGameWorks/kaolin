@@ -406,7 +406,9 @@ echo "Driver compat OK: cuda=\$CUDA need>=\$MIN have=\$DRV (max claimed: \$DRV_M
             export KAOLIN_TEST_SHREC16_PATH=/mnt/data/ci_shrec16
             export KAOLIN_TEST_GSPLATS_DIR=/mnt/gsplats
             export KAOLIN_SCANNED_TOYS_PATH=/mnt/data/toys/
+            export KAOLIN_TENSOR_IR_PATH=/mnt/data/tensor_ir/
             export KAOLIN_TEST_SCANNED_TOYS=1
+            export KAOLIN_TEST_TENSOR_IR=1
             pytest --durations=50 --import-mode=importlib -rs --cov=/kaolin/kaolin \
                 --log-disable=PIL.PngImagePlugin \
                 --log-disable=PIL.TiffImagePlugin \
