@@ -132,7 +132,7 @@ class SimplicitsRKPM(SkinningModule):
        
             self.num_nodes = pts.shape[0]
             node_indices = torch.arange(0, pts.shape[0], device=device)
-            evecs = nn.Parameter(torch.zeros(self.num_nodes, self.num_handles, dtype=self.dtype, device=self.evecs.device))
+            evecs = nn.Parameter(torch.zeros(self.num_nodes, self.num_handles, dtype=self.dtype, device=device))
             self.register_parameter("evecs", evecs)
             self.evecs.requires_grad = False
         else:
@@ -263,6 +263,34 @@ class SimplicitsRKPM(SkinningModule):
         grad = torch.einsum("nNd,Nc->ncd", grad_phi, self.evecs)  # (n, D, C)
         return grad.to(dtype=out_dtype)
 
+@torch.compile(fullgraph=True)
+def compiled_func_x(x, nodes, radius):
+    r"""Uncorrected Gaussian RBF kernel evaluated at input locations.
+
+    Args:
+        x (torch.Tensor): Query points of shape :math:`(n, d)`.
+        nodes (torch.Tensor): RBF node centers of shape :math:`(N, d)`.
+        radius (torch.Tensor): Per-node support radii of shape :math:`(N,)`.
+
+    Returns:
+        torch.Tensor: Kernel values of shape :math:`(n, N)`.
+    """
+    r = torch.cdist(x, nodes)
+    return torch.exp(-(r / radius.unsqueeze(0)) ** 2)
+
+@torch.compile(fullgraph=True)
+def compiled_phi_x(Cx, Pn, func_x):
+    r"""Assembles RKPM corrected shape functions from polynomial coefficients and the RBF.
+
+    Args:
+        Cx (torch.Tensor): Polynomial correction coefficients of shape :math:`(n, P)`.
+        Pn (torch.Tensor): Polynomial basis at nodes of shape :math:`(N, P)`.
+        func_x (torch.Tensor): Uncorrected RBF values of shape :math:`(n, N)`.
+
+    Returns:
+        torch.Tensor: Corrected shape functions of shape :math:`(n, N)`.
+    """
+    return (Cx @ Pn.T) * func_x  # (n, P) @ (P, N) -> (n, N)
 
 class RKPM(nn.Module):
     r"""Reproducing Kernel Particle Method (RKPM) function module.
@@ -315,19 +343,6 @@ class RKPM(nn.Module):
             self.radius.data.copy_(radius)
         self.initialized = True
 
-    def func_r(self, r):
-        r"""Evaluates the uncorrected radial basis kernel as a function of distance.
-
-        Args:
-            r (torch.Tensor): Distances from query points to nodes of shape
-                :math:`(n, N)`.
-
-        Returns:
-            torch.Tensor: Kernel values of shape :math:`(n, N)`.
-        """
-        # uncorrected RBF kernel, as a function of radius
-        return torch.exp(-(r / self.radius) ** 2)
-    
     def func_x(self, x):
         r"""Evaluates the uncorrected radial basis kernel at input locations.
 
@@ -338,8 +353,7 @@ class RKPM(nn.Module):
             torch.Tensor: Kernel values of shape :math:`(n, N)`.
         """
         # uncorrected RBF kernel, as a function of input location
-        r = torch.linalg.norm(x[:, None, :] - self.nodes[None, :, :], dim=-1)
-        return self.func_r(r)
+        return compiled_func_x(x, self.nodes, self.radius)
     
     def dfunc_dx(self, x):
         r"""Computes the spatial gradient of the uncorrected radial basis kernel.
@@ -428,7 +442,7 @@ class RKPM(nn.Module):
         Mx = torch.einsum("nN,Nij->nij", func_x, Pn_PnT)  # (n, P, P)
         Px = self.polynomial(x)  # (n, P)
         Cx = torch.linalg.solve(Mx, Px)  # (n, P)
-        phi_x = (Cx @ Pn.T) * func_x  # (n, P) @ (P, N) -> (n, N)
+        phi_x = compiled_phi_x(Cx, Pn, func_x) #(Cx @ Pn.T) * func_x  # (n, P) @ (P, N) -> (n, N)
         return phi_x
 
     def grad_phi(self, x):

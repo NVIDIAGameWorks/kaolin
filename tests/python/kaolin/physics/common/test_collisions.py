@@ -204,7 +204,7 @@ def test_collision_jacobian(test_scenes):
                                      friction=friction)  # other parameters are default
     
     collision.detect_collisions(dx, x0, obj_ids, is_static)
-    collision.get_jacobian(weights, x0, is_static)
+    collision.calculate_jacobian(weights, x0, is_static)
     collision_jacobian = collision.collision_J_dense
 
     if collision.num_contacts == 0:
@@ -437,7 +437,7 @@ def test_collision_bounds_indexing():
     assert collision.num_contacts == 2, \
         f"Expected exactly 2 contacts, got {collision.num_contacts}"
 
-    collision.get_jacobian(weights, x0, is_static)
+    collision.calculate_jacobian(weights, x0, is_static)
 
     J_a = collision.collision_J_a
     assert J_a.offsets.shape[0] >= 3 * 2 + 1

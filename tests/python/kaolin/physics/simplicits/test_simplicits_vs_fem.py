@@ -286,3 +286,105 @@ def test_cantilever_beam_dFdz_consistency(device, dtype, cantilever_beam_dFdz_se
     _, simplicits_scene, data = cantilever_beam_dFdz_setup
     run_regression_test(simplicits_scene, data, tol=0.005, test_name="cantilever_beam_dFdz")
 
+
+@pytest.fixture(params=[False, True])
+@with_seed(0, 0, 0)
+def cantilever_beam_apply_qr_setup(request, device, dtype, cantilever_beam_data):
+    """Cantilever beam with rkpm object, parametrized over apply_qr."""
+    mesh, pts, yms, prs, rhos, object_vol, fem_data = cantilever_beam_data
+    phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=object_vol)
+    simplicits_object = SimplicitsObject.create_with_rkpm(
+        physics_points=phys,
+        num_handles=32, num_nodes=1024, num_points=8192, dtype=torch.float64)
+    rendered_pts = fem_data["v0"]
+
+    scene = SimplicitsScene(device=device, timestep=0.05,
+                            max_newton_steps=10, max_ls_steps=20)
+    scene.newton_hessian_regularizer = 0
+    scene.direct_solve = True
+    scene.add_object(simplicits_object, num_qp=1024,
+                     apply_qr=request.param,
+                     renderable_pts=rendered_pts)
+    scene.set_scene_gravity(torch.tensor([0, 9.8, 0]))
+    scene.set_scene_floor(floor_height=-1.0, floor_axis=1,
+                          floor_penalty=10000.0, flip_floor=False)
+    scene.set_object_boundary_condition(
+        0, "right", lambda x: x[:, 0] >= 0.98, bdry_penalty=10000.0)
+    return mesh, scene, fem_data
+
+
+@pytest.fixture(params=[True, False])
+@with_seed(0, 0, 0)
+def cantilever_beam_normalize_setup(request, device, dtype, cantilever_beam_data):
+    """Cantilever beam with rkpm object, parametrized over normalize_weights_by_samples."""
+    mesh, pts, yms, prs, rhos, object_vol, fem_data = cantilever_beam_data
+    phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=object_vol)
+    simplicits_object = SimplicitsObject.create_with_rkpm(
+        physics_points=phys,
+        num_handles=32, num_nodes=1024, num_points=8192, dtype=torch.float64)
+    rendered_pts = fem_data["v0"]
+
+    scene = SimplicitsScene(device=device, timestep=0.05,
+                            max_newton_steps=10, max_ls_steps=20)
+    scene.newton_hessian_regularizer = 0
+    scene.direct_solve = True
+    scene.add_object(simplicits_object, num_qp=1024,
+                     normalize_weights_by_samples=request.param,
+                     renderable_pts=rendered_pts)
+    scene.set_scene_gravity(torch.tensor([0, 9.8, 0]))
+    scene.set_scene_floor(floor_height=-1.0, floor_axis=1,
+                          floor_penalty=10000.0, flip_floor=False)
+    scene.set_object_boundary_condition(
+        0, "right", lambda x: x[:, 0] >= 0.98, bdry_penalty=10000.0)
+    return mesh, scene, fem_data
+
+
+@pytest.mark.parametrize("device", ["cuda"])
+@pytest.mark.parametrize("dtype", [torch.float32])
+def test_cantilever_beam_apply_qr_consistency(device, dtype, cantilever_beam_apply_qr_setup):
+    """Both apply_qr=False and True should pass the cantilever beam FEM regression test."""
+    _, simplicits_scene, data = cantilever_beam_apply_qr_setup
+    run_regression_test(simplicits_scene, data, tol=0.005, test_name="cantilever_beam_apply_qr")
+
+
+@pytest.mark.parametrize("device", ["cuda"])
+@pytest.mark.parametrize("dtype", [torch.float32])
+def test_cantilever_beam_normalize_consistency(device, dtype, cantilever_beam_normalize_setup):
+    """Both normalize_weights_by_samples=True and False should pass the cantilever beam FEM regression test."""
+    _, simplicits_scene, data = cantilever_beam_normalize_setup
+    run_regression_test(simplicits_scene, data, tol=0.01, test_name="cantilever_beam_normalize")
+
+
+@pytest.fixture
+@with_seed(0, 0, 0)
+def cantilever_beam_qr_and_normalize_setup(device, dtype, cantilever_beam_data):
+    """Cantilever beam with apply_qr=True AND normalize_weights_by_samples=True."""
+    mesh, pts, yms, prs, rhos, object_vol, fem_data = cantilever_beam_data
+    phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=object_vol)
+    simplicits_object = SimplicitsObject.create_with_rkpm(
+        physics_points=phys,
+        num_handles=32, num_nodes=1024, num_points=8192, dtype=torch.float64)
+    rendered_pts = fem_data["v0"]
+
+    scene = SimplicitsScene(device=device, timestep=0.05,
+                            max_newton_steps=10, max_ls_steps=20)
+    scene.newton_hessian_regularizer = 0
+    scene.direct_solve = True
+    scene.add_object(simplicits_object, num_qp=1024,
+                     apply_qr=True,
+                     normalize_weights_by_samples=True,
+                     renderable_pts=rendered_pts)
+    scene.set_scene_gravity(torch.tensor([0, 9.8, 0]))
+    scene.set_scene_floor(floor_height=-1.0, floor_axis=1,
+                          floor_penalty=10000.0, flip_floor=False)
+    scene.set_object_boundary_condition(
+        0, "right", lambda x: x[:, 0] >= 0.98, bdry_penalty=10000.0)
+    return mesh, scene, fem_data
+
+
+@pytest.mark.parametrize("device", ["cuda"])
+@pytest.mark.parametrize("dtype", [torch.float32])
+def test_cantilever_beam_qr_and_normalize_consistency(device, dtype, cantilever_beam_qr_and_normalize_setup):
+    """apply_qr=True AND normalize_weights_by_samples=True together should still pass the cantilever beam FEM regression test."""
+    _, simplicits_scene, data = cantilever_beam_qr_and_normalize_setup
+    run_regression_test(simplicits_scene, data, tol=0.01, test_name="cantilever_beam_qr_and_normalize")

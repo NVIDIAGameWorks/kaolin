@@ -83,8 +83,17 @@ class SkinningModule(torch.nn.Module):
         Returns:
             torch.Tensor: The Jacobian of the skinning weights, of shape :math:`(N, \text{num_handles}, 3)`.
         """
-        jac_single = torch.func.jacrev(lambda x: self.compute_skinning_weights(x[None])[0])
-        return torch.vmap(jac_single)(pts)
+        if hasattr(self, 'grad'):
+            norm_pts = self._offset_scale(pts)
+            model_grad = self.grad(norm_pts)
+            model_grad = model_grad / (self.bb_max - self.bb_min)[None, None]
+            return torch.cat([
+                model_grad,
+                torch.zeros((model_grad.shape[0], 1, model_grad.shape[2]), device=pts.device)
+            ], dim=1)
+        else:
+            jac_single = torch.func.jacrev(lambda x: self.compute_skinning_weights(x[None])[0])
+            return torch.vmap(jac_single)(pts)
 
     @staticmethod
     def from_function(function: Callable, bb_min=0, bb_max=1):

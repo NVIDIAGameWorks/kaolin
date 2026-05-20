@@ -15,15 +15,15 @@
 
 import logging
 import warnings
-from typing import Literal, Any, Union
+from typing import Literal, Union
 
 import warp as wp
 import warp.sparse as wps
 import numpy as np
 import torch
-import kaolin
 
 from functools import partial
+from scipy.linalg import qr
 
 from ..utils import warp_utilities, torch_utilities
 
@@ -55,12 +55,26 @@ class SimulatedObject(SkinnedPhysicsPoints):
     def __init__(self, pts, yms, prs, rhos, appx_vol, skinning_weights, dwdx,
                  renderable: SkinnedPointsProtocol = None,
                  init_transform=None,
-                 is_kinematic=False):
+                 is_kinematic=False,
+                 normalize_weights_by_samples=False,
+                 apply_qr=False):
+
+        handle_norms = None
+        if normalize_weights_by_samples:
+            handle_norms = torch.linalg.norm(skinning_weights, dim=0).clamp(min=1e-10)
+            skinning_weights = skinning_weights / handle_norms.unsqueeze(0)
+            dwdx = dwdx / handle_norms.reshape(1, -1, 1)
+
+
         super().__init__(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol,
                          skinning_weights=skinning_weights, dwdx=dwdx,
                          renderable=renderable)
+        self.handle_norms = handle_norms
+
         self.init_transform = init_transform
         self.is_kinematic = is_kinematic
+        self.normalize_weights_by_samples = normalize_weights_by_samples
+        self.apply_qr = apply_qr
 
         # TODO(vismay):
         # This is a live design question. We should discuss this with Gilles/Newton folks.
@@ -95,11 +109,83 @@ class SimulatedObject(SkinnedPhysicsPoints):
         self._B_dense = None
         self._dFdz_dense = None
 
+        # QR reads B/dFdz via the dense properties, so must run after they exist.
+        if apply_qr:
+            self._apply_qr_decomposition()
+
         # Let's initialize simulation state variables
         self.z = None
         self.z_prev = None
         self.z_dot = None
         self.reset_sim_state()
+        
+
+    def _apply_qr_decomposition(self):
+        r"""QR: orthogonalize B to reduce condition number of Newton system.
+
+        The simulator's linearized skinning map is :math:`\Delta\mathbf{x} = \mathbf{B}\,\mathbf{z}`,
+        where :math:`\mathbf{B}` is the sparse LBS Jacobian (built from skinning weights and rest
+        points) and :math:`\mathbf{z}` is the stacked per-handle DOFs (12 per handle: a :math:`3\times4`
+        affine block). Columns of the raw :math:`\mathbf{B}_{\text{old}}` are often nearly
+        dependent, which hurts conditioning of :math:`\mathbf{B}^\top\mathbf{M}\mathbf{B}` and of
+        Newton solves.
+
+        Column-pivoted economic QR factorizes
+
+        .. math::
+           \mathbf{B}_{\text{old}}\,\boldsymbol{\Pi} = \mathbf{Q}\,\mathbf{R},
+
+        with :math:`\mathbf{Q}` orthonormal-columned, :math:`\mathbf{R}` upper-triangular, and
+        :math:`\boldsymbol{\Pi}` a column permutation. Define the basis-change matrix
+
+        .. math::
+           \mathbf{K} \equiv \boldsymbol{\Pi}\,\mathbf{R}^{-1} \quad(\text{stored as ``qr\_tfm``}),
+
+        so :math:`\mathbf{B}_{\text{old}}\,\mathbf{K} = \mathbf{Q}`. The stored LBS operator becomes
+        :math:`\mathbf{B}_{\text{new}} = \mathbf{Q}`, and the internal DOFs :math:`\mathbf{z}'`
+        relate to the original :math:`\mathbf{z}` by :math:`\mathbf{z} = \mathbf{K}\,\mathbf{z}'`.
+        The reachable set of linearized motions is unchanged — this is a reparameterization, not a
+        physics change. The inverse direction (used in the line search's apply_bounds for collision 
+        bounds in the raw sparse-DOF basis) is stored as ``qr_tfm_inv = R @ pmat.T``, with
+        ``qr_tfm @ qr_tfm_inv = I``.
+
+        Elasticity derivatives are transformed by the chain rule:
+        :math:`\partial\mathbf{F}/\partial\mathbf{z}' = (\partial\mathbf{F}/\partial\mathbf{z})\,\mathbf{K}`,
+        applied here as ``dFdz_dense @ qr_tfm``. Initial-state solve uses a least-squares fit
+        of :math:`\mathbf{B}_{\text{new}}\mathbf{z}'` to the transformed rest positions
+        (see ``reset_sim_state``). When exporting per-handle affines in the original column space
+        (e.g. to drive unnormalized renderable skinning weights), ``qr_tfm`` is applied to
+        :math:`\mathbf{z}'` — see ``_get_object_transforms_internal``.
+        """
+
+        # TODO(Donglai): Could this be implemented entirely on the GPU?
+
+        B_dense = self.B_dense
+        np_B = B_dense.detach().cpu().numpy()
+        _, np_R, np_P = qr(np_B, mode='economic', pivoting=True)
+        pmat = torch.eye(np_B.shape[1], device=self.device, dtype=self.dtype)[:, np_P]
+        R = torch.from_numpy(np_R).to(device=self.device, dtype=self.dtype)
+        self.qr_tfm = pmat @ torch.linalg.solve_triangular(
+            R, torch.eye(R.shape[0], device=R.device, dtype=R.dtype), upper=True)
+        # qr_tfm_inv = R @ P^T; satisfies qr_tfm @ qr_tfm_inv = I.
+        # Used to map vectors from the post-QR z basis back to the pre-QR z basis
+        # (and the inverse direction) so the collision bounds can clamp in the
+        # original basis where the per-DOF sparsity is meaningful.
+        self.qr_tfm_inv = R @ pmat.T
+
+        Q_dense = B_dense @ self.qr_tfm
+        self.B = wps.bsr_copy(warp_utilities._warp_csr_from_torch_dense(Q_dense), block_shape=(1, 4))
+        self.B.nnz_sync()
+        self._B_dense = Q_dense
+
+        # Kinematic objects keep dFdz as a sparse zero matrix (allocated at construction);
+        # orthogonalizing zeros yields zeros, so skip the dense materialization to avoid
+        # allocating a (9*N, 12*H) tensor that can OOM on large objects.
+        if not self.is_kinematic:
+            dFdz_dense = self.dFdz_dense
+            self._dFdz_dense = dFdz_dense @ self.qr_tfm
+            self.dFdz = warp_utilities._warp_csr_from_torch_dense(self._dFdz_dense)
+            self.dFdz.nnz_sync()
 
     @property
     def B_dense(self):
@@ -117,7 +203,8 @@ class SimulatedObject(SkinnedPhysicsPoints):
         return self._dFdz_dense
 
     @classmethod
-    def from_skinned_physics_points(cls, phys_pts: SkinnedPhysicsPoints, init_transform, is_kinematic=False):
+    def from_skinned_physics_points(cls, phys_pts: SkinnedPhysicsPoints, init_transform, is_kinematic=False,
+                                    normalize_weights_by_samples=False, apply_qr=False):
         """
         Creates simulation object given skinned physics points, minimal data needed for Simplicits simulation
         (e.g. this data can be read from disk).
@@ -126,6 +213,8 @@ class SimulatedObject(SkinnedPhysicsPoints):
             phys_pts (SkinnedPhysicsPoints): SkinnedPhysicsPoints object to use to define SimulatedObject properties.
             init_transform: Initial transform of the SimulatedObject.
             is_kinematic: If true, the object will be kinematic in the scene. Default: False.
+            normalize_weights_by_samples: If true, normalize skinning weights by L2 norm for better conditioning. Default: False.
+            apply_qr: If true, apply QR decomposition to orthogonalize the LBS basis. Default: False.
 
         Returns:
             (SimulatedObject): SimulatedObject object.
@@ -134,18 +223,24 @@ class SimulatedObject(SkinnedPhysicsPoints):
                    rhos=phys_pts.rhos, appx_vol=phys_pts.appx_vol,
                    skinning_weights=phys_pts.skinning_weights, dwdx=phys_pts.dwdx,
                    renderable=phys_pts.renderable,
-                   init_transform=init_transform, is_kinematic=is_kinematic)
+                   init_transform=init_transform, is_kinematic=is_kinematic,
+                   normalize_weights_by_samples=normalize_weights_by_samples, apply_qr=apply_qr)
 
     def reset_sim_state(self):
         r"""Reset the simulation state. Object's handle transforms are set back to initial deformations.
         This does not reset any material parameters or simplicits object parameters.
         """
 
-        self.z = torch.zeros(self.num_handles * 12, dtype=self.dtype, device=self.device)
-
-        # Sets the final (constant) handle
         if self.init_transform is not None:
-            self.z[-12:] = self.init_transform.flatten()
+            # The constant (last) handle has weight 1 (or 1/norm after normalization) at every
+            # point, so placing init_transform entirely in the last handle reproduces the
+            # desired rigid delta on every point. The lstsq route used to do this implicitly
+            # but introduced float32 noise; this closed form is exact in every case.
+            z_pre_qr = torch.zeros(self.num_handles * 12, dtype=self.dtype, device=self.device)
+            scale = self.handle_norms[-1].detach() if self.normalize_weights_by_samples else 1.0
+            z_pre_qr[-12:] = self.init_transform.flatten() * scale
+            # Map from post-normalization, pre-QR basis to post-QR basis: z' = qr_tfm_inv @ z.
+            self.z = self.qr_tfm_inv @ z_pre_qr if self.apply_qr else z_pre_qr
 
         self.z_prev = self.z.clone().detach()
         self.z_dot = torch.zeros_like(self.z, device=self.device)
@@ -170,15 +265,12 @@ class SimplicitsScene:
         cg_tol=1e-4,
         cg_iters=100,
         conv_tol=1e-4):
-        r"""Initializes a simplicits scene. SimplicitsObjects can be added to the scene. 
-        Scene forces such as floor and gravity can be set on the scene. 
+        r"""Initializes a simplicits scene. SimplicitsObjects can be added to the scene.
+        Scene forces such as floor and gravity can be set on the scene.
         The scene defaults to using float32 for all computations.
 
         Args:
             device (str, optional): Defaults to 'cuda'.
-            dtype (torch.dtype, optional): Defaults to torch.float. Must be torch.float32 — the
-                underlying warp sparse infrastructure (B, dFdz, mass matrix, sim state arrays)
-                is hard-coded to wp.float32, so float64 is unsupported.
             direct_solve (bool, optional): Whether to use direct solve for linear system. Defaults to True.
             use_cuda_graphs (bool, optional): Whether to use cuda graphs. Defaults to False.
             timestep (float, optional): Sim time-step. Defaults to 0.03.
@@ -232,6 +324,10 @@ class SimplicitsScene:
         self.sim_rhos = None         # wp.array(num_qp, dtype=wp.float32)
         self.sim_vols = None         # wp.array(num_qp, dtype=wp.float32)
         self.sim_masses = None       # wp.array(num_qp, dtype=wp.float32)
+
+        self.sim_qr_tfm = None         # full (12*total_H, 12*total_H) rotation; applied to collision_J once per detection
+        self.sim_qr_tfm_red = None     # reduced (kinematic objects projected out) variant for line-search wrap
+        self.sim_qr_tfm_inv_red = None # reduced inverse variant for line-search wrap
 
         # DOFs
         self.sim_z = None         # wp.array(num_handles*12, dtype=wp.float32)
@@ -288,6 +384,10 @@ class SimplicitsScene:
         self._ready_for_sim = False
 
     def _compute_sim_constants(self):  # pragma: no cover
+        if len(self.sim_obj_dict) == 0:
+            raise RuntimeError(
+                'Cannot prepare simulation for an empty scene; call add_object() first.')
+           
         _num_qp = []
         _num_cp = []
         _num_handles = []
@@ -374,6 +474,43 @@ class SimplicitsScene:
         self.sim_pts = wp.from_torch(
             torch.cat(_stacked_pts, dim=0).contiguous(), dtype=wp.vec3)
         self.sim_pts_flat = wp.array(self.sim_pts, dtype=wp.float32).flatten()
+
+        # Block-diagonal QR rotation across objects. sim_skinning_weights is built from
+        # raw (pre-QR) weights, so the collision Jacobian comes out in the pre-QR basis;
+        # sim_qr_tfm rotates it into the post-QR basis used by sim_B / sim_dFdz / z.
+        # Identity blocks fill in for objects without apply_qr, so non-QR scenes still
+        # see a single uniform multiply. None when no object uses QR (fast path).
+        #
+        # sim_qr_tfm_red / _inv_red are the same matrix family with kinematic-object
+        # blocks dropped, sized to match the kinematic-projected (reduced) DOF vector
+        # that the Newton line search operates on. Both directions are needed because
+        # the bounds wrap is a round trip: forward-rotate direction into the raw basis,
+        # element-wise clamp there, inverse-rotate the clamped step back to the new basis.
+        if any(obj.apply_qr for obj in self.sim_obj_dict.values()):
+            _rinv_blocks = []
+            _rinv_red_blocks = []
+            _rinv_red_inv_blocks = []
+            for obj in self.sim_obj_dict.values():
+                dof_dim = 12 * obj.num_handles
+                if obj.apply_qr:
+                    rinv = obj.qr_tfm
+                    rinv_inv = obj.qr_tfm_inv
+                else:
+                    rinv = torch.eye(dof_dim, device=self.device, dtype=self.dtype)
+                    rinv_inv = rinv
+                _rinv_blocks.append(rinv)
+                if not obj.is_kinematic:
+                    _rinv_red_blocks.append(rinv)
+                    _rinv_red_inv_blocks.append(rinv_inv)
+            self.sim_qr_tfm = torch.block_diag(*_rinv_blocks).contiguous()
+            self.sim_qr_tfm_red = (
+                torch.block_diag(*_rinv_red_blocks).contiguous() if _rinv_red_blocks else None)
+            self.sim_qr_tfm_inv_red = (
+                torch.block_diag(*_rinv_red_inv_blocks).contiguous() if _rinv_red_inv_blocks else None)
+        else:
+            self.sim_qr_tfm = None
+            self.sim_qr_tfm_red = None
+            self.sim_qr_tfm_inv_red = None
 
         mus, lams = to_lame(
             torch.cat(_stacked_yms, dim=0).contiguous(),
@@ -483,8 +620,45 @@ class SimplicitsScene:
         obj.init_transform = relative_transform
         self.reset_scene() # quick way to update the scene's dofs
 
+    def _get_object_transforms_internal(self, object_id):
+        """Returns transforms in the same space as ``self.skinning_weights``.
+
+        When ``normalize_weights_by_samples=True``, ``self.skinning_weights`` is
+        normalized in-place by weight normalization; this method
+        returns transforms in that same normalized space (suitable for LBS with
+        ``self.skinning_weights``). 
+        
+        When ``apply_qr=True``, the QR basis change
+        is undone via ``qr_tfm`` so the result is still in the row-space of
+        the (possibly normalized) ``B``. Use ``get_object_transforms`` instead
+        when pairing with the unnormalized ``renderable.skinning_weights``.
+
+        Args:
+            object_id (int): Id of the object to get the transforms of
+
+        Returns:
+            torch.Tensor: Torch tensor of size :math:`(\text{num_handles}, 3, 4)` for transforms.
+        """
+        obj = self.sim_obj_dict[object_id]
+        if self.sim_z is not None:
+            wp_tfms = wp.clone(self.sim_z[self.object_to_z_map[object_id]])
+            tfms = wp.to_torch(wp_tfms, requires_grad=False).reshape((-1, 3, 4))
+        else:
+            # Pre-sim: read from obj.z, which reset_sim_state populates correctly
+            # for every (apply_qr, normalize_weights_by_samples) combination.
+            tfms = obj.z.detach().clone().view(-1, 3, 4)
+        if obj.apply_qr:
+            tfms = (obj.qr_tfm @ tfms.flatten()).view(-1, 3, 4)
+
+        padding = torch.zeros(tfms.shape[0], 1, 4, device=self.device, dtype=self.dtype)
+        padding[:, 0, 3] = 1.0
+        return torch.cat([tfms, padding], dim=1)
+
     def get_object_transforms(self, object_id):
-        """Returns the current 4x4 padded *relative* transforms.
+        """Returns the current 4x4 padded *relative* transforms in raw (physical) space.
+
+        Undoes any internal normalization (weight norms, QR) so the transforms
+        can be used with unnormalized skinning weights (e.g. rendered points).
 
         Args:
             object_id (int): Id of the object to get the transforms of
@@ -492,17 +666,12 @@ class SimplicitsScene:
         Returns:
             torch.Tensor: Torch tensor of size :math:`(\text{num_handles}, 4, 4)` for relative transforms.
         """
-        tfms = None
-        if self.sim_z is not None:
-            wp_tfms = wp.clone(self.sim_z[self.object_to_z_map[object_id]])
-            tfms = wp.to_torch(wp_tfms, requires_grad=False).reshape((-1, 3, 4))
-        else:
-            tfms = torch.zeros(self.sim_obj_dict[object_id].num_handles, 3, 4, device=self.device, dtype=self.dtype)
-            tfms[-1] = self.sim_obj_dict[object_id].init_transform.reshape(-1, 3, 4)
-
-        padding = torch.zeros(tfms.shape[0], 1, 4, device=self.device, dtype=self.dtype)
-        padding[:, 0, 3] = 1.0
-        return torch.cat([tfms, padding], dim=1)
+        tfms = self._get_object_transforms_internal(object_id)
+        # Un-normalize: z_raw = z_norm / norms
+        if self.sim_obj_dict[object_id].normalize_weights_by_samples:
+            norms = self.sim_obj_dict[object_id].handle_norms
+            tfms[:, :3, :] = tfms[:, :3, :] / norms.view(-1, 1, 1)
+        return tfms
 
     def _add_object(self, simulated_object: SimulatedObject):
         if self._ready_for_forces:
@@ -512,7 +681,8 @@ class SimplicitsScene:
         self.current_id += 1
         return self.current_id - 1
 
-    def add_object(self, sim_object: Union[SimplicitsObject, SkinnedPhysicsPoints], num_qp=None, init_transform=None, is_kinematic=False, renderable_pts=None):
+    def add_object(self, sim_object: Union[SimplicitsObject, SkinnedPhysicsPoints], num_qp=None, init_transform=None, is_kinematic=False, renderable_pts=None,
+                   normalize_weights_by_samples=True, apply_qr=True):
         r"""Adds a simplicits object to the scene as a SimulatedObject. Can add a just trained SimplicitsObject which
         contains a skinning weight field, or can also accept a baked version, sufficient for simulation.
 
@@ -529,6 +699,13 @@ class SimplicitsScene:
                 When provided and sim_object is a SimplicitsObject, skinning weights are baked for these
                 points and stored in the SimulatedObject for use with get_object_deformed_pts(..., points='rendered').
                 This is not to be used with already baked SkinnedPhysicsPointsProtocol.
+            normalize_weights_by_samples (bool): If True, L2-normalize skinning weights over the sample set
+                for better conditioning of the Newton system. Default: True.
+            apply_qr (bool): If True, apply QR decomposition to orthogonalize the LBS basis. Default: True.
+
+        Returns:
+            int: The id assigned to the newly added object, usable with the other
+            ``get_object_*`` / ``set_object_*`` methods on this scene.
         """
         # Check if init transform is a 3x4 or 4x4 tensor, convert to 3x4 if necessary
         # Subtract identity transform from init transform to get relative transform
@@ -537,19 +714,20 @@ class SimplicitsScene:
         else:
             relative_transform = torch.zeros(3, 4, device=self.device, dtype=self.dtype)
 
-
         if isinstance(sim_object, SimplicitsObject):
             # For SimplicitsObject, bake directly with num_qp to avoid double subsampling
             assert num_qp is not None, "'num_qp' must be provided with SimplicitsObject"
             baked = sim_object.bake(num_qps=num_qp, renderable_pts=renderable_pts)
             simulated_object = SimulatedObject.from_skinned_physics_points(
-                baked, init_transform=relative_transform, is_kinematic=is_kinematic)
+                baked, init_transform=relative_transform, is_kinematic=is_kinematic,
+                normalize_weights_by_samples=normalize_weights_by_samples, apply_qr=apply_qr)
         else:
             # For already baked SkinnedPhysicsPointsProtocol, subsample if needed
             assert renderable_pts is None, "'renderable_pts' are not supported for already baked SkinnedPhysicsPointsProtocol"
             sampled = sim_object.subsample(num_pts=num_qp) if num_qp is not None else sim_object
             simulated_object = SimulatedObject.from_skinned_physics_points(
-                sampled, init_transform=relative_transform, is_kinematic=is_kinematic)
+                sampled, init_transform=relative_transform, is_kinematic=is_kinematic,
+                normalize_weights_by_samples=normalize_weights_by_samples, apply_qr=apply_qr)
 
         return self._add_object(simulated_object)
     
@@ -729,9 +907,15 @@ class SimplicitsScene:
                                            cp_obj_ids=self.qp_to_object_map,
                                            cp_is_static=None)
         
-        # Builds collision jacobian    
-        collision_struct.get_jacobian(
-            cp_w=self.sim_skinning_weights, cp_x0=self.sim_pts, cp_is_static=self.qp_is_kinematic)
+        # Builds collision jacobian. sim_skinning_weights is the raw (pre-QR) block-diag
+        # weight matrix; collision_J_a/_b stay in this basis (so the bounds kernel reads
+        # the original per-handle sparsity), while collision_J is rotated into the post-QR
+        # basis to match sim_B for gradient/Hessian assembly.
+        collision_struct.calculate_jacobian(
+            cp_w=self.sim_skinning_weights, 
+            cp_x0=self.sim_pts,
+            cp_is_static=self.qp_is_kinematic, 
+            qr_tfm=self.sim_qr_tfm)
 
     def _build_preconditioner(self, lhs):  # pragma: no cover
         return warp_utilities._build_preconditioner(lhs)
@@ -903,7 +1087,7 @@ class SimplicitsScene:
         # 3. Concatenate the hessians into a big list [(i,i,H_ii), (i,j,H_ij), ....]
 
         num_pts = int(self.sim_B.shape[0]/3)
-        num_dofs = self.sim_B.shape[1]
+
         # Names of gradients to assemble
         pt_names = list(self.force_dict["pt_wise"].keys())
         defo_grad_names = list(self.force_dict["defo_grad_wise"].keys())
@@ -996,8 +1180,7 @@ class SimplicitsScene:
                   dt, wp_z, wp_z_prev, wp_z_dot], outputs=[delta_dz])
         return delta_dz
 
-    def _newton_E(self, wp_z, wp_z_prev, wp_z_dot,
-                  wp_B, wp_BMB, dt, wp_dFdz, defo_grad_energies=None, pt_wise_energies=None):  # pragma: no cover
+    def _newton_E(self, wp_z, wp_z_prev, wp_z_dot, wp_B, dt):  # pragma: no cover
         r"""Backward's euler energy used in newton's method
 
         Args:
@@ -1005,11 +1188,7 @@ class SimplicitsScene:
             wp_z_prev (wp.array): Previous transforms
             wp_z_dot (wp.array): Time derivative of transforms
             wp_B (wp.sparse.bsr_matrix): Precomputed Jacobian, dx/dz
-            wp_BMB (wp.sparse.bsr_matrix): Precomputed z-wise mass matrix.
             dt (float): Timestep
-            wp_dFdz (wp.sparse.bsr_matrix): Precomputed jacobian
-            defo_grad_energies (list, optional): List of energies. Defaults to [].
-            pt_wise_energies (list, optional): List of energies. Defaults to [].
 
         Returns:
             float: Backward's euler energy scalar.
@@ -1021,7 +1200,7 @@ class SimplicitsScene:
         wp_newton_energy = ke + dt*dt * pe_sum
         return wp_newton_energy
 
-    def _newton_G(self, wp_z, wp_z_prev, wp_z_dot, wp_B, wp_BMB, dt, wp_dFdz, defo_grad_gradients=None, pt_wise_gradients=None):  # pragma: no cover
+    def _newton_G(self, wp_z, wp_z_prev, wp_z_dot, wp_B, wp_BMB, dt):  # pragma: no cover
         r"""Backward's euler gradient used in newton's method
 
         Args:
@@ -1031,9 +1210,6 @@ class SimplicitsScene:
             wp_B (wp.sparse.bsr_matrix): Precomputed Jacobian, dx/dz
             wp_BMB (wp.sparse.bsr_matrix): Precomputed z-wise mass matrix.
             dt (float): Timestep
-            wp_dFdz (wp.sparse.bsr_matrix): Precomputed jacobian
-            defo_grad_gradients (list, optional): List of gradients. Defaults to [].
-            pt_wise_gradients (list, optional): List of gradients. Defaults to [].
 
         Returns:
             wp.array: Backward's euler gradient.
@@ -1048,19 +1224,14 @@ class SimplicitsScene:
 
         return newton_gradient
 
-    def _newton_H(self, wp_z, wp_z_prev, wp_z_dot, wp_B, wp_BMB, dt, wp_dFdz, defo_grad_hessians=None, pt_wise_hessians=None):  # pragma: no cover
+    def _newton_H(self, wp_z, wp_B, wp_BMB, dt):  # pragma: no cover
         r"""Backward's euler hessian used in newton's method
 
         Args:
             wp_z (wp.array): Transforms
-            wp_z_prev (wp.array): Previous transforms
-            wp_z_dot (wp.array): Time derivative of transforms
             wp_B (wp.sparse.bsr_matrix): Precomputed Jacobian, dx/dz
             wp_BMB (wp.sparse.bsr_matrix): Precomputed z-wise mass matrix.
             dt (float): Timestep
-            wp_dFdz (wp.sparse.bsr_matrix): Precomputed jacobian
-            defo_grad_hessians (list, optional): List of hessians. Defaults to [].
-            pt_wise_hessians (list, optional): List of hessians. Defaults to [].
 
         Returns:
             wp.sparse.bsr_matrix: Backward's euler hessian.
@@ -1111,13 +1282,16 @@ class SimplicitsScene:
                     f'Pass renderable_pts when calling add_object().')
             pts = sim_obj.renderable.pts
             skinning_weights = sim_obj.renderable.skinning_weights
+            tfms = self.get_object_transforms(obj_idx)[:, :3, :]
         elif points == 'simulated':
             pts = sim_obj.pts
             skinning_weights = sim_obj.skinning_weights
-        else:
-            raise ValueError('Only supports "rendered" or "simulated" points')
+            # sim_obj.skinning_weights is in normalized space when
+            # normalize_weights_by_samples=True; pair it with transforms in the
+            # matching space.
+            tfms = self._get_object_transforms_internal(obj_idx)[:, :3, :]
+        
 
-        tfms = self.get_object_transforms(obj_idx)[:, :3, :]  # make 4x4 to 3x4
         return standard_lbs(pts, tfms.unsqueeze(0), skinning_weights).squeeze()
 
     def get_object_point_transforms(self, obj_idx,
@@ -1141,17 +1315,22 @@ class SimplicitsScene:
                     f'Object {obj_idx} has no renderable skinning weights. '
                     f'Pass renderable skinning weights when calling add_object().')
             skinning_weights = sim_obj.renderable.skinning_weights
+            transforms = self.get_object_transforms(obj_idx)
         elif points == 'simulated':
             skinning_weights = sim_obj.skinning_weights
-        else:
-            raise ValueError('Only supports "rendered" or "simulated" points')
-
-        transforms = self.get_object_transforms(obj_idx)
+            # sim_obj.skinning_weights is in normalized space when
+            # normalize_weights_by_samples=True; pair it with transforms in the
+            # matching space.
+            transforms = self._get_object_transforms_internal(obj_idx)
 
         # N x 4 x 4 = sum((N x H x 1 x 1) * (1 x H x 4 x 4), dim=1)
         per_pt_transforms = torch.sum(skinning_weights.unsqueeze(-1).unsqueeze(-1) * transforms, dim=1)
 
         per_pt_transforms[:, :3, :3] += torch.eye(3, 3, dtype=per_pt_transforms.dtype, device=per_pt_transforms.device).unsqueeze(0)
+
+        # Per-point affine: homogeneous row is [0, 0, 0, 1] by definition.
+        per_pt_transforms[:, 3, :] = 0
+        per_pt_transforms[:, 3, 3] = 1
 
         return per_pt_transforms
 
@@ -1176,14 +1355,13 @@ class SimplicitsScene:
         self.sim_z_prev = wp.clone(self.sim_z)
 
         more_partial_newton_E = partial(
-            self._newton_E, wp_B=self.sim_B, wp_BMB=self.sim_BMB, dt=self.timestep, wp_dFdz=self.sim_dFdz,
-            defo_grad_energies=None, pt_wise_energies=None, wp_z_prev=self.sim_z_prev, wp_z_dot=self.sim_z_dot)
+            self._newton_E, wp_B=self.sim_B, dt=self.timestep,
+            wp_z_prev=self.sim_z_prev, wp_z_dot=self.sim_z_dot)
         more_partial_newton_G = partial(
-            self._newton_G, wp_B=self.sim_B, wp_BMB=self.sim_BMB, dt=self.timestep, wp_dFdz=self.sim_dFdz,
-            defo_grad_gradients=None, pt_wise_gradients=None, wp_z_prev=self.sim_z_prev, wp_z_dot=self.sim_z_dot)
+            self._newton_G, wp_B=self.sim_B, wp_BMB=self.sim_BMB, dt=self.timestep,
+            wp_z_prev=self.sim_z_prev, wp_z_dot=self.sim_z_dot)
         more_partial_newton_H = partial(
-            self._newton_H, wp_B=self.sim_B, wp_BMB=self.sim_BMB, dt=self.timestep, wp_dFdz=self.sim_dFdz,
-            defo_grad_hessians=None, pt_wise_hessians=None, wp_z_prev=self.sim_z_prev, wp_z_dot=self.sim_z_dot)
+            self._newton_H, wp_B=self.sim_B, wp_BMB=self.sim_BMB, dt=self.timestep)
 
         ###########################################################
 
@@ -1200,7 +1378,9 @@ class SimplicitsScene:
             cg_tol=self.cg_tol,
             cg_iters=self.cg_iters,
             conv_tol=self.conv_tol,
-            direct_solve=self.direct_solve)
+            direct_solve=self.direct_solve,
+            bounds_qr_tfm=self.sim_qr_tfm_red, 
+            bounds_qr_tfm_inv=self.sim_qr_tfm_inv_red)
 
         self.sim_z_dot = wp.from_torch(
             (wp.to_torch(self.sim_z) - wp.to_torch(self.sim_z_prev)) / self.timestep)
