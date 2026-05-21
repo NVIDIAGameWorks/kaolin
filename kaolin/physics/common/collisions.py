@@ -19,7 +19,7 @@ import warp as wp
 import warp.sparse as wps
 
 from kaolin.physics.simplicits.precomputed import sparse_collision_jacobian_matrix
-from kaolin.physics.utils.warp_utilities import _bsr_to_torch
+from kaolin.physics.utils.warp_utilities import _bsr_to_torch, _warp_csr_from_torch_dense
 
 __all__ = ['Collision']
 
@@ -593,7 +593,7 @@ class Collision:
 
         return
 
-    def get_jacobian(self, cp_w, cp_x0, cp_is_static=None):
+    def calculate_jacobian(self, cp_w, cp_x0, cp_is_static=None, qr_tfm=None):
         r""" Builds the jacobians of the collision points w.r.t the dofs. For contact pairs :math:`x_a \in \mathbb{R}^3, x_b \in \mathbb{R}^3`, the jacobians are:
 
         .. math::
@@ -607,13 +607,13 @@ class Collision:
             cp_w (wp.array2d(dtype=wp.float32)): Contact point skinning weights of size :math:`(\text{num_pts}, \text{num_handles})`
             cp_x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
             cp_is_static (wp.array(dtype=int), optional): Array indicating which contact points are static (1 for static, 0 for dynamic). Defaults to None.
-        
+            qr_tfm (torch.Tensor, optional): Block-diagonal handle-DOF rotation that maps the raw (pre-QR) basis to the post-QR basis used for elastic/inertia terms. When provided, ``collision_J`` and ``collision_J_dense`` are rotated into the post-QR basis for gradient/Hessian assembly, while ``collision_J_a``/``collision_J_b`` are kept in the raw basis so the bounds kernel can still read meaningful per-DOF sparsity. Defaults to None.
+
         Note:
             The jacobian set by this function is a sparse matrix of size :math:`(3 \times \text{num_contacts}, 12 \times \text{num_handles})`.
         """
 
         # indices of the colliding point pairs
-        num_pts = self.num_contacts
         num_handles = cp_w.shape[1]
         if self.num_contacts == 0:
             num_rows = 0
@@ -629,9 +629,6 @@ class Collision:
 
             ind_a = wp.clone(self.collision_indices_a[:self.num_contacts])
             ind_b = wp.clone(self.collision_indices_b[:self.num_contacts])
-            
-            t_ind_a = wp.to_torch(ind_a)
-            t_ind_b = wp.to_torch(ind_b)
 
             J_a = sparse_collision_jacobian_matrix(cp_w, cp_x0, indices=ind_a, cp_is_static=cp_is_static)
             J_b = sparse_collision_jacobian_matrix(cp_w, cp_x0, indices=ind_b, cp_is_static=cp_is_static)
@@ -648,6 +645,19 @@ class Collision:
             self.collision_J_dense = _bsr_to_torch(self.collision_J).to_dense()
         else:
             self.collision_J_dense = torch.zeros(self.collision_J.shape, device=wp.device_to_torch(self.collision_J.device), dtype=wp.dtype_to_torch(self.collision_J.dtype))
+
+        # QR mode: rotate the consumer-facing collision_J / collision_J_dense into the
+        # post-QR basis. collision_J_a / collision_J_b stay raw so get_bounds can read
+        # the original LBS sparsity (a row-subset of pre-QR B with per-handle column
+        # blocks). The line search wraps _apply_bounds with the inverse rotation so the
+        # clamp still happens in the basis where the bounds were computed.
+        if qr_tfm is not None and self.num_contacts > 0:
+            self.collision_J_dense = self.collision_J_dense @ qr_tfm
+            # Match the (1, 4) block shape used elsewhere (e.g. simulation.py:140
+            # for sim_B), so bsr_mv downstream sees the same layout it did pre-QR.
+            self.collision_J = wps.bsr_copy(
+                _warp_csr_from_torch_dense(self.collision_J_dense), block_shape=(1, 4))
+            self.collision_J.nnz_sync()
 
         return
 

@@ -811,7 +811,7 @@ class SimplicitsObject(PhysicsPoints):
         from the generalized eigenvalue problem of the mass and stiffness matrices.
 
         Note:
-            If num_handles is set to 0, the object will be created as rigid instead of deformable.
+            If num_handles is set to 1, the object will be created as rigid instead of deformable.
 
         Args:
             physics_points (PhysicsPoints): PhysicsPoints object to be used for training.
