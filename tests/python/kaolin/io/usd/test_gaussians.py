@@ -282,16 +282,16 @@ class TestGaussianExportImport:
         else:
             merged = usd.import_gaussiancloud(out_path, scene_path)
 
-        new_xyz, new_rot, new_scales, new_sh_rest = transform_gaussians(
+        new_xyz, new_rot, new_scales, new_sh_coeff = transform_gaussians(
             data['positions'], data['orientations'], data['scales'],
-            transform, shs_feat=data['sh_coeff'][:, 1:], use_log_scales=False
+            transform, sh_coeff=data['sh_coeff'], use_log_scales=False
         )
         expected = {
             'positions': new_xyz,
             'orientations': new_rot,
             'scales': new_scales,
             'opacities': data['opacities'],
-            'sh_coeff': torch.cat([data['sh_coeff'][:, :1], new_sh_rest], dim=1),
+            'sh_coeff': new_sh_coeff,
         }
         assert contained_torch_equal(expected, merged.as_dict(only_tensors=True),
                                      approximate=True, rtol=1e-5, atol=1e-5, print_error_context='Fail')
@@ -333,23 +333,20 @@ class TestGaussianExportImport:
             del stage
             merged = usd.import_gaussiancloud(out_path)
 
-        xyz0, rot0, s0, sh_rest0 = transform_gaussians(
+        xyz0, rot0, s0, sh0 = transform_gaussians(
             cloud_0['positions'], cloud_0['orientations'], cloud_0['scales'],
-            transform_0, shs_feat=cloud_0['sh_coeff'][:, 1:], use_log_scales=False
+            transform_0, sh_coeff=cloud_0['sh_coeff'], use_log_scales=False
         )
-        xyz1, rot1, s1, sh_rest1 = transform_gaussians(
+        xyz1, rot1, s1, sh1 = transform_gaussians(
             cloud_1['positions'], cloud_1['orientations'], cloud_1['scales'],
-            transform_1, shs_feat=cloud_1['sh_coeff'][:, 1:], use_log_scales=False
+            transform_1, sh_coeff=cloud_1['sh_coeff'], use_log_scales=False
         )
         expected = {
             'positions':    torch.cat([xyz0, xyz1], dim=0),
             'orientations': torch.cat([rot0, rot1], dim=0),
             'scales':       torch.cat([s0, s1], dim=0),
             'opacities':    torch.cat([cloud_0['opacities'], cloud_1['opacities']], dim=0),
-            'sh_coeff':     torch.cat([
-                torch.cat([cloud_0['sh_coeff'][:, :1], sh_rest0], dim=1),
-                torch.cat([cloud_1['sh_coeff'][:, :1], sh_rest1], dim=1),
-            ], dim=0),
+            'sh_coeff':     torch.cat([sh0, sh1], dim=0),
         }
         assert contained_torch_equal(expected, merged.as_dict(only_tensors=True),
                                      approximate=True, rtol=1e-5, atol=1e-5)

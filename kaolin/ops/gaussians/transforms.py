@@ -60,34 +60,40 @@ def _decompose_4x4_transform(transform):
 
     return translation, rotation, scale
 
-# TODO: use same naming as GaussianSplatModel and take full sh_coeff for ease of use
-def transform_gaussians(xyz, rotations, scales, transform, shs_feat=None, use_log_scales=False,
+def transform_gaussians(positions, orientations, scales, transform, sh_coeff=None, use_log_scales=False,
                         use_xyzw=False):
-    r"""Apply a 4x4 affine transform to gaussian positions, rotations, and scales.
+    r"""Apply a 4x4 affine transform to gaussian positions, orientations, and scales.
 
-    Transforms are applied as T @ pt for positions. Scale is decomposed from the transform
-    and applied to raw_scales.
+    Argument naming matches :class:`~kaolin.rep.gaussians.GaussianSplatModel`. Transforms are
+    applied as T @ pt for positions. Scale is decomposed from the transform and applied to scales.
+
+    **Note**: ⚠️ Works robustly for isotropic scaling, rotation, translation (combined in
+    a general transform matrix), but unexpected results may occur for shear and anisotropic scaling (for
+    example, applying inverse transform will not work correctly for these cases).
 
     Args:
-        xyz (torch.Tensor): Positions of shape :math:`(N, 3)`.
-        rotations (torch.Tensor):
+        positions (torch.Tensor): Splat centres of shape :math:`(N, 3)`.
+        orientations (torch.Tensor):
             Unit quaternions, shape :math:`(N, 4)`.
             Follow wxyz convention, or xyzw convention if ``use_xyzw`` is True.
-        scales (torch.Tensor): Scale per gaussian, shape :math:`(N, 3)`.
-        transform (torch.Tensor): Affine transform, shape :math:`(4, 4)` or :math:`(N, 4, 4)`.
+        scales (torch.Tensor): Per-axis scale per gaussian, shape :math:`(N, 3)`.
+        transform (torch.Tensor): Affine transform, shape :math:`(4, 4)`, :math:`(1, 4, 4)` or :math:`(N, 4, 4)`.
             Single transform is broadcast to all gaussians.
-        shs_feat (torch.Tensor): SH features of shape :math:`(N, \text{num_coeffs}, 3)`. Default: None.
+        sh_coeff (torch.Tensor, optional): Full SH coefficients of shape
+            :math:`(N, S, 3)` where :math:`S = (sh\_degree + 1)^2`. The band 0 (DC)
+            coefficient at index 0 is rotation-invariant and passed through unchanged;
+            only bands :math:`l \geq 1` are rotated. Default: None.
         use_log_scales (bool): If True, use log-based scaling for scales. Default: False.
         use_xyzw (bool): If True, use xyzw convention for quaternions. Default: False.
 
     Returns:
-        tuple: (new_xyz, new_rotations, new_scales, Optional[new_shs_feat]) with same shapes as inputs.
+        tuple: (new_positions, new_orientations, new_scales, Optional[new_sh_coeff]) with same shapes as inputs.
     """
-    assert xyz.dtype == rotations.dtype == scales.dtype == transform.dtype, f"xyz, rotations, scales, and transform must have the same dtype, got xyz.dtype: {xyz.dtype}, rotations.dtype: {rotations.dtype}, scales.dtype: {scales.dtype}, transform.dtype: {transform.dtype}"
-    assert xyz.device == rotations.device == scales.device == transform.device, f"xyz, rotations, scales, and transform must be on the same device, got xyz.device: {xyz.device}, rotations.device: {rotations.device}, scales.device: {scales.device}, transform.device: {transform.device}"
-    if shs_feat is not None:
-        assert shs_feat.dtype == xyz.dtype, f"shs_feat must have the same dtype as the other inputs, got shs_feat.dtype: {shs_feat.dtype}, xyz.dtype: {xyz.dtype}"
-        assert shs_feat.device == xyz.device, f"shs_feat must be on the same device as the other inputs, got shs_feat.device: {shs_feat.device}, xyz.device: {xyz.device}"
+    assert positions.dtype == orientations.dtype == scales.dtype == transform.dtype, f"positions, orientations, scales, and transform must have the same dtype, got positions.dtype: {positions.dtype}, orientations.dtype: {orientations.dtype}, scales.dtype: {scales.dtype}, transform.dtype: {transform.dtype}"
+    assert positions.device == orientations.device == scales.device == transform.device, f"positions, orientations, scales, and transform must be on the same device, got positions.device: {positions.device}, orientations.device: {orientations.device}, scales.device: {scales.device}, transform.device: {transform.device}"
+    if sh_coeff is not None:
+        assert sh_coeff.dtype == positions.dtype, f"sh_coeff must have the same dtype as the other inputs, got sh_coeff.dtype: {sh_coeff.dtype}, positions.dtype: {positions.dtype}"
+        assert sh_coeff.device == positions.device, f"sh_coeff must be on the same device as the other inputs, got sh_coeff.device: {sh_coeff.device}, positions.device: {positions.device}"
 
     if len(transform.shape) == 2:  # single transform for all the gaussians
         transform = transform.unsqueeze(0)
@@ -95,8 +101,8 @@ def transform_gaussians(xyz, rotations, scales, transform, shs_feat=None, use_lo
     # transforms: n x 4 x 4, where 4 x 4 transform T is applied to pt as T @ pt.
     _, tfm_rotation, tfm_scale = _decompose_4x4_transform(transform)
 
-    new_xyz = _transform_xyz(xyz, transform)
-    new_rotations = _transform_rot(rotations, tfm_rotation, use_xyzw)
+    new_positions = _transform_xyz(positions, transform)
+    new_orientations = _transform_rot(orientations, tfm_rotation, use_xyzw)
 
     if scales.dtype != tfm_scale.dtype:
         tfm_scale = tfm_scale.to(scales.dtype)
@@ -106,32 +112,34 @@ def transform_gaussians(xyz, rotations, scales, transform, shs_feat=None, use_lo
         scaling_norm_factor = torch.log(tfm_scale) / scales + 1
         new_scales = scales * scaling_norm_factor
 
-    if shs_feat is None:
-        new_shs_feat = None
+    if sh_coeff is None:
+        new_sh_coeff = None
     else:
-        new_shs_feat = transform_shs(shs_feat, tfm_rotation)
+        new_sh_coeff = transform_shs(sh_coeff, tfm_rotation)
 
-    return new_xyz, new_rotations, new_scales, new_shs_feat
+    return new_positions, new_orientations, new_scales, new_sh_coeff
 
 # Q R Q^{-1} decomposes into permutation [1,2,0] + this sign pattern
 _S_3DGS = [[1, -1, 1], [-1, 1, -1], [1, -1, 1]]
 
 def transform_shs(shs_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
     r"""
-    Rotate real SH coefficients (bands 1-3) in batch.
+    Rotate real SH coefficients (bands 0..3) in batch. Band 0 (DC) is rotation-invariant
+    and is passed through unchanged.
 
     Args:
-        shs_feat (torch.Tensor): SH coefficients for bands l=1..3, RGB, of shape :math:`(N, \text{num_coeffs}, 3)`.
+        shs_feat (torch.Tensor): SH coefficients for bands l=0..degree, RGB, of shape
+            :math:`(N, (\text{degree}+1)^2, 3)` with the DC term at index 0.
         R (torch.Tensor): rotation matrices (SO(3)), of shape :math:`(N, 3, 3)`.
 
     Returns:
-        (torch.Tensor): rotated SH coefficients, of shape :math:`(N, \text{num_coeffs}, 3)`.
+        (torch.Tensor): rotated SH coefficients, same shape as ``shs_feat``.
     """
     assert shs_feat.dtype == R.dtype, f"sh and R must have the same dtype, got sh.dtype: {shs_feat.dtype}, R.dtype: {R.dtype}"
     assert shs_feat.device == R.device, f"sh and R must be on the same device, got sh.device: {shs_feat.device}, R.device: {R.device}"
     num_coeffs = shs_feat.shape[1]
-    degree = math.isqrt(num_coeffs + 1) - 1
-    assert ((degree + 1) ** 2) - 1 == num_coeffs
+    degree = math.isqrt(num_coeffs) - 1
+    assert ((degree + 1) ** 2) == num_coeffs
     if degree > 3:
         raise NotImplementedError(f"transform_shs does not support degree > 3, got {degree}")
     assert shs_feat.shape[2] == 3, f"sh must have 3 channels, got sh.shape: {shs_feat.shape}"
@@ -140,12 +148,18 @@ def transform_shs(shs_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
 
     out = torch.empty_like(shs_feat)
 
+    # DC (band 0) is rotation-invariant.
+    out[:, :1] = shs_feat[:, :1]
+
+    if degree == 0:
+        return out
+
     # D^1 = Q R Q^{-1} = R[perm][:,perm] * S
     perm = [1, 2, 0]
     S = R.new_tensor(_S_3DGS)
     D1 = R[:, perm][:, :, perm] * S                        # (N, 3, 3)
 
-    out[:, :3] = (D1 @ shs_feat[:, :3])
+    out[:, 1:4] = (D1 @ shs_feat[:, 1:4])
 
     if degree == 1:
         return out
@@ -156,7 +170,7 @@ def transform_shs(shs_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
     D2 = torch.zeros(out_idx.shape[0], 5 * 5, device=products.device, dtype=products.dtype)
     D2.scatter_add_(1, out_idx, products)
     D2 = D2.view(-1, 5, 5)
-    out[:, 3:8] = (D2 @ shs_feat[:, 3:8])
+    out[:, 4:9] = (D2 @ shs_feat[:, 4:9])
 
     if degree == 2:
         return out
@@ -166,7 +180,7 @@ def transform_shs(shs_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
     D3 = torch.zeros(out_idx.shape[0], 7 * 7, device=products.device, dtype=products.dtype)
     D3.scatter_add_(1, out_idx, products)
     D3 = D3.view(-1, 7, 7)
-    out[:, 8:15] = (D3 @ shs_feat[:, 8:15])
+    out[:, 9:16] = (D3 @ shs_feat[:, 9:16])
     if degree == 3:
         return out
 

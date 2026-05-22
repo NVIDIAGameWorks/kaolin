@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import torch
-from typing import Any
 import functools
 import numpy as np
 import warp as wp
@@ -61,52 +60,6 @@ def _displacement_delta_kernel(
     """
     i = wp.tid()
     delta_dz[i] = (z[i] - z_prev[i]) - dt*z_dot[i]
-
-@wp.kernel
-def _bsr_mul_diag_wp_kernel(
-    Bt_values: wp.array3d(dtype=float),
-    Bt_columns: wp.array(dtype=int),
-    C_values: wp.array(dtype=Any),
-    Output_values: wp.array3d(dtype=float),
-):  # pragma: no cover
-    r"""
-    Performs the reduction :math:`B^T C B` where :math:`B` is a sparse matrix and :math:`C` is a diagonal matrix.
-    
-    Args:
-        Bt_values (wp.array3d(dtype=float)): The values of the sparse matrix :math:`B^T`.
-        Bt_columns (wp.array(dtype=int)): The columns of the sparse matrix :math:`B^T`.
-        C_values (wp.array(dtype=Any)): The values of the diagonal matrix :math:`C`.
-        Output_values (wp.array3d(dtype=float)): The output values of the sparse matrix :math:`B^T C B`.
-    """
-    i, r = wp.tid()
-    col = Bt_columns[i]
-    C = C_values[col]
-    Btr = Bt_values[i, r]
-    Otr = Output_values[i, r]
-    BtC = wp.vec3(Btr[0], Btr[1], Btr[2]) @ C
-    for k in range(3):
-        Otr[k] = BtC[k]
-
-
-def _hessian_reduction(Jt, H, J):  # pragma: no cover
-    r"""
-    Performs a reduction :math:`J^T H J` where :math:`H` is a block-wise diagonal matrix and :math:`J` is a Jacobian matrix.
-    
-    Args:
-        Jt (wps.BsrMatrix): The left Jacobian matrix of shape :math:`(m, n)`.
-        H (wps.BsrMatrix): The Hessian matrix of shape :math:`(n, n)`.
-        J (wps.BsrMatrix): The right Jacobian matrix of shape :math:`(n, m)`.
-    
-    Returns:
-        wps.BsrMatrix: The reduced Hessian matrix of shape :math:`(m, m)`.
-    """
-    Output = wps.bsr_copy(Jt)
-    wp.launch(_bsr_mul_diag_wp_kernel,
-              dim=(Jt.nnz, Jt.block_shape[0]),
-              inputs=[Jt.scalar_values, Jt.columns, H, Output.scalar_values]
-              )
-    return wps.bsr_mm(Output, J)
-
 
 def _warp_csr_from_torch_dense(dense_mat):  # pragma: no cover
     r"""Converts a dense torch matrix to a sparse warp csr matrix.
@@ -223,7 +176,7 @@ def _wp_bsr_to_torch_bsr(mat):  # pragma: no cover
 
 
 def _wp_bsr_to_wp_triplets(mat):  # pragma: no cover
-    r"""Converts a sparse warp BSR matrix (or CSR matrix) to a sparse warp triplets.
+    r"""Converts a sparse warp BSR matrix (or CSR matrix) to a sparse warp triplets. 
 
     Args:
         mat (wps.BsrMatrix): A sparse warp BSR matrix
@@ -231,14 +184,13 @@ def _wp_bsr_to_wp_triplets(mat):  # pragma: no cover
     Returns:
         tuple: (row_indices, col_indices, values) representing the triplets
     """
-
     # First convert to torch sparse tensor
     torch_mat = _wp_bsr_to_torch_bsr(mat)
     row_indices, col_indices, values = torch_utilities.torch_bsr_to_torch_triplets(
         torch_mat)
 
-    # TODO: Be really careful with the types.
-    # Causes all sorts of bugs that are hard to track down.
+    # Be consistent with the types in the row, col, values arrays.
+    # Mismatches cause all sorts of bugs that are hard to track down.
     row_indices = row_indices.int()
     col_indices = col_indices.int()
     values = values.float()

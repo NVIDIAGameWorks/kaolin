@@ -242,15 +242,15 @@ class TestAddSubset:
         with pytest.raises(ValueError, match="already exists"):
             usd.add_subset(path, '/World/Mesh', 'mysubset', torch.tensor([1]))
 
-    def test_add_subset_override(self, out_dir):
-        path = os.path.join(out_dir, 'mesh_subset_override.usda')
+    def test_add_subset_overwrite(self, out_dir):
+        path = os.path.join(out_dir, 'mesh_subset_overwrite.usda')
         vertices = torch.tensor([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.], [0., 0., 1.]], dtype=torch.float32)
         faces = torch.tensor([[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]], dtype=torch.long)
         usd.export_mesh(path, vertices=vertices, faces=faces, scene_path='/World/Mesh')
 
         usd.add_subset(path, '/World/Mesh', 'mysubset', torch.tensor([0]), family_name='part')
         usd.add_subset(path, '/World/Mesh', 'mysubset', torch.tensor([2, 3]),
-                       family_name='materialBind', override=True)
+                       family_name='materialBind', overwrite=True)
 
         result = usd.import_subsets(path, '/World/Mesh')
         assert len(result) == 1

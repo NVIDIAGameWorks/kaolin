@@ -14,13 +14,15 @@
 # limitations under the License.
 
 
+import warnings
+
 import torch
 import pytest
 import os
 import kaolin as kal
 from kaolin.utils.testing import with_seed, check_allclose
 
-from kaolin.physics.simplicits import SimplicitsObject, SkinnedPhysicsPoints, SkinnedPoints, PhysicsPoints, SkinningModule
+from kaolin.physics.simplicits import SimplicitsObject, SkinnedPhysicsPoints, SkinnedPoints, PhysicsPoints, SkinningModule, SimplicitsMLP
 
 import logging
 
@@ -32,6 +34,17 @@ torch.backends.cuda.matmul.allow_tf32 = False
 
 # The flag below controls whether to allow TF32 on cuDNN. This flag defaults to True.
 torch.backends.cudnn.allow_tf32 = False
+
+# `SimplicitsObject.create_rigid` keeps the deprecated `pts/yms/prs/rhos/appx_vol` API and
+# `create_trained` itself is deprecated in favor of `create_with_mlp`. Dedicated tests below
+# exercise both deprecation paths; other tests use them incidentally and don't care about the
+# warning — silence them module-wide so they don't show up as test noise.
+pytestmark = [
+    pytest.mark.filterwarnings(
+        "ignore:.*are deprecated. Please use physics_points.*:UserWarning"),
+    pytest.mark.filterwarnings(
+        "ignore:.*'create_trained' is deprecated.*:UserWarning"),
+]
 
 
 ########### Test Simplicits Easy API Training ##############
@@ -62,6 +75,185 @@ class TestSimplicitsObject:
         weights = obj.skinning_mod.compute_skinning_weights(pts[:5])
         assert weights.shape == (5, 1)
         assert torch.allclose(weights, torch.ones(5, 1, device=device, dtype=dtype))
+
+    def test_create_with_rkpm(self, device, dtype):
+        if device == 'cuda' and not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+        pts = torch.rand(128, 3, device=device, dtype=dtype)
+        yms = torch.full((pts.shape[0],), 1e4, device=device, dtype=dtype)
+        prs = torch.full((pts.shape[0],), 0.45, device=device, dtype=dtype)
+        rhos = torch.full((pts.shape[0],), 500.0, device=device, dtype=dtype)
+        appx_vol = torch.tensor([1.0], device=device, dtype=dtype)
+
+        phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+
+        obj = SimplicitsObject.create_with_rkpm(
+            physics_points=phys, num_handles=4, num_nodes=16, num_points=64, dtype=torch.float32)
+
+        assert torch.equal(obj.pts, pts)
+        assert torch.equal(obj.yms, yms)
+        assert torch.equal(obj.prs, prs)
+        assert torch.equal(obj.rhos, rhos)
+        # PhysicsPoints squeezes length-1 appx_vol tensors to a scalar tensor.
+        assert torch.allclose(obj.appx_vol.reshape(-1), appx_vol.reshape(-1))
+        assert obj.num_handles == 4 # 3 learned + 1 constant handle
+
+    def test_create_with_mlp(self, device, dtype):
+        if device == 'cuda' and not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+        pts = torch.rand(50, 3, device=device, dtype=dtype)
+        yms = torch.full((pts.shape[0],), 1e4, device=device, dtype=dtype)
+        prs = torch.full((pts.shape[0],), 0.45, device=device, dtype=dtype)
+        rhos = torch.full((pts.shape[0],), 500.0, device=device, dtype=dtype)
+        appx_vol = torch.tensor([1.0], device=device, dtype=dtype)
+
+        phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+
+        obj = SimplicitsObject.create_with_mlp(
+            physics_points=phys,
+            num_handles=3,
+            num_samples=50,
+            model_layers=2,
+            training_batch_size=10,
+            training_num_steps=5,
+            training_lr_start=1e-3,
+            training_lr_end=1e-3,
+            training_le_coeff=1e-1,
+            training_lo_coeff=1e6,
+            training_log_every=5,
+            normalize_for_training=True,
+        )
+        assert torch.equal(obj.pts, pts)
+        assert obj.num_handles == 3  # 2 learned + 1 constant handle
+
+    def test_create_with_mlp_no_normalize(self, device, dtype):
+        if device == 'cuda' and not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+        # Points outside the unit cube — if normalization were applied silently the
+        # MLP's bb_min/bb_max would be set to the bbox of `pts`, not (0, 1).
+        pts = torch.rand(50, 3, device=device, dtype=dtype) * 4.0 - 2.0
+        phys = PhysicsPoints(pts=pts, yms=1e4, prs=0.45, rhos=500.0, appx_vol=1.0)
+
+        obj = SimplicitsObject.create_with_mlp(
+            physics_points=phys,
+            num_handles=3, num_samples=50, model_layers=2,
+            training_num_steps=5, training_log_every=5,
+            normalize_for_training=False,
+        )
+        assert torch.equal(obj.pts, pts)
+        assert obj.num_handles == 3
+        # With normalize_for_training=False the skinning module is built with default
+        # bb_min=0 / bb_max=1, not the bbox of `pts`.
+        assert obj.skinning_mod.bb_min.item() == 0
+        assert obj.skinning_mod.bb_max.item() == 1
+
+    def test_create_trained_emits_deprecation_warning(self, device, dtype):
+        if device == 'cuda' and not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+        pts = torch.rand(50, 3, device=device, dtype=dtype)
+        yms = torch.full((pts.shape[0],), 1e4, device=device, dtype=dtype)
+        prs = torch.full((pts.shape[0],), 0.45, device=device, dtype=dtype)
+        rhos = torch.full((pts.shape[0],), 500.0, device=device, dtype=dtype)
+        appx_vol = torch.tensor([1.0], device=device, dtype=dtype)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", UserWarning)
+            obj = SimplicitsObject.create_trained(
+                pts, yms, prs, rhos, appx_vol,
+                num_handles=3, num_samples=50, model_layers=2,
+                training_num_steps=5, training_log_every=5)
+        deprecation_warnings = [w for w in caught
+                                if "'create_trained' is deprecated" in str(w.message)]
+        assert len(deprecation_warnings) == 1, \
+            f"Expected 1 deprecation warning, got: {[str(w.message) for w in caught]}"
+        assert torch.equal(obj.pts, pts)
+        assert obj.num_handles == 3  # 2 learned + 1 constant handle
+
+    def test_create_rigid_accepts_physics_points(self, device, dtype):
+        pts = torch.rand(50, 3, device=device, dtype=dtype)
+        yms = torch.full((pts.shape[0],), 1e5, device=device, dtype=dtype)
+        prs = torch.full((pts.shape[0],), 0.45, device=device, dtype=dtype)
+        rhos = torch.full((pts.shape[0],), 100.0, device=device, dtype=dtype)
+        appx_vol = torch.tensor([1.0], device=device, dtype=dtype)
+
+        phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+        obj = SimplicitsObject.create_rigid(physics_points=phys)
+        assert obj.num_handles == 1
+        assert torch.equal(obj.pts, pts)
+        assert torch.equal(obj.yms, yms)
+        assert torch.equal(obj.prs, prs)
+        assert torch.equal(obj.rhos, rhos)
+        # PhysicsPoints squeezes length-1 appx_vol tensors to a scalar tensor.
+        assert torch.allclose(obj.appx_vol.reshape(-1), appx_vol.reshape(-1))
+
+        with pytest.raises(ValueError, match="do not also pass yms/prs/rhos/appx_vol"):
+            _ = SimplicitsObject.create_rigid(physics_points=phys, yms=yms)
+
+    def test_create_from_function(self, device, dtype):
+        pts = torch.rand(50, 3, device=device, dtype=dtype)
+        yms = torch.full((pts.shape[0],), 1e5, device=device, dtype=dtype)
+        prs = torch.full((pts.shape[0],), 0.45, device=device, dtype=dtype)
+        rhos = torch.full((pts.shape[0],), 500.0, device=device, dtype=dtype)
+        appx_vol = torch.tensor([1.0], device=device, dtype=dtype)
+        phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+
+        # base_fn returns 2 weights; compute_skinning_weights appends constant 1.0 → 3 handles
+        def base_fn(x):
+            return torch.ones(x.shape[0], 2, device=x.device, dtype=x.dtype) / 2.0
+
+        obj = SimplicitsObject.create_from_function(physics_points=phys, fcn=base_fn)
+        assert torch.equal(obj.pts, pts)
+        assert obj.num_handles == 3
+        weights = obj.skinning_mod.compute_skinning_weights(pts[:5])
+        expected = torch.tensor([0.5, 0.5, 1.0], device=device, dtype=dtype).expand(5, -1)
+        assert torch.allclose(weights, expected)
+
+    @pytest.mark.parametrize("factory", ["create_rigid", "create_trained"])
+    def test_create_missing_required_args_raises(self, factory):
+        # No args at all — should error mentioning the missing args, not crash inside
+        # PhysicsPoints.__init__ with an AttributeError. `create_with_mlp` / `create_with_rkpm` /
+        # `create_from_function` use the new physics_points-only API; bare Python TypeErrors from
+        # missing positional args are uninteresting, so they're not parametrized here.
+        method = getattr(SimplicitsObject, factory)
+        if factory == "create_rigid":
+            with pytest.raises(ValueError, match=f"{factory} requires"):
+                _ = method()
+        else:
+            with pytest.raises(TypeError, match="missing .* required positional argument"):
+                _ = method()
+
+    def test_create_rigid_emits_deprecation_warning_on_old_api(self, device, dtype):
+        pts = torch.rand(20, 3, device=device, dtype=dtype)
+        with pytest.warns(UserWarning, match="deprecated. Please use physics_points"):
+            _ = SimplicitsObject.create_rigid(pts=pts, yms=1e5, prs=0.45,
+                                              rhos=100.0, appx_vol=1.0)
+
+    def test_create_no_warning_on_new_api(self, device, dtype):
+        # Confirms the new API does not emit any warnings, including the regression where
+        # internal create_rigid calls (e.g. when num_handles==1 in create_with_mlp) would
+        # re-trigger the deprecation warning from create_rigid.
+        pts = torch.rand(64, 3, device=device, dtype=dtype)
+        yms = torch.full((pts.shape[0],), 1e4, device=device, dtype=dtype)
+        prs = torch.full((pts.shape[0],), 0.45, device=device, dtype=dtype)
+        rhos = torch.full((pts.shape[0],), 500.0, device=device, dtype=dtype)
+        appx_vol = torch.tensor([1.0], device=device, dtype=dtype)
+        phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            _ = SimplicitsObject.create_rigid(physics_points=phys)
+
+        # num_handles=1 forces the internal create_rigid path; only the "Num Handles is 1"
+        # UserWarning should remain — the deprecation warning must not fire.
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", UserWarning)
+            _ = SimplicitsObject.create_with_mlp(
+                physics_points=phys, num_handles=1, num_samples=10, model_layers=2,
+                training_num_steps=1, training_log_every=1)
+        deprecation_warnings = [w for w in caught
+                                if "deprecated" in str(w.message)]
+        assert deprecation_warnings == [], \
+            f"Unexpected deprecation warnings on new API: {deprecation_warnings}"
 
     def test_ctor_with_base_skinning_weight_function(self, device, dtype):
         pts = torch.rand(50, 3, device=device, dtype=dtype)
@@ -96,6 +288,71 @@ class TestSimplicitsObject:
         assert scaled.min().item() >= 0.0 - 1e-6
         assert scaled.max().item() <= 0.5 + 1e-6
 
+    def _make_cpu_simplicits_object(self):
+        # Use SimplicitsMLP so the skinning_mod has both buffers (bb_min/bb_max) and
+        # real nn.Linear parameters — tests that .to() / .cuda() / .cpu() move both.
+        pts = torch.rand(50, 3, dtype=torch.float32, device='cpu')
+        skinning_mod = SimplicitsMLP(
+            spatial_dimensions=3, layer_width=8, num_handles=4, num_layers=2,
+        ).to('cpu', dtype=torch.float32)
+        return SimplicitsObject(
+            pts=pts, yms=1e5, prs=0.45, rhos=500.0, appx_vol=1.0,
+            skinning_mod=skinning_mod,
+        )
+
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA not available')
+    def test_to_device_moves_skinning_mod(self):
+        obj = self._make_cpu_simplicits_object()
+        moved = obj.to('cuda')
+        for attr in ['pts', 'yms', 'prs', 'rhos', 'appx_vol']:
+            assert getattr(moved, attr).device.type == 'cuda'
+        for p in moved.skinning_mod.parameters():
+            assert p.device.type == 'cuda'
+        for b in moved.skinning_mod.buffers():
+            assert b.device.type == 'cuda'
+        weights = moved.skinning_mod.compute_skinning_weights(moved.pts)
+        assert weights.device.type == 'cuda'
+        assert weights.shape == (moved.pts.shape[0], moved.num_handles)
+
+    def test_to_dtype_casts_skinning_mod(self):
+        obj = self._make_cpu_simplicits_object()
+        moved = obj.to(dtype=torch.float64)
+        for attr in ['pts', 'yms', 'prs', 'rhos', 'appx_vol']:
+            assert getattr(moved, attr).dtype == torch.float64
+        for p in moved.skinning_mod.parameters():
+            assert p.dtype == torch.float64
+        for b in moved.skinning_mod.buffers():
+            assert b.dtype == torch.float64
+
+    def test_to_attributes_filter_leaves_skinning_mod(self):
+        obj = self._make_cpu_simplicits_object()
+        moved = obj.to(dtype=torch.float64, attributes=['pts'])
+        assert moved.pts.dtype == torch.float64
+        assert moved.yms.dtype == torch.float32
+        for p in moved.skinning_mod.parameters():
+            assert p.dtype == torch.float32
+        for b in moved.skinning_mod.buffers():
+            assert b.dtype == torch.float32
+
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA not available')
+    def test_cuda_cpu_roundtrip_moves_skinning_mod(self):
+        obj = self._make_cpu_simplicits_object()
+        on_cuda = obj.cuda()
+        for attr in ['pts', 'yms', 'prs', 'rhos', 'appx_vol']:
+            assert getattr(on_cuda, attr).device.type == 'cuda'
+        for p in on_cuda.skinning_mod.parameters():
+            assert p.device.type == 'cuda'
+        for b in on_cuda.skinning_mod.buffers():
+            assert b.device.type == 'cuda'
+
+        back_on_cpu = on_cuda.cpu()
+        for attr in ['pts', 'yms', 'prs', 'rhos', 'appx_vol']:
+            assert getattr(back_on_cpu, attr).device.type == 'cpu'
+        for p in back_on_cpu.skinning_mod.parameters():
+            assert p.device.type == 'cpu'
+        for b in back_on_cpu.skinning_mod.buffers():
+            assert b.device.type == 'cpu'
+
     @pytest.fixture
     @with_seed(0, 0, 0)
     def fox_object(self, device, dtype, samples_path):
@@ -118,10 +375,10 @@ class TestSimplicitsObject:
         uniform_pts = torch.rand(num_samples, 3, device=device) * (orig_vertices.max(dim=0).values -
                                                                    orig_vertices.min(dim=0).values) + orig_vertices.min(dim=0).values
         pts = uniform_pts
-        yms = torch.full((pts.shape[0],), soft_youngs_modulus, device=device)
-        prs = torch.full((pts.shape[0],), poisson_ratio, device=device)
-        rhos = torch.full((pts.shape[0],), rho, device=device)
-        appx_vol = torch.tensor([appx_vol], device=device)
+        yms = torch.full((pts.shape[0],), soft_youngs_modulus, dtype=dtype, device=device)
+        prs = torch.full((pts.shape[0],), poisson_ratio, dtype=dtype, device=device)
+        rhos = torch.full((pts.shape[0],), rho, dtype=dtype, device=device)
+        appx_vol = torch.tensor(appx_vol, dtype=dtype, device=device)
         return pts, yms, prs, rhos, appx_vol, orig_vertices
 
     @with_seed(0, 0, 0)
@@ -155,23 +412,21 @@ class TestSimplicitsObject:
             logger.addHandler(log_handler)
 
             # Create object and capture training logs
-            sim_obj = kal.physics.simplicits.SimplicitsObject.create_trained(pts,
-                                                                             yms,
-                                                                             prs,
-                                                                             rhos,
-                                                                             appx_vol,
-                                                                             num_handles=10,
-                                                                             num_samples=1000,
-                                                                             model_layers=6,
-                                                                             training_batch_size=10,
-                                                                             training_num_steps=4000,
-                                                                             training_lr_start=0.001,
-                                                                             training_lr_end=0.001,
-                                                                             training_le_coeff=0.1,
-                                                                             training_lo_coeff=1000000,
-                                                                             training_log_every=1000,
-                                                                             normalize_for_training=True)
-        
+            phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+            sim_obj = kal.physics.simplicits.SimplicitsObject.create_with_mlp(
+                physics_points=phys,
+                num_handles=10,
+                num_samples=1000,
+                model_layers=6,
+                training_batch_size=10,
+                training_num_steps=4000,
+                training_lr_start=0.001,
+                training_lr_end=0.001,
+                training_le_coeff=0.1,
+                training_lo_coeff=1000000,
+                training_log_every=1000,
+                normalize_for_training=True)
+
             # NOTE: Take a look at this MLP if this test fails. Might help with debugging.
             # torch.save(sim_obj.base_skinning_weight_function, os.path.dirname(os.path.realpath(__file__)) + "/regression_test_data/box_reference_weights_fcn_10_handles.pth")
 
@@ -205,22 +460,20 @@ class TestSimplicitsObject:
             pts, yms, prs, rhos, appx_vol, orig_vertices = fox_object
 
             # Create object and capture training logs
-            sim_obj = kal.physics.simplicits.SimplicitsObject.create_trained(pts,
-                                                                             yms,
-                                                                             prs,
-                                                                             rhos,
-                                                                             appx_vol,
-                                                                             num_handles=10,
-                                                                             num_samples=1000,
-                                                                             model_layers=6,
-                                                                             training_batch_size=10,
-                                                                             training_num_steps=1000,
-                                                                             training_lr_start=0.001,
-                                                                             training_lr_end=0.001,
-                                                                             training_le_coeff=0.1,
-                                                                             training_lo_coeff=1000000,
-                                                                             training_log_every=1000,
-                                                                             normalize_for_training=True)
+            phys = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
+            sim_obj = kal.physics.simplicits.SimplicitsObject.create_with_mlp(
+                physics_points=phys,
+                num_handles=10,
+                num_samples=1000,
+                model_layers=6,
+                training_batch_size=10,
+                training_num_steps=1000,
+                training_lr_start=0.001,
+                training_lr_end=0.001,
+                training_le_coeff=0.1,
+                training_lo_coeff=1000000,
+                training_log_every=1000,
+                normalize_for_training=True)
 
             r"Step 3: Read Reference Train Vals"
             filename = os.path.dirname(os.path.realpath(__file__)) + \
@@ -439,7 +692,7 @@ class TestPhysicsPoints:
         yms = torch.full((N,), 1e5, device=device, dtype=dtype)
         prs = torch.full((N,), 0.45, device=device, dtype=dtype)
         rhos = torch.full((N,), 500.0, device=device, dtype=dtype)
-        appx_vol = torch.tensor([1.0], device=device, dtype=dtype)
+        appx_vol = torch.tensor(1.0, device=device, dtype=dtype)
         obj = PhysicsPoints(pts=pts, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
         assert torch.equal(obj.pts, pts)
         assert torch.equal(obj.yms, yms)
@@ -455,7 +708,7 @@ class TestPhysicsPoints:
         assert torch.equal(obj.yms, torch.full((N,), 1e5, device=device, dtype=dtype))
         assert torch.equal(obj.prs, torch.full((N,), 0.45, device=device, dtype=dtype))
         assert torch.equal(obj.rhos, torch.full((N,), 500.0, device=device, dtype=dtype))
-        assert torch.equal(obj.appx_vol, torch.tensor([1.0], device=device, dtype=dtype))
+        assert torch.equal(obj.appx_vol, torch.tensor(1.0, device=device, dtype=dtype))
 
 
 ########### Test SkinnedPoints ##############

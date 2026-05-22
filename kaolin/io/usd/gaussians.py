@@ -23,10 +23,7 @@ import torch
 
 from kaolin.rep import GaussianSplatModel
 
-try:
-    from pxr import Usd, UsdGeom, UsdVol, Gf
-except ImportError:
-    pass
+from pxr import Usd, UsdGeom, UsdVol, Gf
 
 from .utils import _get_stage_from_maybe_file, get_scene_paths, create_stage
 from .transform import set_local_to_world_transform, get_local_to_world_transform

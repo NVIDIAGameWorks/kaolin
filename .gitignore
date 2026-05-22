@@ -40,6 +40,7 @@ node_modules/
 .coverage
 
 # example-output
+examples/tutorial/cache/
 examples/tutorial/output/
 examples/tutorial/logs/
 examples/tutorial/physics/*.log

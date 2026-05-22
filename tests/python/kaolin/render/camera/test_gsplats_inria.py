@@ -17,6 +17,7 @@
 import os
 import sys
 import subprocess
+import types
 import pytest
 import math
 import random
@@ -49,21 +50,50 @@ def gs_cam_cls():
         repo.git.checkout("472689c")
 
     sys.path.append(LOCAL_GSPLATS_DIR)
-    subprocess.check_call([
-        sys.executable, "-m", "pip", "install", "--no-build-isolation",
-        os.path.join(LOCAL_GSPLATS_DIR, "submodules", "diff-gaussian-rasterization")
-    ])
-    subprocess.check_call([
-        sys.executable, "-m", "pip", "install", "--no-build-isolation",
-        os.path.join(LOCAL_GSPLATS_DIR, "submodules", "simple-knn")
-    ])
+
+    # This is to avoid having to build diff-gaussian-rasterization and simple-knn
+    # Stub out the unbuilt CUDA submodules so the inria scene/cameras import
+    # chain (which transitively imports simple_knn._C and, in other paths,
+    # diff_gaussian_rasterization) does not raise ImportError. Track only the
+    # names we actually injected so teardown does not clobber a real install.
+    _stub_specs = ('simple_knn', 'simple_knn._C', 'diff_gaussian_rasterization')
+    _injected_modules = []
+    for _name in _stub_specs:
+        if _name not in sys.modules:
+            sys.modules[_name] = types.ModuleType(_name)
+            _injected_modules.append(_name)
+    if 'simple_knn' in _injected_modules:
+        sys.modules['simple_knn']._C = sys.modules['simple_knn._C']
+    if 'simple_knn._C' in _injected_modules:
+        sys.modules['simple_knn._C'].distCUDA2 = lambda *a, **kw: None
+    if 'diff_gaussian_rasterization' in _injected_modules:
+        sys.modules['diff_gaussian_rasterization'].GaussianRasterizationSettings = None
+        sys.modules['diff_gaussian_rasterization'].GaussianRasterizer = None
+
+
+    # Uncomment in case need to install everything
+    #subprocess.check_call([
+    #    sys.executable, "-m", "pip", "install", "--no-build-isolation",
+    #    os.path.join(LOCAL_GSPLATS_DIR, "submodules", "diff-gaussian-rasterization")
+    #])
+    #subprocess.check_call([
+    #    sys.executable, "-m", "pip", "install", "--no-build-isolation",
+    #    os.path.join(LOCAL_GSPLATS_DIR, "submodules", "simple-knn")
+    #])
     from scene.cameras import Camera as GSCamera
 
     yield GSCamera
     sys.path.remove(LOCAL_GSPLATS_DIR)
+    for _name in _injected_modules:
+        sys.modules.pop(_name, None)
+    # Drop modules cached against the stubs so they do not leak into other tests.
+    for _name in [m for m in list(sys.modules)
+                  if m == 'scene' or m.startswith('scene.')
+                  or m == 'arguments' or m.startswith('arguments.')
+                  or m.startswith('utils.')]:
+        sys.modules.pop(_name, None)
     if not 'KAOLIN_TEST_GSPLATS_DIR' in os.environ:
         shutil.rmtree(LOCAL_GSPLATS_DIR)
-
 
 class TestGsplats:
     def test_cycle(self, gs_cam_cls):

@@ -28,7 +28,7 @@ __all__ = [
     'export_gaussiancloud',
 ]
 
-def import_gaussiancloud(filename: str, device='cpu', dtype=torch.float32, #sh_degree=None,
+def import_gaussiancloud(filename: str,
                          apply_activations=True,
                          scale_activation=torch.exp,
                          rotation_activation=torch.nn.functional.normalize,
@@ -38,8 +38,6 @@ def import_gaussiancloud(filename: str, device='cpu', dtype=torch.float32, #sh_d
     
     Args:
         filename (str): path to the PLY file.
-        device (str, optional): device to load the data onto. Defaults to 'cpu'.
-        dtype (torch.dtype, optional): data type to load the data as. Defaults to torch.float32.
         apply_activations (bool, optional): whether to apply the activations to the data. Defaults to True.
         scale_activation (callable, optional): activation function to apply to the scale. Defaults to torch.exp.
         rotation_activation (callable, optional): activation function to apply to the rotation. Defaults to torch.nn.functional.normalize.
@@ -87,7 +85,7 @@ def import_gaussiancloud(filename: str, device='cpu', dtype=torch.float32, #sh_d
         mogt_rotation[:, idx] = np.asarray(plydata.elements[0][attr_name])
 
 
-    tensor_kwargs = {'dtype': dtype, 'device': device}
+    tensor_kwargs = {'dtype': torch.float32} # consistent with our exporter
     densities = torch.tensor(mogt_densities, **tensor_kwargs)
     scales = torch.tensor(mogt_scales, **tensor_kwargs)
     rotations = torch.tensor(mogt_rotation, **tensor_kwargs)
@@ -109,9 +107,6 @@ def import_gaussiancloud(filename: str, device='cpu', dtype=torch.float32, #sh_d
     return GaussianSplatModel(**kwargs)
 
 
-# TODO: should design Gaussian class such that can do the following:
-# cloud = GaussianCloud(...)
-# export_gaussiancloud('/tmp/cloud.ply', **cloud.as_dict())
 def export_gaussiancloud(file_path, positions, orientations, scales, opacities,
                          sh_coeff, sh_degree=None, overwrite=False):
     """Write a 3D Gaussian splatting-style PLY (``f_dc_*``, ``f_rest_*``, ``opacity``, ``scale_*``, ``rot_*``).

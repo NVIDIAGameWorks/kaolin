@@ -42,18 +42,24 @@ def _red_to_full(wp_P, wp_red_x):
     else:
         return wp.array(wp_P @ wp_red_x).flatten()
 
-
-def _apply_bounds(direction, bounds, t):
+@torch.no_grad()
+def _apply_bounds(direction, bounds, t, bounds_qr_tfm=None, bounds_qr_tfm_inv=None):
     """Applies bounds to a search direction in optimization.
 
-    This function takes a search direction and scales it element-wise by the minimum 
-    of the provided bounds and current line search step size t. This ensures the optimization step respects 
+    This function takes a search direction and scales it element-wise by the minimum
+    of the provided bounds and current line search step size t. This ensures the optimization step respects
     any constraints defined by the bounds.
 
     Args:
         direction (torch.Tensor): The search direction vector
         bounds (torch.Tensor): Per-element bounds on the step size
-        t (float): Global line searchstep size scaling factor
+        t (float): Global line search step size scaling factor
+        bounds_qr_tfm (torch.Tensor, optional): When ``bounds`` were computed against a
+            Jacobian in a different DOF basis (e.g. the raw pre-QR basis while ``direction``
+            lives in the post-QR basis), this matrix rotates ``direction`` into the basis
+            where the clamp is meaningful. Must be paired with ``bounds_qr_tfm_inv``.
+        bounds_qr_tfm_inv (torch.Tensor, optional): Inverse of ``bounds_qr_tfm``. Used
+            to rotate the clamped step back into the basis ``direction`` came from.
 
     Returns:
         torch.Tensor: The bounded/scaled search direction
@@ -61,33 +67,57 @@ def _apply_bounds(direction, bounds, t):
     min_bounds = torch.min(bounds, torch.as_tensor(
         t, dtype=bounds.dtype, device=bounds.device))
 
-    updated_direction = direction * min_bounds
-    return updated_direction
+    if bounds_qr_tfm is None or bounds_qr_tfm_inv is None:
+        return direction * min_bounds
+
+    # Background:
+    # Updated direction lives in the post-QR (new) basis; bounds live in the raw (old) basis.
+    # Details:
+    # 1) Rotate direction into the old basis
+    # 2) Do the element-wise clamp there
+    # 3) Rotate the clamped step back to the new basis
+    # Vectors transform linearly under change of basis; bounds (an axis-aligned box) would not, 
+    # which is why we wrap the clamp instead of trying to transform bounds directly.
+
+    direction_old = bounds_qr_tfm @ direction
+    dz_old_step = direction_old * min_bounds
+    dz_new_step = bounds_qr_tfm_inv @ dz_old_step
+    return dz_new_step
 
 
 @torch.no_grad()
-def _line_search(func, x, wp_P, direction, gradient, initial_step_size, bounds, alpha=1e-3, beta=0.6, max_steps=10):
+def _line_search(func, x, wp_P, direction, gradient, initial_step_size, bounds,
+                 alpha=1e-3, beta=0.6, max_steps=10,
+                 bounds_qr_tfm=None, bounds_qr_tfm_inv=None):
     r"""Implements the simplest backtracking line search with the sufficient decrease Armijo condition
 
     Args:
         func (function): Optimization Energy/Loss function
         x (torch.Tensor): Optimization objective (the value you're optimizing)
+        wp_P (wps.bsr_matrix or None): Projection matrix mapping the reduced ``x`` back
+            to the full DOF space before calling ``func``. ``None`` means no projection.
         direction (torch.Tensor): Search direction
         gradient (torch.Tensor): Optimization gradient
         initial_step_size (float): Initial step size
-        alpha (float, optional): LS parameter. Defaults to 1e-8.
-        beta (float, optional): LS parameter. Defaults to 0.3.
-        max_steps (int, optional): Max number of line search steps. Defaults to 20.
+        bounds (torch.Tensor): Per-element bounds on the step size; forwarded to ``_apply_bounds``.
+        alpha (float, optional): LS parameter. Defaults to 1e-3.
+        beta (float, optional): LS parameter. Defaults to 0.6.
+        max_steps (int, optional): Max number of line search steps. Defaults to 10.
+        bounds_qr_tfm (torch.Tensor, optional): Forwarded to ``_apply_bounds``; see that
+            function for the basis-change semantics.
+        bounds_qr_tfm_inv (torch.Tensor, optional): Forwarded to ``_apply_bounds``.
 
     Returns:
-        torch float: Optimal step size used to scale the search direction
+        torch.Tensor: The bounded search direction scaled by the chosen step size
+        (i.e. the update to add to ``x``), not a scalar step size.
     """
     t = initial_step_size  # Initial step size
     wp_x = _red_to_full(wp_P, wp.from_torch(x))
     f = func(wp_x)
 
     can_break = False
-    bounded_direction = _apply_bounds(direction, bounds, t)
+    bounded_direction = _apply_bounds(
+        direction, bounds, t, bounds_qr_tfm, bounds_qr_tfm_inv)
 
     for __ in range(max_steps):
         x_new = x + bounded_direction
@@ -100,14 +130,16 @@ def _line_search(func, x, wp_P, direction, gradient, initial_step_size, bounds, 
             else:
                 can_break = True
                 t = t / beta  # Increase the step size
-                bounded_direction = _apply_bounds(direction, bounds, t)
+                bounded_direction = _apply_bounds(
+                    direction, bounds, t, bounds_qr_tfm, bounds_qr_tfm_inv)
         else:
             t *= beta  # Reduce the step size
-            bounded_direction = _apply_bounds(direction, bounds, t)
+            bounded_direction = _apply_bounds(
+                direction, bounds, t, bounds_qr_tfm, bounds_qr_tfm_inv)
 
     return bounded_direction  # Return the final step size if max_iters is reached
 
-
+@torch.no_grad()
 def newtons_method(x,
                    energy_fcn,
                    gradient_fcn,
@@ -120,7 +152,9 @@ def newtons_method(x,
                    cg_tol=1e-4,
                    cg_iters=100,
                    conv_tol=1e-4,
-                   direct_solve=False):
+                   direct_solve=False,
+                   bounds_qr_tfm=None,
+                   bounds_qr_tfm_inv=None):
     r""" Newton's method optimizes for the updated dofs at the next time step. At each iteration, it computes the updated direction `dz`, 
     finds an appropriate step size, and updates the dofs. It continues to do this iteratively until the directional update is small which indicates the energy is minimized.
 
@@ -138,6 +172,8 @@ def newtons_method(x,
         cg_iters (int, optional): CG iterations. Defaults to 100.
         conv_tol (float, optional): Convergence tolerance. Defaults to 1e-4.
         direct_solve (bool, optional): Whether to use a dense direct solver, or a sparse CG solver. Defaults to False.
+        bounds_qr_tfm (torch.Tensor, optional): If apply_qr=True, this is the forward direction used in the line search's apply_bounds for collision bounds in the raw sparse-DOF basis. If apply_qr=False, this is None. Forwarded to ``_apply_bounds``; see that function for the basis-change semantics.
+        bounds_qr_tfm_inv (torch.Tensor, optional): If apply_qr=True, this is the inverse direction used in the line search's apply_bounds for collision bounds in the raw sparse-DOF basis. If apply_qr=False, this is None. Forwarded to ``_apply_bounds``.
 
     Returns:
         wp.array: Optimized objective of size :math:`(\text{num_dofs},)`
@@ -151,6 +187,7 @@ def newtons_method(x,
     # Get the kinematic dofs
     t_x_kinematic = wp.to_torch(x) - wp.to_torch(_red_to_full(P, _full_to_red(Pt, x))) # x - P @ Pt @ x
 
+    converged = False
     for k in range(nm_max_iters):
         E_curr = energy_fcn(x)  # scalar
         G_curr = gradient_fcn(x).flatten()  # vector
@@ -173,7 +210,7 @@ def newtons_method(x,
             b = wp.to_torch(red_g)
             t_red_dx = -torch.linalg.solve(A, b)
         else:
-            # TODO:Change this to a block-wise preconditioner, so CG converges in 1 step when
+            # TODO: Change this to a block-wise preconditioner, so CG converges in 1 step when
             # The hessian is block-diagonal and there is no contact
             precond = preconditioner(
                 red_H, "diag") if preconditioner_fcn is None else preconditioner_fcn(red_H)
@@ -191,7 +228,7 @@ def newtons_method(x,
 
         # Converges if the directional update is small
         if (torch.abs(t_red_dx.t() @ t_red_g) < conv_tol):
-            logger.debug(f"Newton: Converged in {k} iterations")
+            converged = True
             break
 
         full_dx = _red_to_full(P, wp.from_torch(t_red_dx))
@@ -209,11 +246,13 @@ def newtons_method(x,
                                       direction=t_red_dx,
                                       gradient=t_red_g,
                                       initial_step_size=last_alpha,
-                                      bounds=t_bounds)
+                                      bounds=t_bounds,
+                                      bounds_qr_tfm=bounds_qr_tfm,
+                                      bounds_qr_tfm_inv=bounds_qr_tfm_inv)
 
-        t_red_x += bounded_update
+        t_red_x = t_red_x + bounded_update
 
         t_x = wp.to_torch(_red_to_full(P, wp.from_torch(t_red_x))) + t_x_kinematic 
         x = wp.from_torch(t_x)
-    
+
     return x

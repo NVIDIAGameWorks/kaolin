@@ -32,8 +32,8 @@ def gravity_energy_wp_func(g: wp.vec3,
 
     Args:
         g (wp.vec3): Gravity acceleration (0, -9.81, 0)
-        rho (wp.float32): Density
-        vol (wp.float32): Volume
+        rho (wp.float32): Density (in :math:`kg/m^3`)
+        vol (wp.float32): Volume (in :math:`m^3`)
         dx (wp.vec3): Delta in position
         x0 (wp.vec3): Rest position
 
@@ -53,8 +53,8 @@ def gravity_gradient_wp_func(g: wp.vec3,
 
     Args:
         g (wp.vec3): Gravity acceleration (0, -9.81, 0)
-        rho (wp.float32): Density
-        vol (wp.float32): Volume
+        rho (wp.float32): Density (in :math:`kg/m^3`)
+        vol (wp.float32): Volume (in :math:`m^3`)
         dx (wp.vec3): Delta in position
         x0 (wp.vec3): Rest position
 
@@ -62,27 +62,6 @@ def gravity_gradient_wp_func(g: wp.vec3,
         wp.vec3: Gravity force
     """
     return g * rho * vol
-
-
-@wp.func
-def gravity_hessian_wp_func(g: wp.vec3,
-                    rho: wp.float32,
-                    vol: wp.float32,
-                    dx: wp.vec3,
-                            x0: wp.vec3):  # pragma: no cover
-    r"""Returns gravity hessian matrix at each integration primitive which is 0.
-
-    Args:
-        g (wp.vec3): Gravity acceleration (0, -9.81, 0)
-        rho (wp.float32): Density
-        vol (wp.float32): Volume
-        dx (wp.vec3): Delta in position
-        x0 (wp.vec3): Rest position
-
-    Returns:
-        wp.mat33: Gravity hessian
-    """
-    return wp.mat33(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 @wp.kernel
@@ -408,8 +387,8 @@ class Gravity:
         
         Args:
             g (wp.vec3): Gravity acceleration (0, -9.81, 0)
-            integration_pt_density (wp.array): Density at each point of size :math:`(\text{num_pts})`
-            integration_pt_volume (wp.array): Volume at each point of size :math:`(\text{num_pts})`
+            integration_pt_density (wp.array): Density at each point of size :math:`(\text{num_pts})` (in :math:`kg/m^3`)
+            integration_pt_volume (wp.array): Volume at each point of size :math:`(\text{num_pts})` (in :math:`m^3`)
         """
 
         # warp constant [x, y, z] acceleration due to gravity

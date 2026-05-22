@@ -1,4 +1,4 @@
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,13 +14,11 @@
 # limitations under the License.
 
 import os
+import logging
 
-import kaolin.io.gltf
-import kaolin.io.obj
-import kaolin.io.off
-import kaolin.io.usd
-import kaolin.io.utils
+from . import obj, off, utils, gltf
 
+logger = logging.getLogger(__name__)
 
 def import_mesh(filename, triangulate=False):
     """ Automatically selects appropriate reader and reads mesh from file. Supported formats: USD, obj, gltf.
@@ -40,16 +38,20 @@ def import_mesh(filename, triangulate=False):
 
     # TODO: if off and gltf support consistent settings with the rest, then we can expose these
     default_settings = {'with_materials': True, 'with_normals': True, "triangulate": triangulate,
-                        'heterogeneous_mesh_handler': kaolin.io.utils.mesh_handler_naive_triangulate}
+                        'heterogeneous_mesh_handler': utils.mesh_handler_naive_triangulate}
 
     # TODO: add support for off
     extension = filename.split('.')[-1].lower()
     if extension == 'obj':
-        mesh = kaolin.io.obj.import_mesh(filename, **default_settings, raw_materials=False)
+        mesh = obj.import_mesh(filename, **default_settings, raw_materials=False)
     elif extension in ["usd", "usda", "usdc", "usdz"]:
-        mesh = kaolin.io.usd.import_mesh(filename, **default_settings)
+        try:
+            from . import usd
+        except ImportError:
+            raise ImportError("Cannot use usd import features, usd-core is not installed")
+        mesh = usd.import_mesh(filename, **default_settings)
     elif extension in ['gltf', 'glb']:
-        mesh = kaolin.io.gltf.import_mesh(filename)
+        mesh = gltf.import_mesh(filename)
     else:
         raise ValueError(f'Unsupported filename extension {extension}')
 

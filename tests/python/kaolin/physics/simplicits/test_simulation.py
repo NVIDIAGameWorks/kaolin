@@ -87,18 +87,19 @@ class TestSimplicitsScene:
 
     @pytest.fixture(autouse=True)
     def example_rigid_cube(self, example_unit_cube_object, device, dtype):
-        x0, x0_sdfval, yms, prs, rhos, appx_vol = example_unit_cube_object
+        x0, _, yms, prs, rhos, appx_vol = example_unit_cube_object
         rigid_obj = SimplicitsObject.create_rigid(
             pts=x0, yms=yms, prs=prs, rhos=rhos, appx_vol=appx_vol)
         return rigid_obj
 
     @pytest.fixture(autouse=True)
     def scene_with_one_object(self, example_rigid_cube, device, dtype):
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         scene.add_object(example_rigid_cube, num_qp=200,
                          init_transform=torch.tensor([[1, 0, 0, 0],
                                                       [0, 1, 0, 10],
-                                                      [0, 0, 1, 0]], device=device, dtype=dtype))
+                                                      [0, 0, 1, 0]], device=device, dtype=dtype),
+                                                      )
         return scene
     
     def test_easy_api_scene_add_object_error_no_objects(self, example_rigid_cube, device, dtype):
@@ -107,9 +108,8 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
 
-        # TODO: This will be fixed in another release
         # Set force without any objects in scene
         with pytest.raises(RuntimeError):
             scene.set_scene_gravity()
@@ -120,11 +120,11 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
 
         # Check Error: Add object to scene with incorrect init transform
         with pytest.raises(ValueError):
-            scene.add_object(rigid_obj_one,
+            scene.add_object(rigid_obj_one, num_qp=100,
                              init_transform=torch.tensor([[1, 0, 0, 0],
                                                           [0, 1, 0, 0]], device=device, dtype=dtype))
         
@@ -134,7 +134,7 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         
        
         #Add objects to scene with correct init transforms
@@ -144,7 +144,7 @@ class TestSimplicitsScene:
                                                          [0, 0, 1, 0]], device=device, dtype=dtype))
         
         scene.set_scene_gravity()
-        
+
         # Check error: Add object to scene after simulation has started
         scene.run_sim_step()
         with pytest.raises(RuntimeError):
@@ -171,7 +171,7 @@ class TestSimplicitsScene:
         dyn_pts = scene.get_object_deformed_pts(0)
         mean_dyn_y = dyn_pts[:, 1].mean()
         assert mean_dyn_y < 10.0, f"Mean y coordinate of object {mean_dyn_y} has moved lower than 10 under gravity."
-    
+
     def test_easy_api_set_scene_floor(self, scene_with_one_object):
         scene = scene_with_one_object
         scene.set_scene_gravity()
@@ -310,7 +310,7 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         # Add object to scene
         scene.add_object(rigid_obj_one, num_qp=200,
                         init_transform=torch.tensor([[1, 0, 0, 0],
@@ -347,7 +347,7 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
 
         transform = torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0], [0, 0, 0, 1]], device=device, dtype=dtype)
         # Add object to scene
@@ -366,7 +366,7 @@ class TestSimplicitsScene:
         rigid_obj_two = example_rigid_cube
 
         # Create scene
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         # Add object to scene
         scene.add_object(rigid_obj_one, num_qp=200,
                         init_transform=torch.tensor([[1, 0, 0, 0],
@@ -437,7 +437,7 @@ class TestSimplicitsScene:
         rigid_obj_one = example_rigid_cube
         rigid_obj_two = example_rigid_cube
         
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         scene.timestep = 0.1
         scene.add_object(rigid_obj_one, num_qp=200,
                         init_transform=torch.tensor([[1, 0, 0, 0],
@@ -450,7 +450,7 @@ class TestSimplicitsScene:
                                     [0, 1, 0, 5],
                                     [0, 0, 1, 0],
                                     [0, 0, 0, 1]], device=device, dtype=dtype))
-        
+
         scene.set_scene_gravity()
         scene.set_scene_floor()
         
@@ -513,7 +513,7 @@ class TestSimplicitsScene:
         rigid_obj_one = example_rigid_cube
         rigid_obj_two = example_rigid_cube
 
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         scene.timestep = 0.1
         scene.add_object(rigid_obj_one, num_qp=200,
                         init_transform=torch.tensor([[1, 0, 0, 0],
@@ -582,7 +582,7 @@ class TestSimplicitsScene:
                              ids=["SimplicitsObject", "SkinnedPhysicsPoints"])
     def test_add_object_no_renderable_pts(self, example_rigid_cube, device, dtype, use_baked):
         """add_object without renderable_pts leaves renderable fields None for both input types."""
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             obj = example_rigid_cube.bake(num_qps=200)
             scene.add_object(obj)
@@ -598,7 +598,7 @@ class TestSimplicitsScene:
         """add_object with renderable_pts stores them on the SimulatedObject."""
         x0 = example_unit_cube_object[0]
         render_pts = x0[:20]
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             obj = example_rigid_cube.bake(num_qps=200, renderable_pts=render_pts)
             scene.add_object(obj)
@@ -619,7 +619,7 @@ class TestSimplicitsScene:
         """get_object_deformed_pts('rendered') returns correct shape after renderable_pts baked."""
         x0 = example_unit_cube_object[0]
         render_pts = x0[:20]
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             obj = example_rigid_cube.bake(num_qps=200, renderable_pts=render_pts)
             scene.add_object(obj, init_transform=torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0]],
@@ -639,7 +639,7 @@ class TestSimplicitsScene:
                              ids=["SimplicitsObject", "SkinnedPhysicsPoints"])
     def test_get_object_deformed_pts_rendered_error(self, example_rigid_cube, device, dtype, use_baked):
         """get_object_deformed_pts('rendered') raises ValueError when no renderable_pts were set."""
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             scene.add_object(example_rigid_cube.bake(num_qps=200))
         else:
@@ -667,7 +667,7 @@ class TestSimplicitsScene:
         """get_object_point_transforms('rendered') returns (n_render, 4, 4) tensors."""
         x0 = example_unit_cube_object[0]
         render_pts = x0[:20]
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             obj = example_rigid_cube.bake(num_qps=200, renderable_pts=render_pts)
             scene.add_object(obj, init_transform=torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0]],
@@ -685,7 +685,7 @@ class TestSimplicitsScene:
                              ids=["SimplicitsObject", "SkinnedPhysicsPoints"])
     def test_get_object_point_transforms_rendered_error(self, example_rigid_cube, device, dtype, use_baked):
         """get_object_point_transforms('rendered') raises ValueError when no renderable_pts were set."""
-        scene = SimplicitsScene(device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
         if use_baked:
             scene.add_object(example_rigid_cube.bake(num_qps=200))
         else:
@@ -693,3 +693,189 @@ class TestSimplicitsScene:
         scene.set_scene_gravity()
         with pytest.raises(ValueError):
             scene.get_object_point_transforms(0, 'rendered')
+
+    # ---- 'simulated' branch under normalize_weights_by_samples=True ----
+    # Regression: 'simulated' uses self.skinning_weights (mutated by
+    # _apply_weight_normalization), so transforms must come from
+    # _get_object_transforms_internal (matching normalized space). 'rendered'
+    # uses renderable.skinning_weights (raw), so transforms must come from
+    # get_object_transforms (un-normalized). Pre-fix code paired normalized
+    # weights with un-normalized transforms, deflating the simulated
+    # deformation by 1/sqrt(num_qp).
+
+    def test_get_object_deformed_pts_simulated_normalize_weights(
+            self, example_rigid_cube, device, dtype):
+        """For a rigid translation, 'simulated' deformed pts must equal pts + t
+        regardless of the normalize_weights_by_samples flag."""
+        init = torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0]],
+                            device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
+        scene.add_object(example_rigid_cube, num_qp=200, init_transform=init,
+                         normalize_weights_by_samples=True)
+        scene.set_scene_gravity()  # initializes sim_z from per-object normalized z
+
+        rest = scene.get_object(0).pts
+        deformed = scene.get_object_deformed_pts(0, 'simulated')
+        expected = rest + torch.tensor([0., 10., 0.], device=device, dtype=dtype)
+        check_allclose(deformed, expected, atol=1e-5)
+
+    def test_get_object_point_transforms_simulated_normalize_weights(
+            self, example_rigid_cube, device, dtype):
+        """For a rigid translation, the affine block of 'simulated' per-point
+        transforms must equal the un-normalized rigid transform regardless of
+        the normalize_weights_by_samples flag."""
+        init = torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0]],
+                            device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
+        scene.add_object(example_rigid_cube, num_qp=200, init_transform=init,
+                         normalize_weights_by_samples=True)
+        scene.set_scene_gravity()
+
+        tfms = scene.get_object_point_transforms(0, 'simulated')
+        # Top 3 rows are what LBS consumes; assert they equal the un-normalized
+        # rigid translation. (Bottom row may not be [0,0,0,1] under normalized
+        # weights since sum_h w_h != 1, which is a separate concern.)
+        expected_top = torch.tensor([[1., 0., 0., 0.],
+                                     [0., 1., 0., 10.],
+                                     [0., 0., 1., 0.]], device=device, dtype=dtype)
+        check_allclose(tfms[:, :3, :],
+                       expected_top.unsqueeze(0).expand(tfms.shape[0], -1, -1),
+                       atol=1e-5)
+
+    # ---- Pre-sim get_object_transforms across (apply_qr, normalize_weights_by_samples) ----
+    # Regression: when no force is set yet, sim_z is None and
+    # _get_object_transforms_internal hits its else branch. The pre-fix branch
+    # placed init_transform at the last handle unconditionally, which is wrong
+    # under normalize_weights_by_samples (extra 1/handle_norm scaling slips
+    # through) and under apply_qr (obj.z is a lstsq solution spread across all
+    # handles in the QR basis, not init_transform at the last handle).
+
+    @pytest.mark.parametrize("apply_qr,normalize", [
+        (False, False), (False, True), (True, False), (True, True)],
+        ids=["plain", "normalize", "qr", "qr_and_normalize"])
+    def test_get_object_transforms_presim(self, example_rigid_cube, device, dtype,
+                                          apply_qr, normalize):
+        """Before any force is set (sim_z is None), get_object_transforms must
+        still return the un-normalized relative transform regardless of which
+        conditioning flags are enabled. For a rigid (single-handle) object the
+        returned (num_handles, 4, 4) tensor must match the relative transform
+        broadcast across handles."""
+        init = torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0]],
+                            device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
+        scene.add_object(example_rigid_cube, num_qp=200, init_transform=init,
+                         normalize_weights_by_samples=normalize, apply_qr=apply_qr)
+
+        # Pre-sim: no force has been set, so scene.sim_z is None and the else
+        # branch in _get_object_transforms_internal runs.
+        assert scene.sim_z is None
+        tfms = scene.get_object_transforms(0)
+
+        expected = torch.tensor([[0., 0., 0., 0.],
+                                 [0., 0., 0., 10.],
+                                 [0., 0., 0., 0.],
+                                 [0., 0., 0., 1.]], device=device, dtype=dtype)
+        check_allclose(tfms,
+                       expected.unsqueeze(0).expand(tfms.shape[0], -1, -1),
+                       atol=1e-4)
+
+    @pytest.mark.parametrize("apply_qr,normalize", [
+        (False, False), (False, True), (True, False), (True, True)],
+        ids=["plain", "normalize", "qr", "qr_and_normalize"])
+    def test_get_object_transforms_presim_matches_postforce(
+            self, example_rigid_cube, device, dtype, apply_qr, normalize):
+        """The pre-sim (sim_z=None) and post-force-setup (sim_z populated)
+        paths of _get_object_transforms_internal must agree, since both should
+        encode the same init_transform when no sim step has been taken yet."""
+        init = torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0]],
+                            device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
+        scene.add_object(example_rigid_cube, num_qp=200, init_transform=init,
+                         normalize_weights_by_samples=normalize, apply_qr=apply_qr)
+
+        assert scene.sim_z is None
+        presim_tfms = scene.get_object_transforms(0)
+
+        scene.set_scene_gravity()  # triggers reset_scene -> populates sim_z
+        assert scene.sim_z is not None
+        postsetup_tfms = scene.get_object_transforms(0)
+
+        check_allclose(presim_tfms, postsetup_tfms, atol=1e-4)
+
+    # ---- reset_sim_state populates obj.z correctly across mode combinations ----
+    # Regression: ensures the lstsq path (apply_qr=True) and the scale-by-norm
+    # path agree on the displacement they encode for the same init_transform,
+    # and continue to compose correctly when both flags are on.
+
+    @pytest.mark.parametrize("apply_qr,normalize", [
+        (False, False), (False, True), (True, False), (True, True)],
+        ids=["plain", "normalize", "qr", "qr_and_normalize"])
+    def test_reset_sim_state_z_matches_init_transform(
+            self, example_rigid_cube, device, dtype, apply_qr, normalize):
+        """obj.B_dense @ obj.z must reconstruct the rigid displacement implied
+        by init_transform, for every combination of conditioning flags. This
+        directly exercises the reset_sim_state branches."""
+        init = torch.tensor([[1, 0, 0, 0], [0, 1, 0, 10], [0, 0, 1, 0]],
+                            device=device, dtype=dtype)
+        scene = SimplicitsScene(device=device)
+        scene.add_object(example_rigid_cube, num_qp=200, init_transform=init,
+                         normalize_weights_by_samples=normalize, apply_qr=apply_qr)
+
+        obj = scene.get_object(0)
+        predicted_dx = (obj.B_dense @ obj.z).view(-1, 3)
+
+        # Rigid translation by (0, 10, 0) on the (subsampled) sim points.
+        expected_dx = torch.zeros_like(obj.pts)
+        expected_dx[:, 1] = 10.0
+
+        check_allclose(predicted_dx, expected_dx, atol=1e-4)
+
+    # ---- QR + collisions: basis-rotation invariance ----
+    # Regression: with apply_qr=True the collision Jacobian must be rotated into
+    # the post-QR basis (via sim_qr_tfm) and the line-search bounds must clamp
+    # in the raw basis (via the basis-change wrap in _apply_bounds). Otherwise the
+    # Newton solver mixes inconsistent bases and the trajectory drifts.
+
+    def _build_collision_scene(self, example_rigid_cube, device, dtype, *,
+                               apply_qr, floor_height=3.0, num_steps=20):
+        """Build a one-object scene with gravity, floor, and collisions; step it."""
+        torch.manual_seed(0)
+        scene = SimplicitsScene(device=device)
+        scene.timestep = 0.01
+        scene.newton_hessian_regularizer = 1e-5
+        scene.add_object(
+            example_rigid_cube, num_qp=200,
+            init_transform=torch.tensor([[1, 0, 0, 0],
+                                         [0, 1, 0, 5],
+                                         [0, 0, 1, 0]], device=device, dtype=dtype),
+            apply_qr=apply_qr)
+        scene.set_scene_gravity()
+        scene.set_scene_floor(floor_height=floor_height)
+        scene.reset_scene()
+        scene.enable_collisions(impenetrable_barrier_ratio=0.5, collision_penalty=100.0)
+        for _ in range(num_steps):
+            scene.run_sim_step()
+        return scene
+
+    def test_enable_collisions_with_qr_does_not_raise(self, example_rigid_cube, device, dtype):
+        """The Phase 1 guard (NotImplementedError when apply_qr=True meets
+        enable_collisions) must be gone now that collision_J is rotated."""
+        scene = self._build_collision_scene(
+            example_rigid_cube, device, dtype, apply_qr=True, num_steps=1)
+        assert scene.force_dict["collision"]["object"] is not None
+        # sim_qr_tfm must be present (any QR object -> non-None) and shape-compatible
+        assert scene.sim_qr_tfm is not None
+        assert scene.sim_qr_tfm.shape[0] == scene.sim_B.shape[1]
+
+    def test_qr_collisions_trajectory_invariance(self, example_rigid_cube, device, dtype):
+        """QR is a pure basis change. Running an identical scene with apply_qr={False,True}
+        must produce the same simulated-point positions: same gravity, same floor
+        contact, same Newton solution after Phase 2 fixes the basis mismatch."""
+        scene_plain = self._build_collision_scene(
+            example_rigid_cube, device, dtype, apply_qr=False, num_steps=20)
+        scene_qr = self._build_collision_scene(
+            example_rigid_cube, device, dtype, apply_qr=True, num_steps=20)
+
+        pts_plain = scene_plain.get_object_deformed_pts(0, points='simulated')
+        pts_qr = scene_qr.get_object_deformed_pts(0, points='simulated')
+        check_allclose(pts_plain, pts_qr, atol=1e-3)

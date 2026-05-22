@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import warp as wp
-from kaolin.physics.utils.warp_utilities import mat99
 
 __all__ = [
     "to_lame", "get_defo_grad"
@@ -25,7 +24,7 @@ def to_lame(yms, prs):
     r"""Converts youngs modulus and poissons ratio to lame parameters
 
     Args:
-        yms (torch.Tensor): tensor of youngs modulus
+        yms (torch.Tensor): tensor of youngs modulus (in :math:`kg/m/s^2`)
         prs (torch.Tensor): tensor of poisson ratios
 
     Returns:
@@ -34,26 +33,6 @@ def to_lame(yms, prs):
     mus = yms / (2 * (1 + prs))
     lams = yms * prs / ((1 + prs) * (1 - 2 * prs))
     return mus, lams
-
-
-@wp.func
-def _kron3_wp_func(a: wp.mat33, b: wp.mat33):  # pragma: no cover
-    """Kronecker product of two :math:`(3,3)` matrices
-
-    Args:
-        a (wp.mat33): Warp :math:`(3,3)` matrix
-        b (wp.mat33): Warp :math:`(3,3)` matrix
-
-    Returns:
-        wp.mat33: A warp 9x9 matrix.
-    """
-    output = mat99(0.0)
-    for i in range(3):
-        for j in range(3):
-            for k in range(3):
-                for l in range(3):
-                    output[i * 3 + k, j * 3 + l] = a[i, j] * b[k, l]
-    return output
 
 
 @wp.kernel

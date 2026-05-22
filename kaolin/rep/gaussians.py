@@ -66,7 +66,8 @@ class PointSamples(TensorContainerBase):
 
     * :meth:`cat` - concatenate all tensors along the point dimension, including features (override :meth:`_custom_attr_cat` to customize)
     * :meth:`as_transformed` - apply affinetransform to positions (override to customize)
-    * :meth:`\[mask\] <__getitem__>` - return new instance with point properties masked by boolean mask
+    * :meth:`\[mask\](get) <__getitem__>` - return new instance with point properties masked by boolean mask
+    * :meth:`\[mask\](set) <__setitem__>` - sets masked set of properties from same length class instance
     * :meth:`len <__len__>` - return number of points
 
     .. rubric:: Inheriting from PointSamples
@@ -424,6 +425,68 @@ class PointSamples(TensorContainerBase):
                 kwargs[attr] = getattr(self, attr)
         return self.__class__(**kwargs)
 
+    # TODO: consider extending to slices, etc.
+    def __setitem__(self, mask, value):
+        """Assign per-point attributes from ``value`` into this instance at indices selected by ``mask``.
+
+        Acts as the in-place inverse of :meth:`__getitem__`: per-point attributes
+        (see :meth:`class_point_attributes`) of ``self`` are updated in-place
+        using the matching attributes of ``value``. Non-point attributes
+        (e.g. ``transform``, ``sh_degree``) are not modified; the caller is
+        responsible for ensuring they are consistent between ``self`` and
+        ``value`` (in particular both should be in the same coordinate frame --
+        see :meth:`as_transformed` to canonicalize beforehand).
+
+        Args:
+            mask (torch.Tensor): Boolean tensor of shape ``(N,)``.
+            value: Instance of the same class as ``self`` with
+                ``len(value) == mask.sum()``.
+
+        Raises:
+            TypeError: If ``mask`` is not a boolean tensor or ``value`` is not
+                an instance of the same class as ``self``.
+            ValueError: If ``mask`` shape, ``value`` length, or per-point
+                attribute structures are inconsistent.
+        """
+        if not isinstance(mask, torch.Tensor):
+            raise TypeError(f'Mask must be a torch.Tensor, got {type(mask)}')
+        if mask.dtype != torch.bool:
+            raise TypeError(f'Mask must be boolean, got {mask.dtype}')
+        if mask.shape[0] != len(self):
+            raise ValueError(f'Mask length {mask.shape[0]} does not match number of points {len(self)}')
+
+        if not isinstance(value, type(self)):
+            raise TypeError(
+                f'Value must be an instance of {type(self).__name__}, got {type(value).__name__}')
+
+        expected_len = int(mask.sum().item())
+        if len(value) != expected_len:
+            raise ValueError(
+                f'Value has {len(value)} points, but mask selects {expected_len} points')
+
+        for attr in self.class_point_attributes():
+            self_val = getattr(self, attr, None)
+            other_val = getattr(value, attr, None)
+            if self_val is None and other_val is None:
+                continue
+            if self_val is None or other_val is None:
+                raise ValueError(
+                    f'Per-point attribute "{attr}" is set on only one of self/value; '
+                    f'cannot perform partial assignment')
+            if isinstance(self_val, dict) or isinstance(other_val, dict):
+                if not (isinstance(self_val, dict) and isinstance(other_val, dict)):
+                    raise ValueError(
+                        f'Per-point attribute "{attr}" has mismatched types: '
+                        f'self={type(self_val).__name__}, value={type(other_val).__name__}')
+                missing = set(self_val.keys()) - set(other_val.keys())
+                if missing:
+                    raise ValueError(
+                        f'Per-point attribute "{attr}" is missing keys in value: {sorted(missing)}')
+                for k, t in self_val.items():
+                    t[mask] = other_val[k]
+            else:
+                self_val[mask] = other_val
+
     def _combined_canonical_transform(self, input_transform=None):
         left_transform = input_transform
         right_transform = self.transform
@@ -522,24 +585,35 @@ class GaussianSplatModel(PointSamples):
     * :meth:`to` - move tensor attributes to ``device`` or ``dtype``
     * :meth:`cuda`, :meth:`cpu` - move tensor attributes to cuda/CPU devices.
     * :meth:`detach` - detach all tensor attributes
-    * :meth:`to_string(print_stats=True)` - easy inspection, also allows ``print(obj)`` to work
+    * :meth:`to_string(print_stats=True) <to_string>` - easy inspection, also allows ``print(obj)`` to work
     * :meth:`as_dict()` - saves all attributes to dict
-      * compatible with constructor ``GaussianSplatModel(**dict_output)``
-      * compatible with :func:`~kaolin.io.usd.export_gaussiancloud`
-      * compatible with :func:`~kaolin.io.ply.export_gaussiancloud`
+
+       * compatible with constructor ``GaussianSplatModel(**dict_output)``
+       * compatible with USD :func:`~kaolin.io.usd.export_gaussiancloud`
+       * compatible with PLY :func:`~kaolin.io.ply.export_gaussiancloud`
     * :meth:`check_sanity` - checks all tensor shapes for sanity
     * :meth:`len <__len__>` - return number of gaussians
 
     .. rubric:: Gaussian-specific utility methods
 
-    Gaussian-specific utility methods.
+    Gaussian-specific utility methods that work on GaussianSplatModel instances.
 
-    * :meth:`cat` - concatenate all tensors along the point dimension, including features (override :meth:`_custom_attr_cat` to customize)
-    * :meth:`as_transformed` - apply affine transform to all gaussian attributes
-      * **Note**: ⚠️ Works for only isotropic scaling, rotation, translation, and unexpected results may occur for other transform combinations.
-    * :meth:`\[mask\] <__getitem__>` - return new instance with point properties masked by boolean mask
-    * :meth:`compute_sh_degree` - compute SH degree based on number of SH coefficients (class method)
-    * :meth:`compute_num_sh_coeff` - compute number of SH coefficients based on SH degree (class method)
+    * :meth:`as_transformed` - apply affine transform to all gaussian attributes, or per-Gaussian transforms
+
+       * **Note**: ⚠️ Works for only isotropic scaling, rotation, translation, and unexpected results may occur for other transform combinations.
+    * :meth:`\[mask\](get) <__getitem__>` - return new instance with properties masked by a boolean mask
+    * :meth:`\[mask\](set) <__setitem__>` - sets masked set of properties from same length GaussianSplatModel instance
+
+       * E.g. ``scene[object_mask] = scene[object_mask].as_transformed(object_transform)``
+
+    Gaussian-specific utility methods (class methods).
+
+    * :meth:`GaussianSplatModel.cat <cat>` - concatenate all tensors along the point dimension, including features
+    * :meth:`GaussianSplatModel.compute_sh_degree <compute_sh_degree>` - compute SH degree based on number of SH coefficients
+    * :meth:`GaussianSplatModel.compute_num_sh_coeff <compute_num_sh_coeff>` - compute number of SH coefficients based on SH degree
+
+    .. rubric:: Detailed API Docs
+    
     """
 
     @classmethod
@@ -711,8 +785,8 @@ class GaussianSplatModel(PointSamples):
 
         kwargs = self.as_dict()
         if transform is not None:
-            kwargs['positions'], kwargs['orientations'], kwargs['scales'], kwargs['sh_coeff'][:, 1:, :] = transform_gaussians(
-                self.positions, self.orientations, self.scales, transform, shs_feat=self.sh_coeff[:, 1:, :],
+            kwargs['positions'], kwargs['orientations'], kwargs['scales'], kwargs['sh_coeff'] = transform_gaussians(
+                self.positions, self.orientations, self.scales, transform, sh_coeff=self.sh_coeff,
                 use_log_scales=False)
             kwargs['transform'] = None
         return GaussianSplatModel(**kwargs)
