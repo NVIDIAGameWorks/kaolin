@@ -420,25 +420,27 @@ node {
     } else if (hasPushWindowsBaseInCommit == 0) {
         def registryImagePath = imageBaseTag.substring(dockerRegistryServer.length() + 1)
         stage('Promote windows base images to master') {
-            withCredentials([usernamePassword(credentialsId: 'kaolin-gitlab-access-token-as-password',
-                                              usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
-                for (config in windows_base_configs) {
-                    def branchTag = "windows-base-cuda${config['cudaVer']}-${branchRef}"
-                    def masterTag = "windows-base-cuda${config['cudaVer']}-master"
-                    sh """
-                        TOKEN=\$(curl -s -u \$REG_USER:\$REG_PASS \
-                            'https://gitlab-master.nvidia.com/jwt/auth?service=container_registry&scope=repository:${registryImagePath}:pull,push' \
-                            | sed 's/.*"token":"\\([^"]*\\)".*/\\1/')
-                        MANIFEST=\$(curl -s \
-                            -H "Authorization: Bearer \$TOKEN" \
-                            -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
-                            "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${branchTag}")
-                        curl -s -X PUT \
-                            -H "Authorization: Bearer \$TOKEN" \
-                            -H 'Content-Type: application/vnd.docker.distribution.manifest.v2+json' \
-                            -d "\$MANIFEST" \
-                            "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${masterTag}"
-                    """
+            gitlabCommitStatus("push windows-base-cuda${config['cudaVer']}-${branchRef}") {
+                withCredentials([usernamePassword(credentialsId: 'kaolin-gitlab-access-token-as-password',
+                                                  usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+                    for (config in windows_base_configs) {
+                        def branchTag = "windows-base-cuda${config['cudaVer']}-${branchRef}"
+                        def masterTag = "windows-base-cuda${config['cudaVer']}-master"
+                        sh """
+                            TOKEN=\$(curl -s -u \$REG_USER:\$REG_PASS \
+                                'https://gitlab-master.nvidia.com/jwt/auth?service=container_registry&scope=repository:${registryImagePath}:pull,push' \
+                                | sed 's/.*"token":"\\([^"]*\\)".*/\\1/')
+                            MANIFEST=\$(curl -s \
+                                -H "Authorization: Bearer \$TOKEN" \
+                                -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
+                                "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${branchTag}")
+                            curl -s -X PUT \
+                                -H "Authorization: Bearer \$TOKEN" \
+                                -H 'Content-Type: application/vnd.docker.distribution.manifest.v2+json' \
+                                -d "\$MANIFEST" \
+                                "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${masterTag}"
+                        """
+                    }
                 }
             }
         }
