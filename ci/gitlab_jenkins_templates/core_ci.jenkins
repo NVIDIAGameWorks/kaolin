@@ -419,8 +419,8 @@ node {
 
     } else if (hasPushWindowsBaseInCommit == 0) {
         def registryImagePath = imageBaseTag.substring(dockerRegistryServer.length() + 1)
-        stage('Promote windows base images to master') {
-            gitlabCommitStatus("push windows-base-cuda${config['cudaVer']}-${branchRef}") {
+        gitlabCommitStatus("Push windows base images to master") {
+            stage('Promote windows base images to master') {
                 withCredentials([usernamePassword(credentialsId: 'kaolin-gitlab-access-token-as-password',
                                                   usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
                     for (config in windows_base_configs) {
