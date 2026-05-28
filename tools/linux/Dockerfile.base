@@ -10,12 +10,7 @@ ENV PYTORCH_VERSION=${PYTORCH_VERSION}
 RUN echo exit 0 > /usr/sbin/policy-rc.d
 
 RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-peer.conf \
-    && if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
-        rm /etc/apt/sources.list.d/cuda.list; \
-    fi \
-    && if [ -f /etc/apt/sources.list.d/nvidia-ml.list ]; then \
-        rm /etc/apt/sources.list.d/nvidia-ml.list; \
-    fi \
+    && rm -f /etc/apt/sources.list.d/cuda*.list /etc/apt/sources.list.d/nvidia-ml*.list \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated ca-certificates \
     && rm /etc/apt/apt.conf.d/99verify-peer.conf \

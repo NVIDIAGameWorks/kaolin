@@ -58,12 +58,12 @@ class BaseTests:
     def device(self, request):
         return request.param
 
-    @with_seed(42)
     @pytest.fixture(params=[
         {'axis': torch.tensor([0, 1, 0]), 'angle': math.pi / 2},
         {'axis': torch.tensor([1, 0, 0]), 'angle': random.uniform(0.1, math.pi)},
         {'axis': torch.nn.functional.normalize(torch.randn(3), dim=0), 'angle': random.uniform(0.1, math.pi)}
     ])
+    @with_seed(42)
     def transform_matrix_info(self, request):
         axis, angle = request.param['axis'], request.param['angle']
         rot_matrix = kaolin.math.quat.rot33_from_angle_axis(torch.tensor(angle).unsqueeze(0),
@@ -101,8 +101,8 @@ class BaseTests:
         assert set(cls.class_point_attributes()) == set(self.expected_point_attributes()), \
             f"{cls.class_point_attributes()} for {cls.__name__} does not match {self.expected_point_attributes()}"
 
-    @with_seed(42)
     @pytest.fixture()
+    @with_seed(42)
     def valid_constructor_kwargs(self, request, device):
         sample_input_kwargs = [
             self.sample_input_kwargs(10, device=device),
@@ -674,8 +674,8 @@ class TestPointSamples(BaseTests):
     def attributes_changed_by_transform(self):
         return ["positions"]
 
-    @with_seed(15)
     @pytest.fixture(params=[False, True, ["magic", "weight", "size"]])
+    @with_seed(15)
     def cat_input_kwargs(self, request, device):
         with_features = request.param
         
@@ -776,8 +776,8 @@ class TestGaussians(BaseTests):
             kwargs["features"] = self.sample_features_input(num_pts, with_features, device=device, dtype=dtype)
         return kwargs
 
-    @with_seed(15)
     @pytest.fixture(params=[False, True, ["twist", "texture"]])
+    @with_seed(15)
     def cat_input_kwargs(self, request, device):
         optional = [] if len(self.class_optional_attributes) == 0 else np.random.choice(self.class_optional_attributes, size=2, replace=False).tolist()
         

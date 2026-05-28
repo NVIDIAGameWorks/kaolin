@@ -33,13 +33,13 @@ class TestSidedDistance:
         elif dtype == torch.double:
             return 1e-6, 1e-5
 
-    @with_seed(torch_seed=0)
     @pytest.fixture(autouse=True)
+    @with_seed(torch_seed=0)
     def input_double_p1(self, device, dtype):
         return torch.randn((5, 20, 3), requires_grad=True, device='cuda', dtype=torch.double)
 
-    @with_seed(torch_seed=0)
     @pytest.fixture(autouse=True)
+    @with_seed(torch_seed=0)
     def input_double_p2(self, device, dtype):
         return torch.randn((5, 15, 3), requires_grad=True, device='cuda', dtype=torch.double)
 
@@ -57,16 +57,15 @@ class TestSidedDistance:
 
         return p1, p2
 
-    @with_seed(torch_seed=0)
     @pytest.fixture(autouse=True)
+    @with_seed(torch_seed=0)
     def get_large_input(self, device, dtype):
         N = 100
         B = 3
         M = 50
 
-        p1 = torch.randint(0, 100, (B, N, 3), dtype=dtype, device=device)
-        
-        p2 = torch.randint(0, 100, (B, M, 3), dtype=dtype, device=device)
+        p1 = torch.randn((B, M, 3), dtype=dtype, device=device) * 100
+        p2 = torch.randn((B, M, 3), dtype=dtype, device=device) * 100
         return p1, p2
 
     @pytest.fixture(autouse=True)

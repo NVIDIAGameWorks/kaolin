@@ -34,6 +34,23 @@ RUN apt-get -y update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Dev headers required when imgui-bundle (newton dep) builds from source:
+# PyPI ships imgui-bundle>=1.92.0 wheels only for Python >=3.11, so on
+# Python 3.10 pip falls back to the sdist, whose CMake step builds glfw
+# and needs X11/Wayland/GL dev headers.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libx11-dev \
+        libxrandr-dev \
+        libxinerama-dev \
+        libxcursor-dev \
+        libxi-dev \
+        libgl1-mesa-dev \
+        libwayland-dev \
+        libxkbcommon-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Remove PEP 668 restriction (safe in containers)
 RUN rm -f /usr/lib/python*/EXTERNALLY-MANAGED
 

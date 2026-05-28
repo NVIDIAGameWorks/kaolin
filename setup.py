@@ -165,6 +165,15 @@ def get_extensions():
     else:
         extension = CppExtension
 
+    # CUDA 13's CCCL headers hard-error on MSVC's traditional (legacy) preprocessor.
+    # Opt into the standard-conforming preprocessor on Windows so CUDA 13+ compiles
+    # cleanly. `/Zc:preprocessor` requires MSVC >= 19.27 (VS 2019 16.5+); the CI's
+    # toolchain (MSVC 19.34 / VS 2022) is well past that.
+    if sys.platform == 'win32':
+        extra_compile_args['cxx'].append('/Zc:preprocessor')
+        if is_cuda:
+            extra_compile_args['nvcc'] += ['-Xcompiler', '/Zc:preprocessor']
+
     extensions = [
         extension(
             name='kaolin._C',

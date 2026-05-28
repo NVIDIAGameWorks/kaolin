@@ -9,6 +9,13 @@ ENV CUDA_URL=${CUDA_URL}
 ARG CUDA_FILENAME=cuda_${CUDA_VERSION}_win10.exe
 ENV CUDA_FILENAME=${CUDA_FILENAME}
 
+# MSVC version selection is derived from CUDA_VERSION at build time (see the
+# vs_buildtools install step below). CUDA 13.x CCCL hits MSVC 14.34's C++17
+# nested-namespace lookup bug (C2872 cuda/c10::cuda ambiguity), so CUDA >=13
+# images need 14.42, while older CUDA configs need 14.34 for compatibility with
+# their PyTorch/CCCL ABIs. The chosen prefix is exported as a machine env var
+# (MSVC_VER_PREFIX) and inherited by Dockerfile.install / Dockerfile.install_wheel.
+
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 #### BUILD TOOLS ####
@@ -16,10 +23,20 @@ SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPref
 # pulling downloads to top to not repeat
 # download & install VS build tools 17.x (Visual Studio 2022)
 RUN Invoke-WebRequest 'https://aka.ms/vs/17/release/vs_buildtools.exe' -OutFile vs_buildtools.exe -UseBasicParsing; \
+    $cudaMajor = [int]($Env:CUDA_VERSION.Split('.')[0]); \
+    if ($cudaMajor -lt 13) { \
+        $msvcComponent = 'Microsoft.VisualStudio.Component.VC.14.34.17.4.x86.x64'; \
+        $msvcVerPrefix = '14.34'; \
+    } else { \
+        $msvcComponent = 'Microsoft.VisualStudio.Component.VC.14.42.17.12.x86.x64'; \
+        $msvcVerPrefix = '14.42'; \
+    }; \
+    Write-Host ('Selected MSVC component for CUDA ' + $Env:CUDA_VERSION + ': ' + $msvcComponent); \
+    [Environment]::SetEnvironmentVariable('MSVC_VER_PREFIX', $msvcVerPrefix, 'Machine'); \
     $components = @( \
         'Microsoft.VisualStudio.Workload.VCTools', \
         'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', \
-        'Microsoft.VisualStudio.Component.VC.14.34.17.4.x86.x64', \
+        $msvcComponent, \
         'Microsoft.VisualStudio.Workload.MSBuildTools', \
         'Microsoft.Component.VC.Runtime.UCRTSDK', \
         'Microsoft.VisualStudio.Component.Windows10SDK.17763' \
@@ -51,7 +68,7 @@ RUN setx /M PATH $('c:\buildtools\vc\tools\msvc\' + $(Get-ChildItem -Path 'c:\bu
 
 RUN Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc\' -Directory | Select-Object -ExpandProperty Name
 
-RUN $msvcDir = $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc\' -Force -Directory | Where-Object { $_.Name -like '14.34*' } | Select-Object -First 1).FullName; \
+RUN $msvcDir = $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc\' -Force -Directory | Where-Object { $_.Name -like ($Env:MSVC_VER_PREFIX + '*') } | Select-Object -First 1).FullName; \
     $sdkVersion = $(Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\Include\' -Force -Directory | Sort-Object -Descending | Select-Object -First 1).Name; \
     $sdkBinBase = 'C:\Program Files (x86)\Windows Kits\10\bin\' + $sdkVersion; \
     $sdkIncBase = 'C:\Program Files (x86)\Windows Kits\10\Include\' + $sdkVersion; \
@@ -65,10 +82,12 @@ RUN $msvcDir = $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc\' -Force -Dire
     [Environment]::SetEnvironmentVariable('INCLUDE', $incValue, 'Machine'); \
     [Environment]::SetEnvironmentVariable('LIB', $libValue, 'Machine')
 
-RUN $clPath = $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc\' -Force -Directory | Where-Object { $_.Name -like '14.34*' } | Select-Object -First 1).FullName + '\bin\hostx64\x64\cl.exe'; \
+RUN $msvcSubdir = $(Get-ChildItem -Path 'c:\buildtools\vc\tools\msvc\' -Force -Directory | Where-Object { $_.Name -like ($Env:MSVC_VER_PREFIX + '*') } | Select-Object -First 1).Name; \
+    $clPath = 'c:\buildtools\vc\tools\msvc\' + $msvcSubdir + '\bin\hostx64\x64\cl.exe'; \
     Write-Host ('CUDAHOSTCXX=' + $clPath); \
+    Write-Host ('VCToolsVersion=' + $msvcSubdir); \
     [Environment]::SetEnvironmentVariable('CUDAHOSTCXX', $clPath, 'Machine'); \
-    [Environment]::SetEnvironmentVariable('VCToolsVersion', '14.34.31933', 'Machine')
+    [Environment]::SetEnvironmentVariable('VCToolsVersion', $msvcSubdir, 'Machine')
 
 
 #### CUDA ####

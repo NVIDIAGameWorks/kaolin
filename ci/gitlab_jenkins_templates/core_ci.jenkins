@@ -5,7 +5,7 @@ import groovy.transform.Field
 if (gitlabActionType == "MERGE" || gitlabSourceBranch == "master") {
 gitlabCommitStatus("launch all builds") {
 
-def defaultWheelsPythonVers = ['3.9', '3.10', '3.11', '3.12']
+def defaultWheelsPythonVers = ['3.10', '3.11', '3.12']
 
 // Configs for build from pytorch docker images
 // (See: https://hub.docker.com/r/pytorch/pytorch/tags)
@@ -40,12 +40,12 @@ def ubuntu_from_nvcr_configs = [
 def ubuntu_from_cuda_configs = [
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'pythonVer': '3.9', 'torchVer': '2.5.0',
+        'pythonVer': '3.10', 'torchVer': '2.5.1',
         'archsToTest': 'MULTI'
     ],
     [
-        'cudaVer': '13.0.1', 'cudnnVer': '',
-        'pythonVer': '3.12', 'torchVer': '2.10.0',
+        'cudaVer': '13.2.1', 'cudnnVer': '',
+        'pythonVer': '3.14', 'torchVer': '2.12.0',
         'archsToTest': 'MULTI'
     ],
 ]
@@ -54,71 +54,15 @@ def ubuntu_from_cuda_configs = [
 // (Use docker image ubuntu:18.04 as a base)
 def ubuntu_cpuonly_configs = [
     [
-        'pythonVer': '3.9', 'torchVer': '2.5.0',
+        'pythonVer': '3.10', 'torchVer': '2.5.1',
     ],
     [
-        'pythonVer': '3.12', 'torchVer': '2.10.0',
+        'pythonVer': '3.14', 'torchVer': '2.12.0',
     ]
 ]
 
 // Configs for building python wheels
 def ubuntu_for_cuda_wheels_configs = [
-/*
-    [
-        'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'torchVer': '2.3.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '12.1.0', 'cudnnVer': '8',
-        'torchVer': '2.3.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'torchVer': '2.3.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '12.1.0', 'cudnnVer': '8',
-        'torchVer': '2.3.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'torchVer': '2.4.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '12.1.0', 'cudnnVer': '8',
-        'torchVer': '2.4.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '12.4.1', 'cudnnVer': '',
-        'torchVer': '2.4.0', 'archsToTest': 'MULTI'
-    ],
-*/
-/*
-    [
-        'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'torchVer': '2.4.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '12.1.0', 'cudnnVer': '8',
-        'torchVer': '2.4.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '12.4.1', 'cudnnVer': '',
-        'torchVer': '2.4.1', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '11.8.0', 'cudnnVer': '8',
-        'torchVer': '2.5.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '12.1.0', 'cudnnVer': '8',
-        'torchVer': '2.5.0', 'archsToTest': 'MULTI'
-    ],
-    [
-        'cudaVer': '12.4.1', 'cudnnVer': '',
-        'torchVer': '2.5.0', 'archsToTest': 'MULTI'
-    ],
-*/
 /*
     [
         'cudaVer': '11.8.0', 'cudnnVer': '8',
@@ -228,62 +172,6 @@ def windows_for_cuda_wheels_configs = [
 /*
     [
         'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.3.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.3.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.3.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.3.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.4.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.4.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.4', 'cudnnVer': '',
-        'torchVer': '2.4.0', 'archsToTest': ''
-    ],
-*/
-/*
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.4.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.4.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.4', 'cudnnVer': '',
-        'torchVer': '2.4.1', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
-        'torchVer': '2.5.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.1', 'cudnnVer': '8',
-        'torchVer': '2.5.0', 'archsToTest': ''
-    ],
-    [
-        'cudaVer': '12.4', 'cudnnVer': '',
-        'torchVer': '2.5.0', 'archsToTest': ''
-    ]
-*/
-/*
-    [
-        'cudaVer': '11.8', 'cudnnVer': '8',
         'torchVer': '2.5.1', 'archsToTest': ''
     ],
     [
@@ -350,29 +238,6 @@ def windows_for_cuda_wheels_configs = [
 ]
 
 def windows_for_cpu_wheels_configs = [
-// numpy<2
-/*
-    [
-        'torchVer': '2.3.0', 'archsToTest': ''
-    ],
-    [
-        'torchVer': '2.3.1', 'archsToTest': ''
-    ],
-    [
-        'torchVer': '2.4.0', 'archsToTest': ''
-    ],
-*/
-/*
-    [
-        'torchVer': '2.4.1', 'archsToTest': ''
-    ],
-    [
-        'torchVer': '2.5.0', 'archsToTest': ''
-    ]
-    [
-        'torchVer': '2.5.1', 'archsToTest': ''
-    ],
-*/
 /*
     [
         'torchVer': '2.6.0', 'archsToTest': ''
@@ -404,12 +269,12 @@ def windows_from_server_configs = [
 */
     [
         'cudaVer': '11.8',
-        'pythonVer': '3.9', 'torchVer': '2.5.0',
+        'pythonVer': '3.10', 'torchVer': '2.5.0',
         'archsToTest': ''
     ],
     [
-        'cudaVer': '13.0',
-        'pythonVer': '3.12', 'torchVer': '2.10.0',
+        'cudaVer': '13.2',
+        'pythonVer': '3.14', 'torchVer': '2.12.0',
         'archsToTest': ''
     ],
 ]
@@ -435,7 +300,10 @@ def windows_base_configs = [
     ],
     [
         'cudaVer': '13.0',
-    ]
+    ],
+    [
+        'cudaVer': '13.2',
+    ],
 ]
 
 dockerRegistryServer = 'gitlab-master.nvidia.com:5005'
@@ -551,26 +419,28 @@ node {
 
     } else if (hasPushWindowsBaseInCommit == 0) {
         def registryImagePath = imageBaseTag.substring(dockerRegistryServer.length() + 1)
-        stage('Promote windows base images to master') {
-            withCredentials([usernamePassword(credentialsId: 'kaolin-gitlab-access-token-as-password',
-                                              usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
-                for (config in windows_base_configs) {
-                    def branchTag = "windows-base-cuda${config['cudaVer']}-${branchRef}"
-                    def masterTag = "windows-base-cuda${config['cudaVer']}-master"
-                    sh """
-                        TOKEN=\$(curl -s -u \$REG_USER:\$REG_PASS \
-                            'https://gitlab-master.nvidia.com/jwt/auth?service=container_registry&scope=repository:${registryImagePath}:pull,push' \
-                            | sed 's/.*"token":"\\([^"]*\\)".*/\\1/')
-                        MANIFEST=\$(curl -s \
-                            -H "Authorization: Bearer \$TOKEN" \
-                            -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
-                            "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${branchTag}")
-                        curl -s -X PUT \
-                            -H "Authorization: Bearer \$TOKEN" \
-                            -H 'Content-Type: application/vnd.docker.distribution.manifest.v2+json' \
-                            -d "\$MANIFEST" \
-                            "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${masterTag}"
-                    """
+        gitlabCommitStatus("Push windows base images to master") {
+            stage('Promote windows base images to master') {
+                withCredentials([usernamePassword(credentialsId: 'kaolin-gitlab-access-token-as-password',
+                                                  usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+                    for (config in windows_base_configs) {
+                        def branchTag = "windows-base-cuda${config['cudaVer']}-${branchRef}"
+                        def masterTag = "windows-base-cuda${config['cudaVer']}-master"
+                        sh """
+                            TOKEN=\$(curl -s -u \$REG_USER:\$REG_PASS \
+                                'https://gitlab-master.nvidia.com/jwt/auth?service=container_registry&scope=repository:${registryImagePath}:pull,push' \
+                                | sed 's/.*"token":"\\([^"]*\\)".*/\\1/')
+                            MANIFEST=\$(curl -s \
+                                -H "Authorization: Bearer \$TOKEN" \
+                                -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
+                                "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${branchTag}")
+                            curl -s -X PUT \
+                                -H "Authorization: Bearer \$TOKEN" \
+                                -H 'Content-Type: application/vnd.docker.distribution.manifest.v2+json' \
+                                -d "\$MANIFEST" \
+                                "https://${dockerRegistryServer}/v2/${registryImagePath}/manifests/${masterTag}"
+                        """
+                    }
                 }
             }
         }

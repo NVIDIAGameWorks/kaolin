@@ -44,7 +44,7 @@ RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.pytho
 
 SHELL ["cmd", "/S", "/C"]
 
-RUN "C:\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" x64 -vcvars_ver=14.34 && \
+RUN "C:\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" x64 -vcvars_ver=%MSVC_VER_PREFIX% && \
     set DISTUTILS_USE_SDK=1 && \
     python setup.py develop
 

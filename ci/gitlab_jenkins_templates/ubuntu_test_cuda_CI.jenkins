@@ -4,108 +4,283 @@ docker_registry_server = ImageTag.split(':')[0..1].join(':')
 currentBuild.displayName = ImageTag.split(':')[2] + "-${arch}"
 currentBuild.description = sourceBranch + ": " + commitHash
 
-if (arch == "MULTI") {
-    gpu_list = """
-            - "A100_PCIE_40GB"
-            - "A100_PCIE_80GB"
-            - "A100_80GB_PCIE"
-            - "A100_PCIE_100GB"
-            - "A10"
-            - "A30"
-            - "A40"
-            - "GA100-E4720-HBM2"
-            - "GA100-E4720-DVT"
-            - "GA104-300-PG142-SKU10-TS3"
-            - "GeForce_RTX_4090"
-            - "H100_80GB_HBM3"
-            - "GH100_P1010_PCIE_CR"
-            - "Tesla_V100_PCIE_32GB"
-    """
-} else {
-    gpu_list = """
-            - "${arch}"
-    """
-}
+// Wrap the entire build in a try/catch so any failure BEFORE gitlabCommitStatus' inner
+// block runs (e.g. missing CUDA_MIN_DRIVER entry, all candidate GPUs filtered out by
+// GPU_MIN_CUDA, malformed cudaVer) is still reported to GitLab as a failed commit status.
+// Without this, top-level Groovy `error()` calls propagate out without updating the
+// GitLab MR status, so the failure is invisible there.
+gitlabStatusName = "test-${configName}-${arch}"
+try {
 
 cudaVerTuple = cudaVer.split('\\.')
 cudaMajor = cudaVerTuple[0]
 Float cudaMinor = cudaVerTuple[1]
-if (cudaMajor == "12" && cudaMinor > 2) {
-    node_blacklist = """
-            - "ipp1-0581.ipp1a1.colossus"
-            - "ipp1-0648.ipp1u1.colossus"
-            - "ipp1-0901.ipp1u1.colossus"
-            - "ipp1-1926.ipp1u1.colossus"
-            - "ipp1-1928.ipp1u1.colossus"
-            - "a4u8g-0031.ipp1u1.colossus"
-            - "ipp1-0022.ipp1u1.colossus"
-            - "ipp1-0136.ipp1u1.colossus"
-            - "ipp1-0208.ipp1u1.colossus"
-            - "ipp1-0216.ipp1u1.colossus"
-            - "ipp1-0218.ipp1u1.colossus"
-            - "ipp1-0268.ipp1u1.colossus"
-            - "ipp1-0295.ipp1u1.colossus"
-            - "ipp1-0323.ipp1u1.colossus"
-            - "ipp1-0386.ipp1u1.colossus"
-            - "ipp1-0453.ipp1u1.colossus"
-            - "ipp1-0454.ipp1u1.colossus"
-            - "ipp1-0557.ipp1a1.colossus"
-            - "ipp1-0558.ipp1u1.colossus"
-            - "ipp1-0574.ipp1u1.colossus"
-            - "ipp1-0593.ipp1u1.colossus"
-            - "ipp1-0624.ipp1u1.colossus"
-            - "ipp1-0776.ipp1u1.colossus"
-            - "ipp1-0893.ipp1u1.colossus"
-            - "ipp1-0895.ipp1u1.colossus"
-            - "ipp1-0897.ipp1u1.colossus"
-            - "ipp1-0902.ipp1u1.colossus"
-            - "ipp1-1163.ipp1a1.colossus"
-            - "ipp1-1257.ipp1u1.colossus"
-            - "ipp1-1266.ipp1u1.colossus"
-            - "ipp1-1267.ipp1u1.colossus"
-            - "ipp1-1335.ipp1u1.colossus"
-            - "ipp1-1427.ipp1u1.colossus"
-            - "ipp1-1555.ipp1u1.colossus"
-            - "ipp1-1556.ipp1u1.colossus"
-            - "ipp1-1557.ipp1u1.colossus"
-            - "ipp1-1558.ipp1u1.colossus"
-            - "ipp1-1560.ipp1u1.colossus"
-            - "ipp1-1562.ipp1u1.colossus"
-            - "ipp1-1564.ipp1a1.colossus"
-            - "ipp1-1565.ipp1u1.colossus"
-            - "ipp1-1991.ipp1u1.colossus"
-            - "ipp1-2248.ipp1u1.colossus"
-            - "ipp1-2250.ipp1u1.colossus"
-            - "ipp1-2255.ipp1u1.colossus"
-            - "ipp1-2993.ipp1u1.colossus"
-            - "ipp2-0722.ipp2a1.colossus"
-            - "ipp2-0946.ipp2u1.colossus"
-            - "ipp2-0958.ipp2u1.colossus"
-            - "ipp2-1688.ipp2u1.colossus"
-            - "nvc-t2-045.ipp2u1.colossus"
-            - "s1019-0255.ipp1u1.colossus"
-            - "s1019-0256.ipp1u1.colossus"
-            - "s1019-0257.ipp1u1.colossus"
-            - "s1019-0292.ipp1u1.colossus"
-            - "s1019-0293.ipp1u1.colossus"
-            - "s1019-0293.ipp1u1.colossus"
-            - "s4124-0126.ipp1u1.colossus"
-            - "s4124-0127.ipp1u1.colossus"
-            - "s4124-0133.ipp1u1.colossus"
-            - "x11-0615.ipp1a1.colossus"
-            - "x11-0619.ipp1a1.colossus"
-    """
-} else {
-    node_blacklist = """
-            - "a4u8g-0031.ipp1u1.colossus"
-            - "ipp2-0722.ipp2a1.colossus"
-            - "s4124-0126.ipp1u1.colossus"
-            - "s4124-0127.ipp1u1.colossus"
-            - "s4124-0133.ipp1u1.colossus"
-    """
+// Discard patch version (e.g. "13.0.1" -> "13.0"). NVIDIA's CUDA-vs-driver compatibility
+// table is keyed by major.minor only; the patch component doesn't change driver requirements
+// or compute-capability support, and our Map keys are all major.minor.
+cudaMajorMinor = "${cudaVerTuple[0]}.${cudaVerTuple[1]}"
+
+// Minimum NVIDIA Linux driver version required per CUDA major.minor. (always use the latest update)
+// Source: NVIDIA CUDA Toolkit Release Notes, "CUDA Toolkit and Corresponding Driver Versions"
+// (https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html).
+// Extend this map when bumping CI to a new CUDA version.
+// We only need to support CUDA version that are supported by pytorch
+CUDA_MIN_DRIVER = [
+    "11.8": "520.61.05",
+    "12.1": "530.30.02",
+    "12.4": "550.54.15",
+    "12.6": "560.35.05",
+    "12.8": "570.124.06",
+    "12.9": "575.57.08",
+    "13.0": "580.95.05",
+    "13.2": "595.58.03",
+]
+
+// Known-bad driver versions, keyed by the minimum CUDA major.minor where they break.
+// Effective bad list for cudaVer X = union of values where key <= X. The model assumes
+// "bad from version K onwards" (monotonic); if a driver is ever found bad on exactly one
+// CUDA but fine on a later one, this shape needs extending.
+//
+// Capacity optimization only — correctness is enforced by the "Driver compat check" stage.
+//
+// Initial population (snapshot 2026-05-15) derived from the Blossom fleet driver inventory
+// (https://prod.blsm.nvidia.com/bcs/nodes) cross-referenced against CUDA_MIN_DRIVER. Each
+// driver here is on at least one fleet node and is too old for the bucket's CUDA. Refresh
+// procedure: see .claude/CI.md.
+//
+// Add new entries when a driver appears in CI logs with an INFRA_DRIVER_MISMATCH marker
+// (use the bucket key suggested in the error message).
+KNOWN_BAD_DRIVERS = [
+    "11.8": [
+        "470.13",
+        "510.41",
+    ],
+    "12.1": [
+        "525.60.13",
+        "525.147.05",
+    ],
+    "12.4": [
+        "535.05",
+        "535.20",
+        "535.54",
+        "535.54.03",
+        "535.74",
+        "535.104.05",
+        "535.183.06",
+        "535.247.01.04-internal",
+        "535.288.01.01",
+        "545.21",
+        "550.54.14",
+    ],
+    "12.6": [
+        "550.54.15",
+        "550.90.07",
+        "550.144.03",
+        "550.191",
+        "555.12",
+        "555.42.02",
+        "560.25",
+        "560.28",
+        "560.35",
+        "560.35.03",
+    ],
+    "12.8": [
+        "570.14",
+        "570.19",
+        "570.86.10",
+    ],
+    "12.9": [
+        "570.133.20",
+        "575.25",
+        "575.51.02",
+        "575.51.03",
+    ],
+    "13.0": [
+        "575.57.08",
+        "575.57.08-open",
+        "575.64",
+        "580.23",
+        "580.35",
+        "580.35-open",
+        "580.40",
+        "580.40-open",
+        "580.54",
+        "580.55",
+        "580.65.06",
+        "580.65.06-open",
+        "580.76.05",
+        "580.82.07",
+        "580.86",
+        "580.86-open",
+    ],
+    "13.2": [
+        "580.95.05",
+        "580.95.05-open",
+        "580.126.20",
+        "590.11-open",
+        "590.27",
+        "590.27-open",
+        "590.41",
+        "590.41-open",
+        "590.44.01",
+        "590.48.01",
+        "590.48.01-open",
+        "590.52-open",
+        "595.14",
+        "595.14-open",
+        "595.25",
+        "595.25-open",
+        "595.39",
+        "595.45.04",
+        "595.45.04-open",
+        "595.48",
+    ],
+]
+
+required_min_driver = CUDA_MIN_DRIVER[cudaMajorMinor]
+if (required_min_driver == null) {
+    error("No CUDA_MIN_DRIVER entry for cudaVer='${cudaVer}' (normalized to '${cudaMajorMinor}'). Add '${cudaMajorMinor}' to CUDA_MIN_DRIVER in ubuntu_test_cuda_CI.jenkins.")
 }
 
-gitlabCommitStatus("test-${configName}-${arch}") {
+// Version-aware comparison: returns negative/zero/positive when a < / == / > b.
+// Splits on '.', pads with zeros so '12.3' == '12.3.0'.
+// Defined as a closure (not a method) because Groovy/Jenkins CPS doesn't allow method
+// declarations inside the enclosing try { ... } block.
+compareDottedVersion = { String a, String b ->
+    def aParts = a.tokenize('.').collect { it.toInteger() }
+    def bParts = b.tokenize('.').collect { it.toInteger() }
+    int n = Math.max(aParts.size(), bParts.size())
+    for (int i = 0; i < n; i++) {
+        int av = i < aParts.size() ? aParts[i] : 0
+        int bv = i < bParts.size() ? bParts[i] : 0
+        if (av != bv) return av - bv
+    }
+    return 0
+}
+
+// GPU catalog keyed by minimum CUDA major.minor required. Drives two things:
+//   1. candidate_gpus[MULTI] is the union of every list here — to add or remove a GPU from
+//      the MULTI pool, edit this map (NOT a separate candidate list).
+//   2. The cudaVer filter below drops any GPU listed under a key K > cudaVer, so a non-MULTI
+//      arch request fails fast when incompatible.
+// The "11.8" bucket is the default: pre-Hopper architectures (Volta/Turing/Ampere/Ada) are
+// supported by every cudaVer in the matrix. Higher buckets list GPUs whose compute
+// capability isn't supported by older CUDA toolkits (Hopper sm_90 needs 12.0+, Blackwell
+// sm_100 needs 12.8+, sm_120 needs 13.0+).
+//
+// Sources: NVIDIA GPU Compute Capability table (https://developer.nvidia.com/cuda-gpus)
+// and the CUDA Toolkit Release Notes ("New Features" / "Deprecated Features" sections that
+// add codegen for new sm_XX targets). Fleet board_type strings come from BCS.
+GPU_MIN_CUDA = [
+    "11.8": [   // Default bucket — supported by every cudaVer in the matrix.
+        "A10",
+        "A100_80GB_PCIe",
+        "A100_PCIE_40GB",
+        "A16",
+        "A30",
+        "A40",
+        "GA100-E4720-DVT",
+        "GA100-E4720-HBM2",
+        "GA100-E4720-POR",
+        "GA104-300-PG142-SKU10-TS3",
+        "GA107-PG179-SKU200-TS2",
+        "GeForce_RTX_2070_SUPER",
+        "GeForce_RTX_2080_Ti",
+        "GeForce_RTX_3060_Ti",
+        "GeForce_RTX_3070",
+        "GeForce_RTX_3070_Ti",
+        "GeForce_RTX_3080",
+        "GeForce_RTX_3080_Ti",
+        "GH100-882-P1010-SKU200-TS3",
+        "GH100-882-P1010-SKU200-TS3_A",
+        "GH100-885-PG520-SKU200-TS6",
+        "GH100-PG520-SKU201-TS4",
+        "H100_PCIe",
+        // "Quadro_RTX_8000", // Having unknown issue (TODO ?)
+        "Tesla_P100_PCIE_12GB",
+        "Tesla_P40",
+        "Tesla_P40_perf",
+        "Tesla_PG500",
+        "Tesla_PG500_216",
+        "Tesla_V100_FHHL_16GB",
+        "Tesla_V100_PCIE_16GB",
+        "Tesla_V100_PCIE_32GB",
+        "Tesla_V100S_PCIE_32GB",
+        // "TITAN_RTX", // too old
+        // "TITAN_V", // too old
+    ],
+    "12.0": [   // Hopper sm_90 (requires CUDA 12.0+) and Ada datacenter (NVIDIA recommends 12.0+).
+        "GB100-P2020-SKU200-TS2", // need to verify if not 12.2
+        "GB112-P2021-SKU220-TS2",
+        "L40",
+    ],
+    "12.4": [
+        "NVIDIA_GH200_480GB",
+    ],
+    "12.8": [   // Blackwell sm_100 (requires CUDA 12.8+)
+        "GB102-P2021",
+        "GB202_B40_TS2_MATHLIBS",
+        "GB202-PG145-SKU30-TS2",
+        "GB203-400DVT-A1-PG147-SKU45-TS2",
+        "GB205-300-A1-PG146-SKU70-CR",
+        "NVIDIA_HGX_B300",
+    ],
+    "13.0": [   // Blackwell sm_120 (requires CUDA 13.0+)
+    ],
+]
+
+// Candidate GPU types for this build.
+// arch=="MULTI": union of every list in GPU_MIN_CUDA — the map is the single source of truth
+// for the MULTI pool. Any other arch value: single-element list, so the cudaVer filter below
+// fail-fasts when that arch's min-CUDA bucket is above cudaVer.
+if (arch == "MULTI") {
+    candidate_gpus = []
+    GPU_MIN_CUDA.each { min_cuda, gpus ->
+        candidate_gpus.addAll(gpus)
+    }
+    candidate_gpus = candidate_gpus.unique()
+} else {
+    candidate_gpus = [arch]
+}
+
+// Filter candidate_gpus: drop any whose required min CUDA is higher than cudaVer.
+gpus_requiring_higher_cuda = []
+GPU_MIN_CUDA.each { min_cuda, gpus ->
+    if (compareDottedVersion(cudaMajorMinor, min_cuda) < 0) {
+        gpus_requiring_higher_cuda.addAll(gpus)
+    }
+}
+compatible_gpus = candidate_gpus.findAll { !(it in gpus_requiring_higher_cuda) }
+if (compatible_gpus.isEmpty()) {
+    def dropped = candidate_gpus.findAll { it in gpus_requiring_higher_cuda }
+    error("No GPU types compatible with cudaVer='${cudaVer}' from arch='${arch}'. " +
+          "All candidate GPUs require a higher CUDA: ${dropped}. " +
+          "Use a different arch or update GPU_MIN_CUDA in ubuntu_test_cuda_CI.jenkins.")
+}
+gpu_list = "\n" + compatible_gpus.collect { "            - \"${it}\"" }.join("\n") + "\n    "
+
+// Union all KNOWN_BAD_DRIVERS[K] where K <= cudaVer.
+applicable_bad_drivers = []
+KNOWN_BAD_DRIVERS.each { bucket_min, drivers ->
+    if (compareDottedVersion(cudaMajorMinor, bucket_min) >= 0) {
+        applicable_bad_drivers.addAll(drivers)
+    }
+}
+applicable_bad_drivers = applicable_bad_drivers.unique()
+
+driver_blacklist_clause = ""
+if (!applicable_bad_drivers.isEmpty()) {
+    def values_lines = applicable_bad_drivers.collect { "            - \"${it}\"" }.join("\n")
+    driver_blacklist_clause = """          - key: "nvidia.com/driver_version"
+            operator: "NotIn"
+            values:
+${values_lines}"""
+}
+
+// Shell-friendly CSV of the bad-driver union, for the runtime check stage.
+known_bad_csv = applicable_bad_drivers.join(",")
+
+gitlabCommitStatus(gitlabStatusName) {
 
 podTemplate(
 cloud:'sc-ipp-blossom-prod',
@@ -146,17 +321,61 @@ spec:
           - key: "nvidia.com/gpu_type"
             operator: "In"
             values:${gpu_list}
-          - key: "kubernetes.io/hostname"
-            operator: "NotIn"
-            values:${node_blacklist}
-          - key: "nvidia.com/driver_version"
-            operator: "NotIn"
-            values:
-            - "545.23"
+${driver_blacklist_clause}
 """) {
   node(POD_LABEL) {
     container("docker") {
       timeout(time: 230, unit: 'MINUTES') {
+        // Runtime driver-compat check. Layer 1 of the node-selection design:
+        // catches bad-driver landings that the affinity blacklist (Layer 2) didn't filter,
+        // and emits an INFRA_DRIVER_MISMATCH marker with a suggested YAML edit so the
+        // KNOWN_BAD_DRIVERS list grows from real evidence. See .claude/CI.md.
+        stage("Driver compat check") {
+          sh """#!/bin/bash
+set -eu
+DRV=\$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1 | tr -d '[:space:]')
+DRV_MAX_CUDA=\$(nvidia-smi | grep -oE 'CUDA Version: [0-9]+\\.[0-9]+' | head -n 1 | awk '{print \$NF}')
+[ -z "\$DRV_MAX_CUDA" ] && DRV_MAX_CUDA="unknown"
+MIN="${required_min_driver}"
+CUDA="${cudaMajorMinor}"
+KNOWN_BAD="${known_bad_csv}"
+HOST=\$(hostname)
+
+# Branch 1: minimum-version violation (driver too old for this CUDA).
+if [ "\$(printf '%s\\n%s' "\$DRV" "\$MIN" | sort -V | head -n 1)" != "\$MIN" ]; then
+    if [ "\$DRV_MAX_CUDA" = "unknown" ]; then
+        SUGGEST_BUCKET="\$CUDA"
+    else
+        SUGGEST_BUCKET=\$(echo "\$DRV_MAX_CUDA" | awk -F. '{printf "%d.%d", \$1, \$2+1}')
+    fi
+    cat <<EOF
+INFRA_DRIVER_MISMATCH: cuda=\$CUDA required>=\$MIN got=\$DRV (max claimed: \$DRV_MAX_CUDA) host=\$HOST
+  Suggested fix: add "\$DRV" to KNOWN_BAD_DRIVERS["\$SUGGEST_BUCKET"] in
+    ci/gitlab_jenkins_templates/ubuntu_test_cuda_CI.jenkins
+  (If the driver claims to support cuda=\$CUDA but is buggy, use
+   KNOWN_BAD_DRIVERS["\$CUDA"] instead.)
+EOF
+    exit 1
+fi
+
+# Branch 2: known-bad-hit (driver matches an entry already in the union list).
+if [ -n "\$KNOWN_BAD" ]; then
+    IFS=',' read -ra BAD_ARR <<< "\$KNOWN_BAD"
+    for bad in "\${BAD_ARR[@]}"; do
+        if [ "\$DRV" = "\$bad" ]; then
+            cat <<EOF
+INFRA_DRIVER_MISMATCH: cuda=\$CUDA got=\$DRV host=\$HOST (already in KNOWN_BAD_DRIVERS)
+  The affinity should have filtered this driver. Possible causes: stale pod,
+  recently-relabeled node, or affinity bug. Escalate to CI on-call.
+EOF
+            exit 1
+        fi
+    done
+fi
+
+echo "Driver compat OK: cuda=\$CUDA need>=\$MIN have=\$DRV (max claimed: \$DRV_MAX_CUDA)"
+"""
+        }
         stage("Install deps") {
           sh 'pip install -r /kaolin/tools/ci_requirements.txt "jupyter_client<8"'
           sh 'apt update && apt install -y unzip && unzip /kaolin/examples/samples/rendered_clock.zip -d /kaolin/examples/samples/'
@@ -288,7 +507,7 @@ spec:
             sh '''#!/bin/bash
                   PYTHON_VERSION=`python --version`
                   PYTHON_MINOR=`echo "$PYTHON_VERSION" | cut -d'.' -f2`
-                  if [[ "$PYTHON_MINOR" -ge "11" ]]; then
+                  if [[ "$PYTHON_MINOR" -ge "11" && "$PYTHON_MINOR" -lt "14" ]]; then
                       export CONDA_NO_PLUGINS=true
                       DEBIAN_FRONTEND=noninteractive add-apt-repository ppa:ubuntu-toolchain-r/test
                       DEBIAN_FRONTEND=noninteractive apt-get install -y gcc-11 g++-11
@@ -305,29 +524,37 @@ spec:
           build_passed = false
           echo e.toString()
         }
-        try {
-          stage("Physics - Newton Franka Coupling") {
-            sh 'cd /kaolin/examples/tutorial/physics/ && ipython newton_franka_coupling.ipynb'
+        // Newton notebooks only run when the `newton` package is importable.
+        // Probed once at the controller level so the gate is visible in the pipeline
+        // structure rather than buried in each stage's shell.
+        def newton_installed = (sh(script: 'python -c "import newton"', returnStatus: true) == 0)
+        if (newton_installed) {
+          try {
+            stage("Physics - Newton Franka Coupling") {
+              sh 'cd /kaolin/examples/tutorial/physics/ && ipython newton_franka_coupling.ipynb'
+            }
+          } catch(e) {
+            build_passed = false
+            echo e.toString()
           }
-        } catch(e) {
-          build_passed = false
-          echo e.toString()
-        }
-        try {
-          stage("Physics - Newton MPM Coupling Oneway") {
-            sh 'cd /kaolin/examples/tutorial/physics/ && ipython newton_mpm_coupling_oneway.ipynb'
+          try {
+            stage("Physics - Newton MPM Coupling Oneway") {
+              sh 'cd /kaolin/examples/tutorial/physics/ && ipython newton_mpm_coupling_oneway.ipynb'
+            }
+          } catch(e) {
+            build_passed = false
+            echo e.toString()
           }
-        } catch(e) {
-          build_passed = false
-          echo e.toString()
-        }
-        try {
-          stage("Physics - Newton Rigidbody Coupling") {
-            sh 'cd /kaolin/examples/tutorial/physics/ && ipython newton_rigidbody_coupling.ipynb'
+          try {
+            stage("Physics - Newton Rigidbody Coupling") {
+              sh 'cd /kaolin/examples/tutorial/physics/ && ipython newton_rigidbody_coupling.ipynb'
+            }
+          } catch(e) {
+            build_passed = false
+            echo e.toString()
           }
-        } catch(e) {
-          build_passed = false
-          echo e.toString()
+        } else {
+          echo "newton not installed, skipping Newton tutorial stages"
         }
         try {
           stage("Spherical Gaussian lighting Tutorial") {
@@ -446,3 +673,13 @@ spec:
 }
 
 }  // gitlabCommitStatus
+
+} catch (Throwable e) {
+    // Pre-gitlabCommitStatus or post-gitlabCommitStatus failure: ensure GitLab sees red.
+    // Wrapped in its own try/catch because if the GitLab plugin itself is unhealthy, we
+    // still want the original exception to propagate.
+    try {
+        updateGitlabCommitStatus name: gitlabStatusName, state: 'failed'
+    } catch (Throwable ignored) { }
+    throw e
+}
