@@ -654,7 +654,7 @@ class TestMeshes:
 
     def test_export_overwrite_pointcloud(self, out_dir, mesh, golden_overwrite_path):
         out_path = os.path.join(out_dir, 'exported_overwrite_pointcloud.usda')
-        usd.export_pointcloud(out_path, pointcloud=torch.rand((100, 3)))
+        usd.export_pointcloud(out_path, points=torch.rand((100, 3)))
         usd.export_mesh(out_path, vertices=mesh.vertices, faces=mesh.faces,
                         overwrite=True)
         assert filecmp.cmp(out_path, golden_overwrite_path)

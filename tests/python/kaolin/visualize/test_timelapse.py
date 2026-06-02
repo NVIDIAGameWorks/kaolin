@@ -63,9 +63,9 @@ def pointcloud():
 @pytest.fixture(scope='module')
 def pointcloud_color():
     cur_dir = os.path.dirname(os.path.realpath(__file__))
-    pointcloud, color, normals = io.usd.import_pointcloud(os.path.join(cur_dir, os.pardir, os.pardir,
-                                                          os.pardir, 'samples/golden/pointcloud_GeomPoints_colors.usda'),
-                                                          '/World/pointcloud')
+    pointcloud, color, normals, transform = io.usd.import_pointcloud(os.path.join(cur_dir, os.pardir, os.pardir,
+                                                                     os.pardir, 'samples/golden/pointcloud_GeomPoints_colors.usda'),
+                                                                     '/World/pointcloud')
     return pointcloud, color
 
 @pytest.fixture(scope='module')
@@ -212,7 +212,7 @@ class TestTimelapse:
         # Verify
         filename = os.path.join(out_dir, 'test', 'pointcloud_0.usd')
         for iteration, params in data.items():
-            pointcloud_in, color_in, normals_in = io.usd.import_pointcloud(filename, scene_path='/pointcloud_0', time=iteration)
+            pointcloud_in, color_in, normals_in, transform_in = io.usd.import_pointcloud(filename, scene_path='/pointcloud_0', time=iteration)
 
             assert torch.allclose(pointcloud_in, params['pointcloud_list'][0])
 
