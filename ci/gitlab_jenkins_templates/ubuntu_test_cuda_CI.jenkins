@@ -191,11 +191,6 @@ GPU_MIN_CUDA = [
         "GeForce_RTX_3070_Ti",
         "GeForce_RTX_3080",
         "GeForce_RTX_3080_Ti",
-        "GH100-882-P1010-SKU200-TS3",
-        "GH100-882-P1010-SKU200-TS3_A",
-        "GH100-885-PG520-SKU200-TS6",
-        "GH100-PG520-SKU201-TS4",
-        "H100_PCIe",
         // "Quadro_RTX_8000", // Having unknown issue (TODO ?)
         "Tesla_P100_PCIE_12GB",
         "Tesla_P40",
@@ -211,8 +206,12 @@ GPU_MIN_CUDA = [
     ],
     "12.0": [   // Hopper sm_90 (requires CUDA 12.0+) and Ada datacenter (NVIDIA recommends 12.0+).
         "GB100-P2020-SKU200-TS2", // need to verify if not 12.2
-        "GB112-P2021-SKU220-TS2",
         "L40",
+        "GH100-882-P1010-SKU200-TS3", // Hopper, nvdiffrast build crash with cuda 11.8
+        "GH100-882-P1010-SKU200-TS3_A", // Hopper, nvdiffrast build crash with cuda 11.8
+        "GH100-885-PG520-SKU200-TS6", // Hopper, nvdiffrast build crash with cuda 11.8
+        "GH100-PG520-SKU201-TS4", // Hopper, nvdiffrast build crash with cuda 11.8
+        "H100_PCIe", // Hopper, nvdiffrast build crash with cuda 11.8
     ],
     "12.4": [
         "NVIDIA_GH200_480GB",
@@ -384,7 +383,12 @@ echo "Driver compat OK: cuda=\$CUDA need>=\$MIN have=\$DRV (max claimed: \$DRV_M
         try {
           stage('Disp info') {
             sh 'nvidia-smi'
+            sh 'nvidia-smi --query-gpu=name,driver_version --format=csv'
             sh 'python --version'
+            sh '''
+            python -c "import torch; print(torch.__version__, torch.version.cuda); \
+            print(torch.cuda.get_arch_list()); print(torch.cuda.get_device_capability())"
+            '''
             sh 'lscpu'
             sh 'free -h --si'
           }

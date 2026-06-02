@@ -857,9 +857,9 @@ class IpyFirstPersonVisualizer(BaseIpyVisualizer):
                     self.world_up = self.world_up.unsqueeze(0)
 
                 self.world_right = camera.cam_right().squeeze(-1)
-                self.elevation = torch.acos(torch.dot(
+                self.elevation = torch.acos(torch.clamp(torch.dot(
                     self.world_up.squeeze(), camera.cam_up().squeeze()
-                )).reshape(1)
+                ), -1.0, 1.0)).reshape(1)
                 if torch.dot(self.world_up.squeeze(), camera.cam_forward().squeeze()) >= 0:
                     self.elevation = -self.elevation
         self.azimuth = torch.zeros((1,), device=camera.device, dtype=camera.dtype)

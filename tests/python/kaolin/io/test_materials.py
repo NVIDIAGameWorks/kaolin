@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -87,24 +87,26 @@ class TestUtilities:
         sad_mat1 = kaolin.render.materials.PBRMaterial(material_name='sad', **random_material_textures())
         sad_mat2 = kaolin.render.materials.PBRMaterial(material_name='sad', **random_material_textures())
 
-        materials_input = [unnamed_mat1,  # 0 --> 0
-                           happy_mat1,    # 1 --> 1
-                           sad_mat1,      # 2 --> 2
-                           sad_mat2,      # 3 --> 2
+        # Output is sorted alphabetically by material_name with unnamed materials last
+        # (relative order between unnamed materials preserved).
+        materials_input = [unnamed_mat1,  # 0 --> 2
+                           happy_mat1,    # 1 --> 0
+                           sad_mat1,      # 2 --> 1
+                           sad_mat2,      # 3 --> 1
                            unnamed_mat2,  # 4 --> 3
-                           happy_mat2]    # 5 --> 1
+                           happy_mat2]    # 5 --> 0
         material_assignments_input = torch.LongTensor(
             [[0, 1, 2, 3, 4, 5],
              [0, 0, 1, 1, 2, 2],
              [4, 5, 4, 5, 4, 5],
              [5, 3, 3, 2, 4, 1]])
 
-        expected_materials = [unnamed_mat1, happy_mat1, sad_mat1, unnamed_mat2]
+        expected_materials = [happy_mat1, sad_mat1, unnamed_mat1, unnamed_mat2]
         expected_material_assignments = torch.LongTensor(
-            [[0, 1, 2, 2, 3, 1],
-             [0, 0, 1, 1, 2, 2],
-             [3, 1, 3, 1, 3, 1],
-             [1, 2, 2, 2, 3, 1]])
+            [[2, 0, 1, 1, 3, 0],
+             [2, 2, 0, 0, 1, 1],
+             [3, 0, 3, 0, 3, 0],
+             [0, 1, 1, 1, 3, 0]])
 
         materials, assignments = kaolin.io.materials.group_materials_by_name(
             materials_input, material_assignments_input)

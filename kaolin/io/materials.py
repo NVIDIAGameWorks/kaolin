@@ -69,6 +69,9 @@ class PBRMaterial:
 def group_materials_by_name(materials_list, material_assignments):
     """Groups materials that have the same name. Does not group materials that do not have any name set.
 
+    The grouped materials are returned in canonical order: sorted alphabetically by
+    ``material_name``, with unnamed materials at the end (in their original relative order).
+
     Args:
         materials_list (list of objects): each item is expected to have material_name member, or
             'material_name' key if dictionary.
@@ -76,9 +79,10 @@ def group_materials_by_name(materials_list, material_assignments):
 
     Returns:
         (tuple) of:
-            - **materials** (list): list of material parameters, with any grouped materials replaced by single material
-            - **material_assignments** (torch.LongTensor): copy of material_assignments, modified according to grouped
-                    materials (or None if input material_assignments were None)
+            - **materials** (list): list of material parameters, deduplicated by ``material_name`` and
+                    sorted alphabetically (unnamed materials last).
+            - **material_assignments** (torch.LongTensor): copy of material_assignments, remapped to the
+                    new material indices (or None if input material_assignments were None)
     """
     def _try_to_get_name(material):
         name = None
@@ -94,20 +98,33 @@ def group_materials_by_name(materials_list, material_assignments):
         return name
 
     material_indices = {}
-    new_materials_list = []
-    new_material_assignments = material_assignments.clone() if material_assignments is not None else None
+    grouped_materials_list = []
+    grouped_assignments = material_assignments.clone() if material_assignments is not None else None
     for current_mat_idx, mat in enumerate(materials_list):
         name = _try_to_get_name(mat)
         if name in material_indices:
             new_mat_idx = material_indices[name]
         else:
-            new_mat_idx = len(new_materials_list)
-            new_materials_list.append(mat)
+            new_mat_idx = len(grouped_materials_list)
+            grouped_materials_list.append(mat)
             if name is not None:
                 material_indices[name] = new_mat_idx
 
         if material_assignments is not None:
-            new_material_assignments[material_assignments == current_mat_idx] = new_mat_idx
+            grouped_assignments[material_assignments == current_mat_idx] = new_mat_idx
+
+    # Canonical order: alphabetical by material_name, with unnamed materials last
+    # (sorted is stable, so unnamed materials keep their relative order).
+    order = sorted(range(len(grouped_materials_list)),
+                   key=lambda i: (_try_to_get_name(grouped_materials_list[i]) is None,
+                                  _try_to_get_name(grouped_materials_list[i]) or ''))
+    new_materials_list = [grouped_materials_list[i] for i in order]
+    if grouped_assignments is not None:
+        new_material_assignments = grouped_assignments.clone()
+        for new_idx, orig_idx in enumerate(order):
+            new_material_assignments[grouped_assignments == orig_idx] = new_idx
+    else:
+        new_material_assignments = None
 
     return new_materials_list, new_material_assignments
 

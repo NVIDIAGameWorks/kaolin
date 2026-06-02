@@ -1,4 +1,4 @@
-# Copyright (c) 2019,20-21-23 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2019-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import re
 import warnings
 import numpy as np
 import pathlib
@@ -30,9 +31,11 @@ from kaolin.rep import SurfaceMesh
 from .materials import export_material, UsdMaterialIoManager
 from .subset import add_subset
 from .utils import _get_stage_from_maybe_file, get_scene_paths, create_stage
+from .transform import set_local_to_world_transform, get_local_to_world_transform
 
 
 __all__ = [
+    'get_mesh_scene_paths',
     'import_mesh',
     'import_meshes',
     'add_mesh',
@@ -41,6 +44,26 @@ __all__ = [
     'get_raw_mesh_prim_geometry',
     'get_mesh_prim_materials',
 ]
+
+
+def get_mesh_scene_paths(file_path_or_stage, scene_path=None):
+    r"""Returns all mesh scene paths contained in specified file.
+
+    Args:
+        file_path_or_stage (str or Usd.Stage):
+            Path to usd file (\*.usd, \*.usda) or :class:`Usd.Stage`.
+        scene_path (str, optional): If specified, only return paths under this scene path prefix.
+
+    Returns:
+        (list of str): List of filtered scene paths.
+    """
+    scene_path_regex = f"{re.escape(scene_path)}(/|$)" if scene_path is not None else None
+    stage = _get_stage_from_maybe_file(file_path_or_stage)
+    try:
+        mesh_paths = get_scene_paths(stage, prim_types=['Mesh'], scene_path_regex=scene_path_regex)
+    finally:
+        del stage, file_path_or_stage
+    return mesh_paths
 
 
 def get_uvmap_primvar(mesh_prim):
@@ -90,8 +113,8 @@ def get_raw_mesh_prim_geometry(mesh_prim, time=None, with_normals=False, with_uv
 
     (dict):
 
-        - **vertices** (torch.FloatTensor): vertex positions with any transforms already applied, of shape (N, 3)
-        - **transform** (torch.FloatTensor): applied transform of shape (4, 4)
+        - **vertices** (torch.FloatTensor): vertex positions in the prim's local space, of shape (N, 3)
+        - **transform** (torch.FloatTensor): local-to-world transform of shape (4, 4), in USD convention (translation in last row)
         - **faces** (torch.LongTensor): face vertex indices of original shape saved in the USD
         - **face_sizes** (torch.LongTensor): face vertex counts of original shape saved in the USD
         - **normals** (torch.FloatTensor, optional):
@@ -121,7 +144,6 @@ def get_raw_mesh_prim_geometry(mesh_prim, time=None, with_normals=False, with_uv
 
     if vertices:
         vertices = torch.from_numpy(np.array(vertices, dtype=np.float32))
-        vertices = _apply_transform(vertices)
     else:
         vertices = torch.zeros((0, 3), dtype=torch.float32)
 
@@ -145,7 +167,6 @@ def get_raw_mesh_prim_geometry(mesh_prim, time=None, with_normals=False, with_uv
         normals_interpolation = mesh.GetNormalsInterpolation()
         if normals:
             normals = torch.from_numpy(np.array(normals, dtype=np.float32))
-            normals = _apply_transform(normals)
 
     # UVs
     uvs = None
@@ -267,12 +288,12 @@ def set_normals(geo):
                                   'not supported')
 
 
-def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_normals, time):
-    """Return attributes of all mesh prims under `scene_path`, flattened into a single mesh.
+def _get_mesh_prim_attributes(stage, scene_path, with_materials, with_normals, time):
+    """Return attributes of the mesh prim at `scene_path`.
 
     Args:
         stage: USD stage
-        scene_path (str): path from which to extract all child meshes
+        scene_path (str): path to the mesh prim to read
         with_materials (bool): if to parse materials
         with_normals (bool): if to parse normals
         time: time code
@@ -281,111 +302,72 @@ def _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_norma
 
     (dict) containing at least:
 
-         - **vertices** (torch.FloatTensor or None): vertex positions with any transforms already applied,
-            of shape (N, 3) aggergated for all meshes under scene_path
-        - **faces** (torch.LongTensor or None): face vertex indices of all meshes under scene_path
-        - **face_sizes** (torch.LongTensor or None): face vertex counts of all meshes under scene_path
-        - **face_normals** (torch.FloatTensor or None): normal values of all vertices of all faces of all meshes,
-            set to `None` if `not with_normals` or normals are not available for some meshes under scene_path.
-        - **uvs** (torch.FloatTensor or None): raw UV values of all meshes under scene_path, set to `None`
-            if uvs are not available for some meshes.
-        - **face_uvs_idx** (torch.LongTensor or None): processed indices into `uvs` for every vertex of
-            every face.
+        - **vertices** (torch.FloatTensor or None): vertex positions in the prim's local space, of shape (N, 3)
+        - **faces** (torch.LongTensor or None): face vertex indices
+        - **face_sizes** (torch.LongTensor or None): face vertex counts
+        - **face_normals** (torch.FloatTensor or None): normal values for all vertices of all faces,
+            set to `None` if `not with_normals` or normals are not available.
+        - **uvs** (torch.FloatTensor or None): raw UV values, set to `None` if uvs are not available.
+        - **face_uvs_idx** (torch.LongTensor or None): processed indices into `uvs` for every vertex of every face.
         - **materials_dict** (None or dict from string to material): mapping from material name to material or
             None if not `with_materials`.
         - **material_assignments_dict** (None or dict of str to torch.LongTensor): mapping from material name
             to face indices assigned to that material or None if not `with_materials`
-
-    may contain other auxiliary information, such as:
-        - **normals_interpolation** (list of string or None): normal interpolation types for all meshes
-        - **uv_idx** (list of torch.LongTensor or None): raw UV indices stored in the USD
-        - **uv_interpolation** (list of string or None): UV interpolation types of all meshes
+        - **transform** (torch.FloatTensor or None): local-to-world transform of shape (4, 4),
+            or None if the prim has an identity transform.
     """
     stage_dir = os.path.dirname(str(stage.GetRootLayer().realPath))
     prim = stage.GetPrimAtPath(scene_path)
     if not prim:
         raise ValueError(f'No prim found at "{scene_path}".')
 
-    def _process_mesh_prim(mesh_prim, attrs, time):
-        start_vertex_idx = sum([len(v) for v in attrs.get('vertices', [])])
-        start_uv_idx = sum([0 if u is None else len(u) for u in attrs.get('uvs', [])])
-        start_face_idx = sum([len(f) for f in attrs.get('face_sizes', [])])
+    geo = get_raw_mesh_prim_geometry(prim, time=time, with_normals=with_normals, with_uvs=True)
+    attrs = {k: geo[k] for k in ('vertices', 'faces', 'face_sizes')}
 
-        # Returns dict of attributes:
-        #   - vertices, transform, faces, face_sizes (never None)
-        #   - normals, normals_interpolation, uvs, uv_idx, uv_interpolation  (sometimes None)
-        geo = get_raw_mesh_prim_geometry(mesh_prim, time=time, with_normals=with_normals, with_uvs=True)
-        if geo.get('uvs') is not None:
-            geo['face_uvs_idx'] = get_face_uvs_idx(**geo) + start_uv_idx
-        else:
-            geo['face_uvs_idx'] = None
-        geo['faces'] += start_vertex_idx
+    if geo.get('uvs') is not None:
+        attrs['face_uvs_idx'] = get_face_uvs_idx(**geo)
+        attrs['uvs'] = geo['uvs']
+    else:
+        attrs['face_uvs_idx'] = None
+        attrs['uvs'] = None
 
-        if geo.get('normals') is not None:
-            set_normals(geo)
-            del geo['normals']  # save memory
+    if geo.get('normals') is not None:
+        set_normals(geo)
+        attrs['face_normals'] = geo.get('face_normals')
+        attrs['vertex_normals'] = geo.get('vertex_normals')
+    else:
+        attrs['face_normals'] = None
+        attrs['vertex_normals'] = None
 
-        for k, v in geo.items():
-            attrs.setdefault(k, []).append(v)
+    if with_materials:
+        num_faces = len(geo['face_sizes'])
+        attrs['materials_dict'], attrs['material_assignments_dict'] = get_mesh_prim_materials(
+            prim, time=time)
+    else:
+        attrs['materials_dict'] = None
+        attrs['material_assignments_dict'] = None
 
-        # Parse mesh materials
-        if with_materials:
-            num_faces = len(geo['face_sizes'])
-            materials_dict, material_assignments_dict = get_mesh_prim_materials(
-                mesh_prim, time=time)
-            attrs.setdefault('materials_dict', {}).update(materials_dict)
-            attrs.setdefault('material_assignments_dict', {})
-            for mat_name, face_ids in material_assignments_dict.items():
-                face_ids = face_ids + start_face_idx
-                if mat_name not in attrs['material_assignments_dict']:
-                    attrs['material_assignments_dict'][mat_name] = face_ids
-                else:
-                    attrs['material_assignments_dict'][mat_name] = torch.cat(
-                        [attrs['material_assignments_dict'][mat_name], face_ids])
-
-    def _traverse(cur_prim, ref_path, attrs, time):
-        if UsdGeom.Mesh(cur_prim):
-            _process_mesh_prim(cur_prim, attrs, time)
-        for child in cur_prim.GetChildren():
-            _traverse(child, ref_path, attrs, time)
-
-    attrs = {}
-    _traverse(stage.GetPrimAtPath(scene_path), '', attrs, time)
-
-    # Flatten obtained geometric attributes
-    for k in ['vertices', 'faces', 'face_sizes', 'face_normals', 'uvs', 'face_uvs_idx']:
-        value = attrs.get(k, [])
-        if not all([v is not None for v in value]):  # Only applicable for normals and uvs
-            warnings.warn(f'Some child prims for {scene_path} are missing {k}; skipping importing {k}.', UserWarning)
-            attrs[k] = None
-        elif len(value) == 0:
-            attrs[k] = None
-        else:
-            attrs[k] = torch.cat(value)
-
-    # Make sure these items are present as None
-    for k in ['materials_dict', 'material_assignments_dict']:
-        if k not in attrs:
-            attrs[k] = None
+    tfm = get_local_to_world_transform(stage, prim, time)
+    attrs['transform'] = tfm.float() if tfm is not None else None
 
     return attrs
 
 
 def import_mesh(file_path_or_stage, scene_path=None, with_materials=False, with_normals=False,
                 heterogeneous_mesh_handler=None, time=None, triangulate=False):
-    r"""Import a single mesh from a USD file of Stage in an unbatched representation.
+    r"""Import a mesh scene from a USD file or Stage,
+    all the prims under `scene_path` are merged into a single :class:`kaolin.rep.SurfaceMesh`
+    with their local-to-world transforms applied.
 
     Supports homogeneous meshes (meshes with consistent numbers of vertices per face).
-    All sub-meshes found under the `scene_path` are flattened to a single mesh. The following
-    interpolation types are supported for UV coordinates: `vertex`, `varying` and `faceVarying`.
-    Returns an unbatched attributes as CPU torch tensors in an easy-to-manage
-    :class:`kaolin.rep.SurfaceMesh` container.
+    The following interpolation types are supported for UV coordinates: `vertex`, `varying`
+    and `faceVarying`.  Returns an unbatched :class:`kaolin.rep.SurfaceMesh` container.
 
     Args:
         file_path_or_stage (str, Usd.Stage):
             Path to usd file (`\*.usd`, `\*.usda`) or :class:`Usd.Stage`.
-        scene_path (str, optional): Scene path within the USD file indicating which primitive to import.
-            If not specified, the all meshes in the scene will be imported and flattened into a single mesh.
+        scene_path (str, optional): If specified, only import meshes under this scene path prefix.
+            Default: import all meshes in the file.
         with_materials (bool): if True, load materials. Default: False.
         with_normals (bool): if True, load vertex normals. Default: False.
         heterogeneous_mesh_handler (Callable, optional):
@@ -403,8 +385,9 @@ def import_mesh(file_path_or_stage, scene_path=None, with_materials=False, with_
             which may skip or throw an error.
 
     Returns:
-        (SurfaceMesh):
-            an unbatched instance of :class:`kaolin.rep.SurfaceMesh`, where:
+        (SurfaceMesh or None):
+            A single merged unbatched :class:`kaolin.rep.SurfaceMesh` in world space,
+            or ``None`` if no meshes are found.
 
             * **normals** and **face_normals_idx** will only be filled if `with_normals=True`
             * **materials** will be a list
@@ -435,17 +418,6 @@ def import_mesh(file_path_or_stage, scene_path=None, with_materials=False, with_
         >>> mesh.face_normals  # Causes face_normals and any attributes required to compute it to be auto-computed
         >>> mesh.to_batched()  # Apply fixed topology batching, unsqueezing most attributes
         >>> mesh = mesh.cuda(attributes=["vertices"])  # Moves just vertices to GPU
-        >>> print(mesh)
-        SurfaceMesh object with batching strategy FIXED
-                    vertices: [1, 482, 3] (torch.float32)[cuda:0]
-               face_vertices: [1, 960, 3, 3] (torch.float32)[cpu]
-                face_normals: [1, 960, 3, 3] (torch.float32)[cpu]
-                         uvs: [1, 2880, 2] (torch.float32)[cpu]
-                       faces: [960, 3] (torch.int64)[cpu]
-                face_uvs_idx: [1, 960, 3] (torch.int64)[cpu]
-              vertex_normals: if possible, computed on access from: (faces, face_normals)
-                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
-
 
     To load a mesh with normals and materials, while triangulating and homogenizing if needed::
 
@@ -455,48 +427,36 @@ def import_mesh(file_path_or_stage, scene_path=None, with_materials=False, with_
                               with_normals=True, with_materials=True,
                               heterogeneous_mesh_handler=mesh_handler_naive_triangulate,
                               triangulate=True)
-        >>> print(mesh)
-        SurfaceMesh object with batching strategy NONE
-                    vertices: [482, 3] (torch.float32)[cpu]
-                face_normals: [960, 3, 3] (torch.float32)[cpu]
-                         uvs: [2880, 2] (torch.float32)[cpu]
-                       faces: [960, 3] (torch.int64)[cpu]
-                face_uvs_idx: [960, 3] (torch.int64)[cpu]
-        material_assignments: [960] (torch.int16)[cpu]
-                   materials: list of length 2
-               face_vertices: if possible, computed on access from: (faces, vertices)
-              vertex_normals: if possible, computed on access from: (faces, face_normals)
-                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
     """
-    # TODO  add arguments to selectively import UVs
-    stage = _get_stage_from_maybe_file(file_path_or_stage)
-    if scene_path is None:
-        scene_path = stage.GetPseudoRoot().GetPath()
-    if time is None:
-        time = Usd.TimeCode.Default()
-    meshes_list = import_meshes(stage, [scene_path],
-                                heterogeneous_mesh_handler=heterogeneous_mesh_handler,
-                                with_materials=with_materials,
-                                with_normals=with_normals, times=[time], triangulate=triangulate)
-    return meshes_list[0]
+    scene_paths = get_mesh_scene_paths(file_path_or_stage, scene_path=scene_path)
+    meshes = import_meshes(file_path_or_stage, scene_paths,
+                           with_materials=with_materials, with_normals=with_normals,
+                           heterogeneous_mesh_handler=heterogeneous_mesh_handler,
+                           times=None if time is None else [time] * len(scene_paths),
+                           triangulate=triangulate, return_list=False)
+    if not meshes:
+        return None
+
+    meshes_list = list(meshes.values())
+    if len(meshes_list) == 1:
+        return meshes_list[0].as_transformed()
+    return SurfaceMesh.flatten(meshes_list, group_materials_by_name=True)
 
 
 def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, with_normals=False,
-                  heterogeneous_mesh_handler=None, times=None, triangulate=False):
+                  heterogeneous_mesh_handler=None, times=None, triangulate=False, return_list=True):
     r"""Import one or more meshes from a USD file or Stage in an unbatched representation.
 
     Supports homogeneous meshes (meshes with consistent numbers of vertices per face). Custom handling of
     heterogeneous meshes can be achieved by passing a function through the ``heterogeneous_mesh_handler`` argument.
     The following interpolation types are supported for UV coordinates: `vertex`, `varying` and `faceVarying`.
     For each scene path specified in `scene_paths`, sub-meshes (if any) are flattened to a single mesh.
-    Prims with no meshes or with heterogenous faces are skipped. Returns an unbatched attributes as CPU torch
-    tensors in a list of easy-to-manage :class:`kaolin.rep.SurfaceMesh` containers.
 
     Args:
         file_path_or_stage (str or Usd.Stage):
             Path to usd file (`\*.usd`, `\*.usda`) or :class:`Usd.Stage`.
         scene_paths (list of str, optional): Scene path(s) within the USD file indicating which primitive(s)
-            to import. If None, all prims of type `Mesh` will be imported.
+            to import. Default: all mesh prims in the file are imported.
         with_materials (bool): if True, load materials. Default: False.
         with_normals (bool): if True, load vertex normals. Default: False.
         heterogeneous_mesh_handler (Callable, optional):
@@ -512,10 +472,15 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
             If `heterogeneous_mesh_handler` is not set, this flag will cause non-homogeneous meshes to
             be triangulated and loaded without error; otherwise triangulation executes after `heterogeneous_mesh_handler`,
             which may skip or throw an error.
+        return_list (bool, optional): If ``True`` (default), return a ``list`` of
+            :class:`kaolin.rep.SurfaceMesh` in the order of ``scene_paths`` (v0.18-compatible
+            behaviour). If ``False``, return a ``dict`` keyed by scene path.
 
     Returns:
-        (a list of SurfaceMesh):
-            a list of unbatched instances of :class:`kaolin.rep.SurfaceMesh`, where:
+        (list or dict of SurfaceMesh):
+            A list of :class:`kaolin.rep.SurfaceMesh` (when ``return_list=True``, the default)
+            or a ``dict[str, SurfaceMesh]`` keyed by scene path (when ``return_list=False``),
+            where each mesh has:
 
             * **normals** and **face_normals_idx** will only be filled if `with_normals=True`
             * **materials** will be a list
@@ -526,6 +491,8 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
               of the material (in the `materials` list) assigned to the corresponding face,
               or `-1` if no material was assigned; filled only if `with_materials=True`.
 
+            Meshes skipped due to ``heterogeneous_mesh_handler`` returning ``None`` are omitted.
+
     .. rubric:: Examples
 
     To export and then import USD meshes::
@@ -534,14 +501,12 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
         >>> vertices_list = [torch.rand(3, 3) for _ in range(3)]
         >>> faces_list = [torch.tensor([[0, 1, 2]]) for _ in range(3)]
         >>> stage = export_meshes('./new_stage.usd', vertices=vertices_list, faces=faces_list)
-        >>> # Import meshes
+        >>> # Import meshes (auto-discovers all mesh prims)
         >>> meshes = import_meshes('./new_stage.usd')
         >>> len(meshes)
         3
         >>> meshes[0].vertices.shape
         torch.Size([3, 3])
-        >>> [m.faces for m in meshes]
-        [tensor([[0, 1, 2]]), tensor([[0, 1, 2]]), tensor([[0, 1, 2]])]
 
     To load multiple meshes from file, including materials and normals, while homongenizing and triangulating::
 
@@ -553,32 +518,9 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
                                    triangulate=True)
         >>> len(meshes)
         18
-        >>> print(meshes[0])
-        SurfaceMesh object with batching strategy NONE
-                    vertices: [4, 3] (torch.float32)[cpu]
-                face_normals: [2, 3, 3] (torch.float32)[cpu]
-                         uvs: [4, 2] (torch.float32)[cpu]
-                       faces: [2, 3] (torch.int64)[cpu]
-                face_uvs_idx: [2, 3] (torch.int64)[cpu]
-        material_assignments: [2] (torch.int16)[cpu]
-                   materials: list of length 1
-               face_vertices: if possible, computed on access from: (faces, vertices)
-              vertex_normals: if possible, computed on access from: (faces, face_normals)
-                    face_uvs: if possible, computed on access from: (uvs, face_uvs_idx)
         >>> # If needed, concatenate meshes into a batch
         >>> from kaolin.rep import SurfaceMesh
         >>> mesh = SurfaceMesh.cat(meshes, fixed_topology=False)
-        >>> print(mesh)
-        SurfaceMesh object with batching strategy LIST
-            vertices: [
-                      0: [4, 3] (torch.float32)[cpu]
-                      1: [98, 3] (torch.float32)[cpu]
-                      ...
-                     17: [4, 3] (torch.float32)[cpu]
-                      ]
-        face_normals: [
-                      0: [2, 3, 3] (torch.float32)[cpu]
-                      ...
     """
     triangulate_handler = None if not triangulate else utils.mesh_handler_naive_triangulate
     if heterogeneous_mesh_handler is None:
@@ -586,96 +528,106 @@ def import_meshes(file_path_or_stage, scene_paths=None, with_materials=False, wi
 
     # TODO  add arguments to selectively import UVs and normals
     stage = _get_stage_from_maybe_file(file_path_or_stage)
-    # Remove `instanceable` flags
-    # USD Scene Instances are an optimization to avoid duplicating mesh data in memory
-    # Removing the instanceable flag allows for easy retrieval of mesh data
-    for p in stage.Traverse():
-        p.SetInstanceable(False)
-    if scene_paths is None:
-        scene_paths = get_scene_paths(stage, prim_types=['Mesh'])
-    if times is None:
-        times = [Usd.TimeCode.Default()] * len(scene_paths)
+    try:
+        if scene_paths is None:
+            scene_paths = get_mesh_scene_paths(stage)
+        # Remove `instanceable` flags
+        # USD Scene Instances are an optimization to avoid duplicating mesh data in memory
+        # Removing the instanceable flag allows for easy retrieval of mesh data
+        # TODO(cfujitsang): get_scene_paths should support proxy, and material binding should also work with proxy. See commit 84853b46
+        for p in stage.Traverse():
+            p.SetInstanceable(False)
+        if times is None:
+            times = [Usd.TimeCode.Default()] * len(scene_paths)
 
-    results = []
-    silence_tqdm = len(scene_paths) < 10  # Silence tqdm if fewer than 10 paths are found
-    for scene_path, time in zip(tqdm(scene_paths, desc="Importing from USD", unit="mesh", disable=silence_tqdm), times):
-        # Returns (any may be None):
-        # vertices, faces, face_sizes, face_normals, uvs, face_uvs_idx, materials_dict, material_assignments_dict
-        mesh_attr = _get_flattened_mesh_attributes(stage, scene_path, with_materials, with_normals, time=time)
-        vertices = mesh_attr['vertices']
-        faces = mesh_attr['faces']
-        face_sizes = mesh_attr['face_sizes']
-        face_normals = mesh_attr['face_normals']
-        uvs = mesh_attr['uvs']
-        face_uvs_idx = mesh_attr['face_uvs_idx']
-        materials_dict = mesh_attr['materials_dict'] or {}
-        material_assignments_dict = mesh_attr['material_assignments_dict'] or {}
+        results = {}
+        silence_tqdm = len(scene_paths) < 10  # Silence tqdm if fewer than 10 paths are found
+        for scene_path, time in zip(tqdm(scene_paths, desc="Importing from USD", unit="mesh", disable=silence_tqdm), times):
+            # Returns (any may be None):
+            # vertices, faces, face_sizes, face_normals, uvs, face_uvs_idx, materials_dict, material_assignments_dict
+            mesh_attr = _get_mesh_prim_attributes(stage, scene_path, with_materials, with_normals, time=time)
+            vertices = mesh_attr['vertices']
+            faces = mesh_attr['faces']
+            face_sizes = mesh_attr['face_sizes']
+            face_normals = mesh_attr['face_normals']
+            vertex_normals = mesh_attr.get('vertex_normals')
+            uvs = mesh_attr['uvs']
+            face_uvs_idx = mesh_attr['face_uvs_idx']
+            materials_dict = mesh_attr['materials_dict'] or {}
+            material_assignments_dict = mesh_attr['material_assignments_dict'] or {}
+            transform = mesh_attr.get('transform')
 
-        # Handle attributes that require faces
-        nfaces = 0
-        facesize = 0
-        if faces is not None:
-            if face_sizes is not None and face_sizes.shape[0] > 0:
-                facesize = face_sizes[0]
+            # Handle attributes that require faces
+            nfaces = 0
+            facesize = 0
+            if faces is not None:
+                if face_sizes is not None and face_sizes.shape[0] > 0:
+                    facesize = face_sizes[0]
 
-            if not torch.all(face_sizes == facesize):
-                if heterogeneous_mesh_handler is None:
-                    raise utils.NonHomogeneousMeshError(
-                        f'Mesh at {scene_path} is non-homogeneous '
-                        f'and cannot be imported from {repr(file_path_or_stage)}.')
-                else:
-                    mesh = heterogeneous_mesh_handler(vertices, face_sizes, faces, face_uvs_idx, face_normals,
-                                                      face_assignments=material_assignments_dict)
+                if not torch.all(face_sizes == facesize):
+                    if heterogeneous_mesh_handler is None:
+                        raise utils.NonHomogeneousMeshError(
+                            f'Mesh at {scene_path} is non-homogeneous '
+                            f'and cannot be imported from {repr(file_path_or_stage)}.')
+                    else:
+                        mesh = heterogeneous_mesh_handler(vertices, face_sizes, faces, face_uvs_idx, face_normals,
+                                                          face_assignments=material_assignments_dict)
+                        if mesh is None:
+                            continue
+                        vertices, face_sizes, faces, face_uvs_idx, face_normals, material_assignments_dict = mesh
+                        facesize = faces.shape[-1]
+
+                if triangulate_handler is not None and not torch.all(face_sizes == 3):
+                    mesh = triangulate_handler(vertices, face_sizes, faces, face_uvs_idx, face_normals,
+                                               face_assignments=material_assignments_dict)
                     if mesh is None:
                         continue
                     vertices, face_sizes, faces, face_uvs_idx, face_normals, material_assignments_dict = mesh
-                    facesize = faces.shape[-1]
+                    facesize = 3
 
-            if triangulate_handler is not None and not torch.all(face_sizes == 3):
-                mesh = triangulate_handler(vertices, face_sizes, faces, face_uvs_idx, face_normals,
-                                           face_assignments=material_assignments_dict)
-                if mesh is None:
-                    continue
-                vertices, face_sizes, faces, face_uvs_idx, face_normals, material_assignments_dict = mesh
-                facesize = 3
+                faces = faces.view(-1 if len(faces) > 0 else 0, facesize)  # Nfaces x facesize
+                nfaces = faces.shape[0]
 
-            faces = faces.view(-1 if len(faces) > 0 else 0, facesize)  # Nfaces x facesize
-            nfaces = faces.shape[0]
+            # Process face-related attributes, correctly handling absence of face information
+            if face_uvs_idx is not None and face_uvs_idx.size(0) > 0:
+                uvs = uvs.reshape(-1, 2)
+                uvs[..., 1] = 1 - uvs[..., 1]  # modify according to convention
+                face_uvs_idx = face_uvs_idx.reshape(-1, max(1, facesize))
+            else:
+                uvs = None
+                face_uvs_idx = None
 
-        # Process face-related attributes, correctly handling absence of face information
-        if face_uvs_idx is not None and face_uvs_idx.size(0) > 0:
-            uvs = uvs.reshape(-1, 2)
-            uvs[..., 1] = 1 - uvs[..., 1]  # modify according to convention
-            face_uvs_idx = face_uvs_idx.reshape(-1, max(1, facesize))
-        else:
-            uvs = None
-            face_uvs_idx = None
+            if face_normals is not None and face_normals.size(0) > 0:
+                face_normals = face_normals.reshape((nfaces, -1, 3) if nfaces > 0 else (-1, 1, 3))
+            else:
+                face_normals = None
 
-        if face_normals is not None and face_normals.size(0) > 0:
-            face_normals = face_normals.reshape((nfaces, -1, 3) if nfaces > 0 else (-1, 1, 3))
-        else:
-            face_normals = None
+            materials = None
+            material_assignments = None
+            if with_materials and nfaces > 0:
+                # TODO: add support for custom material error_handler
+                def _default_error_handler(error, **kwargs):
+                    raise error
+                materials, material_assignments = process_materials_and_assignments(
+                    materials_dict, material_assignments_dict, _default_error_handler, nfaces,
+                    error_context_str=scene_path)
 
-        materials = None
-        material_assignments = None
-        if with_materials and nfaces > 0:
-            # TODO: add support for custom material error_handler
-            def _default_error_handler(error, **kwargs):
-                raise error
-            materials, material_assignments = process_materials_and_assignments(
-                materials_dict, material_assignments_dict, _default_error_handler, nfaces,
-                error_context_str=scene_path)
+            results[str(scene_path)] = SurfaceMesh(
+                vertices=vertices, faces=faces, uvs=uvs, face_uvs_idx=face_uvs_idx, face_normals=face_normals,
+                vertex_normals=vertex_normals,
+                material_assignments=material_assignments, materials=materials,
+                transform=transform,
+                unset_attributes_return_none=True)  # for greater backward compatibility
+    finally:
+        del stage, file_path_or_stage
 
-        results.append(SurfaceMesh(
-            vertices=vertices, faces=faces, uvs=uvs, face_uvs_idx=face_uvs_idx, face_normals=face_normals,
-            material_assignments=material_assignments, materials=materials,
-            unset_attributes_return_none=True))  # for greater backward compatibility
-
+    if return_list:
+        return list(results.values())
     return results
 
 
 def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_idx=None, face_normals=None,
-             material_assignments=None, materials=None, time=None, overwrite_textures=False):
+             material_assignments=None, materials=None, local_to_world=None, time=None, overwrite_textures=False):
     r"""Add a mesh to an existing USD stage. The stage is modified but not saved to disk; material textures are written
     to disk.
 
@@ -692,6 +644,7 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
         materials (list of Material): list of material objects
         material_assignments (torch.ShortTensor): of shape ``(num_faces,)`` containing index of the
             material (in the above list) assigned to the corresponding face, or `-1` if no material was assigned
+        local_to_world (torch.FloatTensor, optional): local-to-world transform of shape ``(4, 4)``.
         time (convertible to float, optional): Positive integer defining the time at which the supplied parameters
             correspond to.
         overwrite_textures (bool): set to True to overwrite existing image files when writing textures; if False
@@ -772,14 +725,18 @@ def add_mesh(stage, scene_path, vertices=None, faces=None, uvs=None, face_uvs_id
             except Exception as e:
                 raise(e)
 
+    if local_to_world is not None:
+        set_local_to_world_transform(stage, usd_mesh.GetPrim(), local_to_world, time)
+
     return usd_mesh.GetPrim()
 
 def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, faces=None,
                 uvs=None, face_uvs_idx=None, face_normals=None, material_assignments=None, materials=None,
-                up_axis='Y', time=None, overwrite_textures=False, overwrite=False):
+                local_to_world=None, up_axis='Y', time=None, overwrite_textures=False, overwrite=False):
     r"""Export a single mesh to USD and save the stage to disk.
 
-    ..note::
+    .. note::
+
         Since v0.18.0 this function can only overwrite existing file or raise an error. Use :func:`add_mesh` to modify existing usd file.
 
     Args:
@@ -799,6 +756,7 @@ def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, fac
         materials (list of Material): list of material objects
         material_assignments (torch.ShortTensor): of shape ``(num_faces,)`` containing index of the
             material (in the above list) assigned to the corresponding face, or `-1` if no material was assigned
+        local_to_world (torch.FloatTensor, optional): local-to-world transform of shape ``(4, 4)``.
         up_axis (str, optional): Specifies the scene's up axis. Choose from ``['Y', 'Z']``
         time (convertible to float, optional):
             Positive integer defining the time at which the supplied parameters correspond to.
@@ -818,12 +776,13 @@ def export_mesh(file_path, scene_path='/World/Meshes/mesh_0', vertices=None, fac
                               "to add mesh to existing usd, use add_mesh' instead.")
     stage = create_stage(file_path, up_axis)
     add_mesh(stage, scene_path, vertices, faces, uvs, face_uvs_idx,
-             face_normals, material_assignments, materials, time=time, overwrite_textures=overwrite_textures)
+             face_normals, material_assignments, materials, local_to_world=local_to_world,
+             time=time, overwrite_textures=overwrite_textures)
     stage.Save()
 
 def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
                   uvs=None, face_uvs_idx=None, face_normals=None, material_assignments=None, materials=None,
-                  up_axis='Y', times=None, overwrite_textures=False, overwrite=False):
+                  local_to_world=None, up_axis='Y', times=None, overwrite_textures=False, overwrite=False):
     r"""Export multiple meshes to a new USD stage.
 
     Export multiple meshes defined by lists vertices and faces and save the stage to disk.
@@ -843,6 +802,9 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
         materials (list of list of Material): list of material objects
         material_assignments (list of torch.ShortTensor): of shape `(\text{num_faces},)` containing index of the
             material (in the above list) assigned to the corresponding face, or `-1` if no material was assigned
+        local_to_world (torch.FloatTensor, optional): local-to-world transforms as a single ``(4, 4)`` tensor
+            (broadcast to every mesh) or a batched ``(N, 4, 4)`` tensor (one transform per mesh). Aligned
+            with :attr:`kaolin.rep.SurfaceMesh.transform`.
         up_axis (str, optional): Specifies the scene's up axis. Choose from ``['Y', 'Z']``.
         times (list of int, optional): Positive integers defining the time at which the supplied parameters
             correspond to.
@@ -870,6 +832,24 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
             else:
                 assert len(param) == num_meshes, f'All list inputs to export_meshes must have same length'
 
+    if local_to_world is not None:
+        if not torch.is_tensor(local_to_world):
+            raise TypeError(f'Unexpected type {type(local_to_world)} for local_to_world (torch.Tensor expected)')
+        if local_to_world.ndim == 3:
+            if num_meshes == -1:
+                num_meshes = local_to_world.shape[0]
+            assert local_to_world.shape == (num_meshes, 4, 4), (
+                f'local_to_world batched tensor must have shape ({num_meshes}, 4, 4), '
+                f'got {tuple(local_to_world.shape)}')
+        elif local_to_world.ndim == 2:
+            assert tuple(local_to_world.shape) == (4, 4), (
+                f'local_to_world tensor must have shape (4, 4) or (N, 4, 4), '
+                f'got {tuple(local_to_world.shape)}')
+        else:
+            raise ValueError(
+                f'local_to_world tensor must have shape (4, 4) or (N, 4, 4), '
+                f'got {tuple(local_to_world.shape)}')
+
     if scene_paths is None:
         if not stage.GetPrimAtPath('/World/Meshes'):
             stage.DefinePrim('/World/Meshes', 'Xform')
@@ -879,6 +859,12 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
         times = [Usd.TimeCode.Default()] * len(scene_paths)
 
     for i, scene_path in enumerate(tqdm(scene_paths, desc="Exporting to USD", unit="mesh")):
+        if local_to_world is None:
+            ltw_i = None
+        elif local_to_world.ndim == 3:
+            ltw_i = local_to_world[i]
+        else:
+            ltw_i = local_to_world
         # Note: we make parameters explicit to ensure tests catch any API changes reliably
         add_mesh(stage, scene_path,
                  vertices=None if vertices is None else vertices[i],
@@ -888,5 +874,6 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
                  face_normals=None if face_normals is None else face_normals[i],
                  material_assignments=None if material_assignments is None else material_assignments[i],
                  materials=None if materials is None else materials[i],
+                 local_to_world=ltw_i,
                  time=times[i], overwrite_textures=overwrite_textures)
     stage.Save()

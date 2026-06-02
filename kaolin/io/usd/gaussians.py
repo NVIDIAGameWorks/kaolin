@@ -105,10 +105,15 @@ def import_gaussianclouds(file_path_or_stage, scene_paths=None, times=None):
             times = [Usd.TimeCode.Default()] * len(scene_paths)
         elif not isinstance(times, list):
             times = [times] * len(scene_paths)
+        else:
+            if len(times) != len(scene_paths):
+                raise ValueError(
+                    f"Length of times ({len(times)}) must match length of scene_paths ({len(scene_paths)})"
+                )
 
         silence_tqdm = len(scene_paths) < 10
         output = {}
-        for scene_path, time in zip(tqdm(scene_paths, desc='Importing from USD', unit='gaussiancloud', disable=silence_tqdm), times, strict=True):
+        for scene_path, time in zip(tqdm(scene_paths, desc='Importing from USD', unit='gaussiancloud', disable=silence_tqdm), times):
             prim = stage.GetPrimAtPath(scene_path)
             assert prim.GetTypeName() == "ParticleField3DGaussianSplat", f"Prim at {scene_path} is not a ParticleField3DGaussianSplat"
             attrs = _get_gaussiancloud(prim, time)

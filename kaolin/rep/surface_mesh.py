@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -91,12 +91,13 @@ class SurfaceMesh(object):
                     face_uvs: (torch.FloatTensor) of shape ['B', 'F', 'FSz', 2]
               vertex_normals: (torch.FloatTensor) of shape ['B', 'V', 3]
              vertex_tangents: (torch.FloatTensor) of shape ['B', 'V', 3]
-              vertex_colors: (torch.FloatTensor) of shape ['B', 'V', None]
-            vertex_features: (torch.FloatTensor) of shape ['B', 'V', None]
+               vertex_colors: (torch.FloatTensor) of shape ['B', 'V', None]
+             vertex_features: (torch.FloatTensor) of shape ['B', 'V', None]
                face_tangents: (torch.FloatTensor) of shape ['B', 'F', 'FSz', 3]
-                face_colors: (torch.FloatTensor) of shape ['B', 'F', 'FSz', None]
-              face_features: (torch.FloatTensor) of shape ['B', 'F', 'FSz', None]
+                 face_colors: (torch.FloatTensor) of shape ['B', 'F', 'FSz', None]
+               face_features: (torch.FloatTensor) of shape ['B', 'F', 'FSz', None]
         material_assignments: (torch.IntTensor)   of shape ['B', 'F']
+                   transform: (torch.FloatTensor) of shape ['B', 4, 4]
                    materials: non-tensor attribute
 
     .. note::
@@ -151,6 +152,8 @@ class SurfaceMesh(object):
     +------------------------------+------------------+--------------------+--------------------------+-------------+
     | material_assignments         | F                | B x F              | [F_i]                    | N           |
     +------------------------------+------------------+--------------------+--------------------------+-------------+
+    | transform                    | 4 x 4            | 4 x 4 or B x 4 x 4 | 4 x 4 or B x 4 x 4       | N           |
+    +------------------------------+------------------+--------------------+--------------------------+-------------+
     | materials (non-tensor)       | list             | list of lists      | list of lists            | N           |
     +------------------------------+------------------+--------------------+--------------------------+-------------+
 
@@ -188,7 +191,8 @@ class SurfaceMesh(object):
         'vertex_features',
         'face_tangents',
         'face_colors',
-        'face_features'
+        'face_features',
+        'transform'
     ]
     __int_tensor_attributes = [
         'faces',
@@ -233,7 +237,8 @@ class SurfaceMesh(object):
         'face_tangents',
         'face_colors',
         'face_features',
-        'material_assignments'
+        'material_assignments',
+        'transform'
     ]
     assert set(__ordered_tensor_attributes) == set(__tensor_attributes), \
         "attributes in __ordered_tensor_attributes don't match those in __tensor_attributes: " \
@@ -279,6 +284,7 @@ class SurfaceMesh(object):
                  face_tangents: Optional[Union[torch.FloatTensor, list]] = None,
                  face_colors: Optional[Union[torch.FloatTensor, list]] = None,
                  face_features: Optional[Union[torch.FloatTensor, list]] = None,
+                 transform: Optional[torch.FloatTensor] = None,
                  strict_checks: bool = True,
                  unset_attributes_return_none: bool = True,
                  allow_auto_compute: bool = True):
@@ -328,6 +334,12 @@ class SurfaceMesh(object):
                 vertex to have different features within distinct faces.
             material_assignments: indices into ``materials`` list for each face.
             materials: raw materials as output by the io reader.
+            transform: optional 4x4 affine transformation matrix from local space to world space,
+                stored on the mesh and not applied by default. Apply to the mesh geometry via
+                :meth:`as_transformed`.
+                Shape is ``(4, 4)`` for ``Batching.NONE``. For ``Batching.FIXED`` and
+                ``Batching.LIST`` it may be a single ``(4, 4)`` tensor (broadcast to every
+                element) or a ``(B, 4, 4)`` tensor (one matrix per element).
             strict_checks: if ``True``, will raise exception if any tensors passed to
                the construcor have unexpected shapes (see :ref:`shapes matrix <rubric mesh attributes>` above);
                note that checks are less strict for ``Batching.LIST`` batching (default: ``True``).
@@ -373,6 +385,7 @@ class SurfaceMesh(object):
         self.face_tangents = face_tangents
         self.face_colors = face_colors
         self.face_features = face_features
+        self.transform = transform
         super().__setattr__('batching', batching)
 
         ok = self.check_sanity()
@@ -601,7 +614,7 @@ class SurfaceMesh(object):
             self.set_batching(value)
         elif value is None:
             if self.has_attribute(attr):
-                print(f'Deleting {attr}')
+                logger.info(f'Deleting {attr}')
                 super().__delattr__(attr)
         else:
             super().__setattr__(attr, value)
@@ -650,7 +663,8 @@ class SurfaceMesh(object):
                   'faces':                         [F, FSz],
                   'material_assignments':          [F],
                   'face_normals_idx':              [F, FSz],
-                  'face_uvs_idx':                  [F, FSz]}
+                  'face_uvs_idx':                  [F, FSz],
+                  'transform':                     [4, 4]}
 
         if name not in shapes:
             raise NotImplementedError(f'Cannot get expected shape for attribute {name}')
@@ -684,6 +698,11 @@ class SurfaceMesh(object):
                 logger.error(msg)
 
         check_tensor_kwargs['throw'] = False
+        # `transform` accepts more flexible shapes than other attributes: a single (4, 4) matrix
+        # broadcasts to every element of a batched mesh, and a (B, 4, 4) tensor is also valid for
+        # LIST batching. `as_transformed` dispatches on whichever shape is present.
+        if name == 'transform':
+            return SurfaceMesh.__check_transform(value, batching, batchsize, _maybe_log)
         if batching == SurfaceMesh.Batching.LIST:
             if type(value) is not list:
                 _maybe_log(f'Attribute {name} must have type list for batching type LIST, but got {type(value)}')
@@ -711,6 +730,28 @@ class SurfaceMesh(object):
         else:
             raise NotImplementedError(f'Unsupported batching {batching}')
         return True
+
+    @staticmethod
+    def __check_transform(value, batching, batchsize, _maybe_log):
+        r"""Validates the ``transform`` attribute. Accepts a single ``(4, 4)`` tensor for any
+        batching (broadcast to every element when batched) and a ``(B, 4, 4)`` tensor for
+        ``FIXED`` and ``LIST`` batching.
+        """
+        if not torch.is_tensor(value):
+            _maybe_log(f'Attribute transform must be a tensor, got {type(value)}')
+            return False
+
+        if value.ndim == 2 and tuple(value.shape) == (4, 4):
+            return True
+        if (batching in (SurfaceMesh.Batching.FIXED, SurfaceMesh.Batching.LIST)
+                and value.ndim == 3 and value.shape[0] == batchsize and tuple(value.shape[1:]) == (4, 4)):
+            return True
+
+        expected = '(4, 4)' if batching == SurfaceMesh.Batching.NONE \
+            else f'(4, 4) or ({batchsize}, 4, 4)'
+        _maybe_log(f'Attribute transform for batching {batching} must be {expected}, got '
+                   f'{kaolin.utils.testing.tensor_info(value)}')
+        return False
 
     @staticmethod
     def convert_attribute_batching(val: Union[torch.Tensor, list],
@@ -830,10 +871,20 @@ class SurfaceMesh(object):
             attribute value
         """
         val = getattr(self, attr)
+        if self.batching == batching:
+            return val
         is_material = attr in SurfaceMesh.__material_attributes
         is_tensor = attr in SurfaceMesh.__tensor_attributes
 
         if not is_material and not is_tensor:
+            return val
+
+        # `transform` is stored as a (4, 4) or (B, 4, 4) tensor for every batching strategy.
+        if attr == 'transform':
+            if batching == SurfaceMesh.Batching.NONE:
+                if len(self) != 1:
+                    raise ValueError(f'Cannot return unbatched transform from batch of length {len(self)}')
+                return val if val.ndim == 2 else val[0]
             return val
 
         return SurfaceMesh.convert_attribute_batching(
@@ -902,9 +953,12 @@ class SurfaceMesh(object):
 
     @classmethod
     def flatten(cls, meshes: Sequence[SurfaceMesh], skip_errors: bool = False, group_materials_by_name: bool = False):
-        r""" Flattens a group of meshes into a single mesh. For indexed attributes, such as `normals` and
-        `face_normals_idx`, will properly book-keep indices. For all other attributes will attempt to concatenate
-        them if present in all the meshes. To ignore concatenation incompatibilities, set `skip_errors=True`.
+        r""" Flattens a group of meshes into a single world-space mesh. Any :attr:`transform`
+        present on input meshes is applied to their vertices (via :meth:`as_transformed`) before
+        concatenation, so the result is always in world space and has no ``transform``.
+        For indexed attributes such as `normals` and `face_normals_idx`, indices are properly book-kept.
+        For all other attributes, concatenation is attempted if the attribute is present in all meshes.
+        To ignore concatenation incompatibilities, set `skip_errors=True`.
 
          Args:
              meshes (list of SurfaceMesh): meshes to concatenate; any mix of batching strategies is supported.
@@ -912,8 +966,9 @@ class SurfaceMesh(object):
              group_materials_by_name (bool): if True, will group materials by name and assume they are the same.
 
         Return:
-            (SurfaceMesh): new mesh
+            (SurfaceMesh): new mesh in world space with no ``transform``
         """
+        meshes = [m.as_transformed() for m in meshes]
         mesh = SurfaceMesh.cat(meshes, fixed_topology=False, skip_errors=skip_errors)
         if len(mesh) == 1:
             mesh.set_batching(SurfaceMesh.Batching.NONE)
@@ -981,6 +1036,9 @@ class SurfaceMesh(object):
         preserved, with special treatment for auto-computable attributes. For example, if one mesh has
         face_normals, and another mesh allows auto-computation of face_normals, then it will be auto-computed.
 
+        :attr:`transform` matrices are batched like any other tensor attribute and are never
+        applied. Use :meth:`flatten` to merge meshes into a single world-space mesh with transforms applied.
+
         Args:
            meshes: meshes to concatenate; any batching is supported
            fixed_topology: if to create a FIXED batched mesh (input must comply to assumptions)
@@ -989,6 +1047,8 @@ class SurfaceMesh(object):
         Return:
            (SurfaceMesh): new mesh
         """
+        meshes = list(meshes)
+
         def _get_joint_attrs():
             # union of all attributes
             attrs_union = set(meshes[0].get_attributes())
@@ -1031,6 +1091,16 @@ class SurfaceMesh(object):
             return attrs
 
         def _attr_from_meshes(in_attr):
+            if in_attr == 'transform':
+                # `transform` is stored as a tensor in every batching mode; broadcast any
+                # per-mesh (4, 4) to that mesh's batch size, then concatenate.
+                parts = []
+                for m in meshes:
+                    t = m.transform
+                    if t.ndim == 2:
+                        t = t.unsqueeze(0).expand(len(m), 4, 4)
+                    parts.append(t)
+                return torch.cat(parts, dim=0)
             return list(chain.from_iterable(
                         [m.getattr_batched(in_attr, SurfaceMesh.Batching.LIST) for m in meshes]))
 
@@ -1555,7 +1625,8 @@ class SurfaceMesh(object):
                 except Exception as ex:
                     logger.warning(f'Cannot convert all materials; keeping original: {ex}')
             else:
-                if self.batching == SurfaceMesh.Batching.LIST:
+                # `transform` is always a tensor, even for LIST batching.
+                if self.batching == SurfaceMesh.Batching.LIST and attr != 'transform':
                     updated_val = [func(x) for x in current_val]
                 else:
                     updated_val = func(current_val)
@@ -1574,6 +1645,95 @@ class SurfaceMesh(object):
         """
         return self._construct_apply(lambda t: t.to(device), attributes)
 
+    def as_transformed(self):
+        r"""Creates a new SurfaceMesh with the stored :attr:`transform` applied.
+
+        Transforms :attr:`vertices` and direction attributes using the stored
+        :attr:`transform` matrix. Normals (:attr:`normals`, :attr:`vertex_normals`,
+        :attr:`face_normals`) transform by :math:`(M^{-1})^T`; tangents
+        (:attr:`vertex_tangents`, :attr:`face_tangents`) transform by the linear part
+        :math:`M`. All transformed direction vectors are re-normalized.
+        :attr:`face_vertices` is cleared so it will be auto-recomputed on demand.
+        Returns a new SurfaceMesh with :attr:`transform` unset.
+
+        :attr:`transform` may be:
+
+          * ``Batching.NONE``: a ``(4, 4)`` tensor.
+          * ``Batching.FIXED`` or ``Batching.LIST``: a ``(4, 4)`` tensor (applied to all
+            batch elements) or a ``(B, 4, 4)`` tensor (one matrix per batch element).
+
+        Return:
+            (SurfaceMesh): new mesh in world space with :attr:`transform` cleared,
+            or ``self`` if :attr:`transform` is not set.
+        """
+        if not self.has_attribute('transform'):
+            return self
+
+        import copy as _copy
+        new_mesh = _copy.copy(self)
+        new_mesh.transform = None
+
+        def _apply_pos(pos, mat4):
+            # pos: (..., V, 3); mat4: (4, 4) or (B, 4, 4); broadcasts.
+            mat4 = mat4.to(dtype=pos.dtype, device=pos.device)
+            padded_pos = torch.nn.functional.pad(pos, (0, 1), value=1.)  # (..., V, 4)
+            new_pos = padded_pos @ mat4.mT
+            return new_pos[..., :3] / new_pos[..., 3:4]
+
+        def _broadcast_linear(lin, vec):
+            # When mat4 is batched (B, 3, 3) and vec is (B, F, FSz, 3), insert singleton dims
+            # so the linear part broadcasts across F/FSz.
+            while lin.dim() < vec.dim():
+                lin = lin.unsqueeze(-3)
+            return lin
+
+        def _apply_normal(vec, mat4):
+            # Normals are covariant: row-vector form is vec @ M^{-1}.
+            mat4 = mat4.to(dtype=vec.dtype, device=vec.device)
+            inv_lin = _broadcast_linear(torch.linalg.inv(mat4[..., :3, :3]), vec)
+            return torch.nn.functional.normalize(vec @ inv_lin, dim=-1)
+
+        def _apply_tangent(vec, mat4):
+            # Tangents are contravariant: row-vector form is vec @ M^T.
+            mat4 = mat4.to(dtype=vec.dtype, device=vec.device)
+            lin = _broadcast_linear(mat4[..., :3, :3], vec)
+            return torch.nn.functional.normalize(vec @ lin.mT, dim=-1)
+
+        normal_attrs = ('normals', 'vertex_normals', 'face_normals')
+        tangent_attrs = ('vertex_tangents', 'face_tangents')
+        tfm = self.transform
+
+        if self.batching in (SurfaceMesh.Batching.NONE, SurfaceMesh.Batching.FIXED):
+            new_mesh.vertices = _apply_pos(self.vertices, tfm)
+            for attr in normal_attrs:
+                if self.has_attribute(attr):
+                    setattr(new_mesh, attr, _apply_normal(getattr(self, attr), tfm))
+            for attr in tangent_attrs:
+                if self.has_attribute(attr):
+                    setattr(new_mesh, attr, _apply_tangent(getattr(self, attr), tfm))
+
+        elif self.batching == SurfaceMesh.Batching.LIST:
+            # tfm is (4, 4) [broadcast] or (B, 4, 4) [per-element]; vertices is a list.
+            def _per_elem(i):
+                return tfm if tfm.dim() == 2 else tfm[i]
+
+            new_mesh.vertices = [_apply_pos(v, _per_elem(i)) for i, v in enumerate(self.vertices)]
+            for attr in normal_attrs:
+                if self.has_attribute(attr):
+                    vals = getattr(self, attr)
+                    setattr(new_mesh, attr,
+                            [_apply_normal(vals[i], _per_elem(i)) for i in range(len(self))])
+            for attr in tangent_attrs:
+                if self.has_attribute(attr):
+                    vals = getattr(self, attr)
+                    setattr(new_mesh, attr,
+                            [_apply_tangent(vals[i], _per_elem(i)) for i in range(len(self))])
+
+        # Clear derived face_vertices — will be auto-recomputed from new vertices
+        new_mesh.face_vertices = None
+
+        return new_mesh
+
     def __getitem__(self, idx):
         if idx > len(self) - 1:
             raise IndexError(f'Out of bound index {idx} for mesh batch of length {len(self)}')
@@ -1589,7 +1749,11 @@ class SurfaceMesh(object):
                 args[att] = self.get_attribute(att)[idx]
             for att in _attrs.intersection(set(SurfaceMesh.__tensor_attributes)):
                 current_value = self.get_attribute(att)
-                if self.batching == SurfaceMesh.Batching.LIST:
+                if att == 'transform':
+                    # transform is stored as a (4, 4) tensor (broadcast across the batch) or
+                    # a (B, 4, 4) tensor; index only when batched.
+                    args[att] = current_value if current_value.ndim == 2 else current_value[idx]
+                elif self.batching == SurfaceMesh.Batching.LIST:
                     args[att] = current_value[idx]
                 elif self.batching == SurfaceMesh.Batching.FIXED:
                     if att in SurfaceMesh.__fixed_topology_attributes:
@@ -1599,7 +1763,6 @@ class SurfaceMesh(object):
                 else:
                     raise NotImplementedError(f'Unsupported batching {self.batching}')
             return SurfaceMesh(**args)
-
 
 # TODO: consider the following API improvements ------------------------------------------------------------------------
 # 1. also implement __getitem__ to access element of a batch
