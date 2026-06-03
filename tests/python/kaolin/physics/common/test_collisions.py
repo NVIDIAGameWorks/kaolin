@@ -24,6 +24,47 @@ import kaolin.physics.common.collisions as collisions
 from kaolin.physics.simplicits.precomputed import lbs_matrix
 from kaolin.utils.testing import with_seed
 
+
+def _collision_contact_energy_analytical(
+        offset, nor, rc, rp_ratio, mu, mu_dt, nu):
+    d = torch.dot(offset, nor)
+    d_hat = d / rc
+    active = (d_hat > rp_ratio) & (d_hat <= 1.0)
+
+    dc = d_hat - 1.0
+    dp = d_hat - rp_ratio
+    barrier = 2.0 * torch.log(dp)
+
+    dE_d_hat = -dc * (barrier + dc / dp)
+    energy = -dc * dc * torch.log(dp)
+
+    vt = (offset - d * nor) / mu_dt
+    vt_norm = vt.norm()
+    mu_fn = -mu * dE_d_hat / rc
+    h_vt = (
+        0.5 * nu * vt_norm * vt_norm
+        + torch.where(
+            vt_norm < 1.0,
+            vt_norm * vt_norm * (1.0 - vt_norm / 3.0),
+            vt_norm - 1.0 / 3.0,
+        )
+    )
+    energy = energy + mu_fn * mu_dt * h_vt
+    return torch.where(active, energy, torch.zeros_like(energy))
+
+
+def _collision_contact_gradient_from_energy(
+        dx_cur, dx_start, kinematic_gap, nor, idx_a, idx_b,
+        rc, rp_ratio, mu, mu_dt, nu):
+    delta_a = dx_cur[idx_a] - dx_start[idx_a]
+    delta_b = dx_cur[idx_b] - dx_start[idx_b] if idx_b >= 0 else torch.zeros_like(delta_a)
+    offset = (delta_a + kinematic_gap - delta_b).detach().requires_grad_(True)
+    energy = _collision_contact_energy_analytical(
+        offset, nor, rc, rp_ratio, mu, mu_dt, nu)
+    energy.backward()
+    return offset.grad
+
+
 @pytest.fixture(params=['one_object', 'two_objects', "three_objects", "two_objects_one_static"])
 @with_seed(2, 2, 2)
 def test_scenes(request):
@@ -112,7 +153,7 @@ def test_detect_collisions(test_scenes):
     collision_radius = 0.05
     detection_ratio = 1.5 
     impenetrable_barrier_ratio = 0.5 
-    friction = 0.0
+    friction = 0.2
     collision = collisions.Collision(dt=dt, 
                                      collision_particle_radius=collision_radius, 
                                      detection_ratio=detection_ratio, 
@@ -176,7 +217,6 @@ def test_detect_collisions(test_scenes):
 
 
 @pytest.mark.parametrize("test_scenes", [
-    "one_object",
     "two_objects",
     "three_objects",
     "two_objects_one_static"
@@ -206,9 +246,6 @@ def test_collision_jacobian(test_scenes):
     collision.detect_collisions(dx, x0, obj_ids, is_static)
     collision.calculate_jacobian(weights, x0, is_static)
     collision_jacobian = collision.collision_J_dense
-
-    if collision.num_contacts == 0:
-        return
     
     t_x0 = wp.to_torch(x0)
     t_dx = wp.to_torch(dx)
@@ -274,62 +311,23 @@ def test_collision_energy(test_scenes):
     t_dx = wp.to_torch(dx)
     t_x = t_x0 + t_dx
     t_obj_ids = wp.to_torch(obj_ids)
-    t_is_static = wp.to_torch(is_static)
 
-    # Analytically calculate collision energy
-    # loop through all pairs of points and calculate the distance between them
+    rc = 2.0 * collision_radius
     expected_energy = torch.tensor(0.0, device=t_x.device, dtype=t_x.dtype)
     for i in range(len(t_x0)):
-        for j in range(i+1, len(t_x0)):
+        for j in range(i + 1, len(t_x0)):
             if t_obj_ids[i] == t_obj_ids[j]:
-                pass  # ignore self collisions
-            else:
-                pos_a = t_x[i]
-                pos_b = t_x[j]
-                dist = (pos_a - pos_b).norm()
-                normal = (pos_a - pos_b)/dist
-                
-                kinematic_gap = torch.zeros(3, device=t_x.device, dtype=t_x.dtype)
-                offset = pos_a - pos_b 
-                rc = 2.0*collision_radius
-
-                if impenetrable_barrier_ratio*rc < dist and dist<=rc:
-                    d_hat = dist/rc 
-                    d_min_l_squared = (d_hat - 1.0) * (d_hat - 1.0)  # quadratic term ensures energy is 0 when d = rc
-                    expected_energy += -d_min_l_squared * torch.log(d_hat - impenetrable_barrier_ratio)  # log barrier term. inf when two rp's overlaps.
-
-
-                    #### friction energy
-                    dc = d_hat - 1.0
-                    dp = d_hat - impenetrable_barrier_ratio
-                    barrier = 2.0 * torch.log(dp)
-
-                    dE_d_hat = -dc * (barrier + dc / dp)
-                    vt = (offset - dist * normal) / mu_dt  # tangential velocity
-                    vt_norm = vt.norm()
-
-                    mu_fn = -mu * dE_d_hat / rc  # yield force
-                    expected_energy += (
-                        mu_fn * mu_dt
-                        * (
-                            0.5 * nu * vt_norm * vt_norm
-                            + torch.where(
-                                vt_norm < 1.0,
-                                vt_norm * vt_norm * (1.0 - vt_norm / 3.0),
-                                vt_norm - 1.0 / 3.0
-                            )
-                        )
-                    )
-                else:
-                    expected_energy += 0.0
-
+                continue
+            offset = t_x[i] - t_x[j]
+            normal = offset / offset.norm()
+            expected_energy += _collision_contact_energy_analytical(
+                offset, normal, rc, impenetrable_barrier_ratio, mu, mu_dt, nu)
 
     assert torch.allclose(wp.to_torch(energy)[0], expected_energy, rtol=1e-5), \
         "Collision energy doesn't match analytical calculation"
 
         
 @pytest.mark.parametrize("test_scenes", [
-    "one_object",
     "two_objects",
     "three_objects"
 ], indirect=True)
@@ -337,52 +335,131 @@ def test_collision_gradient(test_scenes):
 
     x0 = test_scenes['x0']
     dx = test_scenes['dx']
-    weights = test_scenes['weights']
     obj_ids = test_scenes['obj_ids']
     is_static = test_scenes['is_static']
 
-     # Collision parameters 
+    # Collision parameters
     dt = 0.01
     collision_radius = 0.05
-    detection_ratio = 1.5 
-    impenetrable_barrier_ratio = 0.5 
-    friction = 0.5
-    collision = collisions.Collision(dt=dt, 
-                                     collision_particle_radius=collision_radius, 
-                                     detection_ratio=detection_ratio, 
-                                     impenetrable_barrier_ratio=impenetrable_barrier_ratio, 
-                                     friction=friction) # other parameters are default
+    detection_ratio = 1.5
+    impenetrable_barrier_ratio = 0.5
+    friction = 0.2
+    collision = collisions.Collision(dt=dt,
+                                     collision_particle_radius=collision_radius,
+                                     detection_ratio=detection_ratio,
+                                     impenetrable_barrier_ratio=impenetrable_barrier_ratio,
+                                     friction=friction)
 
     collision.detect_collisions(dx, x0, obj_ids, is_static)
     wp_gradient = collision.gradient(dx, x0, coeff=1.0)
     gradient = wp.to_torch(wp_gradient) if wp_gradient.shape[0] > 0 else torch.zeros(0, 3, device=wp.device_to_torch(wp_gradient.device))
-    
-    
+
     t_x0 = wp.to_torch(x0)
     t_dx = wp.to_torch(dx)
-    t_x = t_x0 + t_dx
     t_indices_a = wp.to_torch(collision.collision_indices_a)
     t_indices_b = wp.to_torch(collision.collision_indices_b)
 
-    # Finite difference for collision gradients
-    # loop through t_x pairs of points and calculate the distance between them
-    E0 = wp.to_torch(collision.energy(dx, x0, coeff=1.0))
-    dEdx_fd = torch.zeros(collision.num_contacts, 3, device=t_x.device, dtype=t_x.dtype)
+    dEdx_fd = torch.zeros(collision.num_contacts, 3, device=t_dx.device, dtype=t_dx.dtype)
     eps = 1e-5
     for i in range(dEdx_fd.shape[0]):
         for j in range(dEdx_fd.shape[1]):
             pair = (t_indices_a[i].item(), t_indices_b[i].item())
-            t_dx[pair[0],j] += eps
+            t_dx[pair[0], j] += eps
             E1 = wp.to_torch(collision.energy(wp.from_torch(t_dx, dtype=wp.vec3), x0, coeff=1.0))
-            t_dx[pair[0], j] -= 2.0*eps
+            t_dx[pair[0], j] -= 2.0 * eps
             E2 = wp.to_torch(collision.energy(wp.from_torch(t_dx, dtype=wp.vec3), x0, coeff=1.0))
             t_dx[pair[0], j] += eps
-            dEdx_fd[i, j] = (E1 - E2) / (2.0*eps)
+            dEdx_fd[i, j] = (E1 - E2) / (2.0 * eps)
+
+    assert torch.allclose(gradient, dEdx_fd, rtol=1e-2, atol=1e-2), \
+        "Barrier-only collision gradients don't match finite difference"
 
 
-    assert torch.allclose(gradient, dEdx_fd, rtol=1e-1), \
-        "Collision gradients doesn't match analytical calculation"
-        
+def test_collision_friction_gradient():
+    """Friction gradient with tangential motion; includes d(mu_fn)/d(offset) term."""
+    device = 'cuda'
+    sep = 0.08
+    collision_radius = 0.05
+    dt = 0.01
+    impenetrable_barrier_ratio = 0.5
+    friction = 0.5
+    num_points_per_object = 10
+
+    # Two slabs of 10 points each; pairs spaced along y so only matched pairs collide.
+    pair_spacing = 0.5
+    y = torch.arange(num_points_per_object, device=device, dtype=torch.float32) * pair_spacing
+    z = torch.zeros(num_points_per_object, device=device)
+    x0_obj0 = torch.stack([torch.zeros_like(y), y, z], dim=1)
+    x0_obj1 = torch.stack([torch.full_like(y, sep), y, z], dim=1)
+    x0_t = torch.cat([x0_obj0, x0_obj1], dim=0)
+    dx_t = torch.zeros(2 * num_points_per_object, 3, device=device)
+    obj_ids_t = torch.cat([
+        torch.zeros(num_points_per_object, device=device, dtype=torch.int32),
+        torch.ones(num_points_per_object, device=device, dtype=torch.int32),
+    ])
+    is_static_t = torch.zeros(2 * num_points_per_object, device=device, dtype=torch.int32)
+
+    x0 = wp.array(x0_t, dtype=wp.vec3)
+    dx = wp.array(dx_t, dtype=wp.vec3)
+    obj_ids = wp.array(obj_ids_t, dtype=wp.int32)
+    is_static = wp.array(is_static_t, dtype=wp.int32)
+
+    collision = collisions.Collision(
+        dt=dt,
+        collision_particle_radius=collision_radius,
+        detection_ratio=1.5,
+        impenetrable_barrier_ratio=impenetrable_barrier_ratio,
+        friction=friction,
+    )
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+    assert collision.num_contacts == num_points_per_object
+
+    mu_dt = dt * collision.friction_reg
+    nu = collision.friction_fluid * collision.friction_reg
+    rc = 2.0 * collision_radius
+
+    t_dx = wp.to_torch(dx).clone()
+    t_indices_a = wp.to_torch(collision.collision_indices_a)
+    t_indices_b = wp.to_torch(collision.collision_indices_b)
+
+    # Tangential slip on each contact's particle a (normal is along x).
+    for c in range(collision.num_contacts):
+        idx_a = t_indices_a[c].item()
+        t_dx[idx_a, 1] = 0.005 + 0.001 * c
+    dx = wp.from_torch(t_dx, dtype=wp.vec3)
+
+    wp_gradient = wp.to_torch(collision.gradient(dx, x0, coeff=1.0))
+
+    t_dx_start = wp.to_torch(collision.cp_dx_at_nm_iteration_0)
+    t_kinematic_gaps = wp.to_torch(collision.collision_kinematic_gaps)
+    t_normals = wp.to_torch(collision.collision_normals)
+
+    #Autodiff check
+    for c in range(collision.num_contacts):
+        idx_a = t_indices_a[c].item()
+        idx_b = t_indices_b[c].item()
+        expected_gradient = _collision_contact_gradient_from_energy(
+            t_dx, t_dx_start, t_kinematic_gaps[c], t_normals[c],
+            idx_a, idx_b, rc, impenetrable_barrier_ratio, friction, mu_dt, nu)
+        assert torch.allclose(wp_gradient[c], expected_gradient, rtol=1e-4, atol=1e-5), \
+            f"Friction collision gradient for contact {c} doesn't match autodiff of analytical energy"
+
+    # FD check with tangential motion so mu_fn chain rule matters.
+    dEdx_fd = torch.zeros(collision.num_contacts, 3, device=device, dtype=t_dx.dtype)
+    eps = 1e-5
+    for c in range(collision.num_contacts):
+        idx_a = t_indices_a[c].item()
+        for j in range(3):
+            t_dx[idx_a, j] += eps
+            E1 = wp.to_torch(collision.energy(wp.from_torch(t_dx, dtype=wp.vec3), x0, coeff=1.0))
+            t_dx[idx_a, j] -= 2.0 * eps
+            E2 = wp.to_torch(collision.energy(wp.from_torch(t_dx, dtype=wp.vec3), x0, coeff=1.0))
+            t_dx[idx_a, j] += eps
+            dEdx_fd[c, j] = (E1 - E2) / (2.0 * eps)
+
+    assert torch.allclose(wp_gradient, dEdx_fd, rtol=1e-3, atol=1e-5), \
+        "Friction collision gradient doesn't match finite difference"
+
 
 def test_collision_bounds_indexing():
     """Regression test: Jacobian offsets must be indexed with 3*c (not c).
@@ -537,7 +614,7 @@ def test_collision_hessian(test_scenes):
 
     hessian_fd = torch.zeros(G0.shape[0], G0.shape[0],
                           device=t_x.device, dtype=t_x.dtype)
-    eps = 1e-3
+    eps = 1e-4
     
     hessian_row = 0
     for i in range(collision.num_contacts):
@@ -555,3 +632,66 @@ def test_collision_hessian(test_scenes):
 
     assert torch.allclose(hessian, hessian_fd, rtol=1e-1), \
         "Collision hessian doesn't match analytical calculation"
+
+
+def test_collision_friction_hessian():
+    """Friction Hessian with tangential motion; FD of gradient vs analytical blocks."""
+    device = 'cuda'
+    sep = 0.08
+    collision_radius = 0.05
+    dt = 0.01
+    impenetrable_barrier_ratio = 0.5
+    friction = 0.5
+
+    x0_t = torch.tensor([
+        [0.0, 0.0, 0.0],
+        [sep, 0.0, 0.0],
+    ], device=device)
+    dx_t = torch.zeros(2, 3, device=device)
+    obj_ids_t = torch.tensor([0, 1], device=device, dtype=torch.int32)
+    is_static_t = torch.zeros(2, device=device, dtype=torch.int32)
+
+    x0 = wp.array(x0_t, dtype=wp.vec3)
+    dx = wp.array(dx_t, dtype=wp.vec3)
+    obj_ids = wp.array(obj_ids_t, dtype=wp.int32)
+    is_static = wp.array(is_static_t, dtype=wp.int32)
+
+    collision = collisions.Collision(
+        dt=dt,
+        collision_particle_radius=collision_radius,
+        detection_ratio=1.5,
+        impenetrable_barrier_ratio=impenetrable_barrier_ratio,
+        friction=friction,
+    )
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+    assert collision.num_contacts == 1
+
+    t_dx = wp.to_torch(dx).clone()
+    t_dx[0, 1] = 0.005
+    dx = wp.from_torch(t_dx, dtype=wp.vec3)
+
+    hessian_blocks = wp.to_torch(collision.hessian(dx, x0, coeff=1.0))
+    hessian = hessian_blocks[0]
+
+    idx_a = wp.to_torch(collision.collision_indices_a)[0].item()
+    G0 = wp.to_torch(collision.gradient(dx, x0, coeff=1.0))[0]
+
+    hessian_fd = torch.zeros(3, 3, device=device, dtype=t_dx.dtype)
+    eps = 1e-4
+    for j in range(3):
+        t_dx[idx_a, j] += eps
+        G1 = wp.to_torch(collision.gradient(
+            wp.from_torch(t_dx, dtype=wp.vec3), x0, coeff=1.0))[0]
+        t_dx[idx_a, j] -= 2.0 * eps
+        G2 = wp.to_torch(collision.gradient(
+            wp.from_torch(t_dx, dtype=wp.vec3), x0, coeff=1.0))[0]
+        t_dx[idx_a, j] += eps
+        hessian_fd[:, j] = (G1 - G2) / (2.0 * eps)
+
+    zero_threshold = 1e-2
+    analytical_nonzeros = (hessian.abs() > zero_threshold)
+    fd_nonzeros = (hessian_fd.abs() > zero_threshold)
+    assert torch.all(analytical_nonzeros == fd_nonzeros), \
+        "Friction hessian sparsity mismatch"
+    assert torch.allclose(hessian[fd_nonzeros], hessian_fd[fd_nonzeros], rtol=1e-1, atol=1e-1), \
+        "Friction collision hessian doesn't match finite difference"

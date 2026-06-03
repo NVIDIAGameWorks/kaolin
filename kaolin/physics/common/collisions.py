@@ -171,6 +171,21 @@ def _collision_energy_wp_kernel(
     indices_b: wp.array(dtype=int),
     energies: wp.array(dtype=float),
 ):  # pragma: no cover
+    r"""
+    Compute the collision energy for each collision pair.
+    
+    This function calculates the energy of a collision pair, accounting for the barrier distance ratio,
+    the kinematic gaps, and the normal vector. 
+    
+    Args:
+        dx_cur (wp.array(dtype=wp.vec3)): Current displacements of all points
+        dx_start_of_timestep (wp.array(dtype=wp.vec3)): Displacements at the start of the timestep
+        kinematic_gaps (wp.array(dtype=wp.vec3)): Initial separation vectors between colliding points
+        normals (wp.array(dtype=wp.vec3)): Normal vectors of the collision pairs
+        indices_a (wp.array(dtype=int)): Indices of the first point in each collision pair
+        indices_b (wp.array(dtype=int)): Indices of the second point in each collision pair
+        energies (wp.array(dtype=float)): Energy of each collision pair
+    """
     c = wp.tid()
 
     offset = _collision_offset_wp_func(
@@ -182,26 +197,40 @@ def _collision_energy_wp_kernel(
     d = wp.dot(offset, nor)
     d_hat = d / rc
 
-    # Check its within radiuses.
+    # Check if within the active collision range: d_hat in (rp_ratio, 1]
     if rp_ratio < d_hat and d_hat <= 1.0:
+        # d_hat = d / rc, where d is the normal-projected gap and rc is the collision target distance
+        # d_min_l_squared is a quadratic barrier, nonzero when d_hat < 1 (objects start to overlap)
         d_min_l_squared = (d_hat - 1.0) * (
             d_hat - 1.0
-        )  # quadratic term ensures energy is 0 when d = rc
+        )  # quadratic penalty, ensures E is 0 at d = rc (no contact), positive when overlapping
+
+        # Log barrier energy: becomes infinite as the gap closes to rp_ratio (impenetrable barrier)
         E = -d_min_l_squared * wp.log(
             d_hat - rp_ratio
-        )  # log barrier term. inf when two rp's overlaps.
+        )  # adds infinite energy as d_hat approaches rp_ratio
 
-        # friction energy
+        # --- Friction (tangential) energy terms ---
+        # dc is distance past rc threshold (negative inside collision)
         dc = d_hat - 1.0
+        # dp is gap past the hard barrier
         dp = d_hat - rp_ratio
+        # 'barrier' is twice the log barrier, appears in the friction yield force
         barrier = 2.0 * wp.log(dp)
 
+        # dE_d_hat: derivative of the barrier energy w.r.t. d_hat, sets normal force scale
         dE_d_hat = -dc * (barrier + dc / dp)
-        vt = (offset - d * nor) / dt  # tangential velocity
-        vt_norm = wp.length(vt)
 
-        mu_fn = -mu * dE_d_hat / rc  # yield force
+        # Tangential velocity: subtract projection onto the normal, dividing by dt
+        vt = (offset - d * nor) / dt  # tangential slip vector per unit time
+        vt_norm = wp.length(vt)       # tangential slip speed
 
+        # mu_fn: yield friction force magnitude, scales with normal force
+        mu_fn = -mu * dE_d_hat / rc  # Coulomb friction coefficient (frictional yield magnitude)
+
+        # Add frictional (dissipative and regularized yield) energy term:
+        #   - 0.5 * nu * vt_norm^2: fluid-style (velocity-squared) regularizer
+        #   - (case statement): regularized stick-slip below vt_norm=1, classic friction above
         E += (
             mu_fn
             * dt
@@ -217,6 +246,7 @@ def _collision_energy_wp_kernel(
         ##
 
     else:
+        # Outside the collision range (no overlap) — energy is zero
         E = 0.0
 
     wp.atomic_add(energies, 0, coeff * E)
@@ -236,7 +266,20 @@ def _collision_gradient_wp_kernel(coeff: float,
                         indices_a: wp.array(dtype=int),
                         indices_b: wp.array(dtype=int),
                                   gradient: wp.array(dtype=wp.vec3)):  # pragma: no cover
-    """Calculates the collision energy for each object point
+    r"""
+    Calculates the collision gradient for each collision pair.
+    
+    This function calculates the gradient of the collision energy for each collision pair,
+    accounting for the barrier distance ratio, the kinematic gaps, and the normal vector.
+    
+    Args:
+        dx_cur (wp.array(dtype=wp.vec3)): Current displacements of all points
+        dx_start_of_timestep (wp.array(dtype=wp.vec3)): Displacements at the start of the timestep
+        kinematic_gaps (wp.array(dtype=wp.vec3)): Initial separation vectors between colliding points
+        normals (wp.array(dtype=wp.vec3)): Normal vectors of the collision pairs
+        indices_a (wp.array(dtype=int)): Indices of the first point in each collision pair
+        indices_b (wp.array(dtype=int)): Indices of the second point in each collision pair
+        gradient (wp.array(dtype=wp.vec3)): Gradient of the collision energy for each collision pair
     """
     c = wp.tid()
 
@@ -249,29 +292,73 @@ def _collision_gradient_wp_kernel(coeff: float,
     d = wp.dot(offset, nor)
     d_hat = d / rc
 
+    # The following block computes the gradient of the barrier collision energy and friction term.
+    # 
+    # Let:
+    # - d_hat: normalized gap along the collision normal (distance between points divided by the "collision radius rc")
+    # - rp_ratio: normalized ratio for beginning of the barrier region ("impenetrable barrier ratio")
+    # - dc = d_hat - 1.0: signed penetration depth normalized by rc (negative if interpenetrating)
+    # - dp = d_hat - rp_ratio: normalized distance into the barrier energy region
+    # 
+    # The collision (barrier) potential is nonzero only when rp_ratio < d_hat <= 1.0,
+    # i.e., contacts are within the active barrier region but haven't separated.
+
     if rp_ratio < d_hat and d_hat <= 1.0:
         dc = d_hat - 1.0
         dp = d_hat - rp_ratio
-        barrier = 2.0 * wp.log(dp)
+        barrier = 2.0 * wp.log(dp)  # log-barrier term in the potential
 
+        # dE/d(d_hat): 
+        #   Derivative of the barrier energy with respect to normalized displacement.
+        #   This combines the log-barrier slope plus a quadratic for distance inside the region.
         dE_d_hat = -dc * (barrier + dc / dp)
+
+        # Chain rule: convert to Cartesian gradient in world space along the normal direction
         gradient[c] = dE_d_hat / rc * nor
 
-        # friction
+        # ---- Friction Terms ----
+        # Friction acts tangentially to the contact plane.
+        # vt: tangential slip/velocity between contacting points
         vt = (offset - d * nor) / dt  # tangential velocity
         vt_norm = wp.length(vt)
-        vt_dir = wp.normalize(vt)  # avoids dealing with 0
 
+        # Effective friction force magnitude ("yield force", a la Coulomb friction).
+        # Proportional to normal barrier force (mu_fn ~ mu * |normal force|).
         mu_fn = -mu * dE_d_hat / rc  # yield force
 
+        # Nonlinear regularization for vt_norm -> 0 (improves smoothness)
+        # - For vt_norm < 1, f1_over_vt_norm = 2-vt_norm (quadratic regularization)
+        # - For vt_norm >= 1, f1_over_vt_norm = 1/vt_norm (Coulomb friction regime)
         f1_over_vt_norm = wp.where(
             vt_norm < 1.0,  2.0 - vt_norm, 1.0 / vt_norm)
+
+        # Add friction term to the gradient in tangential direction (proportional to mu, vt, and fluid regularization nu)
         gradient[c] += mu_fn * (f1_over_vt_norm + nu) * vt
+
+        # H_vt: Dissipation term for differentiable stick/slip friction (see DFG/PolyFric)
+        h_vt = (
+            0.5 * nu * vt_norm * vt_norm
+            + wp.where(
+                vt_norm < 1.0,
+                vt_norm * vt_norm * (1.0 - vt_norm / 3.0),
+                vt_norm - 1.0 / 3.0,
+            )
+        )
+
+        # Second derivatives of the barrier energy with respect to d_hat, needed for friction gradient's nontrivial Jacobian
+        dbarrier_d_hat = 2.0 / dp
+        ddcdp_d_hat = (dp - dc) / (dp * dp)
+        d2E_d_hat2 = -(barrier + dc / dp) - dc * (dbarrier_d_hat + ddcdp_d_hat)
+
+        # Add the last frictional correction term, projected along the normal (stick/slip dissipation effect)
+        gradient[c] += -mu * dt * h_vt * d2E_d_hat2 / (rc * rc) * nor
         ###
 
     else:
+        # Outside the barrier/penetration region: energy and its gradient are zero
         gradient[c] = wp.vec3(0.0)
 
+    # Scale by the collision coefficient (typically 1.0 for main collision energy, 0.0 for friction)
     gradient[c] = coeff * gradient[c]
 
 
@@ -289,6 +376,21 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
                                    indices_a: wp.array(dtype=int),
                                    indices_b: wp.array(dtype=int),
                                              hessian: wp.array(dtype=wp.mat33)):  # pragma: no cover
+    r"""
+    Compute the Hessian of the collision energy for each collision pair.
+
+    This function calculates the Hessian of the collision energy for each collision pair,
+    accounting for the barrier distance ratio, the kinematic gaps, and the normal vector.
+
+    Args:
+        dx_cur (wp.array(dtype=wp.vec3)): Current displacements of all points
+        dx_start_of_timestep (wp.array(dtype=wp.vec3)): Displacements at the start of the timestep
+        kinematic_gaps (wp.array(dtype=wp.vec3)): Initial separation vectors between colliding points
+        normals (wp.array(dtype=wp.vec3)): Normal vectors of the collision pairs
+        indices_a (wp.array(dtype=int)): Indices of the first point in each collision pair
+        indices_b (wp.array(dtype=int)): Indices of the second point in each collision pair
+        hessian (wp.array(dtype=wp.mat33)): Hessian of the collision energy for each collision pair
+    """
     c = wp.tid()
 
     offset = _collision_offset_wp_func(
@@ -301,48 +403,103 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
     d_hat = d / rc
 
     if rp_ratio < d_hat and d_hat <= 1.0:
+        # dc = normal projected gap past contact threshold (dc < 0 when in contact)
         dc = d_hat - 1.0
+        # dp = gap past the barrier; dp ~ 0 at hard collision, dp > 0 for separation
         dp = d_hat - rp_ratio
+        # barrier is 2 * log(dp); diverges as dp -> 0, the log barrier for impenetrability
         barrier = 2.0 * wp.log(dp)
 
+        # dE/d_dhat: normal force scale, from differentiating the log barrier energy
         dE_d_hat = -dc * (barrier + dc / dp)
 
-        dbarrier_d_hat = 2.0 / dp
-        ddcdp_d_hat = (dp - dc) / (dp * dp)
+        # First and second derivatives of barrier term wrt d_hat:
+        dbarrier_d_hat = 2.0 / dp  # d(barrier)/d(d_hat)
+        ddcdp_d_hat = (dp - dc) / (dp * dp)  # d(dc/dp)/d(d_hat)
 
+        # d2E/d_dhat2: second derivative, normal force stiffness (curvature of energy wrt normal gap)
         d2E_d_hat2 = -(barrier + dc / dp) - dc * (dbarrier_d_hat + ddcdp_d_hat)
+        # Outer product with nor gives the 3x3 Hessian in the normal direction
         hessian[c] = d2E_d_hat2 / (rc * rc) * wp.outer(nor, nor)
 
-        # friction
+        # friction hessian: slip term (mu_fn * f1_nu * vt) + chain rule term
+        # through -mu * dt * h_vt * d2E_d_hat2 / rc^2 * nor
 
+        # vt: tangential slip vector (velocity tangent to contact)
         vt = (offset - d * nor) / dt  # tangential velocity
-        vt_norm = wp.length(vt)
-        vt_dir = wp.normalize(vt)  # avoids dealing with 0
+        vt_norm = wp.length(vt)       # tangential slip speed
 
-        mu_fn = -mu * dE_d_hat / rc  # yield force
+        # mu_fn: frictional force yield magnitude
+        mu_fn = -mu * dE_d_hat / rc  # yield force (Coulomb friction)
+        mu_fn_p = -mu * d2E_d_hat2 / rc  # d(mu_fn) / d(d_hat)
 
+        # f1_over_vt_norm: regularized interpolation between sticking (quadratic penalty) and kinetic friction (linear), per D.E. Terzopoulos's classic formulation
         f1_over_vt_norm = wp.where(
             vt_norm < 1.0,  2.0 - vt_norm, 1.0 / vt_norm)
+        f1_nu = f1_over_vt_norm + nu
+        tangent_proj = wp.identity(3, dtype=wp.float32) - wp.outer(nor, nor)  # projection operator onto tangential plane
 
-        # regularization such that f / H dt <= k v (penalizes friction switching dir)
-        friction_slip_reg = 0.1
-        df1_d_vtn = wp.max(
-            2.0 * (1.0 - vt_norm),
-            friction_slip_reg / (0.5 * friction_slip_reg + vt_norm),
+        slip_vtn_eps = 1.0e-4  # epsilon to handle tangential slip~0
+
+        if vt_norm < slip_vtn_eps:
+            # For near-zero tangential speed, limit of f1_nu * vt Hessian is f1_nu / dt * tangent_proj
+            hessian[c] += mu_fn / dt * f1_nu * tangent_proj
+        elif vt_norm < 1.0:
+            # Stick regime (quadratic friction); extra out-of-plane curvature from vt
+            hessian[c] += mu_fn / dt * (
+                f1_nu * tangent_proj - wp.outer(vt, vt) / (vt_norm * dt)
+            )
+        else:
+            # Slip regime (linear kinetic friction); out-of-plane curvature term
+            f1_p = -1.0 / (vt_norm * vt_norm)
+            hessian[c] += mu_fn * (
+                f1_p / (vt_norm * dt) * wp.outer(vt, vt)
+                + f1_nu / dt * tangent_proj
+            )
+        # mu_fn_p * f1_nu / rc * vt ⊗ nor: cross term in Hessian for friction-yield gradient vs normal direction
+        hessian[c] += mu_fn_p * f1_nu / rc * wp.outer(vt, nor)
+
+        # h_vt: tangential friction energy (quadratic for stick, linear past slip threshold)
+        h_vt = (
+            0.5 * nu * vt_norm * vt_norm
+            + wp.where(
+                vt_norm < 1.0,
+                vt_norm * vt_norm * (1.0 - vt_norm / 3.0),
+                vt_norm - 1.0 / 3.0,
+            )
+        )
+        # h_vt_p: derivative of frictional energy wrt tangential slip speed
+        h_vt_p = wp.where(
+            vt_norm < 1.0,
+            nu * vt_norm + 2.0 * vt_norm - vt_norm * vt_norm,
+            nu * vt_norm + 1.0,
         )
 
-        vt_perp = wp.cross(vt_dir, nor)
-        hessian[c] += (
-            mu_fn
-            / dt
-            * (
-                (df1_d_vtn + nu) * wp.outer(vt_dir, vt_dir)
-                + (f1_over_vt_norm + nu) * wp.outer(vt_perp, vt_perp)
-            )
+        # Higher order derivatives of barrier/log-barrier and quadratic slip term
+        d2barrier_d_hat = -2.0 / (dp * dp)
+        dddcdp_d_hat = -2.0 * ddcdp_d_hat / dp
+        df_d_hat = dbarrier_d_hat - dc / (dp * dp)
+        dg_d_hat = d2barrier_d_hat + dddcdp_d_hat
+        # d3E/d_dhat3: third derivative, for chain rule in frictional-tangential coupling
+        d3E_d_hat3 = -df_d_hat - dg_d_hat * dc - (dbarrier_d_hat + ddcdp_d_hat)
+
+        # dvtn_doffset: directional derivative of v_t norm w.r.t. offset (tangential motion)
+        dvtn_doffset = wp.where(
+            vt_norm > slip_vtn_eps,
+            vt / (vt_norm * dt),
+            wp.vec3(0.0),
+        )
+
+        # Cross-term coupling: normal and tangential directions via friction energy's chain rule
+        chain_coeff = -mu * dt / (rc * rc)
+        hessian[c] += chain_coeff * (
+            d2E_d_hat2 * h_vt_p * wp.outer(nor, dvtn_doffset)
+            + h_vt * d3E_d_hat3 / rc * wp.outer(nor, nor)
         )
         ###
 
     else:
+        # Outside active barrier region: Hessian is zero
         hessian[c] = wp.mat33(0.0)
 
     hessian[c] = coeff * hessian[c]
