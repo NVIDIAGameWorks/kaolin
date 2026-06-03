@@ -224,7 +224,7 @@ class TestMeshes:
     def test_import_bad_prim(self, scene_paths, mesh_path):
         """Test that import fails when reaching invalid prims"""
         with pytest.raises(ValueError):
-            usd.import_meshes(mesh_path, ['/foo'] + scene_paths, return_list=False)
+            usd.import_meshes(mesh_path, ['/foo', *scene_paths], return_list=False)
 
     def test_get_mesh_scene_paths(self, scene_paths, out_dir, mesh, mesh_alt):
         """get_mesh_scene_paths returns expected paths from exported stage"""
@@ -471,6 +471,20 @@ class TestMeshes:
         meshes_dict = usd.import_meshes(out_path, scene_paths, return_list=False)
         assert torch.allclose(meshes_dict[scene_paths[0]].transform, transform_0, atol=1e-5)
         assert torch.allclose(meshes_dict[scene_paths[1]].transform, transform_0, atol=1e-5)
+
+    def test_export_meshes_transform_mismatch(self, out_dir):
+        """A batched local_to_world whose length != number of meshes raises ValueError."""
+        vertices = [torch.tensor([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]], dtype=torch.float32),
+                    torch.tensor([[0., 0., 0.], [0., 1., 0.], [0., 0., 1.]], dtype=torch.float32)]
+        faces = [torch.tensor([[0, 1, 2]], dtype=torch.int64),
+                 torch.tensor([[0, 1, 2]], dtype=torch.int64)]
+        scene_paths = ['/World/Meshes/mesh_0', '/World/Meshes/mesh_1']
+        # 3 transforms for 2 meshes
+        local_to_world = torch.eye(4, dtype=torch.float32).unsqueeze(0).repeat(3, 1, 1)
+        out_path = os.path.join(out_dir, 'export_meshes_transform_mismatch.usda')
+        with pytest.raises(ValueError):
+            usd.export_meshes(out_path, scene_paths, vertices=vertices, faces=faces,
+                              local_to_world=local_to_world, overwrite=True)
 
     def test_import_vertex_interpolation_normals(self, out_dir):
         """Normals authored with interpolation='vertex' must round-trip into SurfaceMesh.vertex_normals.

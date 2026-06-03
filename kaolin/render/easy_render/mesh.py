@@ -85,7 +85,7 @@ def render_mesh(camera: Camera, mesh: SurfaceMesh, lighting: SgLightingParameter
         mesh = mesh.as_transformed()
         warnings.warn("Mesh has a transform attribute, transforming to world space. "
                       "If you are rasterizing the mesh multiple times, "
-                      "consider transforming it once before rasterizing it.")
+                      "consider transforming it once before rasterizing it.", stacklevel=2)
 
     materials = custom_materials or mesh.materials
     material_assignments = custom_material_assignments if custom_material_assignments is not None else mesh.material_assignments
@@ -158,7 +158,7 @@ def mesh_rasterize_interpolate_cuda(
         mesh = mesh.as_transformed()
         warnings.warn("Mesh has a transform attribute, transforming to world space. "
                       "If you are rasterizing the mesh multiple times, "
-                      "consider transforming it once before rasterizing it.")
+                      "consider transforming it once before rasterizing it.", stacklevel=2)
 
     vertices_camera = camera.extrinsics.transform(mesh.vertices)
     vertices_image = camera.intrinsics.transform(vertices_camera)
@@ -231,7 +231,7 @@ def mesh_rasterize_interpolate_nvdiffrast(
         mesh = mesh.as_transformed()
         warnings.warn("Mesh has a transform attribute, transforming to world space. "
                       "If you are rasterizing the mesh multiple times, "
-                      "consider transforming it once before rasterizing it.")
+                      "consider transforming it once before rasterizing it.", stacklevel=2)
     vertices_camera = camera.extrinsics.transform(mesh.vertices)
     vertices_clip = camera.intrinsics.project(vertices_camera)
 

@@ -838,13 +838,15 @@ def export_meshes(file_path, scene_paths=None, vertices=None, faces=None,
         if local_to_world.ndim == 3:
             if num_meshes == -1:
                 num_meshes = local_to_world.shape[0]
-            assert local_to_world.shape == (num_meshes, 4, 4), (
-                f'local_to_world batched tensor must have shape ({num_meshes}, 4, 4), '
-                f'got {tuple(local_to_world.shape)}')
+            if local_to_world.shape != (num_meshes, 4, 4):
+                raise ValueError(
+                    f'local_to_world batched tensor must have shape ({num_meshes}, 4, 4), '
+                    f'got {tuple(local_to_world.shape)}')
         elif local_to_world.ndim == 2:
-            assert tuple(local_to_world.shape) == (4, 4), (
-                f'local_to_world tensor must have shape (4, 4) or (N, 4, 4), '
-                f'got {tuple(local_to_world.shape)}')
+            if tuple(local_to_world.shape) != (4, 4):
+                raise ValueError(
+                    f'local_to_world tensor must have shape (4, 4) or (N, 4, 4), '
+                    f'got {tuple(local_to_world.shape)}')
         else:
             raise ValueError(
                 f'local_to_world tensor must have shape (4, 4) or (N, 4, 4), '
