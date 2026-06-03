@@ -851,7 +851,7 @@ class TestCoreParameterized:
 
             # Try to make a list batch that's fixed topology -- convertible to FIXED
             input_attr = make_default_list_input(device, batchsize=3, fixed_topology=True)
-            mesh = construct_mesh_default(input_attr)
+            mesh = construct_mesh_default(input_attr, with_transform=with_transform)
             assert mesh.batching == batching
             if convert_to_batching == SurfaceMesh.Batching.FIXED:
                 _apply_batching(mesh, convert_to_batching)
@@ -863,7 +863,7 @@ class TestCoreParameterized:
 
             # Try to make a list batch of size 1 -- that's convertible to either
             input_attr = make_default_list_input(device, batchsize=1, fixed_topology=True)
-            mesh = construct_mesh_default(input_attr)
+            mesh = construct_mesh_default(input_attr, with_transform=with_transform)
             _apply_batching(mesh, convert_to_batching)
         else:
             raise RuntimeError(f'Bug conversion from batching {batching} not tested')
@@ -1615,8 +1615,19 @@ class TestCoreParameterized:
         orig_verts = flat_mesh.vertices if batching == SurfaceMesh.Batching.NONE else flat_mesh.vertices[0]
         result = SurfaceMesh.cat([m1, m2])
 
-        # Transforms must be batched, never applied
-        assert result.has_attribute('transform'), 'cat must batch transform'
+        # Transforms must be batched in input order, never applied. cat concatenates each input's
+        # transform (broadcasting a single (4, 4) to that input's batch size) along the batch dim.
+        if batching in (SurfaceMesh.Batching.FIXED, SurfaceMesh.Batching.LIST):
+            expected_t1 = wtl_a.unsqueeze(0).expand(B1, 4, 4)
+            expected_t2 = wtl_b.unsqueeze(0).expand(B2, 4, 4)
+        else:
+            expected_t1 = wtl_a.unsqueeze(0)
+            expected_t2 = wtl_b.unsqueeze(0)
+        assert torch.allclose(m1.transform, expected_t1.reshape(m1.transform.shape))
+        assert torch.allclose(m2.transform, expected_t2.reshape(m2.transform.shape))
+        expected_transform = torch.cat([expected_t1, expected_t2], dim=0)
+        assert torch.allclose(result.transform, expected_transform), \
+            'cat must batch transforms in [m1, m2] order without applying them'
         assert torch.allclose(result.vertices[0], orig_verts), 'cat must not transform vertices'
 
     def test_ensure_indexed_attribute(self, device, batching):
@@ -1840,6 +1851,20 @@ class TestCoreParameterized:
             if batching == SurfaceMesh.Batching.NONE:
                 return value
             return value[i]
+
+        # as_transformed must return a transformed copy without mutating the source mesh.
+        assert local_mesh is not mesh
+        assert mesh.has_attribute('transform')
+        assert mesh.has_attribute('face_vertices')
+        src_attrs = ['vertices', 'face_normals']
+        if with_normals:
+            src_attrs += ['normals', 'vertex_normals']
+        if with_tangents:
+            src_attrs += ['vertex_tangents', 'face_tangents']
+        for i in range(B):
+            for attr in src_attrs:
+                assert torch.allclose(_elem(getattr(mesh, attr), i), _elem(input_attr[attr], i)), \
+                    f'source {attr} was mutated at i={i}'
 
         for i in range(B):
             ref_mat = ref_mats[i]
