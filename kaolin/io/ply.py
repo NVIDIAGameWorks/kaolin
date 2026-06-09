@@ -84,6 +84,27 @@ def import_gaussiancloud(filename: str,
     for idx, attr_name in enumerate(rot_names):
         mogt_rotation[:, idx] = np.asarray(plydata.elements[0][attr_name])
 
+    # Detect any `{base}_{int}` properties not consumed by the standard schema; these are
+    # surfaced via the `features` dict on the returned GaussianSplatModel.
+    consumed = {'x', 'y', 'z', 'nx', 'ny', 'nz', 'opacity',
+                'f_dc_0', 'f_dc_1', 'f_dc_2'}
+    consumed.update(extra_f_names)
+    consumed.update(scale_names)
+    consumed.update(rot_names)
+
+    extra_groups = {}
+    for p in plydata.elements[0].properties:
+        name = p.name
+        if name in consumed:
+            continue
+        base, sep, idx_str = name.rpartition('_')
+        if not sep:
+            continue
+        try:
+            idx = int(idx_str)
+        except ValueError:
+            continue
+        extra_groups.setdefault(base, []).append((idx, name))
 
     tensor_kwargs = {'dtype': torch.float32} # consistent with our exporter
     densities = torch.tensor(mogt_densities, **tensor_kwargs)
@@ -97,6 +118,16 @@ def import_gaussiancloud(filename: str,
     sh_coeff = torch.cat([torch.tensor(mogt_albedo, **tensor_kwargs).transpose(1, 2),
                         torch.tensor(mogt_specular, **tensor_kwargs).transpose(1, 2)], dim=1)
 
+    features = None
+    if extra_groups:
+        features = {}
+        for base, items in extra_groups.items():
+            items.sort()
+            arr = np.zeros((num_gaussians, len(items)))
+            for col, (_, attr_name) in enumerate(items):
+                arr[:, col] = np.asarray(plydata.elements[0][attr_name])
+            features[base] = torch.tensor(arr, **tensor_kwargs)
+
     kwargs = {
         'positions': torch.tensor(mogt_pos, **tensor_kwargs),
         'orientations': rotations,
@@ -104,11 +135,13 @@ def import_gaussiancloud(filename: str,
         'opacities': densities.squeeze(-1),
         'sh_coeff': sh_coeff
     }
+    if features is not None:
+        kwargs['features'] = features
     return GaussianSplatModel(**kwargs)
 
 
 def export_gaussiancloud(file_path, positions, orientations, scales, opacities,
-                         sh_coeff, sh_degree=None, overwrite=False):
+                         sh_coeff, features=None, sh_degree=None, overwrite=False):
     """Write a 3D Gaussian splatting-style PLY (``f_dc_*``, ``f_rest_*``, ``opacity``, ``scale_*``, ``rot_*``).
 
     Values are stored in the same raw space expected by :func:`import_gaussiancloud` when
@@ -123,11 +156,19 @@ def export_gaussiancloud(file_path, positions, orientations, scales, opacities,
         opacities (torch.Tensor): opacity of each gaussian, of shape :math:`(\text{num_gaussians})`.
         sh_coeff (torch.Tensor): spherical harmonics coefficients of each gaussian,
             of shape :math:`(\text{num_gaussians}, (\text{num_degrees} + 1)^2, 3)`.
+        features (dict, optional): extra per-gaussian fields to serialize alongside the standard
+            schema. Must be a ``dict`` mapping ``str`` name -> ``torch.Tensor`` of shape
+            :math:`(\text{num_gaussians}, K)`. Each entry is written as flat properties
+            ``{name}_0 ... {name}_{K-1}`` and is round-trippable through
+            :func:`import_gaussiancloud` (which restores it under ``GaussianSplatModel.features[name]``).
+            Defaults to ``None``.
         sh_degree (int): optionally pass for sanity checking, otherwise will guess the value
         overwrite (bool, optional): whether to overwrite the file if it already exists. Defaults to False.
 
     Raises:
         RuntimeError: if the file already exists and overwrite is False.
+        ValueError: if ``features`` has an invalid type/shape or a key collides with the
+            standard schema prefixes.
     """
     if not overwrite and os.path.exists(file_path):
         raise RuntimeError(f'Cannot overwrite: {file_path}')
@@ -172,10 +213,34 @@ def export_gaussiancloud(file_path, positions, orientations, scales, opacities,
     for i in range(rotation_np.shape[1]):
         l.append(f'rot_{i}')
 
+    feature_arrays = []
+    if features is not None:
+        if not isinstance(features, dict):
+            raise ValueError(
+                f'features must be a dict of (N, K) tensors, got {type(features).__name__}')
+        reserved_prefixes = ('f_dc', 'f_rest', 'scale', 'rot', 'x', 'y', 'z', 'nx', 'ny', 'nz', 'opacity')
+        for name, tensor in features.items():
+            if not isinstance(name, str):
+                raise ValueError(f'features keys must be str, got {type(name).__name__}')
+            if name in reserved_prefixes or any(name.startswith(p + '_') for p in reserved_prefixes):
+                raise ValueError(
+                    f'features key "{name}" collides with the standard PLY schema; '
+                    f'choose a name that is not one of {reserved_prefixes} or starts with one of them')
+            if not torch.is_tensor(tensor):
+                raise ValueError(
+                    f'features["{name}"] must be a torch.Tensor, got {type(tensor).__name__}')
+            if tensor.dim() != 2 or tensor.shape[0] != n:
+                raise ValueError(
+                    f'features["{name}"] must have shape (N={n}, K), got {tuple(tensor.shape)}')
+            arr = tensor.detach().float().cpu().numpy()
+            for i in range(arr.shape[1]):
+                l.append(f'{name}_{i}')
+            feature_arrays.append(arr)
+
     dtype_full = [(attribute, 'f4') for attribute in l]
     elements = np.empty(n, dtype=dtype_full)
     attributes = np.concatenate(
-        (xyz, normals, f_dc, f_rest_flat, opacities_np, scale_np, rotation_np), axis=1)
+        (xyz, normals, f_dc, f_rest_flat, opacities_np, scale_np, rotation_np, *feature_arrays), axis=1)
     elements[:] = list(map(tuple, attributes))
     el = PlyElement.describe(elements, 'vertex')
     PlyData([el]).write(file_path)
