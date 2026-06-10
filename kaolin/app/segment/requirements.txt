@@ -1,3 +1,5 @@
 gsplat>=1.4.0
-transformers>=4.47.0
+transformers>=5.0.0
 simple-parsing
+annotated_types
+git+https://github.com/Caenorst/Cutie@update_python_pytorch

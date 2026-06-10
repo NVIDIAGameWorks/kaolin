@@ -136,17 +136,100 @@ def hook_sidebar_sections_to_modes(viewer_id, modes, collapsible_section_ids):
         prevent_initial_call=True,
     )
 
-def make_aggregate_ui():
+def make_aggregate_ui(mask_canvas_id):
     tooltips = []
-    add_mask_btn = dbc.Button("Add Mask", id=UniqueIdGenerator.get_unique_id('agg'), color='primary', outline=True,
-                     className='rounded-pill px-1')
-    tooltips.append(dbc.Tooltip('Add current mask as reference', target=add_mask_btn.id))
-    todo_btn = dbc.Button("TODO :)", id=UniqueIdGenerator.get_unique_id('agg'), color='success', outline=False,
-                              className='rounded-pill px-1')
-    tooltips.append(dbc.Tooltip('TBD', target=todo_btn.id))
+    add_mask_btn = dbc.Button("3D Auto Select", id=UniqueIdGenerator.get_unique_id('agg'), color='primary',
+                              outline=True, className='rounded-pill px-1')
+    tooltips.append(dbc.Tooltip('Add current mask and run 3D aggregation', target=add_mask_btn.id))
+    clear_btn = dbc.Button("Clear", id='kaolin-agg-clear-btn', color='danger', outline=True,
+                           className='rounded-pill px-1')
+    tooltips.append(dbc.Tooltip('Clear all accumulated masks', target=clear_btn.id))
 
-    buttons = dbc.ButtonGroup([add_mask_btn, todo_btn], className='gap-1')
+    debug_btn = dbc.Button(html.I(className='bi bi-bug'), id='kaolin-debug-toggle-btn',
+                           color='secondary', outline=True, className='rounded-pill px-1 opacity-50')
+    tooltips.append(dbc.Tooltip('Show/hide tracking debug panel', target='kaolin-debug-toggle-btn'))
 
-    # TODO: hook up UI to events as well
+    buttons = dbc.ButtonGroup([add_mask_btn, clear_btn, debug_btn], className='gap-1')
 
-    return [buttons] + tooltips
+    count_store = dcc.Store(id=UniqueIdGenerator.get_unique_id('agg-count'), data=0)
+    clientside_callback(
+        f"""
+        function(add_clicks, clear_clicks, count) {{
+            const ctx = dash_clientside.callback_context;
+            if (!ctx.triggered || ctx.triggered.length === 0) return dash_clientside.no_update;
+            const triggeredId = ctx.triggered[0].prop_id.split('.')[0];
+            if (triggeredId === '{add_mask_btn.id}') return (count || 0) + 1;
+            if (triggeredId === '{clear_btn.id}') return 0;
+            return dash_clientside.no_update;
+        }}
+        """,
+        Output(count_store.id, 'data'),
+        Input(add_mask_btn.id, 'n_clicks'),
+        Input(clear_btn.id, 'n_clicks'),
+        State(count_store.id, 'data'),
+        prevent_initial_call=True,
+    )
+    clientside_callback(
+        """
+        function(count) {
+            if (!count) return '3D Auto Select';
+            return 'Add Mask (' + count + ')';
+        }
+        """,
+        Output(add_mask_btn.id, 'children'),
+        Input(count_store.id, 'data'),
+    )
+
+    dummy_div, dummy_output = make_dummy()
+    clientside_callback(
+        f"""
+        function(n_clicks) {{
+            send_aggregate_request("{mask_canvas_id}", "add_mask_and_aggregate");
+            kaolin.interact.events.requestMode('view');
+            return window.dash_clientside.no_update;
+        }}
+        """,
+        dummy_output,
+        Input(add_mask_btn.id, 'n_clicks'),
+        prevent_initial_call=True,
+    )
+    clientside_callback(
+        f"""
+        function(n_clicks) {{
+            send_server_request(MessageTags.AGGREGATE, {{ "action": "clear_masks" }});
+            document.getElementById('kaolin-debug-panel')?.classList.remove('show');
+            const debugBtn = document.getElementById('kaolin-debug-toggle-btn');
+            if (debugBtn) {{ debugBtn.classList.add('opacity-50'); debugBtn.classList.remove('active'); }}
+            return window.dash_clientside.no_update;
+        }}
+        """,
+        dummy_output,
+        Input(clear_btn.id, 'n_clicks'),
+        prevent_initial_call=True,
+    )
+
+    return [buttons, count_store, dummy_div] + tooltips
+
+DEBUG_PANEL_HTML = """
+<div class="offcanvas offcanvas-end" tabindex="-1"
+     id="kaolin-debug-panel" style="width:420px">
+  <div class="offcanvas-header">
+    <h6 class="offcanvas-title">Tracking Debug</h6>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body d-flex flex-column gap-3">
+    <div id="kaolin-debug-label" class="text-muted small">No data yet</div>
+    <input type="range" class="form-range" id="kaolin-debug-slider" min="0" max="0" value="0">
+    <div class="d-flex flex-column gap-2">
+      <div>
+        <div class="text-muted small mb-1">Render</div>
+        <img id="kaolin-debug-render" alt="" style="width:100%;border-radius:4px">
+      </div>
+      <div>
+        <div class="text-muted small mb-1">Mask</div>
+        <img id="kaolin-debug-mask" alt="" style="width:100%;border-radius:4px">
+      </div>
+    </div>
+  </div>
+</div>
+"""

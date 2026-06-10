@@ -79,7 +79,6 @@ RUN mkdir -m 777 /opt/npm-cache /opt/cypress-cache
 ENV NPM_CONFIG_CACHE=/opt/npm-cache
 ENV CYPRESS_CACHE_FOLDER=/opt/cypress-cache
 
-
 RUN npm install -g npm@8.5.4
 RUN npm install && chmod -R a+rwX /opt/npm-cache /opt/cypress-cache
 

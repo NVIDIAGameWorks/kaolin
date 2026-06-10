@@ -104,10 +104,10 @@ def gravity_gradient_wp_kernel(
 
 @wp.func
 def floor_energy_wp_func(floor_height: wp.float32,
-                 floor_axis: wp.int32,
-                 flip_floor: wp.int32,
-                 vol: wp.float32,
-                 dx: wp.vec3,
+                         floor_axis: wp.int32,
+                         flip_floor: wp.int32,
+                         vol: wp.float32,
+                         dx: wp.vec3,
                          x0: wp.vec3):  # pragma: no cover
     r"""Return floor energy at each integration primitive.
 
@@ -168,7 +168,7 @@ def floor_gradient_wp_func(floor_height: wp.float32,
             pass
     else:
         if p > floor_height:
-            return -1.0*force
+            return 1.0*force
         else:
             pass
 
@@ -208,7 +208,7 @@ def floor_hessian_wp_func(floor_height: wp.float32,
             pass
     else:
         if p > floor_height:
-            return -1.0*local_hess
+            return 1.0*local_hess
         else:
             pass
     return wp.mat33(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)

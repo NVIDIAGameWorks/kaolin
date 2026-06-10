@@ -1,13 +1,18 @@
 from annotated_types import Ge, Le
 import asyncio
+import base64
 import copy
 from dataclasses import dataclass
 import enum
+import io
 import logging
 import math
 import numpy as np
 import torch
 import torchvision
+import torchvision.transforms.functional as TF
+from PIL import Image
+from torchvision.transforms import InterpolationMode
 from typing import Annotated, Dict, Any, Union, Callable
 
 from humanfriendly.terminal import message
@@ -21,6 +26,9 @@ from .input_abstraction import CloudAbstraction
 from .sam import default_sam2_components, SimplerSAMSegmenter
 from .segment import DisjointSegmentation
 from .selection import CloudSelection, SelectAction
+from .segmenter import GaussianSplatSegmenter
+from .tracking import TrackerState, TrackingSession
+from . import views
 from .util import default_camera, mask_from_message
 
 
@@ -78,6 +86,7 @@ class MessageTags(str, enum.Enum):
     # Outgoing (not exhaustive; AnyRendererMessageHandler sends others)
     SET_SEGMENTS = 'set_segments'
     DONE_WITH_MASK = 'done_with_mask'
+    DEBUG_TRACKING_VIEWS = 'debug_tracking_views'
 
 
 class SegmentAction(str, enum.Enum):
@@ -95,7 +104,39 @@ class AggregateAction(str, enum.Enum):
     ADD_MASK = "add_mask"
     CLEAR_MASKS = "clear_masks"
     AGGREGATE = "aggregate"  # tracks and aggregates
+    ADD_MASK_AND_AGGREGATE = "add_mask_and_aggregate"  # adds mask then immediately aggregates in one round-trip
+    CLEAR_SELECTION = "clear_selection"  # empties the 3D point selection
     GET_DEBUG = "get_debug"  # should return num tracked masks, tracked cameras, and (if requested) specific tracked mask
+
+
+def _encode_debug_images(tracking_outputs, masks_2d, max_dim=320):
+    if not tracking_outputs:
+        return {'count': 0, 'renders': [], 'masks': []}
+    renders_b64 = []
+    masks_b64 = []
+    for out, mask in zip(tracking_outputs, masks_2d):
+        mask = mask.squeeze()  # normalize (1, H, W) → (H, W); no-op if already (H, W)
+        render = out['render']  # (3, H, W) float32 in [0, 1]
+        _, H, W = render.shape
+        scale = min(max_dim / H, max_dim / W, 1.0)
+        new_h, new_w = max(1, int(H * scale)), max(1, int(W * scale))
+
+        render_uint8 = (render.clamp(0, 1) * 255).to(torch.uint8)
+        if scale < 1.0:
+            render_uint8 = TF.resize(render_uint8, [new_h, new_w], antialias=True)
+        buf = io.BytesIO()
+        Image.fromarray(render_uint8.permute(1, 2, 0).cpu().numpy()).save(buf, format='JPEG', quality=70)
+        renders_b64.append(base64.b64encode(buf.getvalue()).decode('utf-8'))
+
+        mask_uint8 = (mask.clamp(0, 1) * 255).to(torch.uint8).unsqueeze(0)  # (1, H, W)
+        if scale < 1.0:
+            mask_uint8 = TF.resize(mask_uint8, [new_h, new_w], antialias=False,
+                                    interpolation=InterpolationMode.NEAREST)
+        buf = io.BytesIO()
+        Image.fromarray(mask_uint8.squeeze(0).cpu().numpy(), mode='L').save(buf, format='PNG')
+        masks_b64.append(base64.b64encode(buf.getvalue()).decode('utf-8'))
+
+    return {'count': len(renders_b64), 'renders': renders_b64, 'masks': masks_b64}
 
 
 class InteractiveCloudSelector(AsyncMessageHandlerProtocol):
@@ -139,6 +180,9 @@ class InteractiveCloudSelector(AsyncMessageHandlerProtocol):
         self._settings = settings
         """Maximum dimension enforced for the tracker rendered views. """
 
+        self.tracker = TrackerState()
+        """Accumulates (image, mask, camera) pairs per client for aggregation."""
+
     def render_for_display(self, camera):
         render_colors = self.user_cloud.render(camera)['render']  # TODO: use render passes here too
         render_colors = (render_colors.clip(0, 1) * 255).to(torch.uint8)
@@ -175,6 +219,7 @@ class InteractiveCloudSelector(AsyncMessageHandlerProtocol):
             MessageTags.SET_CAMERA,
             MessageTags.SAM_SEGMENT,
             MessageTags.PROJECT,
+            MessageTags.AGGREGATE,
             MessageTags.SEGMENT
         ] + self.render_handler.accepted_message_tags()
 
@@ -206,7 +251,7 @@ class InteractiveCloudSelector(AsyncMessageHandlerProtocol):
             await asyncio.to_thread(self._execute_mask_project_task, selection_action, mask, write_message_fn)
             # TODO: also send some selection stats
         elif message_tag == MessageTags.AGGREGATE:
-            pass
+            await asyncio.to_thread(self._execute_aggregate_task, message_content, write_message_fn)
         elif message_tag == MessageTags.SEGMENT:
             name = message_content['name']
             segment_action = message_content['action']
@@ -328,6 +373,70 @@ class InteractiveCloudSelector(AsyncMessageHandlerProtocol):
         self._apply_new_selection(CloudSelection.from_point_mask(segment.mask), action)
         return True
 
+    def _execute_aggregate_task(self, message_content, write_message_fn):
+        action = message_content.get('action')
+        if action in (AggregateAction.ADD_MASK, AggregateAction.ADD_MASK_AND_AGGREGATE):
+            mask = mask_from_message(message_content['mask']).to(self.device).float() / 255.0  # (H, W) float [0,1]
+            # Clamp to max_tracking_resolution so Cutie pixel-memory dimensions are consistent
+            # with the tracking renders (which are also clamped below).
+            width, height = kaolin.render.camera.dimensions_to_max_resolution(
+                self._camera.width, self._camera.height, self._settings.max_tracking_resolution)
+            ref_camera = copy.deepcopy(self._camera)
+            ref_camera.width = width
+            ref_camera.height = height
+            image = self.cloud.render(ref_camera, ['render'])['render'][0, ...].clip(0, 1).permute(2, 0, 1).float()  # (3, H, W)
+            if mask.shape[0] != height or mask.shape[1] != width:
+                mask = TF.resize(mask.unsqueeze(0), [height, width],
+                                 interpolation=InterpolationMode.NEAREST).squeeze(0)
+            self.tracker.add_ground_truth_mask(image, mask, ref_camera)
+            print(f'[AGGREGATE] add_mask: tracker now has {self.tracker.num_reference_masks} mask(s)')
+            if action == AggregateAction.ADD_MASK_AND_AGGREGATE:
+                action = AggregateAction.AGGREGATE  # fall through to aggregation below
+            else:
+                return
+        if action == AggregateAction.AGGREGATE:
+            if not self.tracker.can_track():
+                print('[AGGREGATE] no reference masks; use Add Mask first')
+                return
+            print(f'[AGGREGATE] running tracking with {self.tracker.num_reference_masks} reference(s)')
+            segmenter = GaussianSplatSegmenter(self.cloud.gsmodel)
+            training_cameras = self.shared_state.cameras
+            if training_cameras:
+                # Resize to max_tracking_resolution so renders match reference image resolution.
+                tracking_cameras = []
+                for cam in training_cameras:
+                    w, h = kaolin.render.camera.dimensions_to_max_resolution(
+                        cam.width, cam.height, self._settings.max_tracking_resolution)
+                    resized = copy.deepcopy(cam)
+                    resized.width = w
+                    resized.height = h
+                    tracking_cameras.append(resized)
+                print(f'[AGGREGATE] using {len(tracking_cameras)} training cameras')
+            else:
+                tracking_cameras = views.turnaround_cameras_from_camera_and_2dmask(
+                    self.tracker.ref_mask, self.tracker.ref_cam, 24, segmenter)
+                print(f'[AGGREGATE] no training cameras, using {len(tracking_cameras)} turnaround cameras')
+            session = TrackingSession.from_tracker_state(self.tracker, device=str(self.device))
+            result = session.track_and_segment(segmenter, tracking_cameras)
+            mask_3d = result['3d_mask']
+            print(f'[AGGREGATE] done: {mask_3d.sum().item()} / {len(mask_3d)} points selected')
+            self._apply_new_selection(CloudSelection.from_point_mask(mask_3d), SelectAction.NEW)
+            self.render_handler.render_and_send(write_message_fn)
+            debug_payload = _encode_debug_images(result['outputs'], result['masks_2d'])
+            encoded_debug = kaolin.visualize.web.io.encode_message(
+                MessageTags.DEBUG_TRACKING_VIEWS, debug_payload, binary=True)
+            write_message_fn(encoded_debug, True)
+        elif action == AggregateAction.CLEAR_MASKS:
+            self.tracker.reset_ground_truth_masks()
+            print('[AGGREGATE] clear_masks: tracker reset')
+        elif action == AggregateAction.CLEAR_SELECTION:
+            self.reset_selection()
+            self._update_displayed_cloud()
+            self.render_handler.render_and_send(write_message_fn)
+            print('[AGGREGATE] clear_selection: 3D selection emptied')
+        else:
+            print(f'[AGGREGATE] unhandled action={action}')
+
     def _execute_mask_project_task(self, selection_action, mask, write_message_fn):
         self.project_2d_mask(SelectAction(selection_action), mask)
         self.render_handler.render_and_send(write_message_fn)
@@ -397,7 +506,8 @@ class InteractiveCloudSelector(AsyncMessageHandlerProtocol):
             mask_uint8 = torch.zeros((height, width), dtype=torch.uint8)
         else:
             try:
-                view = (self.cloud.render(sam_camera, ['render'])['render'][0, ...].clip(0, 1) * 255).to(torch.uint8)
+                sam_cloud = self.cloud.with_visibility(self.enabled_segments_mask())
+                view = (sam_cloud.render(sam_camera, ['render'])['render'][0, ...].clip(0, 1) * 255).to(torch.uint8)
                 points = positions * torch.tensor([[width, height]], device=positions.device, dtype=positions.dtype)
                 points = points.unsqueeze(0).unsqueeze(0).to(torch.int32).tolist()
                 labels = labels.unsqueeze(0).unsqueeze(0).to(torch.int32).tolist()

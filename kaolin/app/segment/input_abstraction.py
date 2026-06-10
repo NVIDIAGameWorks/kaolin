@@ -127,6 +127,7 @@ class GaussianSplatInput(CloudAbstraction):
             weight: blend weight of the highlight color vs. the original color.
         """
         result = copy.copy(self)  # Not deep
+        result._gsmodel = copy.copy(self._gsmodel)  # isolate so sh_coeff/opacity writes don't mutate self
         result._gsmodel.sh_coeff = copy.deepcopy(self._orig_sh_coeff)  # Original colors
 
         num_highlighted = mask.sum()

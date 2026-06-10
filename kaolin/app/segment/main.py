@@ -1,6 +1,8 @@
-from dash import html
+from dash import html, dcc, callback, clientside_callback, Input, Output, State, no_update
+import dash_bootstrap_components as dbc
 import logging
 import os
+import pathlib
 import simple_parsing
 
 
@@ -21,9 +23,11 @@ from kaolin.visualize.web.sockets import RemoteRenderingOptions
 # App-specific utilities
 from .sam import GlobalSegmentAnything
 from .handler import ServerSideUserSettings, ServerApplicationState, InteractiveCloudSelector, default_camera
+from .util import load_cameras_json, up_axis_to_tensor
 from .input_abstraction import GaussianSplatInput
+from .save_util import export_scene_as_usd, load_scene_from_usd
 from .ui_util import SVG_FILTER, make_konva_action_controls, make_project_mask_buttons, hook_sidebar_sections_to_modes, \
-    make_aggregate_ui
+    make_aggregate_ui, DEBUG_PANEL_HTML
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +36,14 @@ FILE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 
 def read_cloud(fname, device, rep):
     if rep == 'splat':
-        gsmodel = kaolin.io.gaussians.import_gaussiancloud(fname).to(device)
-        print(gsmodel.to_string(print_stats=True))
-        return GaussianSplatInput(gsmodel)
+        if pathlib.Path(fname).suffix.lower() in ('.usd', '.usda'):
+            cloud, segmentation = load_scene_from_usd(fname, device)
+        else:
+            gsmodel = kaolin.io.gaussians.import_gaussiancloud(fname).to(device)
+            cloud = GaussianSplatInput(gsmodel)
+            segmentation = None
+        print(cloud.gsmodel.to_string(print_stats=True))
+        return cloud, segmentation
     else:
         raise NotImplementedError(f'The segmentation API for representation {rep} not implemented')
 
@@ -61,6 +70,9 @@ if __name__ == '__main__':
                         help='Input PLY or USD file (Gaussian splat)')
     parser.add_argument('--input_cameras', type=str, default=None,
                         help='Location of the cameras')
+    parser.add_argument('--up-axis', type=str, default='y',
+                        choices=['x', 'y', 'z', '-x', '-y', '-z'],
+                        help='World up axis for the camera controller (default: y)')
     parser.add_argument('--sam_model_id', type=str, default='facebook/sam2-hiera-large',
                         help='HuggingFace model ID for SAM2')
     parser.add_arguments(ServerSideUserSettings, dest="settings")
@@ -78,17 +90,23 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # Read Input:
     # TODO: should also figure out how to save; should user profide file? should we do save as?
-    cloud = read_cloud(args.input_scene, device, args.rep)
-    camera = default_camera().to(device)
+    cloud, segmentation = read_cloud(args.input_scene, device, args.rep)
+    suggested_output = str(pathlib.Path(args.input_scene).with_suffix('')) + '_segmented.usd'
+    up_vec = up_axis_to_tensor(args.up_axis)
+    camera = default_camera(up=up_vec).to(device)
 
     # Global server-side state, shared between clients
-    application_state = ServerApplicationState(cloud, [])
+    training_cameras = load_cameras_json(args.input_cameras, device=device) if args.input_cameras else []
+    if training_cameras:
+        logger.info(f'Loaded {len(training_cameras)} training cameras from {args.input_cameras}')
+    application_state = ServerApplicationState(cloud, training_cameras, segmentation=segmentation)
 
     # ------------------------------------------------------------------------------------------------------------------
     # WebappBuilder: helps us create the whole app - layout, websockets, UI, etc.
     # ------------------------------------------------------------------------------------------------------------------
     app_builder = WebappBuilder(debug=False)
     app_builder.add_raw_body_html(SVG_FILTER)  # Styling for the mask layer
+    app_builder.add_raw_body_html(DEBUG_PANEL_HTML)
 
     # Setting controls ------------
     # Easily surface your settings as both flags (see parser.add_argument(ServerSideUserSettings)) and UI controls
@@ -154,7 +172,7 @@ if __name__ == '__main__':
     print(BehaviorLibrary.to_string())
 
     # Shortcut behavior config for camera and remote rendering (see methods for what's under the hood)
-    cam_controller_id = viewer_builder.add_camera_controller()
+    cam_controller_id = viewer_builder.add_camera_controller(options={"up": up_vec.tolist()})
     draw_render_id, send_cam_id, request_render_id = viewer_builder.add_remote_rendering(
         active_layer_id=render_layer_id, connection_id='main-ws', cam_update_period=50, render_update_period=100)
 
@@ -231,7 +249,51 @@ if __name__ == '__main__':
     # Menus ---------------------------
     layout_helper.add_navbar_dropdown('File')
     save_item, save_as_item = layout_helper.add_navbar_dropdown_items('File', ['Save', 'Save As'])
-    # TODO(Clement): figure out how to save
+    save_as_item.id = 'save-as-menu-item'
+
+    stop_btn = dbc.Button(
+        [html.I(className='bi bi-stop-circle me-1'), 'Stop'],
+        id='stop-app-btn', color='danger', className='ms-auto me-2',
+    )
+    layout_helper.navbar_content.children.append(stop_btn)
+
+    stop_modal = dbc.Modal(
+        id='stop-app-modal',
+        children=[
+            dbc.ModalHeader(dbc.ModalTitle('Stop App')),
+            dbc.ModalBody('Are you sure you want to stop the segmentation app?'),
+            dbc.ModalFooter([
+                dbc.Button('Stop', id='stop-app-confirm-btn', color='danger', className='me-2'),
+                dbc.Button('Cancel', id='stop-app-cancel-btn', color='secondary'),
+            ]),
+        ],
+        is_open=False,
+    )
+    layout_helper.main_content.children.append(stop_modal)
+
+    save_as_modal = dbc.Modal(
+        id='save-as-modal',
+        children=[
+            dbc.ModalHeader(dbc.ModalTitle('Save As USD')),
+            dbc.ModalBody([
+                dbc.Label('Output file path (server-side):'),
+                dcc.Input(
+                    id='save-as-path-input',
+                    type='text',
+                    value=suggested_output,
+                    style={'width': '100%'},
+                    debounce=False,
+                ),
+                html.Div(id='save-as-status', style={'marginTop': '8px', 'color': 'red'}),
+            ]),
+            dbc.ModalFooter([
+                dbc.Button('Save', id='save-as-confirm-btn', color='primary', className='me-2'),
+                dbc.Button('Cancel', id='save-as-cancel-btn', color='secondary'),
+            ]),
+        ],
+        is_open=False,
+    )
+    layout_helper.main_content.children.append(save_as_modal)
 
     # Help -----------------------------
     # Add a Help page (rendered from USAGE.md) reachable from the navbar.
@@ -278,7 +340,7 @@ if __name__ == '__main__':
     sidebar_sections['agg'] = layout_helper.add_sidebar_section(
         aggregate_section_name, bootstrap_icon='bi-box', collapsible=False)
     layout_helper.add_sidebar_components(
-        make_aggregate_ui(),
+        make_aggregate_ui(viewer.resolve_id(baked_selection_layer_id)),
         section_name=aggregate_section_name)
     # TODO(Clement): add UI here
     # Add mask
@@ -304,7 +366,67 @@ if __name__ == '__main__':
     app_builder.set_layout_helper(layout_helper)
     app, server = app_builder.build(ws_handlers)
 
-    # Any other configuration of the app can go here
+    # Save As modal: open/close (clientside)
+    clientside_callback(
+        """
+        function(openClicks, cancelClicks) {
+            const ctx = window.dash_clientside.callback_context;
+            if (!ctx.triggered.length) return false;
+            const triggerId = ctx.triggered[0].prop_id;
+            if (triggerId === 'save-as-menu-item.n_clicks') return true;
+            return false;
+        }
+        """,
+        Output('save-as-modal', 'is_open'),
+        Input('save-as-menu-item', 'n_clicks'),
+        Input('save-as-cancel-btn', 'n_clicks'),
+        prevent_initial_call=True,
+    )
+
+    # Save As modal: server-side export
+    @callback(
+        Output('save-as-status', 'children'),
+        Output('save-as-modal', 'is_open', allow_duplicate=True),
+        Input('save-as-confirm-btn', 'n_clicks'),
+        State('save-as-path-input', 'value'),
+        prevent_initial_call=True,
+    )
+    def _save_as_callback(n_clicks, path):
+        if n_clicks is None:
+            return no_update, no_update
+        try:
+            export_scene_as_usd(application_state.fresh_cloud(), application_state.segmentation, path)
+            return f'Saved to {path}', False
+        except Exception as exc:
+            return str(exc), True
+
+    # Stop modal: open/close (clientside)
+    clientside_callback(
+        """
+        function(openClicks, cancelClicks) {
+            const ctx = window.dash_clientside.callback_context;
+            if (!ctx.triggered.length) return false;
+            const triggerId = ctx.triggered[0].prop_id;
+            if (triggerId === 'stop-app-btn.n_clicks') return true;
+            return false;
+        }
+        """,
+        Output('stop-app-modal', 'is_open'),
+        Input('stop-app-btn', 'n_clicks'),
+        Input('stop-app-cancel-btn', 'n_clicks'),
+        prevent_initial_call=True,
+    )
+
+    # Stop modal: kill the server process
+    @callback(
+        Output('stop-app-modal', 'is_open', allow_duplicate=True),
+        Input('stop-app-confirm-btn', 'n_clicks'),
+        prevent_initial_call=True,
+    )
+    def _stop_app_callback(n_clicks):
+        if n_clicks:
+            os._exit(0)
+        return no_update
 
     app_builder.start(args.port)
 
@@ -316,8 +438,3 @@ if __name__ == '__main__':
     # A. Make sure port is accessible, e.g. on Ubuntu: sudo ufw allow {args.port} and navigate to ip_addr:{args.port}
     # B. From another machine do port forwarding, e.g on Ubuntu: ssh -N -f -L $PORT:localhost:$PORT $HOST
     #    (where HOST is youruser@machine_address), the access from localhost:{args.port}/
-
-
-# Debugging notes (if Kaolin component is not loading)
-# from dash.development.base_component import ComponentRegistry
-# print(f'Component registry initial: {len(ComponentRegistry.registry)} components')

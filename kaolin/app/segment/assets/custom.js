@@ -13,6 +13,7 @@ const MessageTags = Object.freeze({
     // Outgoing from the server, received here
     SET_SEGMENTS: 'set_segments',
     DONE_WITH_MASK: 'done_with_mask',
+    DEBUG_TRACKING_VIEWS: 'debug_tracking_views',
 });
 
 
@@ -29,6 +30,17 @@ async function send_server_request(messageTag, content = {}) {
 async function send_mask_project_request(mask_canvas_id, action) {
     const mask = await kaolin.util.canvas.blobAlphaChannelFromCanvas(mask_canvas_id);
     await send_server_request(MessageTags.PROJECT, {
+        "mask": mask,
+        "action": action,
+    });
+}
+
+
+// Grab the current mask (alpha channel of the mask layer canvas) and send it
+// to the server as an aggregate action (e.g. "add_mask").
+async function send_aggregate_request(mask_canvas_id, action) {
+    const mask = await kaolin.util.canvas.blobAlphaChannelFromCanvas(mask_canvas_id);
+    await send_server_request(MessageTags.AGGREGATE, {
         "mask": mask,
         "action": action,
     });
@@ -205,9 +217,30 @@ const SegmentAction = Object.freeze({
             // The schema is the single source of truth for option defaults;
             // merge caller-supplied overrides on top of it.
             const merged = { ...defaultsFromSchema(SegControllerBehavior.schema), ...options };
-            super([MessageTags.SET_SEGMENTS, MessageTags.DONE_WITH_MASK]);
+            super([MessageTags.SET_SEGMENTS, MessageTags.DONE_WITH_MASK, MessageTags.DEBUG_TRACKING_VIEWS]);
             this.options = merged;
             this.segList = new SegmentList(this.options.listContainerId);
+            this._debugData = null;
+            const slider = document.getElementById('kaolin-debug-slider');
+            if (slider) {
+                slider.addEventListener('input', () => this._updateDebugView(Number(slider.value)));
+            }
+            const closeBtn = document.querySelector('#kaolin-debug-panel .btn-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    document.getElementById('kaolin-debug-panel')?.classList.remove('show');
+                    document.getElementById('kaolin-debug-toggle-btn')?.classList.remove('active');
+                });
+            }
+            document.addEventListener('click', (event) => {
+                const btn = event.target.closest('#kaolin-debug-toggle-btn');
+                if (!btn || btn.classList.contains('opacity-50')) return;
+                const panel = document.getElementById('kaolin-debug-panel');
+                if (!panel) return;
+                const opening = !panel.classList.contains('show');
+                panel.classList.toggle('show', opening);
+                document.getElementById('kaolin-debug-toggle-btn')?.classList.toggle('active', opening);
+            });
             this._registerEvents();
         }
 
@@ -221,6 +254,20 @@ const SegmentAction = Object.freeze({
                 if (this.options.switchToModeWhenDoneWithMask) {
                     kaolin.core.event.requestMode(this.options.switchToModeWhenDoneWithMask);
                 } 
+            } else if (messageTag === MessageTags.DEBUG_TRACKING_VIEWS) {
+                const count = messageContent.get('count');
+                if (!count) return;
+                const renders = messageContent.get('renders');
+                const masks = messageContent.get('masks');
+                this._debugData = { count, renders, masks };
+                const slider = document.getElementById('kaolin-debug-slider');
+                if (slider) {
+                    slider.max = count - 1;
+                    slider.value = 0;
+                }
+                this._updateDebugView(0);
+                const debugBtn = document.getElementById('kaolin-debug-toggle-btn');
+                if (debugBtn) debugBtn.classList.remove('opacity-50');
             }
         }
 
@@ -234,6 +281,17 @@ const SegmentAction = Object.freeze({
         // so the list stays a pure renderer. Listeners are delegated on `document`
         // and scoped to our container: they survive every re-render and tolerate
         // the container not yet existing at construction time.
+        _updateDebugView(idx) {
+            if (!this._debugData) return;
+            const { count, renders, masks } = this._debugData;
+            const label = document.getElementById('kaolin-debug-label');
+            const renderImg = document.getElementById('kaolin-debug-render');
+            const maskImg = document.getElementById('kaolin-debug-mask');
+            if (label) label.textContent = `Camera ${idx + 1} / ${count}`;
+            if (renderImg) renderImg.src = `data:image/jpeg;base64,${renders[idx]}`;
+            if (maskImg) maskImg.src = `data:image/png;base64,${masks[idx]}`;
+        }
+
         _registerEvents() {
             document.addEventListener('click', (event) => {
                 const container = this._containerEl();
@@ -634,3 +692,11 @@ class SegmentList {
         container.replaceChildren(list);
     }
 }
+
+// 'd' key: empty the 3D point selection.
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'd') return;
+    if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable]')) return;
+    event.preventDefault();
+    send_server_request(MessageTags.AGGREGATE, { action: 'clear_selection' });
+});

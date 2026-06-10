@@ -1,0 +1,17 @@
+/* Object list container: never let items grow wider than the sidebar. */
+#object-list-container {
+    min-width: 0;
+    overflow-x: hidden;
+    width: 100%;
+}
+
+#object-list-container .list-group {
+    width: 100%;
+    min-width: 0;
+}
+
+#object-list-container .list-group-item {
+    box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
+}

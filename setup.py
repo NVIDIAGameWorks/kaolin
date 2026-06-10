@@ -9,7 +9,7 @@
 import os
 from setuptools import setup, find_packages
 import importlib
-from pkg_resources import parse_version
+from packaging.version import parse as parse_version
 import warnings
 import logging
 import glob
@@ -154,7 +154,8 @@ def get_app_extras():
         req_file = os.path.join(app_dir, app_name, 'requirements.txt')
         if os.path.isfile(req_file):
             with open(req_file) as f:
-                reqs = [l.strip() for l in f if l.strip() and not l.startswith('#')]
+                reqs = [l.strip() for l in f if l.strip() and not l.startswith('#')
+                    and not l.strip().startswith(('git+', 'hg+', 'svn+', 'bzr+'))]
             extras[f'app.{app_name}'] = reqs
     return extras
 

@@ -175,9 +175,9 @@ class DisjointSegmentation:
             logger.warning(f'Cannot rename background segment.')
             return None
 
-        segment = self.get_segment(name)
-        self.delete_segment(name)
-        new_name = self.create_segment(new_name, segment.mask)
+        segment = self.segments.pop(name)
+        segment.name = new_name
+        self.segments[new_name] = segment
         self.id_generator.reset_ids(self.segments.keys())
         return new_name
 
