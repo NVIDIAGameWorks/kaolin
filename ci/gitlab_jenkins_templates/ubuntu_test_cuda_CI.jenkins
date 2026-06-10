@@ -85,6 +85,7 @@ KNOWN_BAD_DRIVERS = [
         "560.35.03",
     ],
     "12.8": [
+        "565.75",
         "570.14",
         "570.19",
         "570.86.10",
@@ -184,7 +185,7 @@ GPU_MIN_CUDA = [
         "GA100-E4720-POR",
         "GA104-300-PG142-SKU10-TS3",
         "GA107-PG179-SKU200-TS2",
-        "GeForce_RTX_2070_SUPER",
+        // "GeForce_RTX_2070_SUPER", // not enough VRAM
         "GeForce_RTX_2080_Ti",
         "GeForce_RTX_3060_Ti",
         "GeForce_RTX_3070",
@@ -299,6 +300,10 @@ spec:
     env:
     - name: NVIDIA_DRIVER_CAPABILITIES
       value: "all"
+    - name: K8S_NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
     resources:
         requests:
           nvidia.com/gpu: 1
@@ -382,6 +387,8 @@ echo "Driver compat OK: cuda=\$CUDA need>=\$MIN have=\$DRV (max claimed: \$DRV_M
         def build_passed = true
         try {
           stage('Disp info') {
+            sh 'echo "Node: $K8S_NODE_NAME"'
+            echo "Image: ${imageTag}"
             sh 'nvidia-smi'
             sh 'nvidia-smi --query-gpu=name,driver_version --format=csv'
             sh 'python --version'
@@ -514,14 +521,12 @@ echo "Driver compat OK: cuda=\$CUDA need>=\$MIN have=\$DRV (max claimed: \$DRV_M
                   PYTHON_VERSION=`python --version`
                   PYTHON_MINOR=`echo "$PYTHON_VERSION" | cut -d'.' -f2`
                   if [[ "$PYTHON_MINOR" -ge "11" && "$PYTHON_MINOR" -lt "14" ]]; then
-                      export CONDA_NO_PLUGINS=true
-                      DEBIAN_FRONTEND=noninteractive add-apt-repository ppa:ubuntu-toolchain-r/test
-                      DEBIAN_FRONTEND=noninteractive apt-get install -y gcc-11 g++-11
-                      conda config --set solver classic
-                      conda install -c conda-forge mesa-libgl-devel-cos7-x86_64 -y
-                      cd /tmp && git clone --recursive https://github.com/nv-tlabs/3dgrut
-                      cd /tmp/3dgrut && cp /kaolin/tests/python/examples/install_only_3dgrut.sh . && ./install_only_3dgrut.sh base WITH_GCC11
-                      export MAX_JOBS=1
+                      git clone --recursive https://github.com/nv-tlabs/3dgrut -b v1.1.0 /tmp/3dgrut
+                      cd /tmp/3dgrut/ && MAX_JOBS=1 pip install -e .[dev,gui]
+                      SLANGC_VERSION="2026.5.2"
+                      DOWNLOAD_URL="https://github.com/shader-slang/slang/releases/download/v${SLANGC_VERSION}/slang-${SLANGC_VERSION}-linux-x86_64.tar.gz"
+                      wget -O /tmp/$(basename $DOWNLOAD_URL) $DOWNLOAD_URL
+                      tar -xzf /tmp/$(basename $DOWNLOAD_URL) -C /usr/local/
                       cd /kaolin/examples/tutorial/physics/ && ipython simulatable_3dgrut.ipynb
                   fi
             '''

@@ -171,6 +171,7 @@ def _wp_bsr_to_torch_bsr(mat):  # pragma: no cover
         col_indices=wp.to_torch(mat.columns[: mat.nnz]),
         values=wp.to_torch(mat.values[: mat.nnz]),
         size=mat.shape,
+        check_invariants=False
     )
     return torch_weights
 
@@ -217,6 +218,7 @@ def _bsr_to_torch(mat: wps.BsrMatrix):  # pragma: no cover
         col_indices=wp.to_torch(mat.columns)[: mat.nnz],
         values=wp.to_torch(mat.values)[: mat.nnz],
         size=mat.shape,
+        check_invariants=False
     )
     return torch_weights
 
