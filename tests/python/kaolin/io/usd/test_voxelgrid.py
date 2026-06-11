@@ -121,7 +121,7 @@ class TestVoxelGrid:
 
     def test_export_overwrite_pointcloud(self, out_dir, voxelgrid, golden_path):
         out_path = os.path.join(out_dir, 'exported_overwrite_pointcloud.usda')
-        usd.export_pointcloud(out_path, pointcloud=torch.rand((100, 3)))
+        usd.export_pointcloud(out_path, points=torch.rand((100, 3)))
         usd.export_voxelgrid(out_path, voxelgrid=voxelgrid, scene_path=self.scene_path, overwrite=True)
         assert filecmp.cmp(out_path, golden_path)
 

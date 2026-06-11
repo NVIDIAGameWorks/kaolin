@@ -44,7 +44,7 @@ def mesh_path():
 
 @pytest.fixture(scope='module')
 def pointcloud():
-    pointcloud, color, normals = usd.import_pointcloud(
+    pointcloud, color, normals, transform = usd.import_pointcloud(
         os.path.join(__samples_path, 'rocket_pointcloud_GeomPoints.usda'),
         '/World/pointcloud')
     return pointcloud

@@ -80,7 +80,7 @@ def _get_gaussiancloud(prim, time):
         output['sh_coeff'] = torch.tensor(np.asarray(gaussian.GetRadianceSphericalHarmonicsCoefficientshAttr().Get(time=time))).reshape(-1, num_coeffs, 3)
     return output    
 
-def import_gaussianclouds(file_path_or_stage, scene_paths=None, times=None):
+def import_gaussianclouds(file_path_or_stage, scene_paths=None, times=None, return_list=True):
     r"""Import gaussians from Usd file.
 
     Args:
@@ -91,12 +91,17 @@ def import_gaussianclouds(file_path_or_stage, scene_paths=None, times=None):
         times (list of Float or Float, optional):
             Positive integer defining the time at which the supplied parameters
             correspond to.
+        return_list (bool, optional): If ``True`` (default), return a ``list`` of
+            :class:`~kaolin.rep.GaussianSplatModel` in the order of ``scene_paths``. If ``False``,
+            return a ``dict`` keyed by scene path.
 
     Returns:
-        (dict of str to GaussianSplatModel):
-            Dictionary mapping each scene path to a :class:`~kaolin.rep.GaussianSplatModel`.
-            Each model's ``transform`` is set to the computed local-to-world matrix of shape
-            :math:`(4, 4)`, or ``None`` if the prim has an identity transform.
+        (list or dict of GaussianSplatModel):
+            Either a list of :class:`~kaolin.rep.GaussianSplatModel` (when ``return_list=True``,
+            the default), or a ``dict[str, GaussianSplatModel]`` keyed by scene path (when
+            ``return_list=False``). Each model's ``transform`` is set to the computed
+            local-to-world matrix of shape :math:`(4, 4)`, or ``None`` if the prim has an
+            identity transform.
     """
     stage = _get_stage_from_maybe_file(file_path_or_stage)
     try:
@@ -119,12 +124,14 @@ def import_gaussianclouds(file_path_or_stage, scene_paths=None, times=None):
             attrs = _get_gaussiancloud(prim, time)
             tfm = get_local_to_world_transform(stage, prim, time)
             tfm = tfm.float() if tfm is not None else None
-            output[scene_path] = GaussianSplatModel(**attrs, transform=tfm, strict_checks=False)
+            output[str(scene_path)] = GaussianSplatModel(**attrs, transform=tfm, strict_checks=False)
     finally:
         del stage, file_path_or_stage
+    if return_list:
+        return list(output.values())
     return output
 
-def import_gaussiancloud(file_path_or_stage, root_path=None, time=None):
+def import_gaussiancloud(file_path_or_stage, scene_path=None, time=None):
     r"""Import all gaussianclouds from a USD file, apply their transforms, and merge into a single world-space cloud.
 
     Each prim's ``local_to_world`` transform (if not identity) is applied to positions,
@@ -135,7 +142,7 @@ def import_gaussiancloud(file_path_or_stage, root_path=None, time=None):
     Args:
         file_path_or_stage (Usd.Stage or str):
             Path to usd file (\*.usd, \*.usda) or :class:`Usd.Stage`.
-        root_path (str, optional):
+        scene_path (str, optional):
             If specified, only import gaussians under this scene path prefix.
             Default: import all gaussians in the file.
         time (convertible to float, optional):
@@ -145,28 +152,28 @@ def import_gaussiancloud(file_path_or_stage, root_path=None, time=None):
         (GaussianSplatModel):
             A single merged gaussian cloud object, or ``None`` if no gaussian clouds are found.
     """
-    scene_paths = get_gaussiancloud_scene_paths(file_path_or_stage, root_path=root_path)
-    clouds = import_gaussianclouds(file_path_or_stage, scene_paths, times=time)
+    scene_paths = get_gaussiancloud_scene_paths(file_path_or_stage, scene_path=scene_path)
+    clouds = import_gaussianclouds(file_path_or_stage, scene_paths, times=time, return_list=True)
     if len(clouds) == 0:
         return None
 
     # Note, transform is applied by default during GaussianSplatModel.cat
-    return GaussianSplatModel.cat(list(clouds.values()))
+    return GaussianSplatModel.cat(clouds)
 
 
-def get_gaussiancloud_scene_paths(file_path_or_stage, root_path=None):
+def get_gaussiancloud_scene_paths(file_path_or_stage, scene_path=None):
     r"""Returns all gaussian cloud scene paths contained in specified file.
     Assuming ParticleField3DGaussianSplat.
 
     Args:
         file_path_or_stage (str or Usd.Stage):
             Path to usd file (\*.usd, \*.usda) or :class:`Usd.Stage`.
-        root_path (str, optional): If specified, only return paths under this scene path prefix.
+        scene_path (str, optional): If specified, only return paths under this scene path prefix.
 
     Returns:
         (list of str): List of filtered scene paths.
     """
-    scene_path_regex = f"{re.escape(root_path)}(/|$)" if root_path is not None else None
+    scene_path_regex = f"{re.escape(scene_path)}(/|$)" if scene_path is not None else None
     stage = _get_stage_from_maybe_file(file_path_or_stage)
     try:
         gaussians_paths = get_scene_paths(stage, prim_types=['ParticleField3DGaussianSplat'],

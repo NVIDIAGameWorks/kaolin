@@ -81,9 +81,9 @@ class TestGaussianExportImport:
 
         if with_stage:
             stage = Usd.Stage.Open(out_path)
-            imported = usd.import_gaussianclouds(stage, [scene_path])
+            imported = usd.import_gaussianclouds(stage, [scene_path], return_list=False)
         else:
-            imported = usd.import_gaussianclouds(out_path, [scene_path])
+            imported = usd.import_gaussianclouds(out_path, [scene_path], return_list=False)
 
         assert contained_torch_equal(
             {scene_path: data},
@@ -119,9 +119,9 @@ class TestGaussianExportImport:
 
         if with_stage:
             stage = Usd.Stage.Open(out_path)
-            imported = usd.import_gaussianclouds(stage, [scene_path])
+            imported = usd.import_gaussianclouds(stage, [scene_path], return_list=False)
         else:
-            imported = usd.import_gaussianclouds(out_path, [scene_path])
+            imported = usd.import_gaussianclouds(out_path, [scene_path], return_list=False)
 
         assert contained_torch_equal(
             {scene_path: {**data, 'transform': transform}},
@@ -211,10 +211,10 @@ class TestGaussianExportImport:
         stage.Save()
 
         if with_stage:
-            reimported = usd.import_gaussianclouds(stage)
+            reimported = usd.import_gaussianclouds(stage, return_list=False)
         else:
             del stage
-            reimported = usd.import_gaussianclouds(out_path)
+            reimported = usd.import_gaussianclouds(out_path, return_list=False)
 
         assert contained_torch_equal(
             clouds,
@@ -223,6 +223,49 @@ class TestGaussianExportImport:
             rtol=1e-5,
             atol=1e-6,
             print_error_context='Failed add roundtrip '
+        )
+
+    @pytest.mark.parametrize('with_stage', [True, False])
+    def test_import_gaussianclouds_default_returns_list(self, out_dir, with_stage):
+        """import_gaussianclouds returns a list by default (return_list=True), in scene_paths order."""
+        clouds = {
+            '/World/Gaussians/gaussian_0': make_synthetic_gaussian_cloud(n=8, seed=0),
+            '/World/Gaussians/gaussian_1': make_synthetic_gaussian_cloud(n=5, seed=42),
+        }
+
+        out_path = os.path.join(out_dir, 'gaussian_default_list.usdc')
+        stage = usd.create_stage(out_path)
+        for scene_path, cloud in clouds.items():
+            usd.add_gaussiancloud(
+                stage,
+                scene_path,
+                positions=cloud['positions'],
+                orientations=cloud['orientations'],
+                scales=cloud['scales'],
+                opacities=cloud['opacities'],
+                sh_coeff=cloud['sh_coeff'],
+            )
+        stage.Save()
+
+        if with_stage:
+            result = usd.import_gaussianclouds(stage)
+            scene_paths = usd.get_gaussiancloud_scene_paths(stage)
+        else:
+            del stage
+            result = usd.import_gaussianclouds(out_path)
+            scene_paths = usd.get_gaussiancloud_scene_paths(out_path)
+
+        assert isinstance(result, list)
+        assert len(result) == len(clouds)
+        # The list must follow scene_paths order.
+        expected = [clouds[str(sp)] for sp in scene_paths]
+        assert contained_torch_equal(
+            expected,
+            [r.as_dict(only_tensors=True) for r in result],
+            approximate=True,
+            rtol=1e-5,
+            atol=1e-6,
+            print_error_context='Default list return mismatch '
         )
 
     @pytest.mark.parametrize('with_stage', [True, False])
@@ -352,8 +395,8 @@ class TestGaussianExportImport:
                                      approximate=True, rtol=1e-5, atol=1e-5)
 
     @pytest.mark.parametrize('with_stage', [True, False])
-    def test_import_gaussiancloud_root_path(self, out_dir, with_stage):
-        """import_gaussiancloud with root_path merges only clouds under that prefix."""
+    def test_import_gaussiancloud_scene_path(self, out_dir, with_stage):
+        """import_gaussiancloud with scene_path merges only clouds under that prefix."""
         cloud_foo_0 = make_synthetic_gaussian_cloud(n=8, seed=0)
         cloud_foo_1 = make_synthetic_gaussian_cloud(n=5, seed=42)
         cloud_bar_0 = make_synthetic_gaussian_cloud(n=6, seed=7)
@@ -373,10 +416,10 @@ class TestGaussianExportImport:
         stage.Save()
 
         if with_stage:
-            merged = usd.import_gaussiancloud(stage, root_path='/World/Foo')
+            merged = usd.import_gaussiancloud(stage, scene_path='/World/Foo')
         else:
             del stage
-            merged = usd.import_gaussiancloud(out_path, root_path='/World/Foo')
+            merged = usd.import_gaussiancloud(out_path, scene_path='/World/Foo')
         assert merged is not None
         assert merged.positions.shape[0] == 8 + 5
 
@@ -411,8 +454,8 @@ class TestGaussianExportImport:
         assert actual_strs == expected_strs
 
     @pytest.mark.parametrize('with_stage', [True, False])
-    def test_get_gaussiancloud_scene_paths_root_path(self, out_dir, with_stage):
-        """get_gaussiancloud_scene_paths with root_path returns only paths under that prefix"""
+    def test_get_gaussiancloud_scene_paths_scene_path(self, out_dir, with_stage):
+        """get_gaussiancloud_scene_paths with scene_path returns only paths under that prefix"""
         foo_paths = ['/World/Foo/gaussian_0', '/World/Foo/gaussian_1']
         bar_paths = ['/World/Bar/gaussian_0']
         all_scene_paths = foo_paths + bar_paths
@@ -433,10 +476,10 @@ class TestGaussianExportImport:
         stage.Save()
 
         if with_stage:
-            actual = usd.get_gaussiancloud_scene_paths(stage, root_path='/World/Foo')
+            actual = usd.get_gaussiancloud_scene_paths(stage, scene_path='/World/Foo')
         else:
             del stage
-            actual = usd.get_gaussiancloud_scene_paths(out_path, root_path='/World/Foo')
+            actual = usd.get_gaussiancloud_scene_paths(out_path, scene_path='/World/Foo')
         assert set(str(p) for p in actual) == set(foo_paths)
 
 
@@ -462,9 +505,9 @@ class TestGaussianImportFromToys:
         path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
         scene_paths = usd.get_gaussiancloud_scene_paths(path)
 
-        gaussianclouds = usd.import_gaussianclouds(path, scene_paths)
+        gaussianclouds = usd.import_gaussianclouds(path, scene_paths, return_list=False)
 
-        assert set(gaussianclouds.keys()) == set(scene_paths)
+        assert set(gaussianclouds.keys()) == set(str(p) for p in scene_paths)
         for cloud in gaussianclouds.values():
             assert cloud.check_sanity(log_error=True)
 
@@ -472,7 +515,7 @@ class TestGaussianImportFromToys:
     def test_import_gaussianclouds_all(self, toy_name):
         """import_gaussianclouds with default scene_pathsreturns dict mapping scene path to cloud."""
         path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
-        all_clouds = usd.import_gaussianclouds(path)
+        all_clouds = usd.import_gaussianclouds(path, return_list=False)
 
         scene_paths = usd.get_gaussiancloud_scene_paths(path)
 
@@ -486,7 +529,7 @@ class TestGaussianImportFromToys:
         path = os.path.join(SCANNED_TOYS_PATH, f'{toy_name}.usdc')
         scene_paths = usd.get_gaussiancloud_scene_paths(path)
 
-        imported = usd.import_gaussianclouds(path, scene_paths)
+        imported = usd.import_gaussianclouds(path, scene_paths, return_list=False)
         # Test round-trip for the first gaussian cloud
         cloud = imported['/World/Gaussians/gaussian_0']
 
@@ -502,7 +545,7 @@ class TestGaussianImportFromToys:
             overwrite=True,
         )
 
-        reimported = usd.import_gaussianclouds(out_path, ['/World/Gaussians/gaussian_0'])
+        reimported = usd.import_gaussianclouds(out_path, ['/World/Gaussians/gaussian_0'], return_list=False)
 
         assert contained_torch_equal(
             {'/World/Gaussians/gaussian_0': cloud_dict},
@@ -536,7 +579,7 @@ class TestGaussianImportFromToys:
         expected['orientations'] = torch.nn.functional.normalize(expected['orientations'])
 
         scene_paths = ['/World/Gaussians/gaussian_0']
-        actual = usd.import_gaussianclouds(path, scene_paths)
+        actual = usd.import_gaussianclouds(path, scene_paths, return_list=False)
         assert len(actual) == 1
         assert contained_torch_equal(
             {k: v.as_dict(only_tensors=True) for k, v in actual.items()},
@@ -558,7 +601,7 @@ class TestGaussianImportFromToys:
             del expected['local_to_world']
         expected['orientations'] = torch.nn.functional.normalize(expected['orientations'])
 
-        actual = usd.import_gaussianclouds(path)
+        actual = usd.import_gaussianclouds(path, return_list=False)
         assert len(actual) == 1
         assert contained_torch_equal(
             actual['/World/Gaussians/gaussian_0'].as_dict(only_tensors=True), expected,
@@ -586,7 +629,7 @@ class TestGaussianImportFromToys:
         gt['orientations'] = torch.nn.functional.normalize(gt['orientations'])
 
         scene_paths = ['/World/Gaussians/BluehairRagdoll_0']
-        output = usd.import_gaussianclouds(path, scene_paths)
+        output = usd.import_gaussianclouds(path, scene_paths, return_list=False)
 
         expected = {'/World/Gaussians/BluehairRagdoll_0': gt}
         
@@ -608,7 +651,7 @@ class TestGaussianImportFromToys:
                                    [0, 0, -2, 0],
                                    [0, 2, 0, 0],
                                    [0, 0, 0, 1]], dtype=torch.float32)
-        output = usd.import_gaussianclouds(path)
+        output = usd.import_gaussianclouds(path, return_list=False)
 
         expected = {
             '/World/Gaussians/BluehairRagdoll_0': gt,
@@ -634,7 +677,7 @@ class TestGaussianImportFromToys:
                                   [0, 2, 0, 0],
                                   [0, 0, 0, 1]], dtype=torch.float32)
         scene_paths = ['/World/Gaussians/BluehairRagdoll_1']
-        output = usd.import_gaussianclouds(path, scene_paths)
+        output = usd.import_gaussianclouds(path, scene_paths, return_list=False)
 
         gt_half = {k: v.half() if v is not None else None for k, v in gt.items()}
         expected = {'/World/Gaussians/BluehairRagdoll_1': {**gt_half, 'transform': transform}}
@@ -657,7 +700,7 @@ class TestGaussianImportFromToys:
                                   [0, 0, -2, 0],
                                   [0, 2, 0, 0],
                                   [0, 0, 0, 1]], dtype=torch.float32)
-        output = usd.import_gaussianclouds(path)
+        output = usd.import_gaussianclouds(path, return_list=False)
 
         gt_half = {k: v.half() if v is not None else None for k, v in gt.items()}
         expected = {
