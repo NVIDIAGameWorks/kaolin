@@ -1,4 +1,4 @@
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -53,7 +53,7 @@ class TestSimpleBase:
             [[[1, 2, 3, 3, 0], [0, 1, 3, 6, 9]],
              [[1, 1, 3, 13, 0], [0, 1, 2, 5, 18]]], dtype=torch.int32)
         expected_exsum = torch.tensor(
-            [0, 2, 4, 5, 6, 7, 8, 0, 1, 4, 5, 13, 17],
+            [2, 4, 5, 6, 7, 8, 1, 4, 5, 13, 17],
             dtype=torch.int32, device='cuda')
         max_level, pyramids, exsum = scan_octrees(octrees, lengths)
         assert max_level == 3
@@ -103,8 +103,7 @@ class TestBase:
         octree_start_idx = 0
         num_childrens_per_level = []
         levels_first_idx = []
-        expected_exsum = torch.zeros((num_childrens_per_node.shape[0] +
-                                      lengths.shape[0], ),
+        expected_exsum = torch.zeros((num_childrens_per_node.shape[0], ),
                                       dtype=torch.int32)
         for bs, length in enumerate(lengths):
             cur_num_childrens_per_node = \
@@ -120,8 +119,8 @@ class TestBase:
             levels_first_idx[-1].append(levels_first_idx[-1][-1] +
                                         num_childrens_per_level[-1][-1])
             num_childrens_per_level[-1].append(0);
-            # + bs + 1 because torch.cumsum is inclusive
-            expected_exsum[octree_start_idx + bs + 1:octree_start_idx + bs + 1 + length] = \
+            # current exsum layout: per-octree inclusive cumsum, length num_bytes
+            expected_exsum[octree_start_idx:octree_start_idx + length] = \
                 torch.cumsum(cur_num_childrens_per_node, dim=0)
             octree_start_idx += length
         num_childrens_per_level = torch.tensor(num_childrens_per_level, dtype=torch.int32)

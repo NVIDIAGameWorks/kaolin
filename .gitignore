@@ -31,6 +31,7 @@ node_modules/
 .vscode/launch.json
 .vscode/settings.json
 .vscode/tasks.json
+.devcontainer
 *.sw*
 *.ipynb_checkpoints
 
@@ -51,3 +52,9 @@ kaolin/physics/simplicits/output/
 kaolin/physics/sparsified/
 output/
 assets/fiscus.ply
+
+# Claude Code — local & branch-agnostic, never committed/merged
+CLAUDE.md
+CLAUDE.local.md
+**/CLAUDE.md
+.claude/

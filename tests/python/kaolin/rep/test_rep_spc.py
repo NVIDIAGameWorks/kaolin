@@ -1,4 +1,4 @@
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,7 +57,7 @@ class TestSpc:
     @pytest.fixture(autouse=True)
     def expected_exsum(self):
         return torch.tensor(
-            [0, 2, 4, 5, 6, 7, 8, 0, 1, 4, 5, 13, 17],
+            [2, 4, 5, 6, 7, 8, 1, 4, 5, 13, 17],
             dtype=torch.int32, device='cuda')
 
     @pytest.fixture(autouse=True)

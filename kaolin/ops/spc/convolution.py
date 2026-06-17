@@ -1,4 +1,4 @@
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,7 @@ import torch
 
 from kaolin import _C
 from kaolin.rep import Spc
+from .exsum_compat import ensure_current_exsum, octree_byte_lengths_from_pyramid
 
 __all__ = [
     'conv3d',
@@ -91,8 +92,10 @@ def conv3d(octrees, point_hierarchies, level, pyramids, exsum, input,
             of shape :math:`(\text{batch_size}, 2, \text{max_level}+2)`.
             See :ref:`pyramids <spc_pyramids>`.
         exsum (torch.IntTensor):
-            Tensor containing the :ref:`packed` exclusive sum of the bit
-            counts of individual octrees of shape :math:`(\text{num_bytes} + \text{batch_size})`.
+            Tensor containing the :ref:`packed` inclusive sum of the bit
+            counts of individual octrees of shape :math:`(\text{num_bytes})`. The deprecated
+            legacy layout of shape :math:`(\text{num_bytes} + \text{batch_size})` is also
+            accepted (with a warning).
             See :ref:`exsum <spc_exsum>`.
         input (torch.FloatTensor):
             :ref:`packed` input feature data of the octrees,
@@ -129,6 +132,8 @@ def conv3d(octrees, point_hierarchies, level, pyramids, exsum, input,
     if (weight.shape[0] == 1 and jump == 0):
         outputs = input.mm(weight.squeeze(0))
     else:
+        exsum = ensure_current_exsum(
+            exsum, octree_byte_lengths_from_pyramid(pyramids), "conv3d")
         outputs, level = Conv3dFunction.apply(octrees, point_hierarchies, level,
                                               pyramids, exsum, input, weight,
                                               kernel_vectors, jump)
@@ -212,8 +217,10 @@ class Conv3d(nn.Module):
                 See :ref:`pyramids <spc_pyramids>`.
 
             exsum (torch.IntTensor):
-                Tensor containing the :ref:`packed` exclusive sum of the bit
-                counts of individual octrees of shape :math:`(\text{num_bytes} + \text{batch_size})`.
+                Tensor containing the :ref:`packed` inclusive sum of the bit
+                counts of individual octrees of shape :math:`(\text{num_bytes})`. The deprecated
+                legacy layout of shape :math:`(\text{num_bytes} + \text{batch_size})` is also
+                accepted (with a warning).
                 See :ref:`exsum <spc_exsum>`.
 
             input (torch.FloatTensor):
@@ -313,8 +320,10 @@ def conv_transpose3d(octrees, point_hierarchies, level, pyramids, exsum,
             See :ref:`pyramids <spc_pyramids>`.
 
         exsum (torch.IntTensor):
-            Tensor containing the :ref:`packed` exclusive sum of the bit
-            counts of individual octrees of shape :math:`(\text{num_bytes} + \text{batch_size})`.
+            Tensor containing the :ref:`packed` inclusive sum of the bit
+            counts of individual octrees of shape :math:`(\text{num_bytes})`. The deprecated
+            legacy layout of shape :math:`(\text{num_bytes} + \text{batch_size})` is also
+            accepted (with a warning).
             See :ref:`exsum <spc_exsum>`.
 
         input (torch.FloatTensor):
@@ -348,6 +357,8 @@ def conv_transpose3d(octrees, point_hierarchies, level, pyramids, exsum,
     if (weight.shape[0] == 1 and jump == 0):
         outputs = input.mm(weight.squeeze(0))
     else:
+        exsum = ensure_current_exsum(
+            exsum, octree_byte_lengths_from_pyramid(pyramids), "conv_transpose3d")
         outputs, level = ConvTranspose3dFunction.apply(octrees, point_hierarchies, level, pyramids,
                                                        exsum, input, weight, kernel_vectors, jump)
     if bias is not None:
@@ -433,8 +444,10 @@ class ConvTranspose3d(nn.Module):
                 See :ref:`pyramids <spc_pyramids>`.
 
             exsum (torch.IntTensor):
-                Tensor containing the :ref:`packed` exclusive sum of the bit
-                counts of individual octrees of shape :math:`(\text{num_bytes} + \text{batch_size})`.
+                Tensor containing the :ref:`packed` inclusive sum of the bit
+                counts of individual octrees of shape :math:`(\text{num_bytes})`. The deprecated
+                legacy layout of shape :math:`(\text{num_bytes} + \text{batch_size})` is also
+                accepted (with a warning).
                 See :ref:`exsum <spc_exsum>`.
 
             input (torch.FloatTensor):

@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -91,7 +91,7 @@ std::tuple<int, at::Tensor, at::Tensor> scan_octrees_cuda(
   // allocate local GPU storage
   at::Tensor num_childrens_per_node = at::zeros({ max_num_nodes },
                                                  octrees.options().dtype(at::kInt));
-  at::Tensor prefix_sum = at::zeros({ total_num_nodes + batch_size },
+  at::Tensor prefix_sum = at::zeros({ total_num_nodes },
                                     octrees.options().dtype(at::kInt));
   at::Tensor pyramid = at::zeros({ batch_size, 2, KAOLIN_SPC_MAX_LEVELS + 2 },
                                  at::device(at::kCPU).dtype(at::kInt));

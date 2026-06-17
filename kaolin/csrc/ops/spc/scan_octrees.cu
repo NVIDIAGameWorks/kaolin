@@ -1,4 +1,4 @@
-// Copyright (c) 2021,22 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,66 +51,57 @@ int scan_octrees_cuda_impl(
   uint8_t* octrees_ptr = octrees.data_ptr<uint8_t>();
   uint* num_childrens_per_node_ptr = reinterpret_cast<uint*>(num_childrens_per_node.data_ptr<int>());
   uint* prefix_sum_ptr = reinterpret_cast<uint*>(prefix_sum.data_ptr<int>());
-  int* pyramid_ptr = pyramid.data_ptr<int>();
+  auto pyramid_acc = pyramid.accessor<int, 3>();
   
   void* temp_storage_ptr = NULL;
   uint64_t temp_storage_bytes = get_cub_storage_bytes(
-        temp_storage_ptr, num_childrens_per_node_ptr, prefix_sum_ptr + 1, num_childrens_per_node.size(0));
+        temp_storage_ptr, num_childrens_per_node_ptr, prefix_sum_ptr, num_childrens_per_node.size(0));
   at::Tensor temp_storage = at::zeros({(int64_t) temp_storage_bytes },
                                       octrees.options().dtype(at::kByte));
   temp_storage_ptr = (void*) temp_storage.data_ptr<uint8_t>();
 
-  // TODO: document better
+  // octree, prefix_sum head pointers for each batch
   uint* EX0 = prefix_sum_ptr;
   uint8_t* O0 = octrees_ptr;
-  int* h0 = pyramid_ptr;
+
   int level;
 
   for (int batch = 0; batch < batch_size; batch++) {
-    uint8_t*  O = O0;
-    uint*   S = EX0 + 1;
     uint  osize = lengths[batch].item<int>();
 
-    // compute exclusive sum 1 element beyond end of list to get inclusive sum starting at prefix_sum_ptr+1
+    // compute bit counts of each octree byte
     scan_nodes_cuda_kernel<<< (osize + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >>>(
         osize, O0, num_childrens_per_node_ptr);
+    // compute inclusive sum of bit counts
     CubDebugExit(cub::DeviceScan::InclusiveSum(
         temp_storage_ptr, temp_storage_bytes, num_childrens_per_node_ptr,
-        EX0 + 1, osize));
+        EX0, osize));
 
-    int* Pmid = h0;
-    int* PmidSum = h0 + KAOLIN_SPC_MAX_LEVELS + 2;
-
-    int Lsize = 1;
     uint currSum, prevSum = 0;
 
-    uint sum = Pmid[0] = Lsize;
-    PmidSum[0] = 0;
-    PmidSum[1] = Lsize;
+    pyramid_acc[batch][0][0] = 1;
+    pyramid_acc[batch][1][0] = 0;
+    pyramid_acc[batch][1][1] = 1;
 
-    level = 0;
-    while (sum <= osize) {
-      O += Lsize;
-      S += Lsize;
-
-      cudaMemcpy(&currSum, EX0 + prevSum + 1, sizeof(uint), cudaMemcpyDeviceToHost);
+    level = 1;
+    while (pyramid_acc[batch][1][level] <= osize) {
+      cudaMemcpy(&currSum, EX0 + prevSum, sizeof(uint), cudaMemcpyDeviceToHost);
       AT_CUDA_CHECK(cudaGetLastError());
 
-      Lsize = currSum - prevSum;
-      prevSum = currSum;
+      pyramid_acc[batch][0][level] = currSum - prevSum;
+      pyramid_acc[batch][1][level+1] = pyramid_acc[batch][0][level] + pyramid_acc[batch][1][level];
 
-      Pmid[++level] = Lsize;
-      sum += Lsize;
-      PmidSum[level + 1] = sum;
+      prevSum = currSum;
+      level++;
     }
 
     O0 += osize;
-    EX0 += (osize + 1);
-    h0 += 2 * (KAOLIN_SPC_MAX_LEVELS + 2);
+    EX0 += osize;
   }
+
   AT_CUDA_CHECK(cudaGetLastError());
 
-  return level;
+  return level-1;
 }
 
 }  // namespace kaolin

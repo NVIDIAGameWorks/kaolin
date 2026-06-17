@@ -72,6 +72,7 @@ def run_apidoc(_):
             "kaolin/ops/gaussians/transforms.py",
             "kaolin/ops/spc/spc.py",
             "kaolin/ops/spc/convolution.py",
+            "kaolin/ops/spc/exsum_compat.py",
             "kaolin/ops/spc/points.py",
             "kaolin/ops/spc/uint8.py",
             "kaolin/ops/spc/raytraced_spc_dataset.py",

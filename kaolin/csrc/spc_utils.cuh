@@ -1,4 +1,4 @@
-// Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES.
+// Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES.
 // All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,7 +48,7 @@ static inline __device__ int32_t identify(
         {
             // count set bits up to child - inclusive sum
             uint cnt = __popc(bits & ((0x2 << child_idx) - 1));
-            ord = prefix_sum[ord] + cnt;
+            ord = ((ord == 0) ? 0 : prefix_sum[ord-1]) + cnt;
             if (depth == 0) {
                 return ord;
             }
@@ -89,7 +89,7 @@ static inline __device__ void identify_multiscale(
         {
             // count set bits up to child - inclusive sum
             uint cnt = __popc(bits & ((0x2 << child_idx) - 1));
-            ord = prefix_sum[ord] + cnt;
+            ord = ((ord == 0) ? 0 : prefix_sum[ord-1]) + cnt;
             pidx[l+1] = ord;
         } else {
             // Miss, populate with -1
@@ -126,7 +126,7 @@ static inline __device__ int32_t identify(
 
     // count set bits up to child - inclusive sum
     uint32_t cnt = __popc(bits&((0x2 << child_idx) - 1));
-    ord = Exsum[prev];
+    ord = (prev == 0) ? 0 : Exsum[prev-1];
 
     // if bit set, keep going
     if (bits&(0x1 << child_idx))

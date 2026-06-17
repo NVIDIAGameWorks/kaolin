@@ -1,4 +1,4 @@
-# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES.
+# Copyright (c) 2024-2026 NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +17,7 @@ import torch
 import numpy as np
 import kaolin.ops.spc as spc
 from kaolin import _C
+from .exsum_compat import ensure_current_exsum
 
 
 class BFReconstructionTerminatedException(Exception):
@@ -395,8 +396,10 @@ def unbatched_query(octree, empty, exsum, query_coords, level):
     Args:
         octree (torch.ByteTensor): The octree, of shape :math:`(\text{num_bytes})`.
         empty (torch.ByteTensor): The empty octree encoding state of empty space, of shape :math:`(\text{num_bytes})`.
-        exsum (torch.IntTensor): The exclusive sum of the octree bytes,
-                                 of shape :math:`(\text{num_bytes} + 1)`.
+        exsum (torch.IntTensor): The inclusive sum of the octree bytes,
+                                 of shape :math:`(\text{num_bytes})`. The deprecated legacy
+                                 layout of shape :math:`(\text{num_bytes} + 1)` is also
+                                 accepted (with a warning).
                                  See :ref:`spc_exsum` for more details.
         query_coords (torch.FloatTensor or torch.IntTensor): 
             A tensor of locations to sample of shape :math:`(\text{num_query}, 3)`. If the tensor is
@@ -418,6 +421,9 @@ def unbatched_query(octree, empty, exsum, query_coords, level):
         input_coords = (query_coords.float() / (2**level)) * 2.0 - 1.0
     else:
         input_coords = query_coords
+
+    exsum = ensure_current_exsum(
+        exsum, torch.tensor([octree.shape[0]], dtype=torch.long), "unbatched_query")
 
     return _C.ops.spc.query_cuda_empty(octree.contiguous(), empty.contiguous(), exsum.contiguous(),
                                        input_coords.contiguous(), level).long()
