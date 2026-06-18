@@ -12,12 +12,12 @@ def defaultWheelsPythonVers = ['3.10', '3.11', '3.12']
 def ubuntu_from_pytorch_configs = [
     [
         // python: 3.10
-        'cudaVer': '11.8', 'cudnnVer': '9', 'torchVer': '2.5.0',
+        'cudaVer': '11.8', 'cudnnVer': '9', 'torchVer': '2.5.1',
         'archsToTest': 'MULTI'
     ],
     [
         // python: 3.11
-        'cudaVer': '13.0', 'cudnnVer': '9', 'torchVer': '2.10.0',
+        'cudaVer': '13.2', 'cudnnVer': '9', 'torchVer': '2.12.1',
         'archsToTest': 'MULTI'
     ]
 ]
@@ -45,7 +45,7 @@ def ubuntu_from_cuda_configs = [
     ],
     [
         'cudaVer': '13.2.1', 'cudnnVer': '',
-        'pythonVer': '3.14', 'torchVer': '2.12.0',
+        'pythonVer': '3.14', 'torchVer': '2.12.1',
         'archsToTest': 'MULTI'
     ],
 ]
@@ -57,7 +57,7 @@ def ubuntu_cpuonly_configs = [
         'pythonVer': '3.10', 'torchVer': '2.5.1',
     ],
     [
-        'pythonVer': '3.14', 'torchVer': '2.12.0',
+        'pythonVer': '3.14', 'torchVer': '2.12.1',
     ]
 ]
 
@@ -269,12 +269,12 @@ def windows_from_server_configs = [
 */
     [
         'cudaVer': '11.8',
-        'pythonVer': '3.10', 'torchVer': '2.5.0',
+        'pythonVer': '3.10', 'torchVer': '2.5.1',
         'archsToTest': ''
     ],
     [
         'cudaVer': '13.2',
-        'pythonVer': '3.14', 'torchVer': '2.12.0',
+        'pythonVer': '3.14', 'torchVer': '2.12.1',
         'archsToTest': ''
     ],
 ]

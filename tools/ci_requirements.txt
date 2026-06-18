@@ -12,4 +12,5 @@ gitpython
 wget
 polyscope>=2.2.0
 gsplat>=1.4.0
+k3d
 newton[examples]==1.2.0  ; python_version > "3.10" and python_version < "3.14"
