@@ -38,7 +38,7 @@ using namespace std;
 uint64_t GetTempSize(void* d_temp_storage, uint* d_M0, uint* d_M1, uint max_total_points)
 {
     uint64_t    temp_storage_bytes = 0;
-    CubDebugExit(DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_M0, d_M1, max_total_points));
+    AT_CUDA_CHECK(DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, d_M0, d_M1, max_total_points));
     return temp_storage_bytes;
 }
 
@@ -60,7 +60,7 @@ at::Tensor inclusive_sum_cuda_x(at::Tensor Inputs)
   d_temp_storage = (void*)temp_storage.data_ptr<uchar>();
 
   DeviceScan::InclusiveSum(d_temp_storage, temp_storage_bytes, inputs, outputs, num);
-  CubDebugExit(cudaGetLastError());
+  AT_CUDA_CHECK(cudaGetLastError());
 
   return Outputs;
 }

@@ -18,6 +18,8 @@ import torch
 import math
 from kaolin.math import quat as quat_ops
 
+from kaolin.utils.compile import maybe_compile
+
 __all__ = [
     'transform_gaussians',
     'transform_shs'
@@ -296,7 +298,7 @@ def transform_shs(shs_feat: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
 
 
 
-@torch.compile
+@maybe_compile
 def _fused_apply_wigner_sparse_band2(M1: torch.Tensor) -> torch.Tensor:
     N = M1.shape[0]
     coeff = torch.tensor([ 0.5000,  0.5000,  0.5000,  0.5000,  1.0000,  1.0000,  0.8660,  0.8660,
@@ -334,7 +336,7 @@ def _fused_apply_wigner_sparse_band2(M1: torch.Tensor) -> torch.Tensor:
     return products, out_idx[None].expand(N, 77)
 
 
-@torch.compile
+@maybe_compile
 def _fused_apply_wigner_sparse_band3(M1: torch.Tensor, Mprev: torch.Tensor) -> torch.Tensor:
     N = M1.shape[0]
     coeff = torch.tensor([ 0.5000,  0.5000,  0.5000,  0.5000,  1.2247,  1.2247,  0.9682,  0.9682,

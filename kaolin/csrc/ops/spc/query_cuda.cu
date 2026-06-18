@@ -14,6 +14,7 @@
 // limitations under the License.
 
 
+#include <cub/device/device_scan.cuh>
 #include <ATen/ATen.h>
 #include <c10/cuda/CUDAGuard.h>
 

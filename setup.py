@@ -19,7 +19,7 @@ import shutil
 
 # Define version constraints
 TORCH_MIN_VER = '2.5.1'
-TORCH_MAX_VER = '2.12.1'  # Updated to support newer PyTorch versions
+TORCH_MAX_VER = '2.14.1'  # Updated to support newer PyTorch versions
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
 
 # Module required before installation
@@ -77,6 +77,11 @@ if not torch.cuda.is_available() and os.getenv('FORCE_CUDA', '0') == '1':
         "Set TORCH_CUDA_ARCH_LIST for specific architectures."
     )
     if os.getenv("TORCH_CUDA_ARCH_LIST") is None:
+        if CUDA_HOME is None:
+            raise RuntimeError(
+                "FORCE_CUDA=1 but no CUDA toolkit was found: set CUDA_HOME (or CUDA_PATH), "
+                "or add nvcc to PATH."
+            )
         _, major, minor = get_cuda_bare_metal_version(CUDA_HOME)
         major, minor = int(major), int(minor)
         if major == 11:
@@ -280,16 +285,22 @@ def build_dash_components():
     dash_components_dir = os.path.join(cwd, 'kaolin', 'visualize', 'dash', 'components')
     # TODO: maybe disable import if not built?
 
+    # On Windows npm is a batch shim (npm.cmd) that CreateProcess won't find from a bare 'npm';
+    # shutil.which honors PATHEXT and returns the full path
+    npm = shutil.which('npm')
+    if npm is None:
+        raise RuntimeError("npm not found, failed to build dash components (set KAOLIN_SKIP_DASH_BUILD=1 to skip)")
+
     logger.info("Building dash components...")
     try:
         # Check if node_modules exists, if not run npm install
         if not os.path.exists(os.path.join(cwd, 'node_modules')):
             logger.info("Installing npm dependencies...")
-            subprocess.check_call(['npm', 'install'], cwd=cwd)
+            subprocess.check_call([npm, 'install'], cwd=cwd)
             
         # Build the components using root-level commands
         logger.info("Building JavaScript bundle...")
-        subprocess.check_call(['npm', 'run', 'build:dash'], cwd=cwd)
+        subprocess.check_call([npm, 'run', 'build:dash'], cwd=cwd)
         logger.info(f"Dash components built successfully! See: {dash_components_dir}/autogen")
     except subprocess.CalledProcessError as e:
         logger.warning(f"Failed to build dash components (set KAOLIN_SKIP_DASH_BUILD=1 to skip; or install nodejs): {e}")

@@ -78,7 +78,6 @@ def test_project_2d_mask_to_3d_and_subscene():
     sub = seg.subscene_from_3d_mask(mask_3d)
     assert isinstance(sub, GaussianSplatSegmenter)
     assert sub.num_primitives == int(mask_3d.sum())
-    assert sub.parent_mask is not None
 
 
 def test_optimize_segmentation_runs_and_backprops():

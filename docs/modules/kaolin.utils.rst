@@ -9,5 +9,6 @@ kaolin.utils
 
    kaolin.utils.testing
    kaolin.utils.bundled_data
+   kaolin.utils.compile
    kaolin.utils.env_vars
    kaolin.utils.log

@@ -17,6 +17,7 @@
 #define KAOLIN_SPC_UTILS_CUH_
 
 #include <cub/device/device_scan.cuh>
+#include <ATen/cuda/CUDAContext.h>
 #include "spc_math.h"
 
 namespace kaolin {
@@ -219,7 +220,7 @@ static uint64_t get_cub_storage_bytes(
     cudaStream_t stream = 0) {
     
   uint64_t temp_storage_bytes = 0;
-  CubDebugExit(cub::DeviceScan::InclusiveSum(
+  AT_CUDA_CHECK(cub::DeviceScan::InclusiveSum(
       temp_storage, temp_storage_bytes, info,
       prefix_sum, max_total_points, stream));
   return temp_storage_bytes;

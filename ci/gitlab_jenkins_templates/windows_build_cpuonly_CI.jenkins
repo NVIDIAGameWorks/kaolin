@@ -195,27 +195,53 @@ spec:
                   """)
             }
 
+            stage("Build image") {
+              targetImage = docker.build(
+                  "${targetImageTag}",
+                  """-m 32g --no-cache -f ./tools/windows/Dockerfile.install \
+                      --build-arg BASE_IMAGE=${targetImageTag}-base \
+                      --build-arg PYTHON_VERSION=${pythonVer} \
+                      --build-arg PYTORCH_VERSION=${torchVer} \
+                      --build-arg FORCE_CUDA=0 \
+                      --build-arg IGNORE_TORCH_VER=1 \
+                      .
+                  """)
+            }
+
             if (buildWheel.toBoolean()) {
-              stage("Build with wheel") {
+              stage('Build wheel') {
+                targetImage.inside() {
+                  bat """
+                    call "C:\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat" x64 -vcvars_ver=%MSVC_VER_PREFIX%
+                    if %errorlevel% neq 0 exit /b %errorlevel%
+                    set DISTUTILS_USE_SDK=1
+                    python setup.py bdist_wheel --dist-dir .
+                  """
+                }
+                kaolinVer = bat(script: "@type version.txt", returnStdout: true).trim()
+                pythonVerTag = pythonVer.split('\\.').join('')
+                Integer minorVal = pythonVer.split('\\.')[1].toInteger()
+                pythonVerAbiTag = (minorVal < 8) ? pythonVerTag + 'm' : pythonVerTag
+                wheelName = "kaolin-${kaolinVer}-cp${pythonVerTag}-cp${pythonVerAbiTag}-win_amd64.whl"
+              }
+              stage('Reinstall from wheel') {
                 targetImage = docker.build(
                     "${targetImageTag}",
                     """-m 32g --no-cache -f ./tools/windows/Dockerfile.install_wheel \
-                       --build-arg BASE_IMAGE=${targetImageTag}-base \
-                       .
-                    """
-                )
-              }
-            } else {
-              stage("Build") {
-                targetImage = docker.build(
-                    "${targetImageTag}",
-                    """-m 32g --no-cache -f ./tools/windows/Dockerfile.install \
                         --build-arg BASE_IMAGE=${targetImageTag}-base \
+                        --build-arg PYTHON_VERSION=${pythonVer} \
+                        --build-arg PYTORCH_VERSION=${torchVer} \
+                        --build-arg FORCE_CUDA=0 \
+                        --build-arg IGNORE_TORCH_VER=1 \
+                        --build-arg WHEEL_NAME=${wheelName} \
                         .
                     """)
               }
+              stage('Push wheel to artifact') {
+                archiveArtifacts artifacts: "${wheelName}"
+              }
             }
-            
+
             stage("Push") {
               targetImage.push()
             }

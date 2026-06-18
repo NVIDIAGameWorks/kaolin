@@ -73,7 +73,7 @@ int scan_octrees_cuda_impl(
     scan_nodes_cuda_kernel<<< (osize + (THREADS_PER_BLOCK - 1)) / THREADS_PER_BLOCK, THREADS_PER_BLOCK >>>(
         osize, O0, num_childrens_per_node_ptr);
     // compute inclusive sum of bit counts
-    CubDebugExit(cub::DeviceScan::InclusiveSum(
+    AT_CUDA_CHECK(cub::DeviceScan::InclusiveSum(
         temp_storage_ptr, temp_storage_bytes, num_childrens_per_node_ptr,
         EX0, osize));
 
