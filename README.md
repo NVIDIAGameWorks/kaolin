@@ -18,6 +18,15 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![NVIDIA Kaolin](https://img.shields.io/badge/NVIDIA-Kaolin-76B900)](https://developer.nvidia.com/kaolin)
 
+⚠️ **Experimental Web Apps Preview**
+
+This branch showcases a new experimental web app feature built on top of Kaolin. 
+It is intended for early testing and public demonstration: APIs, setup steps, and behavior may change. 
+
+Get started with [web app installation instructions](kaolin/app/INSTALL.md).
+
+---
+
 Kaolin packages reusable building blocks from NVIDIA 3D research into a cohesive PyTorch API — continuously improving representation-agnostic physics simulation, fast conversions between representations, quaternion math, batched mesh and splat containers, I/O, visualization and more. See [kaolin.readthedocs.io](https://kaolin.readthedocs.io/en/latest/) for tutorials and API reference, and [developer.nvidia.com/kaolin](https://developer.nvidia.com/kaolin) for the NVIDIA Kaolin hub.
 
 ## SIGGRAPH 2026

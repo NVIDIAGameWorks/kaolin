@@ -1,4 +1,4 @@
-# Tutorial App Installation
+# Web App Installation
 
 Start with an activated Conda environment using Python 3.11+ and an appropriate
 PyTorch/CUDA installation. 
@@ -28,30 +28,20 @@ python setup.py develop
 # MAX_JOBS=1 python setup.py develop
 ```
 
-Install and run one app at a time using the commands below.
+Install and run one app at a time, for example:
+
+```bash
+pip install -e ".[app.segment]" --no-build-isolation
+```
+
+See individual application documentation for further details.
 
 *Note: Applications may take a few minutes to build the first time they are loaded.*
 
-## Applications
+## Sample Applications
 
-### segment
+* [Gaussian Splat Segmentation](segment/README.md)
+* [Toy Gaussian Splat Inpainter](splat_inpaint/README.md)
 
-```bash
-python -m pip install -r kaolin/app/segment/requirements.txt
 
-python -m kaolin.app.segment.main \
-  --input_scene="$PWD/sample_data/scanned_toys/sunflower_baby.ply"
-```
 
-Open <http://localhost:8001>.
-
-### mesh_edit
-
-This app requires a separate Axolotl3D installation. Follow
-[`mesh_edit/README.md`](mesh_edit/README.md), then run:
-
-```bash
-python -m kaolin.app.mesh_edit.main
-```
-
-Open <http://localhost:8000>.
