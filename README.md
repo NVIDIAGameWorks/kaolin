@@ -127,3 +127,7 @@ Other Majors Contributors:
 - Towaki Takikawa
 - Jiehan Wang
 - Tommy Xiang
+
+---
+
+*[Mukller](https://github.com/Mukller)*
