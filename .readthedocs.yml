@@ -12,7 +12,7 @@ build:
   os: "ubuntu-22.04"
   tools:
     python: "3.12"
-    nodejs: "20"
+    nodejs: "26"
   commands:
     - pip install -r docs/readthedocs_requirements.txt -r tools/doc_requirements.txt -r tools/build_requirements.txt -r tools/requirements.txt
     - pip install --no-build-isolation .
