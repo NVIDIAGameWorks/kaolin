@@ -14,7 +14,7 @@ build:
     python: "3.12"
     nodejs: "26"
   commands:
-    - pip install -r docs/readthedocs_requirements.txt -r tools/doc_requirements.txt -r tools/build_requirements.txt -r tools/requirements.txt
+    - pip install -r docs/readthedocs_requirements.txt -r tools/doc_requirements.txt -r tools/build_requirements.txt -r tools/requirements.txt -r tools/viz_requirements.txt
     - pip install --no-build-isolation .
     - npm install
     # Single Makefile build: TypeDoc first, then Sphinx with warnings treated as errors.
