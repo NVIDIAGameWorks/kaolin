@@ -15,7 +15,7 @@ build:
     nodejs: "20"
   commands:
     - pip install -r docs/readthedocs_requirements.txt -r tools/doc_requirements.txt -r tools/build_requirements.txt -r tools/requirements.txt
-    - pip install .
+    - pip install --no-build-isolation .
     - npm install
     # Single Makefile build: TypeDoc first, then Sphinx with warnings treated as errors.
     - make -C docs html SPHINXOPTS="-W --keep-going"
