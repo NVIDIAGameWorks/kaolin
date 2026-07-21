@@ -112,7 +112,7 @@ def load_scene_from_usd(fname: str, device: str):
     Raises:
         ValueError: if no ParticleField3DGaussianSplat prims are found.
     """
-    clouds = import_gaussianclouds(fname)
+    clouds = import_gaussianclouds(fname, return_list=False)
     if not clouds:
         raise ValueError(f"No ParticleField3DGaussianSplat prims found in {fname}")
     scene_paths = list(clouds.keys())

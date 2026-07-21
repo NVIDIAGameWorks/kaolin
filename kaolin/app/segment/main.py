@@ -248,7 +248,7 @@ if __name__ == '__main__':
 
     # Menus ---------------------------
     layout_helper.add_navbar_dropdown('File')
-    save_item, save_as_item = layout_helper.add_navbar_dropdown_items('File', ['Save', 'Save As'])
+    save_as_item, = layout_helper.add_navbar_dropdown_items('File', ['Save As'])
     save_as_item.id = 'save-as-menu-item'
 
     stop_btn = dbc.Button(
