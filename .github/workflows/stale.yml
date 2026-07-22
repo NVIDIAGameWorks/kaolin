@@ -22,7 +22,7 @@ jobs:
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         stale-issue-message: 'Stale issue, please reopen if still relevant'
-        stale-pr-message: 'Stale pull request, please repoen if still relevant'
+        stale-pr-message: 'Stale pull request, please reopen if still relevant'
         close-issue-reason: not_planned
         stale-issue-label: 'no-issue-activity'
         stale-pr-label: 'no-pr-activity'
