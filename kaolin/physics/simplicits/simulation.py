@@ -315,9 +315,14 @@ class SimplicitsScene:
                 "capturable=True always uses a dense direct solve (a data-dependent CG "
                 "iteration count is not capturable), so direct_solve=False would be "
                 "silently ignored. Pass direct_solve=True.")
-        # name -> wp.Graph. Must be cleared whenever scene topology changes, since a
-        # captured graph hard-codes device pointers and launch dimensions.
+        # name -> (wp.Graph, pool). Must be cleared whenever scene topology changes,
+        # since a captured graph hard-codes device pointers and launch dimensions.
         self._graph_dict = {}
+        # One private allocator pool for the whole scene, reused by every re-capture.
+        # Minting a fresh pool per capture leaks 2 MiB each time, because nothing ever
+        # calls _cuda_releasePool -- and _invalidate_graphs makes re-capture routine
+        # (a gravity or floor slider re-captures every frame).
+        self._graph_pool = None
 
         self.timestep = timestep
         self.current_sim_step = 0
@@ -655,6 +660,10 @@ class SimplicitsScene:
         # correct and the graph's recorded pointers stay valid. reset_scene() rebinds
         # them, which is why it must clear the graph cache.
         self._cap_delta_dz = wp.zeros_like(self.sim_z)
+        # Snapshot of sim_z_dot taken before each launch, so a failed solve can be
+        # rolled back. sim_z is recoverable from sim_z_prev (written at the top of the
+        # captured body, hence still clean), but sim_z_dot is overwritten in-graph.
+        self._cap_z_dot_backup = wp.zeros_like(self.sim_z)
 
         # dt lives on device so it is not baked into the graph as a kernel immediate.
         # energy_coeff = (dt*dt, 0.5) so combined E = dt*dt*PE + 0.5*KE.
@@ -1579,20 +1588,40 @@ class SimplicitsScene:
                     "capturable buffers were built. It is baked into the graph; the "
                     "replay would silently use the old value. Rebuild the scene.")
 
-        warp_utilities.capture_and_run_torch(
+        if self.check_solve_info:
+            # Device-to-device, no sync. Needed to make a failed step atomic.
+            wp.copy(src=self.sim_z_dot, dest=self._cap_z_dot_backup)
+
+        self._graph_pool = warp_utilities.capture_and_run_torch(
             self._run_sim_step_capturable_body, "sim_step", self._graph_dict,
-            captured=True, device=self.device)
+            captured=True, device=self.device, pool=self._graph_pool)
 
         if self.check_solve_info:
             # One D2H sync per step. The in-graph assert_zero only fires in Warp debug
             # builds, so without this a singular Hessian is silent.
+            #
+            # Only the last Newton iteration's code is read, which is sufficient *on the
+            # GPU path only*: cuSOLVER reports nonzero info for NaN-contaminated input
+            # (measured info=1/2), so a failure at any iteration poisons x and is still
+            # visible at the end. LAPACK does not do this -- it returns info=0 for the
+            # same NaN input -- so this reasoning must not be carried over to a CPU path.
             info = int(self._nm_buf.solve_info_th.item())
             if info != 0:
+                # Roll back so the step is atomic, matching the reference path, which
+                # raises from inside newtons_method before assigning anything. Otherwise
+                # a caller's halve-timestep-and-retry loop would retry from a NaN scene.
+                wp.copy(src=self.sim_z_prev, dest=self.sim_z)
+                wp.copy(src=self._cap_z_dot_backup, dest=self.sim_z_dot)
+                if info < 0:
+                    detail = (f"argument {-info} to cuSOLVER getrf was invalid "
+                              "(this indicates a bug, not a singular system)")
+                else:
+                    detail = f"U[{info - 1},{info - 1}] is exactly zero"
                 raise torch.linalg.LinAlgError(
                     f"LU factorization of the reduced Hessian failed at step "
-                    f"{self.current_sim_step}: info={info} (leading minor of order "
-                    f"{info} is not positive definite / U[{info-1},{info-1}] is zero). "
-                    "Pass check_solve_info=False to skip this check and its sync.")
+                    f"{self.current_sim_step}: info={info}, {detail}. Scene state has "
+                    "been rolled back to the start of the step. Pass "
+                    "check_solve_info=False to skip this check and its sync.")
 
         self.current_sim_step += 1
 

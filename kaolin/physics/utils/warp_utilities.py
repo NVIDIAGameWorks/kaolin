@@ -36,7 +36,7 @@ __all__ = ["_wp_bsr_to_torch_bsr",
            "mat99"]
 
 
-def capture_function_torch(func, device=None):
+def capture_function_torch(func, device=None, pool=None):
     r"""Captures a function that mixes Warp kernels and PyTorch ops into a CUDA graph.
 
     Two things are required for this to be safe, and both fail silently or
@@ -52,23 +52,29 @@ def capture_function_torch(func, device=None):
        their addresses end up baked into the graph while owned by nothing. A later
        ``torch.cuda.empty_cache()`` frees them and the next replay writes into
        unmapped memory (reproduced as CUDA error 700). Routing capture-time
-       allocations into a private pool, and keeping that pool alive for as long as the
-       graph, prevents this.
+       allocations into a private pool prevents this.
 
     Args:
         func (callable): Zero-argument function issuing the work to capture.
         device (optional): Warp device to capture on. Defaults to Warp's current device.
+        pool (optional): Private pool handle from ``torch.cuda.graph_pool_handle()``.
+            **Pass the same handle back on every re-capture.** Minting a fresh pool each
+            time leaks: ``_cuda_endAllocateToPool`` only removes the stream filter, and
+            ``_cuda_releasePool`` is the sole decrementer of ``PrivatePool::use_count``,
+            so an unreleased pool never becomes reclaimable -- measured at exactly
+            2.00 MiB per re-capture, surviving ``empty_cache()``. Reusing one pool lets
+            buffers freed by an earlier capture be served from its free list instead.
+            Defaults to minting one, which is correct for a single capture only.
 
     Returns:
-        tuple: ``(warp.Graph, pool_handle)``. **The pool handle must be retained for
-        the lifetime of the graph** -- dropping it releases the private pool and
-        reintroduces the use-after-free.
+        tuple: ``(warp.Graph, pool_handle)``. Returned so the caller can pass the handle
+        back on the next capture. Note ``graph_pool_handle()`` is a bare ``tuple[int, int]``
+        with no finalizer: dropping it releases nothing, so retaining it is not what keeps
+        the pool alive -- it is what lets you reuse the pool.
     """
-    torch_device = torch.cuda.current_device() if device is None \
-        else wp.device_to_torch(device)
-    torch_index = torch.device(torch_device).index if not isinstance(torch_device, int) \
-        else torch_device
-    pool = torch.cuda.graph_pool_handle()
+    torch_index = torch.device(wp.device_to_torch(wp.get_device(device))).index or 0
+    if pool is None:
+        pool = torch.cuda.graph_pool_handle()
 
     with torch.cuda.stream(wp.stream_to_torch(device)):
         torch._C._cuda_beginAllocateCurrentStreamToPool(torch_index, pool)
@@ -80,26 +86,33 @@ def capture_function_torch(func, device=None):
     return capture.graph, pool
 
 
-def capture_and_run_torch(func, func_name, graph_dict, captured=True, device=None):
+def capture_and_run_torch(func, func_name, graph_dict, captured=True, device=None,
+                          pool=None):
     r"""Lazily captures ``func`` on first call, then replays the cached graph.
 
     Args:
         func (callable): Zero-argument function issuing the work.
         func_name (str): Cache key.
         graph_dict (dict): Name -> ``(warp.Graph, pool_handle)`` cache, owned by the
-            caller. Holding the pool handle here is what keeps the graph's private
-            allocator pool alive. Clear the dict whenever scene topology changes, or
-            the replay will use stale pointers.
+            caller. Clear it whenever scene topology changes, or the replay will use
+            stale pointers.
         captured (bool, optional): When False, calls ``func`` directly with no
             capture. Defaults to True.
         device (optional): Warp device to capture on. Defaults to Warp's current device.
+        pool (optional): Private allocator pool to reuse across re-captures. See
+            :func:`capture_function_torch` -- passing one long-lived handle is what keeps
+            repeated invalidate/re-capture cycles from leaking 2 MiB apiece.
+
+    Returns:
+        The pool handle actually used, so the caller can hold it and pass it back.
     """
     if captured:
         if func_name not in graph_dict:
-            graph_dict[func_name] = capture_function_torch(func, device=device)
+            graph_dict[func_name] = capture_function_torch(func, device=device, pool=pool)
         wp.capture_launch(graph_dict[func_name][0])
-    else:
-        func()
+        return graph_dict[func_name][1]
+    func()
+    return pool
 
 
 vec12 = wp.types.vector(12, dtype=wp.float32)

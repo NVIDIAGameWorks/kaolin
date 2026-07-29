@@ -126,7 +126,8 @@ def test_collisions_rejected():
         scene.run_sim_step()
 
 
-@cuda_only
+# The next two only exercise __init__ argument validation, which raises before the
+# constructor touches CUDA -- so they run (and are worth running) on a GPU-less box.
 def test_direct_solve_false_rejected():
     r"""A data-dependent CG iteration count is not capturable, so this must not be
     silently upgraded to a dense solve."""
@@ -134,7 +135,6 @@ def test_direct_solve_false_rejected():
         SimplicitsScene(device="cuda", capturable=True, direct_solve=False)
 
 
-@cuda_only
 def test_use_cuda_graphs_conflict_rejected():
     with pytest.raises(ValueError, match="at most one"):
         SimplicitsScene(device="cuda", capturable=True, use_cuda_graphs=True)
@@ -158,6 +158,42 @@ def test_mutating_baked_scalar_raises(attr, value):
 
 
 @cuda_only
+def test_recapture_does_not_leak_pool_memory():
+    r"""Repeated invalidate/re-capture cycles must not grow reserved memory.
+
+    Capture-time torch allocations go into a private allocator pool so empty_cache()
+    cannot free them out from under the graph. Minting a fresh pool per capture leaks:
+    _cuda_endAllocateToPool only drops the stream filter, and nothing decrements
+    PrivatePool::use_count, so the pool is never reclaimable. Measured at exactly
+    2.00 MiB per re-capture before the fix, 0.00 after (one pool reused per scene).
+
+    Reachable in practice because _invalidate_graphs() fires on every force setter --
+    a gravity or floor slider re-captures each frame.
+    """
+    scene = _make_scene(_make_object(), True)
+    scene.run_sim_step()
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+    baseline = torch.cuda.memory_reserved()
+
+    n = 6
+    for i in range(n):
+        # Changing a force invalidates the graph, forcing a re-capture next step.
+        scene.set_scene_floor(floor_height=1e-6 * (i + 1), floor_axis=1,
+                              floor_penalty=1e4, flip_floor=False)
+        scene.run_sim_step()
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+
+    growth_mib = (torch.cuda.memory_reserved() - baseline) / (1024.0 * 1024.0)
+    # The leak was 2 MiB per re-capture; allow generous slack for allocator noise
+    # while still failing decisively if per-recapture growth returns.
+    assert growth_mib < 0.5 * n, (
+        f"reserved memory grew {growth_mib:.2f} MiB over {n} re-captures "
+        f"({growth_mib / n:.2f} MiB each) -- private pool is leaking")
+
+
+@cuda_only
 def test_force_setter_invalidates_graph():
     r"""Replacing a force struct must force a re-capture, not replay stale immediates."""
     scene = _make_scene(_make_object(), True)
@@ -173,10 +209,84 @@ def test_force_setter_invalidates_graph():
 
 
 @cuda_only
-def test_newton_loop_is_data_dependent():
-    r"""The captured loop must exit on convergence, not run a fixed trip count."""
-    scene = _make_scene(_make_object(), True)
+def test_newton_loop_exits_early_on_convergence():
+    r"""The captured loop must exit on convergence rather than run a fixed trip count.
+
+    ``0 < iters <= max_newton_steps`` would also hold for a fixed-trip-count loop, so it
+    proves nothing. Requiring a *strict* early exit is what distinguishes
+    ``wp.capture_while`` driven by a device-side convergence flag from a plain loop:
+    delete the ``exit_while``/``nm_if_cond`` branch and ``nm_step_count`` pins to
+    ``max_newton_steps``, failing this.
+    """
+    scene = _make_scene(_make_object(ym=1e4), True, num_objects=1)
+    scene.max_newton_steps  # noqa: B018  (documents what the bound is)
     for _ in range(4):
         scene.run_sim_step()
     iters = int(scene._nm_buf.nm_step_count.numpy()[0])
-    assert 0 < iters <= scene.max_newton_steps
+    assert 0 < iters < scene.max_newton_steps, (
+        f"expected early convergence exit, got {iters} of "
+        f"{scene.max_newton_steps} iterations")
+
+
+@cuda_only
+def test_newton_iterations_scale_with_difficulty():
+    r"""Iteration count must respond to the problem, confirming genuine data dependence."""
+    def iters_for(ym, dt, conv_tol):
+        scene = SimplicitsScene(device="cuda", timestep=dt, max_newton_steps=8,
+                                max_ls_steps=10, conv_tol=conv_tol, capturable=True)
+        obj = _make_object(ym=ym)
+        T = torch.eye(4, device="cuda", dtype=torch.float32)
+        T[1, 3] = 0.55
+        scene.add_object(obj, num_qp=96, init_transform=T, apply_qr=False)
+        scene.set_scene_gravity(torch.tensor([0.0, -9.8, 0.0]))
+        scene.set_scene_floor(floor_height=0.0, floor_axis=1,
+                              floor_penalty=1e4, flip_floor=False)
+        for _ in range(4):
+            scene.run_sim_step()
+        return int(scene._nm_buf.nm_step_count.numpy()[0])
+
+    easy = iters_for(ym=1e4, dt=0.01, conv_tol=1e-3)
+    hard = iters_for(ym=1e8, dt=0.20, conv_tol=1e-12)
+    assert hard > easy, f"expected harder scene to need more iterations, got {hard} vs {easy}"
+
+
+@cuda_only
+def test_singular_hessian_raises_and_rolls_back():
+    r"""check_solve_info must raise AND leave the scene state untouched.
+
+    The reference path raises from inside newtons_method before assigning, so state is
+    clean. The captured graph has already overwritten sim_z/sim_z_dot in place by the
+    time the host reads the info code, so it must roll back explicitly -- otherwise a
+    caller's halve-timestep-and-retry loop resumes from a NaN scene.
+    """
+    scene = _make_scene(_make_object(), True)
+    scene.run_sim_step()
+    good_z = torch.as_tensor(scene.sim_z.numpy()).clone()
+    good_zdot = torch.as_tensor(scene.sim_z_dot.numpy()).clone()
+
+    # Poison the Hessian. It must be a *device buffer the captured graph reads* --
+    # patching Python-side has no effect once the graph is recorded, and _eval_H_dense_th
+    # is recomputed inside the graph every iteration. _sim_BMB_plus_reg_dense_th is a
+    # constant the graph adds in, so it survives. NaN rather than zero: zeroing only
+    # removes mass + regularizer and the elastic block may still factor, whereas
+    # cuSOLVER reliably reports nonzero info for NaN input.
+    scene._sim_BMB_plus_reg_dense_th.fill_(float("nan"))
+
+    with pytest.raises(torch.linalg.LinAlgError, match="LU factorization"):
+        scene.run_sim_step()
+
+    after_z = torch.as_tensor(scene.sim_z.numpy())
+    after_zdot = torch.as_tensor(scene.sim_z_dot.numpy())
+    assert torch.isfinite(after_z).all(), "sim_z left non-finite after a failed step"
+    assert torch.isfinite(after_zdot).all(), "sim_z_dot left non-finite after a failed step"
+    assert torch.equal(after_z, good_z), "sim_z was not rolled back"
+    assert torch.equal(after_zdot, good_zdot), "sim_z_dot was not rolled back"
+
+
+@cuda_only
+def test_check_solve_info_false_skips_the_check():
+    r"""With the check off the step must not raise, even on a singular Hessian."""
+    scene = _make_scene(_make_object(), True, check_solve_info=False)
+    scene.run_sim_step()
+    scene._sim_BMB_plus_reg_dense_th.fill_(float("nan"))
+    scene.run_sim_step()  # must not raise; result is garbage by design

@@ -166,30 +166,38 @@ def test_hess_reduction_preallocated_matches(device, dtype):
     check_allclose(out, expected)
 
 
-@pytest.mark.parametrize('device', ['cuda', 'cpu'])
-def test_hess_reduction_out_is_allocation_free(device):
-    r"""No tensor allocation may occur when out= and HJ= are supplied."""
-    from torch.utils._python_dispatch import TorchDispatchMode
+@pytest.mark.skipif(not torch.cuda.is_available(),
+                    reason="torch.cuda.memory_stats is the only sound instrument here")
+def test_hess_reduction_out_is_allocation_free():
+    r"""No allocation may occur when out= and HJ= are supplied.
 
-    class _AllocTrace(TorchDispatchMode):
-        def __init__(self):
-            self.n = 0
+    Allocation inside a CUDA graph conditional-node body is illegal, so this property
+    is what lets Hessian assembly be captured.
 
-        def __torch_dispatch__(self, func, types, args=(), kwargs=None):
-            name = str(func)
-            if any(h in name for h in ('empty', 'zeros', 'new_', 'clone', 'ones')):
-                self.n += 1
-            return func(*args, **(kwargs or {}))
-
+    Instrument choice matters. ``TorchDispatchMode`` pops the mode while running the op,
+    so it never observes the ``at::empty`` an out-of-place kernel performs in C++ below
+    the Python dispatch key -- it scores an implementation that ignores ``out=``/``HJ=``
+    and ends in ``out.copy_(...)`` as 0 allocations, i.e. it cannot fail. It is fine for
+    dispatcher-visible allocations (it did correctly catch ``solve_ex``'s two
+    ``new_empty`` calls) but blind to exactly the class that matters here.
+    ``memory_stats`` counts every request through torch's allocator; verified to report
+    0 for the correct implementation and 2 for that mutation.
+    """
     torch.manual_seed(0)
     n_blocks, block_size, n_dofs = 4, 3, 6
-    Ja = torch.randn(n_blocks * block_size, n_dofs, device=device)
-    H = torch.randn(n_blocks, block_size, block_size, device=device)
-    out = torch.zeros(n_dofs, n_dofs, device=device)
-    HJ = torch.zeros(n_blocks, block_size, n_dofs, device=device)
+    Ja = torch.randn(n_blocks * block_size, n_dofs, device='cuda')
+    H = torch.randn(n_blocks, block_size, block_size, device='cuda')
+    out = torch.zeros(n_dofs, n_dofs, device='cuda')
+    HJ = torch.zeros(n_blocks, block_size, n_dofs, device='cuda')
 
     hess_reduction(Ja, H, out=out, HJ=HJ)  # warm up any lazy init
-    with _AllocTrace() as t:
-        hess_reduction(Ja, H, out=out, HJ=HJ)
-    assert t.n == 0, f"hess_reduction allocated {t.n} tensor(s) despite out=/HJ="
+    torch.cuda.synchronize()
+
+    before = torch.cuda.memory_stats()['allocation.all.allocated']
+    hess_reduction(Ja, H, out=out, HJ=HJ)
+    torch.cuda.synchronize()
+    n_alloc = torch.cuda.memory_stats()['allocation.all.allocated'] - before
+
+    assert n_alloc == 0, \
+        f"hess_reduction made {n_alloc} allocation(s) despite out=/HJ="
 

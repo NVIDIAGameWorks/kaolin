@@ -19,8 +19,8 @@ from kaolin.physics.simplicits import PhysicsPoints, SimplicitsObject, Simplicit
 
 def build_scene(num_objects, n_pts, num_handles, num_qp, ym, capturable,
                 max_newton_steps=5, num_nodes=256, seed=0, check_solve_info=True):
-    """Floor-contact scene. No inter-object collisions: the capturable path does not
-    support them yet, so both paths are built identically without them."""
+    """Objects dropping onto a floor. No inter-object collisions: the capturable path
+    does not support them yet, so both paths are built identically without them."""
     device, dtype = "cuda", torch.float32
     torch.manual_seed(seed)
     pts = torch.rand(n_pts, 3, device=device, dtype=dtype) - 0.5
@@ -36,7 +36,10 @@ def build_scene(num_objects, n_pts, num_handles, num_qp, ym, capturable,
         T = torch.eye(4, device=device, dtype=dtype)
         T[1, 3] = 0.55 + 1.2 * i
         scene.add_object(sim_obj, num_qp=num_qp, init_transform=T, apply_qr=False)
-    scene.set_scene_gravity(torch.tensor([0.0, -9.8, 0.0]))
+    # +y is down: set_scene_gravity's default is [0, 9.8, 0] and means downward.
+    # Verified empirically -- [0, -9.8, 0] accelerates objects UP, away from the floor,
+    # which is what this benchmark did before and why it never exercised floor contact.
+    scene.set_scene_gravity(torch.tensor([0.0, 9.8, 0.0]))
     scene.set_scene_floor(floor_height=0.0, floor_axis=1,
                           floor_penalty=10000.0, flip_floor=False)
     return scene
@@ -126,7 +129,10 @@ def build_iter_scene(dt, conv_tol, ym, max_newton, capturable):
         T = torch.eye(4, device=device, dtype=dtype)
         T[1, 3] = 0.55 + 1.2 * i
         scene.add_object(sim_obj, num_qp=256, init_transform=T, apply_qr=False)
-    scene.set_scene_gravity(torch.tensor([0.0, -9.8, 0.0]))
+    # +y is down: set_scene_gravity's default is [0, 9.8, 0] and means downward.
+    # Verified empirically -- [0, -9.8, 0] accelerates objects UP, away from the floor,
+    # which is what this benchmark did before and why it never exercised floor contact.
+    scene.set_scene_gravity(torch.tensor([0.0, 9.8, 0.0]))
     scene.set_scene_floor(floor_height=0.0, floor_axis=1,
                           floor_penalty=1e5, flip_floor=False)
     return scene
