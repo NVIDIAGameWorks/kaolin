@@ -90,7 +90,106 @@ def test_create_projection_matrix(device, dtype):
     num_dofs = 4
     kin_dofs = torch.arange(num_dofs, device=device)
     P = create_projection_matrix(num_dofs, kin_dofs)
-    
+
     expected = torch.empty((0, num_dofs), device=device)
     check_allclose(P, expected)
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+@pytest.mark.parametrize('block_size', [3, 9])
+def test_hess_reduction(device, dtype, block_size):
+    r"""hess_reduction computes Ja^T H Jb for block-diagonal H."""
+    torch.manual_seed(0)
+    n_blocks, n_dofs = 5, 8
+    Ja = torch.randn(n_blocks * block_size, n_dofs, device=device, dtype=dtype)
+    H = torch.randn(n_blocks, block_size, block_size, device=device, dtype=dtype)
+
+    out = hess_reduction(Ja, H)
+    assert out.shape == (n_dofs, n_dofs)
+
+    # Compare against an explicit dense block-diagonal assembly.
+    H_dense = torch.zeros(n_blocks * block_size, n_blocks * block_size,
+                          device=device, dtype=dtype)
+    for i in range(n_blocks):
+        s = i * block_size
+        H_dense[s:s + block_size, s:s + block_size] = H[i]
+    check_allclose(out, Ja.T @ H_dense @ Ja, atol=1e-4, rtol=1e-4)
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+def test_hess_reduction_two_sided(device, dtype):
+    r"""Passing dense_Jb gives Ja^T H Jb rather than Ja^T H Ja."""
+    torch.manual_seed(0)
+    n_blocks, block_size, n_dofs = 4, 3, 6
+    Ja = torch.randn(n_blocks * block_size, n_dofs, device=device, dtype=dtype)
+    Jb = torch.randn(n_blocks * block_size, n_dofs, device=device, dtype=dtype)
+    H = torch.randn(n_blocks, block_size, block_size, device=device, dtype=dtype)
+
+    H_dense = torch.zeros(n_blocks * block_size, n_blocks * block_size,
+                          device=device, dtype=dtype)
+    for i in range(n_blocks):
+        s = i * block_size
+        H_dense[s:s + block_size, s:s + block_size] = H[i]
+
+    check_allclose(hess_reduction(Ja, H, Jb), Ja.T @ H_dense @ Jb,
+                   atol=1e-4, rtol=1e-4)
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+def test_hess_reduction_preallocated_matches(device, dtype):
+    r"""The out=/HJ= path must match the allocating path exactly.
+
+    These kwargs exist so Hessian assembly is allocation-free under CUDA graph
+    capture, where allocating inside a conditional graph node body is illegal.
+    """
+    torch.manual_seed(0)
+    n_blocks, block_size, n_dofs = 5, 3, 8
+    Ja = torch.randn(n_blocks * block_size, n_dofs, device=device, dtype=dtype)
+    H = torch.randn(n_blocks, block_size, block_size, device=device, dtype=dtype)
+
+    expected = hess_reduction(Ja, H)
+
+    out = torch.zeros(n_dofs, n_dofs, device=device, dtype=dtype)
+    HJ = torch.zeros(n_blocks, block_size, n_dofs, device=device, dtype=dtype)
+    returned = hess_reduction(Ja, H, out=out, HJ=HJ)
+
+    check_allclose(out, expected)
+    # Must return the same object it was handed, not a copy.
+    assert returned is out
+
+    # Reusing the buffers overwrites rather than accumulates -- the capturable path
+    # relies on this across Newton iterations.
+    hess_reduction(Ja, H, out=out, HJ=HJ)
+    check_allclose(out, expected)
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+def test_hess_reduction_out_is_allocation_free(device):
+    r"""No tensor allocation may occur when out= and HJ= are supplied."""
+    from torch.utils._python_dispatch import TorchDispatchMode
+
+    class _AllocTrace(TorchDispatchMode):
+        def __init__(self):
+            self.n = 0
+
+        def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+            name = str(func)
+            if any(h in name for h in ('empty', 'zeros', 'new_', 'clone', 'ones')):
+                self.n += 1
+            return func(*args, **(kwargs or {}))
+
+    torch.manual_seed(0)
+    n_blocks, block_size, n_dofs = 4, 3, 6
+    Ja = torch.randn(n_blocks * block_size, n_dofs, device=device)
+    H = torch.randn(n_blocks, block_size, block_size, device=device)
+    out = torch.zeros(n_dofs, n_dofs, device=device)
+    HJ = torch.zeros(n_blocks, block_size, n_dofs, device=device)
+
+    hess_reduction(Ja, H, out=out, HJ=HJ)  # warm up any lazy init
+    with _AllocTrace() as t:
+        hess_reduction(Ja, H, out=out, HJ=HJ)
+    assert t.n == 0, f"hess_reduction allocated {t.n} tensor(s) despite out=/HJ="
 

@@ -27,11 +27,80 @@ import kaolin.physics.utils.torch_utilities as torch_utilities
 __all__ = ["_wp_bsr_to_torch_bsr",
            "_bsr_to_torch",
            "_displacement_delta_kernel",
+           "capture_function_torch",
+           "capture_and_run_torch",
            "vec12",
            "mat1212",
            "mat312",
            "vec9",
            "mat99"]
+
+
+def capture_function_torch(func, device=None):
+    r"""Captures a function that mixes Warp kernels and PyTorch ops into a CUDA graph.
+
+    Two things are required for this to be safe, and both fail silently or
+    catastrophically if omitted:
+
+    1. **Stream redirection.** By default ``torch.cuda.current_stream()`` is the
+       *legacy default stream*, and CUDA forbids graph capture on it under the
+       thread-local capture mode :class:`warp.ScopedCapture` uses. Without the
+       redirection the capture either aborts or omits every torch operation.
+    2. **A graph-private allocator pool.** Torch backends allocate below the
+       dispatcher -- cuSOLVER's ``lu_factor`` workspace is the case that bit us here.
+       Such buffers are returned to torch's ordinary cache when the call returns, so
+       their addresses end up baked into the graph while owned by nothing. A later
+       ``torch.cuda.empty_cache()`` frees them and the next replay writes into
+       unmapped memory (reproduced as CUDA error 700). Routing capture-time
+       allocations into a private pool, and keeping that pool alive for as long as the
+       graph, prevents this.
+
+    Args:
+        func (callable): Zero-argument function issuing the work to capture.
+        device (optional): Warp device to capture on. Defaults to Warp's current device.
+
+    Returns:
+        tuple: ``(warp.Graph, pool_handle)``. **The pool handle must be retained for
+        the lifetime of the graph** -- dropping it releases the private pool and
+        reintroduces the use-after-free.
+    """
+    torch_device = torch.cuda.current_device() if device is None \
+        else wp.device_to_torch(device)
+    torch_index = torch.device(torch_device).index if not isinstance(torch_device, int) \
+        else torch_device
+    pool = torch.cuda.graph_pool_handle()
+
+    with torch.cuda.stream(wp.stream_to_torch(device)):
+        torch._C._cuda_beginAllocateCurrentStreamToPool(torch_index, pool)
+        try:
+            with wp.ScopedCapture(device=device) as capture:
+                func()
+        finally:
+            torch._C._cuda_endAllocateToPool(torch_index, pool)
+    return capture.graph, pool
+
+
+def capture_and_run_torch(func, func_name, graph_dict, captured=True, device=None):
+    r"""Lazily captures ``func`` on first call, then replays the cached graph.
+
+    Args:
+        func (callable): Zero-argument function issuing the work.
+        func_name (str): Cache key.
+        graph_dict (dict): Name -> ``(warp.Graph, pool_handle)`` cache, owned by the
+            caller. Holding the pool handle here is what keeps the graph's private
+            allocator pool alive. Clear the dict whenever scene topology changes, or
+            the replay will use stale pointers.
+        captured (bool, optional): When False, calls ``func`` directly with no
+            capture. Defaults to True.
+        device (optional): Warp device to capture on. Defaults to Warp's current device.
+    """
+    if captured:
+        if func_name not in graph_dict:
+            graph_dict[func_name] = capture_function_torch(func, device=device)
+        wp.capture_launch(graph_dict[func_name][0])
+    else:
+        func()
+
 
 vec12 = wp.types.vector(12, dtype=wp.float32)
 mat1212 = wp.types.matrix(shape=(12, 12), dtype=wp.float32)

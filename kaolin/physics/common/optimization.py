@@ -153,6 +153,7 @@ def newtons_method(x,
                    cg_iters=100,
                    conv_tol=1e-4,
                    direct_solve=False,
+                   max_ls_steps=10,
                    bounds_qr_tfm=None,
                    bounds_qr_tfm_inv=None):
     r""" Newton's method optimizes for the updated dofs at the next time step. At each iteration, it computes the updated direction `dz`, 
@@ -172,6 +173,7 @@ def newtons_method(x,
         cg_iters (int, optional): CG iterations. Defaults to 100.
         conv_tol (float, optional): Convergence tolerance. Defaults to 1e-4.
         direct_solve (bool, optional): Whether to use a dense direct solver, or a sparse CG solver. Defaults to False.
+        max_ls_steps (int, optional): Maximum number of line search steps. Defaults to 10.
         bounds_qr_tfm (torch.Tensor, optional): If apply_qr=True, this is the forward direction used in the line search's apply_bounds for collision bounds in the raw sparse-DOF basis. If apply_qr=False, this is None. Forwarded to ``_apply_bounds``; see that function for the basis-change semantics.
         bounds_qr_tfm_inv (torch.Tensor, optional): If apply_qr=True, this is the inverse direction used in the line search's apply_bounds for collision bounds in the raw sparse-DOF basis. If apply_qr=False, this is None. Forwarded to ``_apply_bounds``.
 
@@ -247,6 +249,7 @@ def newtons_method(x,
                                       gradient=t_red_g,
                                       initial_step_size=last_alpha,
                                       bounds=t_bounds,
+                                      max_steps=max_ls_steps,
                                       bounds_qr_tfm=bounds_qr_tfm,
                                       bounds_qr_tfm_inv=bounds_qr_tfm_inv)
 
