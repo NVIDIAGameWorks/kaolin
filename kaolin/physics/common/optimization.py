@@ -88,7 +88,8 @@ def _apply_bounds(direction, bounds, t, bounds_qr_tfm=None, bounds_qr_tfm_inv=No
 @torch.no_grad()
 def _line_search(func, x, wp_P, direction, gradient, initial_step_size, bounds,
                  alpha=1e-3, beta=0.6, max_steps=10,
-                 bounds_qr_tfm=None, bounds_qr_tfm_inv=None):
+                 bounds_qr_tfm=None, bounds_qr_tfm_inv=None,
+                 x_kinematic=None):
     r"""Implements the simplest backtracking line search with the sufficient decrease Armijo condition
 
     Args:
@@ -106,14 +107,27 @@ def _line_search(func, x, wp_P, direction, gradient, initial_step_size, bounds,
         bounds_qr_tfm (torch.Tensor, optional): Forwarded to ``_apply_bounds``; see that
             function for the basis-change semantics.
         bounds_qr_tfm_inv (torch.Tensor, optional): Forwarded to ``_apply_bounds``.
+        x_kinematic (torch.Tensor, optional): Full-space kinematic component
+            :math:`x - P P^T x`, added back before every energy evaluation. Without it the
+            energy is evaluated with kinematic DOFs snapped to zero, i.e. with kinematic
+            objects at their rest pose rather than where they were placed. For a separable
+            energy that is a constant offset which cancels in the Armijo test, but contact
+            couples kinematic and dynamic DOFs, so it does not cancel there. Defaults to
+            None (no kinematic objects).
 
     Returns:
         torch.Tensor: The bounded search direction scaled by the chosen step size
         (i.e. the update to add to ``x``), not a scalar step size.
     """
+    def _to_full(x_red):
+        """Reduced DOFs -> full DOFs, with the kinematic block restored."""
+        full = _red_to_full(wp_P, wp.from_torch(x_red))
+        if x_kinematic is None:
+            return full
+        return wp.from_torch(wp.to_torch(full) + x_kinematic)
+
     t = initial_step_size  # Initial step size
-    wp_x = _red_to_full(wp_P, wp.from_torch(x))
-    f = func(wp_x)
+    f = func(_to_full(x))
 
     can_break = False
     bounded_direction = _apply_bounds(
@@ -121,8 +135,7 @@ def _line_search(func, x, wp_P, direction, gradient, initial_step_size, bounds,
 
     for __ in range(max_steps):
         x_new = x + bounded_direction
-        wp_x_new = _red_to_full(wp_P, wp.from_torch(x_new))
-        f_new = func(wp_x_new)
+        f_new = func(_to_full(x_new))
 
         if f_new <= f + alpha * (gradient.permute(torch.arange(gradient.ndim - 1, -1, -1)) @ bounded_direction):
             if (can_break == True):
@@ -153,9 +166,9 @@ def newtons_method(x,
                    cg_iters=100,
                    conv_tol=1e-4,
                    direct_solve=False,
-                   max_ls_steps=10,
                    bounds_qr_tfm=None,
-                   bounds_qr_tfm_inv=None):
+                   bounds_qr_tfm_inv=None,
+                   max_ls_steps=10):
     r""" Newton's method optimizes for the updated dofs at the next time step. At each iteration, it computes the updated direction `dz`, 
     finds an appropriate step size, and updates the dofs. It continues to do this iteratively until the directional update is small which indicates the energy is minimized.
 
@@ -251,7 +264,12 @@ def newtons_method(x,
                                       bounds=t_bounds,
                                       max_steps=max_ls_steps,
                                       bounds_qr_tfm=bounds_qr_tfm,
-                                      bounds_qr_tfm_inv=bounds_qr_tfm_inv)
+                                      bounds_qr_tfm_inv=bounds_qr_tfm_inv,
+                                      # None when there are no kinematic objects: P is
+                                      # then None, so t_x_kinematic is exactly zero and
+                                      # adding it would cost a full-size tensor add on
+                                      # every energy evaluation for nothing.
+                                      x_kinematic=None if P is None else t_x_kinematic)
 
         t_red_x = t_red_x + bounded_update
 

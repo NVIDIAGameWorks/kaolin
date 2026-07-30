@@ -22,6 +22,7 @@ the host-side Newton solve. The rest of the tests cover the guards that turn
 
 import pytest
 import torch
+import warp as wp
 
 from kaolin.physics.simplicits import PhysicsPoints, SimplicitsObject, SimplicitsScene
 
@@ -42,14 +43,26 @@ def _make_object(n_pts=600, num_handles=4, num_nodes=128, ym=1e6, seed=0):
 
 
 def _make_scene(sim_obj, capturable, num_objects=2, num_qp=96, max_ls_steps=10,
-                is_kinematic=False, collisions=False, **kwargs):
+                is_kinematic=False, kinematic_ids=None, collisions=False, **kwargs):
+    r"""Build a test scene.
+
+    Args:
+        is_kinematic: shorthand for ``kinematic_ids=(0,)``.
+        kinematic_ids: explicit set of kinematic object indices. Use this to cover
+            configurations other than "object 0 only" -- multiple kinematic objects, a
+            kinematic object that is not first, or an entirely kinematic scene.
+    """
+    if kinematic_ids is None:
+        kinematic_ids = (0,) if is_kinematic else ()
+    kinematic_ids = set(kinematic_ids)
+
     scene = SimplicitsScene(device="cuda", timestep=0.03, max_newton_steps=4,
                             max_ls_steps=max_ls_steps, capturable=capturable, **kwargs)
     for i in range(num_objects):
         T = torch.eye(4, device="cuda", dtype=torch.float32)
         T[1, 3] = _KIN_INIT_Y + 1.2 * i
         scene.add_object(sim_obj, num_qp=num_qp, init_transform=T, apply_qr=False,
-                         is_kinematic=(is_kinematic and i == 0))
+                         is_kinematic=(i in kinematic_ids))
     scene.set_scene_gravity(torch.tensor([0.0, -9.8, 0.0]))
     scene.set_scene_floor(floor_height=0.0, floor_axis=1,
                           floor_penalty=1e4, flip_floor=False)
@@ -137,6 +150,105 @@ def test_kinematic_object_stays_pinned():
         f"kinematic object moved {abs(y_kin1 - y_kin0):.3e}"
     assert abs(y_dyn1 - y_dyn0) > 1e-2, \
         "dynamic object did not move, so pinning was not actually exercised"
+
+
+@cuda_only
+def test_apply_kinematic_bc_zeroes_off_diagonal():
+    r"""Direct unit test of the boundary-condition mask on a fully coupled matrix.
+
+    This is the only test that currently distinguishes a correct
+    ``apply_kinematic_bc`` from one that zeroes just the diagonal. The scene-level
+    kinematic tests cannot: with collisions off, ``_assemble_hessians_capturable``
+    writes only the per-object diagonal blocks and ``BMB``/``reg*I`` are themselves
+    block-diagonal, so ``H_kf`` is already zero and the off-diagonal term is a no-op.
+    Inter-object contact is what makes it load-bearing, by producing genuine ``H_ij``
+    blocks for ``i != j``.
+    """
+    from kaolin.physics.common.optimization_capturable import apply_kinematic_bc
+
+    n = 8
+    kin = [1, 4, 5]
+    free = [i for i in range(n) if i not in kin]
+
+    torch.manual_seed(0)
+    H_th = torch.randn(n, n, device="cuda", dtype=torch.float32) + 5.0 * torch.eye(
+        n, device="cuda")
+    H = wp.from_torch(H_th.contiguous())
+
+    mask_th = torch.ones(n, device="cuda", dtype=torch.float32)
+    mask_th[kin] = 0.0
+    apply_kinematic_bc(H, wp.from_torch(mask_th.contiguous()))
+
+    out = wp.to_torch(H)
+    assert torch.equal(out[kin][:, free], torch.zeros(len(kin), len(free), device="cuda")), \
+        "kinematic ROWS not zeroed"
+    assert torch.equal(out[free][:, kin], torch.zeros(len(free), len(kin), device="cuda")), \
+        "kinematic COLUMNS not zeroed -- coupling survives, dz_k would not be zero"
+    assert torch.equal(out[kin, kin], torch.ones(len(kin), device="cuda")), \
+        "kinematic diagonal must be exactly 1"
+    # The free-free block must be untouched.
+    assert torch.equal(out[free][:, free], H_th[free][:, free])
+
+
+@cuda_only
+def test_kinematic_dofs_are_bitwise_zero_in_dz():
+    r"""Pinned DOFs must not drift at all -- assert on the full DOF vector, not a scalar.
+
+    The other pinning test collapses the state to mean y, which would miss a failure
+    confined to the rotation/shear block or to x/z translation.
+    """
+    scene = _make_scene(_make_object(), True, is_kinematic=True)
+    # sim_z.numpy() is on CPU, so the index tensor must be too.
+    kin_dofs = wp.to_torch(scene.kin_obj_to_z_map[0]).long().cpu()
+    z0 = torch.as_tensor(scene.sim_z.numpy()).clone()
+
+    for _ in range(15):
+        scene.run_sim_step()
+
+    z1 = torch.as_tensor(scene.sim_z.numpy())
+    assert torch.equal(z1[kin_dofs], z0[kin_dofs]), \
+        f"kinematic DOFs drifted by up to {(z1[kin_dofs] - z0[kin_dofs]).abs().max():.3e}"
+    free = torch.ones(z0.numel(), dtype=torch.bool)
+    free[kin_dofs] = False
+    assert (z1[free] - z0[free]).abs().max() > 1e-3, \
+        "free DOFs did not move, so pinning was not actually exercised"
+
+
+@cuda_only
+@pytest.mark.xfail(strict=True, reason=(
+    "Pre-existing host-path bug, not capture-related: an all-kinematic scene crashes at "
+    "setup in warp_utilities._block_diagonalize with 'torch.cat(): expected a non-empty "
+    "list of Tensors'. A kinematic object's dFdz is structurally all-zero, so when every "
+    "object is kinematic every matrix has nnz==0 and nothing is collected to concatenate. "
+    "Reproduces identically with capturable=False."))
+def test_all_kinematic_scene():
+    r"""Degenerate case: every DOF masked, so H is the identity and g is zero.
+
+    Physically meaningless (nothing to solve) but it should fail cleanly rather than
+    crash inside a matrix builder. Marked strict-xfail so this flips to a failure the
+    moment the underlying bug is fixed.
+    """
+    scene = _make_scene(_make_object(), True, num_objects=2, kinematic_ids=(0, 1))
+    scene.run_sim_step()
+
+
+@cuda_only
+@pytest.mark.parametrize("kinematic_ids", [(1,), (0, 1)],
+                         ids=["not-first", "multiple"])
+def test_kinematic_configurations(kinematic_ids):
+    r"""Cover shapes other than 'object 0 only' -- a kinematic object that is not the
+    leading contiguous DOF block, and more than one kinematic object."""
+    scene = _make_scene(_make_object(), True, num_objects=3,
+                        kinematic_ids=kinematic_ids)
+    z0 = torch.as_tensor(scene.sim_z.numpy()).clone()
+    for _ in range(10):
+        scene.run_sim_step()
+    z1 = torch.as_tensor(scene.sim_z.numpy())
+
+    assert torch.isfinite(z1).all(), "non-finite DOFs"
+    for obj_id in kinematic_ids:
+        d = wp.to_torch(scene.kin_obj_to_z_map[obj_id]).long().cpu()
+        assert torch.equal(z1[d], z0[d]), f"kinematic object {obj_id} moved"
 
 
 @cuda_only

@@ -283,8 +283,14 @@ class SimplicitsScene:
                 Newton's method, line search, linear solve and all -- as a single cuda
                 graph. Much faster than ``use_cuda_graphs`` when the step is launch-bound,
                 but requires CUDA 12.4+ for conditional graph nodes, and requires
-                ``direct_solve=True``. Does not yet support inter-object collisions or
-                kinematic objects; both raise. Defaults to False.
+                ``direct_solve=True``. Kinematic objects are supported: rather than
+                reducing the system with ``sim_P``/``sim_Pt`` as the non-capturable path
+                does, their DOFs are pinned by zeroing the corresponding Hessian rows and
+                columns (unit diagonal) and gradient entries. That is algebraically
+                identical, since the projection matrix is a pure row selection, and it
+                keeps shapes fixed as capture requires -- at the cost of factorizing over
+                DOFs the reduced path would project away. Inter-object collisions are not
+                yet supported and raise. Defaults to False.
             check_solve_info (bool, optional): Only used when ``capturable=True``. Reads
                 the LU factorization's info code back to the host after each graph launch
                 and raises on a singular Hessian, restoring the ``LinAlgError`` the
@@ -625,7 +631,10 @@ class SimplicitsScene:
         self._graph_dict = {}
         # Slot 2 holds the combined Newton energy for the capturable path, so the line
         # search can read a device scalar instead of syncing.
-        self._scene_energy = wp.zeros(3, dtype=float)
+        # Explicit device: without it this lands on warp's default device while
+        # _scene_energy_coeff is on self.device, which mixes devices inside
+        # _launch_array_inner for a scene built on anything but cuda:0.
+        self._scene_energy = wp.zeros(3, dtype=float, device=self.device)
         self._scene_gradient = wp.empty_like(self.sim_z)
         self._eval_dx = wp.empty_like(self.sim_pts)
         self._eval_z = wp.empty_like(self.sim_z)
@@ -653,7 +662,8 @@ class SimplicitsScene:
         # solve is just the free-DOF submatrix -- masking the full-size system gives the
         # identical answer while keeping shapes fixed and allocation-free, which is what
         # capture requires. A length-n mask is used rather than precomputed (n, n)
-        # mask/diagonal matrices, which would cost ~118 MiB at 3840 DOF.
+        # mask/diagonal matrices, which would cost ~112 MiB at 3840 DOF
+        # (3840^2 x 4 B = 56.25 MiB each, two of them).
         free_mask = torch.ones(num_dofs, device=self.device, dtype=self.dtype)
         for kin_id in getattr(self, "kin_obj_list", []) or []:
             free_mask[wp.to_torch(self.kin_obj_to_z_map[kin_id])] = 0.0

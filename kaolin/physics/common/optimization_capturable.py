@@ -148,11 +148,19 @@ def _launch_array_inner(a, b, out, alpha=0.0, take_abs=False):
     Args:
         a (wp.array): Left operand.
         b (wp.array): Right operand.
-        out (wp.array): One-element output; scaled by ``alpha`` before accumulating.
-        alpha (float, optional): Prescale applied to ``out``. Use 0.0 to overwrite. Defaults to 0.0.
+        out (wp.array): One-element output; reset or scaled by ``alpha`` before accumulating.
+        alpha (float, optional): Prescale applied to ``out``. 0.0 means overwrite. Defaults to 0.0.
         take_abs (bool, optional): Take the absolute value of the result. Defaults to False.
     """
-    out *= alpha
+    if alpha == 0.0:
+        # NOT `out *= 0.0`: 0.0 * inf and 0.0 * NaN are both NaN, so a single non-finite
+        # value would stick permanently. The downstream predicate is
+        # `int32(value >= 0.0)`, which reads 0 for NaN -- so convergence would report
+        # "not converged" and Armijo "violated" forever, and Newton would silently burn
+        # every iteration on every subsequent step.
+        out.zero_()
+    else:
+        out *= alpha
     wp.launch(_array_inner_kernel, dim=a.shape, inputs=[a, b], outputs=[out])
     if take_abs:
         wp.launch(_array_abs_kernel, dim=out.shape, inputs=[out], outputs=[out])
@@ -317,10 +325,16 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
                               max_ls_steps=10, ls_alpha=1e-3, ls_beta=0.6):
     r"""CUDA-graph-capturable Newton's method.
 
-    Drop-in replacement for :func:`kaolin.physics.common.optimization.newtons_method`
-    for the unprojected case (``P``/``Pt`` are ``None``, i.e. no kinematic objects).
+    Drop-in replacement for :func:`kaolin.physics.common.optimization.newtons_method`.
     Updates ``x`` in place rather than rebinding it, so the caller's buffer address
     stays valid across graph replays.
+
+    Takes no ``P``/``Pt``: kinematic DOFs are not projected out but **pinned in place**,
+    by zeroing their Hessian rows and columns (unit diagonal) and their gradient entries
+    before the solve. See :func:`apply_kinematic_bc`. That is algebraically identical to
+    the reduced solve, because ``create_projection_matrix`` returns a pure row-selection
+    matrix, and it is what keeps every shape fixed for capture. The caller is responsible
+    for applying the mask; this function just solves whatever system it is handed.
 
     The Hessian is dense and preallocated: sparse BSR products reallocate and can
     change topology between iterations, which is not capturable.
