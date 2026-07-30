@@ -28,6 +28,9 @@ from kaolin.physics.simplicits import PhysicsPoints, SimplicitsObject, Simplicit
 cuda_only = pytest.mark.skipif(not torch.cuda.is_available(),
                                reason="capturable path requires CUDA")
 
+# y translation given to object 0 by _make_scene; the animation test shifts relative to it.
+_KIN_INIT_Y = 0.55
+
 
 def _make_object(n_pts=600, num_handles=4, num_nodes=128, ym=1e6, seed=0):
     torch.manual_seed(seed)
@@ -44,7 +47,7 @@ def _make_scene(sim_obj, capturable, num_objects=2, num_qp=96, max_ls_steps=10,
                             max_ls_steps=max_ls_steps, capturable=capturable, **kwargs)
     for i in range(num_objects):
         T = torch.eye(4, device="cuda", dtype=torch.float32)
-        T[1, 3] = 0.55 + 1.2 * i
+        T[1, 3] = _KIN_INIT_Y + 1.2 * i
         scene.add_object(sim_obj, num_qp=num_qp, init_transform=T, apply_qr=False,
                          is_kinematic=(is_kinematic and i == 0))
     scene.set_scene_gravity(torch.tensor([0.0, -9.8, 0.0]))
@@ -111,11 +114,88 @@ def test_capturable_survives_empty_cache():
 
 
 @cuda_only
-def test_kinematic_objects_rejected():
-    r"""Kinematic DOFs need the P/Pt projection, which the capturable path lacks."""
+def test_kinematic_object_stays_pinned():
+    r"""A kinematic object must not move under capture, while dynamic ones do.
+
+    Kinematic DOFs are pinned by zeroing their Hessian rows/columns (unit diagonal) and
+    their gradient entries, so the solve returns exactly zero for them. That is
+    algebraically identical to the host path's sim_P/sim_Pt reduction, because
+    create_projection_matrix builds P as a pure selection matrix.
+    """
     scene = _make_scene(_make_object(), True, is_kinematic=True)
-    with pytest.raises(NotImplementedError, match="kinematic"):
+    kin_id, dyn_id = 0, 1
+    y_kin0 = float(scene.get_object_deformed_pts(kin_id)[:, 1].mean())
+    y_dyn0 = float(scene.get_object_deformed_pts(dyn_id)[:, 1].mean())
+
+    for _ in range(20):
         scene.run_sim_step()
+
+    y_kin1 = float(scene.get_object_deformed_pts(kin_id)[:, 1].mean())
+    y_dyn1 = float(scene.get_object_deformed_pts(dyn_id)[:, 1].mean())
+
+    assert abs(y_kin1 - y_kin0) < 1e-5, \
+        f"kinematic object moved {abs(y_kin1 - y_kin0):.3e}"
+    assert abs(y_dyn1 - y_dyn0) > 1e-2, \
+        "dynamic object did not move, so pinning was not actually exercised"
+
+
+@cuda_only
+def test_capturable_matches_host_with_kinematic():
+    r"""Equivalence must survive a kinematic object being present.
+
+    Note the host path is internally inconsistent here: it evaluates gradient and
+    Hessian at the full x including kinematic values, but _line_search evaluates energy
+    at P @ x_red, with kinematic DOFs zeroed. For a separable energy that cancels in the
+    Armijo test, since both f and f_new carry the same constant -- and every force the
+    capturable path supports (gravity, floor, boundary, elastic, and the block-diagonal
+    BMB kinetic term) is separable per object. This stops holding once inter-object
+    collisions land, because contact couples kinematic and dynamic DOFs.
+
+    A failure here means that argument is wrong; do not loosen the tolerance.
+    """
+    obj = _make_object()
+    ref = _trajectory(_make_scene(obj, False, is_kinematic=True), 20)
+    cap = _trajectory(_make_scene(obj, True, is_kinematic=True), 20)
+
+    assert ref.abs().max() > 1e-3
+    rel = (ref - cap).abs().max() / ref.abs().max()
+    assert rel < 1e-4, f"captured vs host relative error {rel:.3e} with a kinematic object"
+
+
+@cuda_only
+def test_kinematic_object_can_be_animated_under_capture():
+    r"""set_kinematic_object_transform must take effect without forcing a re-capture.
+
+    It writes through a torch view of sim_z, so the store is in place and the captured
+    graph -- which holds that pointer -- sees the new value on the next replay. This is
+    the scripted-motion use case, and it only works because the setter no longer rebinds
+    self.sim_z to a fresh wp.array afterwards.
+    """
+    scene = _make_scene(_make_object(), True, is_kinematic=True)
+    for _ in range(3):
+        scene.run_sim_step()
+    graph_before = dict(scene._graph_dict)
+    y0 = float(scene.get_object_deformed_pts(0)[:, 1].mean())
+
+    # Assert on the *change* in y, not an absolute position. Transforms are relative to
+    # the rest pose (standard_transform_to_relative), and the rest centroid is not exactly
+    # zero -- torch.rand(n, 3) - 0.5 leaves a sampling offset of ~1e-3 at n=800 -- which
+    # would otherwise show up as a spurious error of that size.
+    SHIFT = 1.0
+    T = torch.eye(4, device="cuda", dtype=torch.float32)
+    T[1, 3] = _KIN_INIT_Y + SHIFT
+    scene.set_kinematic_object_transform(0, T)
+
+    for _ in range(5):
+        scene.run_sim_step()
+
+    y1 = float(scene.get_object_deformed_pts(0)[:, 1].mean())
+    assert abs((y1 - y0) - SHIFT) < 1e-3, \
+        f"kinematic object did not follow its scripted transform: moved {y1 - y0:.5f}, " \
+        f"expected {SHIFT}"
+    assert scene._graph_dict.keys() == graph_before.keys(), "should not have re-captured"
+    assert all(scene._graph_dict[k][0] is graph_before[k][0] for k in graph_before), \
+        "graph was re-captured despite only a kinematic transform changing"
 
 
 @cuda_only

@@ -37,7 +37,30 @@ forfeits the speedup.
 import torch
 import warp as wp
 
-__all__ = ['CapturableNewtonBuffers', 'newtons_method_capturable']
+__all__ = ['CapturableNewtonBuffers', 'newtons_method_capturable',
+           'apply_kinematic_bc', 'mask_in_place']
+
+
+def apply_kinematic_bc(H_dense, free_mask):
+    r"""Pins kinematic DOFs in a dense Hessian, in place.
+
+    Args:
+        H_dense (wp.array2d): Dense Hessian of shape :math:`(n, n)`. Modified in place.
+        free_mask (wp.array): Length-:math:`n` mask, 1.0 for free DOFs and 0.0 for
+            kinematic ones.
+    """
+    wp.launch(_apply_kinematic_bc_kernel, dim=H_dense.shape,
+              inputs=[H_dense, free_mask])
+
+
+def mask_in_place(x, mask):
+    r"""Element-wise ``x *= mask``, in place and allocation-free.
+
+    Args:
+        x (wp.array): Array to mask. Modified in place.
+        mask (wp.array): Mask of the same length.
+    """
+    wp.launch(_mask_in_place_kernel, dim=x.shape, inputs=[x, mask])
 
 
 @wp.kernel
@@ -78,6 +101,31 @@ def _assert_zero(a, i=0):
     and must be paired with a host-side check for anything that must not pass silently.
     """
     wp.launch(_assert_zero_kernel, dim=1, inputs=[a, i])
+
+
+@wp.kernel
+def _apply_kinematic_bc_kernel(H: wp.array2d(dtype=wp.float32),
+                               free_mask: wp.array(dtype=wp.float32)):  # pragma: no cover
+    r"""Pins kinematic DOFs in a dense Hessian: ``H[i,j] = H[i,j]m[i]m[j] + d_ij(1-m[i])``.
+
+    Zeroing the kinematic rows *and* columns and putting 1 on their diagonal makes the
+    full-size solve algebraically identical to solving the reduced free-DOF system and
+    mapping back: ``[H_ff 0; 0 I][dz_f; dz_k] = [-g_f; 0]`` yields
+    ``dz_f = -H_ff^-1 g_f`` with ``dz_k`` exactly zero. Zeroing only the diagonal would
+    leave the off-diagonal coupling blocks and give a different answer.
+    """
+    i, j = wp.tid()
+    mi = free_mask[i]
+    H[i, j] = H[i, j] * mi * free_mask[j]
+    if i == j:
+        H[i, j] = H[i, j] + (1.0 - mi)
+
+
+@wp.kernel
+def _mask_in_place_kernel(x: wp.array(dtype=wp.float32),
+                          mask: wp.array(dtype=wp.float32)):  # pragma: no cover
+    tid = wp.tid()
+    x[tid] = x[tid] * mask[tid]
 
 
 @wp.kernel

@@ -32,7 +32,8 @@ from ..materials import NeohookeanElasticMaterial
 from ..materials.material_utils import get_defo_grad, to_lame, _get_defo_grad_wp_kernel
 from ..common.optimization import newtons_method
 from ..common.optimization_capturable import (
-    CapturableNewtonBuffers, newtons_method_capturable, _launch_array_inner)
+    CapturableNewtonBuffers, newtons_method_capturable, _launch_array_inner,
+    apply_kinematic_bc, mask_in_place)
 from .precomputed import sparse_lbs_matrix, sparse_dFdz_matrix
 from .skinning import standard_lbs
 from .training import SkinnedPointsProtocol, SkinnedPhysicsPoints, SimplicitsObject
@@ -646,6 +647,19 @@ class SimplicitsScene:
 
         self._nm_buf = CapturableNewtonBuffers(num_dofs, device=self.device)
 
+        # Kinematic DOFs are pinned by zeroing their rows/columns in the Hessian and
+        # their gradient entries, rather than by reducing the system with sim_P/sim_Pt.
+        # create_projection_matrix builds P as a pure selection matrix, so the reduced
+        # solve is just the free-DOF submatrix -- masking the full-size system gives the
+        # identical answer while keeping shapes fixed and allocation-free, which is what
+        # capture requires. A length-n mask is used rather than precomputed (n, n)
+        # mask/diagonal matrices, which would cost ~118 MiB at 3840 DOF.
+        free_mask = torch.ones(num_dofs, device=self.device, dtype=self.dtype)
+        for kin_id in getattr(self, "kin_obj_list", []) or []:
+            free_mask[wp.to_torch(self.kin_obj_to_z_map[kin_id])] = 0.0
+        self._kin_free_mask = wp.from_torch(free_mask.contiguous())
+        self._has_kinematic = bool((free_mask == 0.0).any())
+
         # Baked into the graph (as kernel immediates and into the folded BMB+reg
         # matrix). Recorded so a later change can be detected rather than silently
         # producing wrong results from a stale graph.
@@ -895,9 +909,13 @@ class SimplicitsScene:
         
         obj.init_transform = torch_utilities.standard_transform_to_relative(transform)
         obj.reset_sim_state()
+        # t_sim_z is a torch view of sim_z, so this store already lands in sim_z's
+        # memory. Deliberately no `self.sim_z = wp.from_torch(t_sim_z)` afterwards:
+        # rebinding to a new wp.array over the same buffer is a no-op for the host path
+        # but leaves a captured graph holding a handle the scene no longer owns. Keeping
+        # the write purely in place is what lets a kinematic object be animated
+        # mid-simulation under capturable=True without forcing a re-capture.
         t_sim_z[wp.to_torch(self.object_to_z_map[obj_idx])] = obj.z.flatten()
-        
-        self.sim_z = wp.from_torch(t_sim_z)
 
     def set_scene_gravity(self, acc_gravity=torch.tensor([0, 9.8, 0]), gravity_coeff=1.0):
         r"""Sets the gravity in the scene. Applies it to all objects in scene.
@@ -1485,6 +1503,8 @@ class SimplicitsScene:
                    beta=1.0, transpose=True)
         wps.bsr_mv(A=self.sim_dFdz, x=self._scene_dEdF, y=self._scene_gradient,
                    beta=1.0, transpose=True)
+        if self._has_kinematic:
+            mask_in_place(self._scene_gradient, self._kin_free_mask)
         return self._scene_gradient
 
     def _assemble_hessians_capturable(self, z):  # pragma: no cover
@@ -1522,6 +1542,9 @@ class SimplicitsScene:
         # H = dt*dt * H_potential + (BMB + reg*I)
         self._eval_H_dense_th *= (self.timestep * self.timestep)
         self._eval_H_dense_th += self._sim_BMB_plus_reg_dense_th
+        if self._has_kinematic:
+            # Applied last, so it is not undone by the BMB/regularizer add.
+            apply_kinematic_bc(self._eval_H_dense, self._kin_free_mask)
         return self._eval_H_dense
 
     def _newton_E_capturable(self, wp_z):  # pragma: no cover
@@ -1568,13 +1591,6 @@ class SimplicitsScene:
                 "Collision detection host-syncs on the contact count "
                 "(kaolin/physics/common/collisions.py:708), which sizes downstream "
                 "launches and allocations. Floor and boundary contact are supported.")
-
-        if self.sim_P is not None:
-            raise NotImplementedError(
-                "capturable=True does not yet support kinematic objects. sim_P/sim_Pt "
-                "pin kinematic DOFs in the reference newtons_method, but "
-                "newtons_method_capturable has no projection step -- a kinematic object "
-                "would silently free-fall instead of staying pinned.")
 
         for attr, captured in (
                 ("timestep", self._captured_timestep),
