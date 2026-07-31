@@ -49,6 +49,7 @@ def _detect_particle_collisions_wp_kernel(
     kinematic_gaps: wp.array(dtype=wp.vec3),  # kinematic gaps
     indices_a: wp.array(dtype=int),       # collision indices pairs a-b
     indices_b: wp.array(dtype=int),       # collision indices pairs a-b
+    pair_matrix: wp.array2d(dtype=wp.int32),  # which object pairs are in contact
 ):  # pragma: no cover
     tid = wp.tid()
 
@@ -101,6 +102,19 @@ def _detect_particle_collisions_wp_kernel(
                 indices_b[idx] = NULL_ELEMENT_INDEX
             else:
                 indices_b[idx] = idx_b
+
+            # Record which object pairs are touching, device-side. Done HERE rather than
+            # in a later kernel because obj_a/obj_b are still in scope: once the sentinel
+            # has been written, a static point's index is -1 and its object identity is
+            # gone (and a -1 subscript into qp_to_object_map would wrap to the last
+            # point, misattributing the contact). Writes are symmetric plus self-pairs,
+            # matching the host-side object_pairs construction. Plain stores, not atomics
+            # -- every write is the same constant, so races are benign.
+            if obj_a < pair_matrix.shape[0] and obj_b < pair_matrix.shape[0]:
+                pair_matrix[obj_a, obj_b] = 1
+                pair_matrix[obj_b, obj_a] = 1
+                pair_matrix[obj_a, obj_a] = 1
+                pair_matrix[obj_b, obj_b] = 1
 
 
 @wp.func
@@ -643,7 +657,9 @@ class Collision:
                  friction_fluid=0.1,
                  friction=0.5,
                  max_contacting_pairs=10000,
-                 bounds=True):
+                 bounds=True,
+                 num_objects=1,
+                 capturable=False):
         r"""
         Initialize the collision class. This class operates on the whole scene
 
@@ -659,6 +675,16 @@ class Collision:
             friction (float): Friction coefficient. Defaults to 0.5.
             max_contacting_pairs (int): Number of contact points. Defaults to 10000.
             bounds (bool): Bounds the dofs in the line search to prevent any interpenetration. Defaults to True.
+            num_objects (int): Number of objects in the scene, sizing the device-side
+                object-pair matrix that records which pairs are touching. That matrix is
+                the capturable replacement for the host-side ``object_pairs`` list. Leave
+                at the default and the matrix is a 1x1 stub that detection skips writing.
+                Defaults to 1.
+            capturable (bool): Launch every per-contact kernel over the fixed
+                ``max_contacting_pairs`` capacity, relying on the in-kernel device-count
+                guard, so no launch dimension depends on a host value. Required for cuda
+                graph capture. Note this changes the length of the arrays ``gradient`` and
+                ``hessian`` return when given preallocated outputs. Defaults to False.
         """
 
         # Collision constants
@@ -699,7 +725,15 @@ class Collision:
         # max_contacting_pairs capacity and relies on the in-kernel device-count guard,
         # so no launch dimension depends on a host-side value. Required for graph
         # capture; off by default so the existing path is unchanged.
-        self.capturable = False
+        self.capturable = capturable
+
+        # Device-side record of which object pairs are touching, written during detection
+        # and symmetrized with self-pairs to match the host-side object_pairs list. A
+        # single element of this is a legal wp.capture_if predicate, which is how the
+        # per-pair Hessian blocks get skipped without a host readback.
+        self.num_objects = num_objects
+        self.collision_pair_matrix = wp.zeros(
+            (num_objects, num_objects), dtype=wp.int32)
 
         # Jacobians used to map from cps of contact pairs back to dofs
         self.collision_J_a = None  # Size 3*num_cps x num_dofs
@@ -788,6 +822,9 @@ class Collision:
         # must live at a stable address.
         self.count.zero_()
         count = self.count
+        # Stale pairs from the previous frame must not persist; detection only ever
+        # sets entries, never clears them.
+        self.collision_pair_matrix.zero_()
 
         # Find collisions
         wp.launch(
@@ -806,7 +843,8 @@ class Collision:
                     self.collision_normals,
                     self.collision_kinematic_gaps,
                     self.collision_indices_a,
-                    self.collision_indices_b],
+                    self.collision_indices_b,
+                    self.collision_pair_matrix],
         )
         
 

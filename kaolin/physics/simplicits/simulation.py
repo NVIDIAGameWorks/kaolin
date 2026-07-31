@@ -1043,7 +1043,11 @@ class SimplicitsScene:
             friction_fluid=0.1, # Don't expose to users, its fine
             friction=friction,
             max_contacting_pairs=max_contact_pairs,
-            bounds=True
+            bounds=True,
+            # Sizes the device-side object-pair matrix, which is how the capturable
+            # Hessian assembly skips non-touching object pairs without a host readback.
+            num_objects=len(self.sim_obj_dict),
+            capturable=self.capturable,
         )
 
         self._invalidate_graphs()

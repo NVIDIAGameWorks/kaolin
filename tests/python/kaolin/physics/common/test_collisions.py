@@ -826,3 +826,119 @@ def test_count_guard_suppresses_stale_slots(test_scenes):
     assert torch.count_nonzero(stale_h) == 0, (
         f"{int(torch.count_nonzero(stale_h))} stale hessian entries survived in slots "
         f"[{n_sparse}, {n_dense})")
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects", "three_objects"], indirect=True)
+def test_pair_matrix_matches_host_object_pairs(test_scenes):
+    r"""The device-side pair matrix must agree exactly with the host object_pairs list.
+
+    `object_pairs` is built with torch.unique(...).cpu().numpy() -- three device syncs
+    and a variable-length host array driving a Python loop in the Hessian assembly. The
+    matrix is its capturable replacement: a single element of it is a legal
+    `wp.capture_if` predicate, so per-pair blocks can be skipped on device.
+
+    It is filled during detection rather than by a later kernel, because after detection
+    a static point's index is NULL_ELEMENT_INDEX and its object identity is gone -- and
+    a -1 subscript into the object map would wrap to the last point, attributing the
+    contact to the wrong object. `two_objects_one_static` is what covers that.
+    """
+    x0 = test_scenes['x0']
+    dx = test_scenes['dx']
+    obj_ids = test_scenes['obj_ids']
+    is_static = test_scenes['is_static']
+    n_obj = int(wp.to_torch(obj_ids).max()) + 1
+
+    collision = collisions.Collision(
+        dt=0.01, collision_particle_radius=0.5, detection_ratio=1.5,
+        impenetrable_barrier_ratio=0.5, friction=0.5,
+        max_contacting_pairs=4096, num_objects=n_obj)
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+
+    if collision.num_contacts == 0:
+        pytest.skip("scene produced no contacts")
+
+    device_matrix = torch.as_tensor(collision.collision_pair_matrix.numpy())
+
+    # Rebuild the same relation from the host-side list.
+    host_matrix = torch.zeros(n_obj, n_obj, dtype=device_matrix.dtype)
+    for i, j in collision.object_pairs:
+        host_matrix[int(i), int(j)] = 1
+
+    assert torch.equal(device_matrix, host_matrix), (
+        f"device pair matrix disagrees with host object_pairs\n"
+        f"device:\n{device_matrix}\nhost:\n{host_matrix}")
+
+    # Symmetric with self-pairs set, matching what the Hessian assembly needs.
+    assert torch.equal(device_matrix, device_matrix.T), "pair matrix must be symmetric"
+
+
+@pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
+def test_pair_matrix_clears_between_detections(test_scenes):
+    r"""Stale pairs must not persist: detection only ever sets entries, never clears."""
+    x0 = test_scenes['x0']
+    dx = test_scenes['dx']
+    obj_ids = test_scenes['obj_ids']
+    is_static = test_scenes['is_static']
+    n_obj = int(wp.to_torch(obj_ids).max()) + 1
+
+    collision = collisions.Collision(
+        dt=0.01, collision_particle_radius=0.5, detection_ratio=1.5,
+        impenetrable_barrier_ratio=0.5, friction=0.5,
+        max_contacting_pairs=4096, num_objects=n_obj)
+
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+    dense = torch.as_tensor(collision.collision_pair_matrix.numpy()).clone()
+
+    # Shrink the radius so nothing is in contact; the matrix must go empty.
+    collision.collision_radius = 1e-6
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+    sparse = torch.as_tensor(collision.collision_pair_matrix.numpy())
+
+    assert dense.sum() > 0, "first detection should have found contacts"
+    assert collision.num_contacts == 0, "second detection should have found none"
+    assert sparse.sum() == 0, (
+        f"pair matrix retained {int(sparse.sum())} stale entries from the previous frame")
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects_one_static"], indirect=True)
+def test_pair_matrix_records_static_contacts_that_host_list_loses(test_scenes):
+    r"""With a static object the device matrix is correct and `object_pairs` is not.
+
+    `object_pairs` is built host-side as `obj_ids[ind_a]`, but by then a static point's
+    index is NULL_ELEMENT_INDEX (-1), and torch wraps a -1 subscript to the LAST entry.
+    So the static object's contacts get attributed to whichever object owns the last
+    contact point, and the genuine (static, dynamic) coupling disappears from the list.
+    The Hessian assembly loops over that list, so the block coupling a kinematic collider
+    to a dynamic body would never be assembled.
+
+    It is not fixable host-side: once the sentinel is written the object identity is
+    gone. That is precisely why the pair matrix is filled inside the detection kernel,
+    where obj_a and obj_b are still in scope. This test pins the difference so the
+    device matrix is not "corrected" to match the broken list.
+    """
+    x0 = test_scenes['x0']
+    dx = test_scenes['dx']
+    obj_ids = test_scenes['obj_ids']
+    is_static = test_scenes['is_static']
+
+    collision = collisions.Collision(
+        dt=0.01, collision_particle_radius=0.5, detection_ratio=1.5,
+        impenetrable_barrier_ratio=0.5, friction=0.5,
+        max_contacting_pairs=4096, num_objects=2)
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+    assert collision.num_contacts > 0
+
+    device_matrix = torch.as_tensor(collision.collision_pair_matrix.numpy())
+
+    # Object 0 is static, object 1 dynamic, and they are in contact. The device matrix
+    # must record the cross coupling in both directions.
+    assert device_matrix[0, 1] == 1 and device_matrix[1, 0] == 1, (
+        f"device matrix lost the static/dynamic coupling:\n{device_matrix}")
+
+    # The host list, by contrast, never mentions object 0 -- documenting the bug rather
+    # than asserting the matrix should reproduce it.
+    host_objects = {int(i) for pair in collision.object_pairs for i in pair}
+    assert 0 not in host_objects, (
+        "object_pairs unexpectedly contains the static object -- if this now passes, "
+        "the host-side -1 wraparound has been fixed and this test should become an "
+        "equality check against the device matrix")
