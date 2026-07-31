@@ -22,6 +22,8 @@ from functools import partial
 
 import kaolin.physics.common.collisions as collisions
 from kaolin.physics.simplicits.precomputed import lbs_matrix
+from kaolin.physics.utils.torch_utilities import hess_reduction
+from kaolin.physics.utils.warp_utilities import capture_function_torch
 from kaolin.utils.testing import with_seed
 
 
@@ -942,3 +944,426 @@ def test_pair_matrix_records_static_contacts_that_host_list_loses(test_scenes):
         "object_pairs unexpectedly contains the static object -- if this now passes, "
         "the host-side -1 wraparound has been fixed and this test should become an "
         "equality check against the device matrix")
+
+
+def _make_collision(**kwargs):
+    r"""Collision configured the way every test in this file configures it."""
+    params = dict(dt=0.01, collision_particle_radius=0.05, detection_ratio=1.5,
+                  impenetrable_barrier_ratio=0.5, friction=0.5)
+    params.update(kwargs)
+    return collisions.Collision(**params)
+
+
+def _detect_and_gather(test_scenes, **kwargs):
+    r"""Runs one detection and returns everything the chunk kernels need.
+
+    Detection happens exactly once and the resulting contact arrays are then shared by
+    every comparison in the caller. Re-detecting from the same state would measure
+    ``wp.atomic_add`` slot-assignment scheduling, not implementation agreement: the
+    contact *set* is stable but its storage *order* is not.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    weights, obj_ids = test_scenes['weights'], test_scenes['obj_ids']
+    is_static = test_scenes['is_static']
+
+    collision = _make_collision(**kwargs)
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+
+    t_B = lbs_matrix(wp.to_torch(x0), wp.to_torch(weights)).contiguous()
+    return collision, wp.from_torch(t_B), t_B
+
+
+def _chunk_reference(t_B, ind_a, ind_b, start, chunk, num_contacts):
+    r"""Row-gather reference for one chunk, guarding NULL_ELEMENT_INDEX on both sides."""
+    device = t_B.device
+    out = torch.zeros(3 * chunk, t_B.shape[1], device=device)
+    offs = torch.arange(3, device=device)
+    for c in range(chunk):
+        g = start + c
+        if g >= num_contacts:
+            continue  # padding: stays zero
+        for idx, sign in ((int(ind_a[g]), 1.0), (int(ind_b[g]), -1.0)):
+            if idx != collisions.NULL_ELEMENT_INDEX:
+                out[3 * c + offs] += sign * t_B[3 * idx + offs]
+    return out
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects", "three_objects"], indirect=True)
+def test_jacobian_chunk_matches_dense_jacobian(test_scenes):
+    r"""Every chunk reproduces the corresponding slice of the sparse-assembled Jacobian.
+
+    This is the identity the whole chunked design rests on: the collision Jacobian is a
+    pure row gather from the dense subspace basis, so a chunk can be built at any offset
+    without ever materializing the full (3*max_contacting_pairs, num_dofs) matrix.
+    Equality is *exact*, not approximate -- both sides gather the same floats and the
+    only arithmetic is one subtraction, so any tolerance here would be hiding something.
+    """
+    collision, b_dense, t_B = _detect_and_gather(test_scenes)
+    collision.calculate_jacobian(test_scenes['weights'], test_scenes['x0'],
+                                 test_scenes['is_static'])
+    num_contacts = collision.num_contacts
+    assert num_contacts > 1, "fixture produced too few contacts to chunk meaningfully"
+
+    expected = collision.collision_J_dense
+    chunk = max(1, num_contacts // 2)
+    chunk_start = wp.zeros(1, dtype=int)
+    j_chunk = wp.zeros((3 * chunk, t_B.shape[1]), dtype=wp.float32)
+
+    for start in range(0, num_contacts, chunk):
+        chunk_start.fill_(start)
+        collision.build_jacobian_chunk(b_dense, chunk_start, j_chunk)
+
+        rows = min(chunk, num_contacts - start)
+        got = wp.to_torch(j_chunk)[:3 * rows]
+        want = expected[3 * start:3 * (start + rows)]
+        assert torch.equal(got, want), \
+            f"chunk at contact {start} differs from the dense Jacobian slice"
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects", "three_objects"], indirect=True)
+def test_jacobian_chunk_zeroes_past_contact_count(test_scenes):
+    r"""Rows past the live contact count are zero, not stale and not garbage.
+
+    The reduction runs over the whole chunk, so a padded row that carried any value at
+    all would add a spurious rank-1 term to :math:`J^T H J`. Two cases matter: a chunk
+    that straddles the count, and one entirely beyond it.
+    """
+    collision, b_dense, t_B = _detect_and_gather(test_scenes)
+    num_contacts = collision.num_contacts
+    assert num_contacts > 1
+
+    chunk_start = wp.zeros(1, dtype=int)
+    # Sized so the chunk starting one contact before the count straddles it.
+    chunk = max(2, num_contacts // 2)
+    j_chunk = wp.zeros((3 * chunk, t_B.shape[1]), dtype=wp.float32)
+
+    # Poison the buffer first: zeros are only meaningful if the kernel wrote them.
+    wp.to_torch(j_chunk).fill_(7.0)
+
+    straddle = num_contacts - 1
+    chunk_start.fill_(straddle)
+    collision.build_jacobian_chunk(b_dense, chunk_start, j_chunk)
+    got = wp.to_torch(j_chunk)
+    assert got[:3].abs().sum() > 0, "the one live contact in the straddling chunk is zero"
+    assert torch.equal(got[3:], torch.zeros_like(got[3:])), \
+        "rows past the contact count were not zeroed"
+
+    wp.to_torch(j_chunk).fill_(7.0)
+    chunk_start.fill_(num_contacts)
+    collision.build_jacobian_chunk(b_dense, chunk_start, j_chunk)
+    got = wp.to_torch(j_chunk)
+    assert torch.equal(got, torch.zeros_like(got)), \
+        "a chunk entirely past the contact count must be all zero"
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects_one_static"], indirect=True)
+def test_jacobian_chunk_guards_static_sentinel(test_scenes):
+    r"""A static side contributes no rows -- it must not wrap to the last point.
+
+    ``NULL_ELEMENT_INDEX`` is -1 and Warp's ``index()`` folds negatives from the end, so
+    an unguarded gather at a static contact silently reads the *last* contact point's
+    rows and attributes that motion to whichever object owns it.
+
+    The host sparse path does exactly that today (``sparse_collision_jacobian_matrix``
+    populates all 3 rows for a contact whose index is -1), so ``collision_J_dense`` is
+    deliberately *not* the oracle here -- the guarded gather is. This is latent rather
+    than live: ``simulation.py`` calls ``detect_collisions`` with ``cp_is_static=None``,
+    so production never writes the sentinel.
+    """
+    collision, b_dense, t_B = _detect_and_gather(test_scenes)
+    num_contacts = collision.num_contacts
+    ind_a = wp.to_torch(collision.collision_indices_a[:num_contacts]).cpu()
+    ind_b = wp.to_torch(collision.collision_indices_b[:num_contacts]).cpu()
+    static_side = (ind_a == collisions.NULL_ELEMENT_INDEX) | \
+                  (ind_b == collisions.NULL_ELEMENT_INDEX)
+    assert num_contacts > 0 and bool(static_side.any()), \
+        "fixture produced no static-partner contacts, so this guards nothing"
+
+    chunk_start = wp.zeros(1, dtype=int)
+    j_chunk = wp.zeros((3 * num_contacts, t_B.shape[1]), dtype=wp.float32)
+    collision.build_jacobian_chunk(b_dense, chunk_start, j_chunk)
+    got = wp.to_torch(j_chunk)
+
+    want = _chunk_reference(t_B, ind_a, ind_b, 0, num_contacts, num_contacts)
+    assert torch.equal(got, want), \
+        "static-partner contacts were not gathered with the sentinel guarded"
+
+    # The specific failure mode: rows equal to +/- the last point's basis rows.
+    last = t_B[3 * (t_B.shape[0] // 3 - 1):]
+    for c in torch.nonzero(static_side).squeeze(1).tolist():
+        assert not torch.equal(got[3 * c:3 * c + 3].abs(), last.abs()), \
+            f"contact {c} gathered the last point's rows -- the -1 index wrapped"
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects", "three_objects"], indirect=True)
+def test_hessian_chunk_gather(test_scenes):
+    r"""The per-contact 3x3 blocks gather by chunk, with padding zeroed."""
+    collision, b_dense, t_B = _detect_and_gather(test_scenes)
+    num_contacts = collision.num_contacts
+    assert num_contacts > 1
+
+    capacity = collision.max_contacting_pairs
+    h_full = wp.zeros(capacity, dtype=wp.mat33)
+    collision.hessian(test_scenes['dx'], test_scenes['x0'], 1.0,
+                      hessian_blocks=h_full)
+    t_h_full = wp.to_torch(h_full)
+
+    chunk = max(2, num_contacts // 2)
+    chunk_start = wp.zeros(1, dtype=int)
+    h_chunk = wp.zeros(chunk, dtype=wp.mat33)
+
+    for start in range(0, num_contacts, chunk):
+        wp.to_torch(h_chunk).fill_(7.0)
+        chunk_start.fill_(start)
+        collision.gather_hessian_chunk(h_full, chunk_start, h_chunk)
+        got = wp.to_torch(h_chunk)
+
+        rows = min(chunk, num_contacts - start)
+        assert torch.equal(got[:rows], t_h_full[start:start + rows]), \
+            f"hessian chunk at contact {start} does not match the full array"
+        assert torch.equal(got[rows:], torch.zeros_like(got[rows:])), \
+            "hessian blocks past the contact count were not zeroed"
+
+
+def _dense_collision_hessian(collision, weights, x0, dx, num_dofs):
+    r"""Reference :math:`J^T H J` built the way the host path builds it today."""
+    collision.calculate_jacobian(weights, x0)
+    num_contacts = collision.num_contacts
+    h_full = wp.zeros(collision.max_contacting_pairs, dtype=wp.mat33)
+    collision.hessian(dx, x0, 1.0, hessian_blocks=h_full)
+    t_h = wp.to_torch(h_full)[:num_contacts]
+    return hess_reduction(collision.collision_J_dense, t_h), h_full, num_contacts
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects", "three_objects"], indirect=True)
+def test_chunked_hessian_matches_dense_reduction(test_scenes):
+    r"""The chunked reduction reproduces the monolithic :math:`J^T H J`.
+
+    Not bit-identical, and it cannot be: one large GEMM and a sum of small ones
+    accumulate the same products in different orders, and float32 addition is not
+    associative. The tolerance below is derived from that mechanism -- float32 epsilon
+    times the number of accumulated terms times the result magnitude -- rather than
+    fitted to whatever the run happens to produce.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    weights, obj_ids = test_scenes['weights'], test_scenes['obj_ids']
+
+    collision = _make_collision(max_contacting_pairs=64, capturable=True)
+    collision.detect_collisions(dx, x0, obj_ids, test_scenes['is_static'])
+
+    t_B = lbs_matrix(wp.to_torch(x0), wp.to_torch(weights)).contiguous()
+    num_dofs = t_B.shape[1]
+    expected, h_full, num_contacts = _dense_collision_hessian(
+        collision, weights, x0, dx, num_dofs)
+    assert num_contacts > 1
+
+    reducer = collisions.ChunkedCollisionHessian(collision, num_dofs, chunk_size=8)
+    out = torch.zeros(num_dofs, num_dofs, device=t_B.device)
+    reducer.reduce(wp.from_torch(t_B), h_full, out)
+
+    scale = max(float(expected.abs().max()), 1.0)
+    tol = torch.finfo(torch.float32).eps * (3 * num_contacts) * scale
+    err = (out - expected).abs().max().item()
+    assert err <= tol, \
+        f"chunked reduction differs from the dense one by {err:.3e} (bound {tol:.3e})"
+
+
+@pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
+def test_chunked_hessian_is_invariant_to_chunk_size(test_scenes):
+    r"""Chunking is a partition of the sum, so the split point must not matter.
+
+    A chunk size that divides the contact count differently exercises different padding
+    boundaries; if the padding were not zeroed, the results would diverge as the number
+    of empty chunks changed.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    weights, obj_ids = test_scenes['weights'], test_scenes['obj_ids']
+
+    collision = _make_collision(max_contacting_pairs=64, capturable=True)
+    collision.detect_collisions(dx, x0, obj_ids, test_scenes['is_static'])
+    t_B = lbs_matrix(wp.to_torch(x0), wp.to_torch(weights)).contiguous()
+    num_dofs = t_B.shape[1]
+    b_dense = wp.from_torch(t_B)
+
+    h_full = wp.zeros(64, dtype=wp.mat33)
+    collision.hessian(dx, x0, 1.0, hessian_blocks=h_full)
+
+    results = []
+    for chunk_size in (4, 8, 16, 64):
+        reducer = collisions.ChunkedCollisionHessian(
+            collision, num_dofs, chunk_size=chunk_size)
+        out = torch.zeros(num_dofs, num_dofs, device=t_B.device)
+        results.append(reducer.reduce(b_dense, h_full, out).clone())
+
+    scale = max(float(results[0].abs().max()), 1.0)
+    tol = torch.finfo(torch.float32).eps * 3 * collision.num_contacts * scale
+    for chunk_size, got in zip((8, 16, 64), results[1:]):
+        err = (got - results[0]).abs().max().item()
+        assert err <= tol, \
+            f"chunk_size={chunk_size} differs from chunk_size=4 by {err:.3e}"
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects"], indirect=True)
+def test_chunked_hessian_rejects_indivisible_chunk_size(test_scenes):
+    r"""An indivisible capacity leaves a final chunk that reads past the arrays."""
+    collision = _make_collision(max_contacting_pairs=64, capturable=True)
+    with pytest.raises(ValueError, match="exact multiple"):
+        collisions.ChunkedCollisionHessian(collision, 24, chunk_size=7)
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects"], indirect=True)
+def test_chunked_hessian_ignores_stale_contacts_past_the_count(test_scenes):
+    r"""Contacts written by an earlier, busier step must not leak into the reduction.
+
+    The buffers are fixed-capacity and are not cleared between detections, so slots past
+    the current count still hold the previous step's indices. Only the device count
+    distinguishes live from stale -- this asserts the reduction respects it.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    weights, obj_ids = test_scenes['weights'], test_scenes['obj_ids']
+
+    collision = _make_collision(max_contacting_pairs=64, capturable=True)
+    collision.detect_collisions(dx, x0, obj_ids, test_scenes['is_static'])
+    t_B = lbs_matrix(wp.to_torch(x0), wp.to_torch(weights)).contiguous()
+    num_dofs = t_B.shape[1]
+    b_dense = wp.from_torch(t_B)
+    num_contacts = collision.num_contacts
+    assert 0 < num_contacts < 60
+
+    h_full = wp.zeros(64, dtype=wp.mat33)
+    collision.hessian(dx, x0, 1.0, hessian_blocks=h_full)
+
+    reducer = collisions.ChunkedCollisionHessian(collision, num_dofs, chunk_size=8)
+    out = torch.zeros(num_dofs, num_dofs, device=t_B.device)
+    reducer.reduce(b_dense, h_full, out)
+    baseline = out.clone()
+
+    # Forge plausible-looking contacts in the stale tail: real indices, real Hessian
+    # blocks. Nothing but the count marks them dead. The helper picks the largest live
+    # block deliberately -- forging with block 0 would often copy an exactly-zero barrier
+    # block, and the assertion below would hold no matter what the reduction did.
+    _forge_extra_contacts(collision, h_full, num_contacts, 64)
+
+    reducer.reduce(b_dense, h_full, out)
+    assert torch.equal(out, baseline), \
+        "stale contacts past the device count contributed to the reduction"
+
+
+def _forge_extra_contacts(collision, h_full, num_contacts, upto):
+    r"""Fills stale slots with copies of the most significant live contact.
+
+    Copies the *largest* block rather than block 0: barrier Hessians are exactly zero for
+    contacts outside the barrier distance, and block 0 frequently is. Forging with a zero
+    block makes every "does the count matter?" assertion pass vacuously.
+    """
+    t_h = wp.to_torch(h_full)
+    block_norms = t_h.abs().sum(dim=(1, 2))[:num_contacts]
+    big = int(block_norms.argmax())
+    assert float(block_norms[big]) > 0.0, "no live contact has a nonzero Hessian block"
+
+    t_ia = wp.to_torch(collision.collision_indices_a)
+    t_ib = wp.to_torch(collision.collision_indices_b)
+    t_ia[num_contacts:upto] = t_ia[big]
+    t_ib[num_contacts:upto] = t_ib[big]
+    t_h[num_contacts:upto] = t_h[big]
+
+
+@pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
+def test_chunked_hessian_captures_and_tracks_live_contact_count(test_scenes):
+    r"""The captured reduction replays correctly at contact counts it never saw.
+
+    This is the point of expressing the chunk loop as ``wp.capture_while`` rather than a
+    Python loop. A Python loop bakes its trip count into the graph, so a step with more
+    contacts than the capture-time step would silently drop the excess. The device
+    predicate makes the trip count a property of replay: capture at 2 chunks' worth of
+    contacts, replay at 5, and get the 5-chunk answer without re-capturing.
+
+    Each replay is checked against the host-side full-capacity loop, which is bit-identical
+    rather than merely close -- chunks past the count contribute exact zeros, and adding
+    0.0 is exact.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    weights, obj_ids = test_scenes['weights'], test_scenes['obj_ids']
+
+    collision = _make_collision(max_contacting_pairs=64, capturable=True)
+    collision.detect_collisions(dx, x0, obj_ids, test_scenes['is_static'])
+    num_contacts = collision.num_contacts
+    assert 0 < num_contacts < 16
+
+    t_B = lbs_matrix(wp.to_torch(x0), wp.to_torch(weights)).contiguous()
+    num_dofs = t_B.shape[1]
+    b_dense = wp.from_torch(t_B)
+    h_full = wp.zeros(64, dtype=wp.mat33)
+    collision.hessian(dx, x0, 1.0, hessian_blocks=h_full)
+
+    reducer = collisions.ChunkedCollisionHessian(collision, num_dofs, chunk_size=8)
+    out = torch.zeros(num_dofs, num_dofs, device=t_B.device)
+
+    # No eager call first: capture must succeed from cold, which it only does because
+    # the reducer forces cuBLAS to create its handle in __init__.
+    graph, _ = capture_function_torch(lambda: reducer.reduce_capturable(b_dense, h_full, out))
+
+    out.zero_()
+    wp.capture_launch(graph)
+    torch.cuda.synchronize()
+    at_capture = out.clone()
+
+    _forge_extra_contacts(collision, h_full, num_contacts, 40)
+
+    seen_sums = []
+    for n_live in (40, 24, 8, 0, num_contacts):
+        collision.count.fill_(n_live)
+
+        out.zero_()
+        wp.capture_launch(graph)
+        torch.cuda.synchronize()
+        captured = out.clone()
+
+        out.zero_()
+        expected = reducer.reduce(b_dense, h_full, out).clone()
+
+        assert torch.equal(captured, expected), \
+            f"captured replay at count={n_live} differs from the host loop"
+        seen_sums.append(float(captured.abs().sum()))
+
+    assert seen_sums[-1] == pytest.approx(float(at_capture.abs().sum())), \
+        "replaying at the capture-time count should reproduce the capture-time result"
+    assert seen_sums[3] == 0.0, "zero contacts must reduce to zero"
+    # Strictly decreasing over 40 > 24 > 8 > 0: the trip count really is following the
+    # count, not replaying a fixed number of chunks.
+    assert seen_sums[0] > seen_sums[1] > seen_sums[2] > seen_sums[3], \
+        f"reduction did not scale with the live contact count: {seen_sums}"
+
+
+@pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
+def test_chunked_hessian_capture_allocates_nothing_on_replay(test_scenes):
+    r"""Replay must not allocate.
+
+    ``wp.capture_while`` bodies become CUDA conditional graph nodes, which are stricter
+    than a plain capture: they tolerate no allocation at all. Measured with
+    ``memory_stats`` rather than ``TorchDispatchMode``, which is blind to allocations made
+    below the dispatcher (cuBLAS/cuSOLVER workspaces).
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    weights, obj_ids = test_scenes['weights'], test_scenes['obj_ids']
+
+    collision = _make_collision(max_contacting_pairs=64, capturable=True)
+    collision.detect_collisions(dx, x0, obj_ids, test_scenes['is_static'])
+    t_B = lbs_matrix(wp.to_torch(x0), wp.to_torch(weights)).contiguous()
+    num_dofs = t_B.shape[1]
+    b_dense = wp.from_torch(t_B)
+    h_full = wp.zeros(64, dtype=wp.mat33)
+    collision.hessian(dx, x0, 1.0, hessian_blocks=h_full)
+
+    reducer = collisions.ChunkedCollisionHessian(collision, num_dofs, chunk_size=8)
+    out = torch.zeros(num_dofs, num_dofs, device=t_B.device)
+    graph, _ = capture_function_torch(lambda: reducer.reduce_capturable(b_dense, h_full, out))
+
+    torch.cuda.synchronize()
+    before = torch.cuda.memory_stats()['allocation.all.allocated']
+    for _ in range(5):
+        wp.capture_launch(graph)
+    torch.cuda.synchronize()
+    after = torch.cuda.memory_stats()['allocation.all.allocated']
+
+    assert after == before, f"{after - before} allocations during graph replay"

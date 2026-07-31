@@ -20,8 +20,9 @@ import warp.sparse as wps
 
 from kaolin.physics.simplicits.precomputed import sparse_collision_jacobian_matrix
 from kaolin.physics.utils.warp_utilities import _bsr_to_torch, _warp_csr_from_torch_dense
+from kaolin.physics.utils.torch_utilities import hess_reduction
 
-__all__ = ['Collision']
+__all__ = ['Collision', 'ChunkedCollisionHessian']
 
 # TODO: Separate the cps from qps. Currently we use qps for both.
 # TODO: Currently self collisions are disabled via high immune radius.
@@ -115,6 +116,89 @@ def _detect_particle_collisions_wp_kernel(
                 pair_matrix[obj_b, obj_a] = 1
                 pair_matrix[obj_a, obj_a] = 1
                 pair_matrix[obj_b, obj_b] = 1
+
+
+@wp.kernel
+def _collision_jacobian_chunk_wp_kernel(
+    b_dense: wp.array2d(dtype=wp.float32),    # (3*num_cps, num_dofs) subspace basis
+    indices_a: wp.array(dtype=int),
+    indices_b: wp.array(dtype=int),
+    num_contacts: wp.array(dtype=int),
+    chunk_start: wp.array(dtype=int),         # device-resident, so the loop never syncs
+    j_chunk: wp.array2d(dtype=wp.float32),    # (3*chunk, num_dofs) output
+):  # pragma: no cover
+    r"""Materializes one chunk of the collision Jacobian as a row gather from ``B``.
+
+    ``J[3c+k, :] = B[3*idx_a[c]+k, :] - B[3*idx_b[c]+k, :]`` -- verified exactly equal to
+    the sparse-assembled ``collision_J_dense``. Because it is only a gather, a chunk can
+    be built directly at any offset, so the full ``(3*max_contacting_pairs, num_dofs)``
+    Jacobian never has to exist: memory is ``chunk * 3 * num_dofs`` regardless of
+    capacity. At the capacities kaolin's examples use that is 14 MiB rather than 343 MiB.
+
+    ``chunk_start`` is an array, not an int, because the enclosing ``wp.capture_while``
+    advances it on device; a Python int would bake the offset into the graph.
+    """
+    c, j = wp.tid()
+    g = chunk_start[0] + c
+
+    # Past the live contact count: zero the rows. The reduction runs over the whole
+    # chunk, so padding must contribute exactly nothing to J^T H J.
+    if g >= num_contacts[0]:
+        for k in range(3):
+            j_chunk[3 * c + k, j] = 0.0
+        return
+
+    idx_a = indices_a[g]
+    idx_b = indices_b[g]
+    for k in range(3):
+        v = float(0.0)
+        # A static side has no DOFs to differentiate against, so it contributes no rows.
+        # Guarded for the same reason as _collision_offset_wp_func: NULL_ELEMENT_INDEX is
+        # a marker, and gathering at -1 would wrap to the last row of B.
+        if idx_a != NULL_ELEMENT_INDEX:
+            v += b_dense[3 * idx_a + k, j]
+        if idx_b != NULL_ELEMENT_INDEX:
+            v -= b_dense[3 * idx_b + k, j]
+        j_chunk[3 * c + k, j] = v
+
+
+@wp.kernel
+def _collision_hessian_chunk_wp_kernel(
+    h_full: wp.array(dtype=wp.mat33),
+    num_contacts: wp.array(dtype=int),
+    chunk_start: wp.array(dtype=int),
+    h_chunk: wp.array(dtype=wp.mat33),
+):  # pragma: no cover
+    r"""Gathers the per-contact 3x3 Hessian blocks for one chunk, zeroing the padding."""
+    c = wp.tid()
+    g = chunk_start[0] + c
+    if g >= num_contacts[0]:
+        h_chunk[c] = wp.mat33(0.0)
+    else:
+        h_chunk[c] = h_full[g]
+
+
+@wp.kernel
+def _advance_chunk_start_wp_kernel(
+    chunk_start: wp.array(dtype=int),
+    chunk_size: int,
+):  # pragma: no cover
+    r"""Advances the chunk cursor on device, so the loop never syncs to advance it."""
+    chunk_start[0] = chunk_start[0] + chunk_size
+
+
+@wp.kernel
+def _chunk_loop_cond_wp_kernel(
+    chunk_start: wp.array(dtype=int),
+    num_contacts: wp.array(dtype=int),
+    cond: wp.array(dtype=int),
+):  # pragma: no cover
+    r"""``wp.capture_while`` predicate: are there still live contacts left to reduce?
+
+    Written as a device array so the loop trip count follows the *actual* contact count
+    at replay rather than the capacity baked in at capture time.
+    """
+    cond[0] = wp.where(chunk_start[0] < num_contacts[0], 1, 0)
 
 
 @wp.func
@@ -776,6 +860,62 @@ class Collision:
         """
         return self.max_contacting_pairs if self.capturable else self.num_contacts
 
+    def build_jacobian_chunk(self, b_dense, chunk_start, j_chunk):
+        r"""Materializes ``chunk`` consecutive contacts of the collision Jacobian.
+
+        Equivalent to ``self.collision_J_dense[3*s : 3*(s+chunk), :]`` for
+        ``s = chunk_start[0]``, but built as a direct row gather from the dense subspace
+        basis rather than assembled sparsely, so no ``bsr_from_triplets``, no
+        ``nnz_sync()``, and no host readback. Rows past the live contact count are zeroed.
+
+        This is what lets the full ``(3*max_contacting_pairs, num_dofs)`` Jacobian stay
+        unallocated: peak memory is set by ``chunk``, not by capacity.
+
+        Args:
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis of size
+                :math:`(3 \times \text{num_pts}, \text{num_dofs})`.
+            chunk_start (wp.array(dtype=int)): Single-element device array holding the
+                index of the first contact in this chunk. Device-resident so the
+                enclosing ``wp.capture_while`` can advance it without a host sync.
+            j_chunk (wp.array2d(dtype=wp.float32)): Output of size
+                :math:`(3 \times \text{chunk}, \text{num_dofs})`. Fully overwritten.
+        """
+        if j_chunk.shape[0] % 3 != 0:
+            raise ValueError(
+                f"j_chunk must have a multiple of 3 rows, got {j_chunk.shape[0]}.")
+        if j_chunk.shape[1] != b_dense.shape[1]:
+            raise ValueError(
+                f"j_chunk has {j_chunk.shape[1]} columns but b_dense has "
+                f"{b_dense.shape[1]}; both must be num_dofs.")
+        wp.launch(
+            kernel=_collision_jacobian_chunk_wp_kernel,
+            dim=(j_chunk.shape[0] // 3, j_chunk.shape[1]),
+            inputs=[b_dense, self.collision_indices_a, self.collision_indices_b,
+                    self.count, chunk_start],
+            outputs=[j_chunk],
+            device=b_dense.device)
+
+    def gather_hessian_chunk(self, h_full, chunk_start, h_chunk):
+        r"""Gathers the per-contact :math:`3 \times 3` Hessian blocks for one chunk.
+
+        The companion to :func:`build_jacobian_chunk`: together they give the
+        :math:`J_c^T H_c J_c` operands for one chunk. Blocks past the live contact count
+        are zeroed, so padded slots contribute nothing to the reduction.
+
+        Args:
+            h_full (wp.array(dtype=wp.mat33)): Per-contact blocks over the full capacity,
+                as written by :func:`hessian`.
+            chunk_start (wp.array(dtype=int)): Single-element device array holding the
+                index of the first contact in this chunk.
+            h_chunk (wp.array(dtype=wp.mat33)): Output of size ``chunk``.
+        """
+        wp.launch(
+            kernel=_collision_hessian_chunk_wp_kernel,
+            dim=h_chunk.shape[0],
+            inputs=[h_full, self.count, chunk_start],
+            outputs=[h_chunk],
+            device=h_full.device)
+
     def detect_collisions(self, cp_dx, cp_x0, cp_obj_ids, cp_is_static=None):
         r""" Detects collisions between contact points and stores the results in the collision buffers.
 
@@ -1168,3 +1308,174 @@ class Collision:
             adjoint=False
         )
         return hessian_blocks
+
+
+class ChunkedCollisionHessian:
+    r"""Reduces the collision Hessian :math:`J^T H J` a chunk of contacts at a time.
+
+    :math:`H` is block diagonal -- one :math:`3 \times 3` block per contact -- so the
+    reduction is separable over contacts:
+
+    .. math::
+        J^T H J = \sum_c J_c^T H_c J_c
+
+    where :math:`J_c` are the rows of :math:`J` belonging to chunk :math:`c`. Each term
+    is a full :math:`(\text{num_dofs}, \text{num_dofs})` matrix that simply accumulates,
+    so the chunks can be visited one at a time and the full
+    :math:`(3 \times \text{max_contacting_pairs}, \text{num_dofs})` Jacobian never has to
+    exist. That is the whole point: peak memory is set by ``chunk_size`` rather than by
+    contact capacity. For ``simplicits_stacking_cubes`` (600 DOFs, 50000 contact capacity)
+    a full dense Jacobian is 343 MiB against 14 MiB for a 2048-contact chunk, and the
+    ``H @ J`` scratch is the same size again in both cases, so the ratio holds overall.
+
+    Every buffer is allocated once, in ``__init__``, and every launch dimension is fixed,
+    so ``reduce`` performs no allocation and no host sync. The trip count is the one
+    remaining host-visible quantity, and :func:`reduce` deliberately walks the full
+    capacity rather than reading the live count; :func:`reduce_capturable` replaces the
+    Python loop with a ``wp.capture_while`` over a device predicate, which both makes it
+    graph-capturable and skips the empty tail.
+
+    Args:
+        collision (Collision): Source of the contact arrays and the device contact count.
+        num_dofs (int): Number of simulation DOFs, i.e. columns of the subspace basis.
+        chunk_size (int, optional): Contacts per chunk. Must divide
+            ``collision.max_contacting_pairs`` exactly. Defaults to 2048.
+        device (optional): Warp device for the buffers. Defaults to ``collision.count``'s.
+    """
+
+    def __init__(self, collision, num_dofs, chunk_size=2048, device=None):
+        capacity = collision.max_contacting_pairs
+        if chunk_size <= 0:
+            raise ValueError(f"chunk_size must be positive, got {chunk_size}.")
+        if capacity % chunk_size != 0:
+            # Not a stylistic preference. An indivisible capacity leaves a final chunk
+            # that runs off the end of the contact arrays, and the gather has no bound
+            # to check against other than the count -- which does not stop an
+            # out-of-range read once chunk_start exceeds capacity.
+            raise ValueError(
+                f"max_contacting_pairs ({capacity}) must be an exact multiple of "
+                f"chunk_size ({chunk_size}); the final chunk would read out of bounds.")
+
+        if device is None:
+            device = collision.count.device
+
+        self.collision = collision
+        self.chunk_size = chunk_size
+        self.num_chunks = capacity // chunk_size
+        self.num_dofs = num_dofs
+        self.device = device
+
+        # Device-resident cursor and loop predicate. Both must be arrays rather than
+        # Python ints: a captured graph bakes in host values, so an int cursor would
+        # replay every step at whatever offset it happened to hold at capture time.
+        self.chunk_start = wp.zeros(1, dtype=int, device=device)
+        self.loop_cond = wp.zeros(1, dtype=int, device=device)
+
+        self.j_chunk = wp.zeros((3 * chunk_size, num_dofs),
+                                dtype=wp.float32, device=device)
+        self.h_chunk = wp.zeros(chunk_size, dtype=wp.mat33, device=device)
+
+        # Torch views onto the same memory -- the reduction is a pair of GEMMs, which
+        # torch does far better than a hand-written kernel. wp.to_torch aliases rather
+        # than copies, so these stay valid for the lifetime of the buffers above.
+        self._t_j_chunk = wp.to_torch(self.j_chunk)
+        self._t_h_chunk = wp.to_torch(self.h_chunk)
+        # Scratch for the intermediate H @ J. Preallocated because torch.bmm would
+        # otherwise allocate inside the capture region.
+        self._hj = torch.zeros(chunk_size, 3, num_dofs,
+                               dtype=self._t_j_chunk.dtype,
+                               device=self._t_j_chunk.device)
+
+        # cuBLAS creates its handle lazily, on the first GEMM of a given device/dtype, and
+        # cublasCreate is illegal inside a capture region -- it fails with
+        # CUBLAS_STATUS_NOT_INITIALIZED and poisons the CUDA context. So force the handle
+        # into existence here, on the buffers that reduce_capturable will use, while we
+        # are still guaranteed to be outside any capture. The buffers are zeroed, so this
+        # computes nothing; only the handle matters. The rest of the capturable path gets
+        # away without this only because scene setup incidentally runs matmuls first,
+        # which is not something a standalone reducer should have to rely on.
+        hess_reduction(self._t_j_chunk, self._t_h_chunk,
+                       out=torch.zeros(num_dofs, num_dofs,
+                                       dtype=self._t_j_chunk.dtype,
+                                       device=self._t_j_chunk.device),
+                       HJ=self._hj)
+
+    def _reduce_one_chunk(self, b_dense, h_full, out):
+        r"""Builds the chunk at the current cursor and accumulates its contribution."""
+        self.collision.build_jacobian_chunk(b_dense, self.chunk_start, self.j_chunk)
+        self.collision.gather_hessian_chunk(h_full, self.chunk_start, self.h_chunk)
+        hess_reduction(self._t_j_chunk, self._t_h_chunk, out=out, HJ=self._hj,
+                       accumulate=True)
+        wp.launch(kernel=_advance_chunk_start_wp_kernel, dim=1,
+                  inputs=[self.chunk_start, self.chunk_size], device=self.device)
+
+    def reduce(self, b_dense, h_full, out):
+        r"""Accumulates :math:`J^T H J` into ``out`` with a host-side chunk loop.
+
+        Walks the full contact *capacity* rather than the live count, so the trip count
+        is independent of the contact state and nothing is read back to the host. Chunks
+        beyond the count contribute exactly zero -- both gather kernels zero their
+        padding -- so the result is identical to reducing only the live contacts, just at
+        the cost of some empty GEMMs.
+
+        Args:
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis.
+            h_full (wp.array(dtype=wp.mat33)): Per-contact Hessian blocks over capacity.
+            out (torch.Tensor): Preallocated ``(num_dofs, num_dofs)`` output, overwritten.
+
+        Returns:
+            torch.Tensor: ``out``.
+        """
+        self._validate(b_dense, h_full, out)
+        out.zero_()
+        self.chunk_start.zero_()
+        for _ in range(self.num_chunks):
+            self._reduce_one_chunk(b_dense, h_full, out)
+        return out
+
+    def reduce_capturable(self, b_dense, h_full, out):
+        r"""Same reduction, but with the chunk loop as a ``wp.capture_while``.
+
+        Two things change versus :func:`reduce`. The loop becomes a device-side
+        conditional graph node, so the whole reduction can live inside a captured graph;
+        and the predicate tests the live contact count, so replay stops after
+        ``ceil(count / chunk_size)`` chunks instead of always walking the capacity.
+
+        Args:
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis.
+            h_full (wp.array(dtype=wp.mat33)): Per-contact Hessian blocks over capacity.
+            out (torch.Tensor): Preallocated ``(num_dofs, num_dofs)`` output, overwritten.
+
+        Returns:
+            torch.Tensor: ``out``.
+        """
+        self._validate(b_dense, h_full, out)
+        out.zero_()
+        self.chunk_start.zero_()
+        self._update_cond()
+
+        def while_body():
+            self._reduce_one_chunk(b_dense, h_full, out)
+            self._update_cond()
+
+        wp.capture_while(self.loop_cond, while_body=while_body)
+        return out
+
+    def _update_cond(self):
+        wp.launch(kernel=_chunk_loop_cond_wp_kernel, dim=1,
+                  inputs=[self.chunk_start, self.collision.count, self.loop_cond],
+                  device=self.device)
+
+    def _validate(self, b_dense, h_full, out):
+        if b_dense.shape[1] != self.num_dofs:
+            raise ValueError(
+                f"b_dense has {b_dense.shape[1]} columns but this reducer was built for "
+                f"{self.num_dofs} DOFs.")
+        if h_full.shape[0] < self.collision.max_contacting_pairs:
+            raise ValueError(
+                f"h_full holds {h_full.shape[0]} blocks but capacity is "
+                f"{self.collision.max_contacting_pairs}.")
+        if tuple(out.shape) != (self.num_dofs, self.num_dofs):
+            raise ValueError(
+                f"out has shape {tuple(out.shape)}, expected "
+                f"({self.num_dofs}, {self.num_dofs}).")

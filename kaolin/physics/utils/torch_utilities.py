@@ -65,7 +65,8 @@ def create_projection_matrix(num_dofs, list_of_kin_dofs):
     return P
 
 
-def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None, out=None, HJ=None):
+def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None, out=None, HJ=None,
+                   accumulate=False):
     r""" This does :math:`\text{Ja}^T \times \text{H} \times \text{Jb}` for a block-wise diagonal :math:`\text{H}` matrix.
 
     Args:
@@ -78,10 +79,18 @@ def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None, out=None, HJ=None):
         HJ (torch.Tensor, optional): Preallocated scratch for the intermediate
             :math:`\text{H} \times \text{Jb}` of shape ``(batch, block, Jb.shape[1])``.
             Also required for capture. When ``None`` a new tensor is allocated.
+        accumulate (bool, optional): When ``True``, add into ``out`` instead of
+            overwriting it. This is what lets a reduction be split across chunks of rows:
+            :math:`J^T H J = \sum_c J_c^T H_c J_c` when :math:`H` is block diagonal, so
+            each chunk contributes additively and the full :math:`J` never has to exist.
+            Requires ``out``. Defaults to False.
 
     Returns:
         torch.Tensor: The reduced Hessian matrix. Same object as ``out`` when given.
     """
+
+    if accumulate and out is None:
+        raise ValueError("accumulate=True requires a preallocated `out` to add into.")
 
     if dense_Jb is None:
         dense_Jb = dense_Ja
@@ -103,6 +112,11 @@ def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None, out=None, HJ=None):
     HJ_2d = HJ.reshape(-1, dense_Jb.shape[1])
     if out is None:
         return torch.matmul(dense_Ja.transpose(0, 1), HJ_2d)
+    if accumulate:
+        # addmm_ is the in-place C = C + A @ B GEMM, so accumulating costs no extra
+        # buffer and no extra pass -- relevant because this runs once per chunk.
+        out.addmm_(dense_Ja.transpose(0, 1), HJ_2d)
+        return out
     torch.matmul(dense_Ja.transpose(0, 1), HJ_2d, out=out)
     return out
 
