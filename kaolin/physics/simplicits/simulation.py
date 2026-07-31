@@ -1074,9 +1074,11 @@ class SimplicitsScene:
 
         collision_struct = self.force_dict["collision"]["object"]
 
-        # Sets the collision points dx at the start of the timestep
+        # Sets the collision points dx at the start of the timestep.
+        # Written in place rather than assigned: the collision kernels read this array,
+        # so a captured graph holds its pointer and rebinding would strand the replay.
         dx0 = wp.array((self.sim_B@z), dtype=wp.vec3)
-        collision_struct.cp_dx_at_nm_iteration_0 = dx0
+        collision_struct.set_start_of_timestep_dx(dx0)
         #-----------------------------------------------------------
         
         # Detecting collisions
@@ -1093,7 +1095,7 @@ class SimplicitsScene:
         collision_struct.calculate_jacobian(
             cp_w=self.sim_skinning_weights, 
             cp_x0=self.sim_pts,
-            cp_is_static=self.qp_is_kinematic, 
+            cp_is_static=self.qp_is_kinematic,  # static points are kinematic points
             qr_tfm=self.sim_qr_tfm)
 
     def _build_preconditioner(self, lhs):  # pragma: no cover
@@ -1599,7 +1601,7 @@ class SimplicitsScene:
             raise NotImplementedError(
                 "capturable=True does not yet support inter-object collisions. "
                 "Collision detection host-syncs on the contact count "
-                "(kaolin/physics/common/collisions.py:708), which sizes downstream "
+                "(Collision.detect_collisions), which sizes downstream "
                 "launches and allocations. Floor and boundary contact are supported.")
 
         for attr, captured in (

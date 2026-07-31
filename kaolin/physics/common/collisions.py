@@ -129,18 +129,29 @@ def _collision_offset_wp_func(
         
     Returns:
         wp.vec3: The relative offset vector from point B to point A, accounting for
-                motion and kinematic gaps. If point B is static (NULL_ELEMENT_INDEX),
-                only point A's motion is considered.
+                motion and kinematic gaps. Either side may be static
+                (NULL_ELEMENT_INDEX), in which case that side contributes no motion;
+                if both are, the offset is just the kinematic gap.
     """
     idx_a = indices_a[c]
     idx_b = indices_b[c]
 
-    pos_delta_a = dx_cur[idx_a] - dx_start_of_timestep[idx_a]
-    pos_delta_b = dx_cur[idx_b] - dx_start_of_timestep[idx_b]
-
-    offset = pos_delta_a + kinematic_gaps[c]
+    # A static point contributes no motion, so its term is simply omitted -- the same
+    # semantics the idx_b branch below has always had. NULL_ELEMENT_INDEX is a marker,
+    # not an index: Warp's index() does `if (i < 0) i += shape[0]`, so gathering at -1
+    # silently returns the LAST contact point in the scene and folds an unrelated
+    # particle's displacement into the offset.
+    #
+    # Unreachable today (simulation.py calls detect_collisions with cp_is_static=None,
+    # so the sentinel is never written), but detect_collisions is public and takes
+    # cp_is_static; the moment a caller supplies it, detection's `idx_a < idx_b`
+    # ordering puts the sentinel in indices_a for *every* contact against a
+    # low-indexed static object, not occasionally.
+    offset = kinematic_gaps[c]
+    if idx_a != NULL_ELEMENT_INDEX:
+        offset += dx_cur[idx_a] - dx_start_of_timestep[idx_a]
     if idx_b != NULL_ELEMENT_INDEX:
-        offset -= pos_delta_b
+        offset -= dx_cur[idx_b] - dx_start_of_timestep[idx_b]
     return offset
 
 
@@ -169,6 +180,7 @@ def _collision_energy_wp_kernel(
     normals: wp.array(dtype=wp.vec3),
     indices_a: wp.array(dtype=int),
     indices_b: wp.array(dtype=int),
+    num_contacts: wp.array(dtype=int),
     energies: wp.array(dtype=float),
 ):  # pragma: no cover
     r"""
@@ -187,6 +199,15 @@ def _collision_energy_wp_kernel(
         energies (wp.array(dtype=float)): Energy of each collision pair
     """
     c = wp.tid()
+
+    # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
+    # no-op when the launch dim is exactly num_contacts (every tid passes), so the
+    # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
+    # sentinel means "partner is static geometry", a distinct concept the offset and
+    # target-distance helpers handle, and conflating the two silently drops every
+    # contact against a kinematic collider.
+    if c >= num_contacts[0]:
+        return
 
     offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
@@ -265,6 +286,7 @@ def _collision_gradient_wp_kernel(coeff: float,
                         normals: wp.array(dtype=wp.vec3),
                         indices_a: wp.array(dtype=int),
                         indices_b: wp.array(dtype=int),
+                        num_contacts: wp.array(dtype=int),
                                   gradient: wp.array(dtype=wp.vec3)):  # pragma: no cover
     r"""
     Calculates the collision gradient for each collision pair.
@@ -282,6 +304,15 @@ def _collision_gradient_wp_kernel(coeff: float,
         gradient (wp.array(dtype=wp.vec3)): Gradient of the collision energy for each collision pair
     """
     c = wp.tid()
+
+    # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
+    # no-op when the launch dim is exactly num_contacts (every tid passes), so the
+    # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
+    # sentinel means "partner is static geometry", a distinct concept the offset and
+    # target-distance helpers handle, and conflating the two silently drops every
+    # contact against a kinematic collider.
+    if c >= num_contacts[0]:
+        return
 
     offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
@@ -375,6 +406,7 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
                                    normals: wp.array(dtype=wp.vec3),
                                    indices_a: wp.array(dtype=int),
                                    indices_b: wp.array(dtype=int),
+                                   num_contacts: wp.array(dtype=int),
                                              hessian: wp.array(dtype=wp.mat33)):  # pragma: no cover
     r"""
     Compute the Hessian of the collision energy for each collision pair.
@@ -392,6 +424,15 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
         hessian (wp.array(dtype=wp.mat33)): Hessian of the collision energy for each collision pair
     """
     c = wp.tid()
+
+    # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
+    # no-op when the launch dim is exactly num_contacts (every tid passes), so the
+    # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
+    # sentinel means "partner is static geometry", a distinct concept the offset and
+    # target-distance helpers handle, and conflating the two silently drops every
+    # contact against a kinematic collider.
+    if c >= num_contacts[0]:
+        return
 
     offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
@@ -520,9 +561,19 @@ def _get_collision_bounds_wp_kernel(
     jacobian_a_columns: wp.array(dtype=int),
     jacobian_b_offsets: wp.array(dtype=int),
     jacobian_b_columns: wp.array(dtype=int),
+    num_contacts: wp.array(dtype=int),
     dof_t_max: wp.array(dtype=float),
 ):  # pragma: no cover
     c = wp.tid()
+
+    # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
+    # no-op when the launch dim is exactly num_contacts (every tid passes), so the
+    # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
+    # sentinel means "partner is static geometry", a distinct concept the offset and
+    # target-distance helpers handle, and conflating the two silently drops every
+    # contact against a kinematic collider.
+    if c >= num_contacts[0]:
+        return
 
     # Distance delta
     nor = normals[c]
@@ -530,7 +581,12 @@ def _get_collision_bounds_wp_kernel(
     idx_a = indices_a[c]
     idx_b = indices_b[c]
 
-    delta_d_a = wp.dot(nor, delta_dx[idx_a])
+    # If idx_a is -1 the first point is static and does not move. Mirrors the idx_b
+    # branch below; without it, delta_dx[-1] wraps to the last contact point.
+    if idx_a == NULL_ELEMENT_INDEX:
+        delta_d_a = 0.0
+    else:
+        delta_d_a = wp.dot(nor, delta_dx[idx_a])
 
     # If idx_b is -1, then there is no second colliding particle
     if idx_b == NULL_ELEMENT_INDEX:
@@ -621,12 +677,29 @@ class Collision:
         self.friction = friction
         self.dt = dt
 
-        # Buffers for collisions get updated per timestep
-        self.collision_indices_a = wp.empty(max_contacting_pairs, dtype=int)
-        self.collision_indices_b = wp.empty(max_contacting_pairs, dtype=int)
-        self.collision_normals = wp.empty(max_contacting_pairs, dtype=wp.vec3)
-        self.collision_kinematic_gaps = wp.empty(
+        self.max_contacting_pairs = max_contacting_pairs
+
+        # Buffers for collisions get updated per timestep.
+        # wp.zeros rather than wp.empty: kernels launched over the full capacity read
+        # the tail as well, and uninitialized indices would be out-of-bounds gathers in
+        # _collision_offset_wp_func. The device-side count guard is what makes the tail
+        # inert, but the buffers must still be deterministic.
+        self.collision_indices_a = wp.zeros(max_contacting_pairs, dtype=int)
+        self.collision_indices_b = wp.zeros(max_contacting_pairs, dtype=int)
+        self.collision_normals = wp.zeros(max_contacting_pairs, dtype=wp.vec3)
+        self.collision_kinematic_gaps = wp.zeros(
             max_contacting_pairs, dtype=wp.vec3)
+
+        # Contact count, kept on device. The host-side self.num_contacts mirror below is
+        # still read by the non-capturable path; the capturable path will consume this
+        # array instead so the count never reaches the host.
+        self.count = wp.zeros(1, dtype=int)
+
+        # When True, every per-contact kernel launches over the fixed
+        # max_contacting_pairs capacity and relies on the in-kernel device-count guard,
+        # so no launch dimension depends on a host-side value. Required for graph
+        # capture; off by default so the existing path is unchanged.
+        self.capturable = False
 
         # Jacobians used to map from cps of contact pairs back to dofs
         self.collision_J_a = None  # Size 3*num_cps x num_dofs
@@ -639,6 +712,35 @@ class Collision:
 
         # Hashgrid for broadphase collision detection
         self.hashgrid = wp.HashGrid(128, 128, 128)
+
+    def set_start_of_timestep_dx(self, cp_dx):
+        r"""Records the contact-point displacements at the start of the timestep.
+
+        Writes **in place** into a persistent buffer rather than rebinding the attribute.
+        All four per-contact kernels read this array, so a captured graph records its
+        pointer; rebinding it (``wp.clone``, or an assignment from outside) would leave
+        the graph replaying against memory the scene no longer owns. Same reasoning as
+        the persistent ``self.count``.
+
+        Args:
+            cp_dx (wp.array(dtype=wp.vec3)): Displacements to record.
+        """
+        if (self.cp_dx_at_nm_iteration_0 is None
+                or self.cp_dx_at_nm_iteration_0.shape[0] != cp_dx.shape[0]):
+            # First call, or the contact-point count changed (scene rebuilt). Allocating
+            # here is fine: it happens outside any capture, and the pointer is then
+            # stable for every subsequent timestep.
+            self.cp_dx_at_nm_iteration_0 = wp.zeros_like(cp_dx)
+        wp.copy(dest=self.cp_dx_at_nm_iteration_0, src=cp_dx)
+
+    def _contact_launch_dim(self):
+        r"""Launch dimension for per-contact kernels.
+
+        ``max_contacting_pairs`` under ``capturable`` (fixed at capture time, with the
+        in-kernel ``c >= num_contacts[0]`` guard making the unused tail inert), otherwise
+        the live host-side count, which is what the non-capturable path has always used.
+        """
+        return self.max_contacting_pairs if self.capturable else self.num_contacts
 
     def detect_collisions(self, cp_dx, cp_x0, cp_obj_ids, cp_is_static=None):
         r""" Detects collisions between contact points and stores the results in the collision buffers.
@@ -659,7 +761,7 @@ class Collision:
         """
         # TODO: If we call this function multiple times per timestep, we need to store the
         # cp_dx_at_nm_iteration_0_torch at the start of each timestep, not here.
-        self.cp_dx_at_nm_iteration_0 = wp.clone(cp_dx)
+        self.set_start_of_timestep_dx(cp_dx)
 
         # current position of contact points
         current_cp = wp.from_torch(wp.to_torch(
@@ -681,9 +783,12 @@ class Collision:
         if cp_is_static is None:
             cp_is_static = wp.zeros_like(cp_obj_ids) # none are static
 
-        # Kernel outputs
-        count = wp.zeros(1, dtype=int)
-        
+        # Kernel outputs. Reuse the persistent device buffer rather than allocating a
+        # fresh one per detection: a captured graph records the pointer, so the count
+        # must live at a stable address.
+        self.count.zero_()
+        count = self.count
+
         # Find collisions
         wp.launch(
             kernel=_detect_particle_collisions_wp_kernel,
@@ -710,6 +815,13 @@ class Collision:
         if self.num_contacts > max_contacts:
             logging.warning('contact buffer size exceed, some have been ignored')
             self.num_contacts = max_contacts
+            # Clamp the device count too. The detection kernel increments before it
+            # tests the capacity, so on overflow count[0] holds the raw detected total
+            # while only max_contacts slots were actually written. The kernels guard on
+            # this array, so leaving it unclamped makes "slot validity" untrue exactly
+            # in the case we just detected -- harmless while every launch dim is
+            # <= capacity, but not an invariant worth leaving broken.
+            self.count.fill_(max_contacts)
 
         # self.build_jacobian(cp_w, cp_x0, cp_obj_ids)
 
@@ -840,7 +952,7 @@ class Collision:
 
         wp.launch(
             _get_collision_bounds_wp_kernel,
-            dim=self.num_contacts,
+            dim=self._contact_launch_dim(),
             inputs=[
                 self.collision_radius,
                 self.collision_barrier_ratio,
@@ -856,6 +968,7 @@ class Collision:
                 self.collision_J_a.columns,  # columns of the jacobian blocks
                 self.collision_J_b.offsets,  # offsets of the jacobian blocks
                 self.collision_J_b.columns,  # columns of the jacobian blocks
+                self.count,                  # device-side contact count (slot guard)
                 blockwise_bounds,               # Output: bounds for each handle
             ],
         )
@@ -893,7 +1006,7 @@ class Collision:
 
         wp.launch(
             kernel=_collision_energy_wp_kernel,
-            dim=self.num_contacts,
+            dim=self._contact_launch_dim(),
             inputs=[coeff,
                     self.collision_radius,
                     self.collision_barrier_ratio,
@@ -905,14 +1018,15 @@ class Collision:
                     self.collision_kinematic_gaps,
                     self.collision_normals,
                     self.collision_indices_a,
-                    self.collision_indices_b],
+                    self.collision_indices_b,
+                    self.count],
             outputs=[energy],
             adjoint=False
         )
         return energy
         # print("collision energy: ", self.num_contacts, energy.numpy())
 
-    def gradient(self, dx, x0, coeff):
+    def gradient(self, dx, x0, coeff, gradient=None):
         r"""
         Compute the gradient of the collision energy.
 
@@ -920,16 +1034,32 @@ class Collision:
             dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs of size :math:`(\text{num_pts}, 3)`
             x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient for the collision energy.
+            gradient (wp.array(dtype=wp.vec3), optional): Preallocated output, normally of
+                size ``max_contacting_pairs``. Required for cuda-graph capture, which
+                forbids allocation. Zeroed on entry, since the count guard leaves the
+                unused tail unwritten. Defaults to allocating a ``num_contacts``-sized
+                array, which is what the non-capturable path expects.
 
         Returns:
             wp.array(dtype=wp.vec3): Gradient of the collision energy of size :math:`(\text{num_contacts}, 3)`
         """
-        gradient = wp.zeros(
-            self.num_contacts, dtype=wp.vec3, device=dx.device)
+        if gradient is None:
+            gradient = wp.zeros(
+                self.num_contacts, dtype=wp.vec3, device=dx.device)
+        else:
+            # The kernel writes slot c for every c below the device count, which is
+            # independent of this buffer's length -- so an undersized buffer is an
+            # out-of-bounds write, and Warp release builds strip the bounds assert.
+            if gradient.shape[0] < self._contact_launch_dim():
+                raise ValueError(
+                    f"gradient buffer holds {gradient.shape[0]} entries but the launch "
+                    f"covers {self._contact_launch_dim()}; size it to "
+                    f"max_contacting_pairs ({self.max_contacting_pairs}).")
+            gradient.zero_()
 
         wp.launch(
             kernel=_collision_gradient_wp_kernel,
-            dim=self.num_contacts,
+            dim=self._contact_launch_dim(),
             inputs=[coeff,
                     self.collision_radius,
                     self.collision_barrier_ratio,
@@ -941,14 +1071,15 @@ class Collision:
                     self.collision_kinematic_gaps,
                     self.collision_normals,
                     self.collision_indices_a,
-                    self.collision_indices_b],
+                    self.collision_indices_b,
+                    self.count],
             outputs=[gradient],
             adjoint=False
         )
 
         return gradient
 
-    def hessian(self, dx, x0, coeff):
+    def hessian(self, dx, x0, coeff, hessian_blocks=None):
         r"""
         Compute the hessian of the collision energy.
 
@@ -956,17 +1087,32 @@ class Collision:
             dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs of size :math:`(\text{num_pts}, 3)`
             x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient for the collision energy.
+            hessian_blocks (wp.array(dtype=wp.mat33), optional): Preallocated output,
+                normally of size ``max_contacting_pairs``. Required for cuda-graph
+                capture, which forbids allocation. Zeroed on entry, since the count guard
+                leaves the unused tail unwritten -- and the padded blocks must be exactly
+                zero so they contribute nothing to :math:`J^T H J`. Defaults to
+                allocating a ``num_contacts``-sized array.
 
         Returns:
             wp.array(dtype=wp.mat33): Hessian of the collision energy of size :math:`(\text{num_contacts}, 3, 3)`
         """
-
-        hessian_blocks = wp.zeros(
-            self.num_contacts, dtype=wp.mat33, device=dx.device)
+        if hessian_blocks is None:
+            hessian_blocks = wp.zeros(
+                self.num_contacts, dtype=wp.mat33, device=dx.device)
+        else:
+            # See gradient(): an undersized buffer is an out-of-bounds write that Warp
+            # release builds will not catch.
+            if hessian_blocks.shape[0] < self._contact_launch_dim():
+                raise ValueError(
+                    f"hessian buffer holds {hessian_blocks.shape[0]} entries but the "
+                    f"launch covers {self._contact_launch_dim()}; size it to "
+                    f"max_contacting_pairs ({self.max_contacting_pairs}).")
+            hessian_blocks.zero_()
 
         wp.launch(
             kernel=_collision_hessian_diag_blocks_wp_kernel,
-            dim=self.num_contacts,
+            dim=self._contact_launch_dim(),
             inputs=[coeff,
                     self.collision_radius,
                     self.collision_barrier_ratio,
@@ -978,7 +1124,8 @@ class Collision:
                     self.collision_kinematic_gaps,
                     self.collision_normals,
                     self.collision_indices_a,
-                    self.collision_indices_b],
+                    self.collision_indices_b,
+                    self.count],
             outputs=[hessian_blocks],
             adjoint=False
         )

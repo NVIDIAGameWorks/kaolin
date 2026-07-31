@@ -124,8 +124,13 @@ def test_scenes(request):
             _stacked_is_static.append(torch.zeros(num_points, device=device, dtype=torch.int32))  # all points are dynamic
             _stacked_weights.append(torch.ones(num_points, 1, device=device))
         
-        # make one object static
-        _stacked_is_static[0] = torch.ones(num_points, device=device)
+        # make one object static.
+        # dtype=torch.int32 is load-bearing: the other entries are int32, so a float32
+        # here promotes the whole torch.cat to float32, and wp.array(<cuda float32>,
+        # dtype=wp.int32) takes Warp's __cuda_array_interface__ path, which reinterprets
+        # the bits rather than converting. 1.0f becomes 1065353216, so `cp_is_static == 1`
+        # is never true and this fixture silently marks nothing static.
+        _stacked_is_static[0] = torch.ones(num_points, device=device, dtype=torch.int32)
 
         return {
             'x0': wp.array(torch.cat(_stacked_x0, dim=0), dtype=wp.vec3),
@@ -695,3 +700,129 @@ def test_collision_friction_hessian():
         "Friction hessian sparsity mismatch"
     assert torch.allclose(hessian[fd_nonzeros], hessian_fd[fd_nonzeros], rtol=1e-1, atol=1e-1), \
         "Friction collision hessian doesn't match finite difference"
+
+
+@pytest.mark.parametrize("test_scenes", [
+    "two_objects", "three_objects", "two_objects_one_static"], indirect=True)
+def test_capturable_launch_matches_host(test_scenes):
+    r"""Launching over the fixed capacity with the device-count guard must match the
+    host-sized launch.
+
+    Per-contact kernels used to launch at ``dim=num_contacts``, a host value. Under
+    ``capturable`` they launch at ``dim=max_contacting_pairs`` and skip inactive slots
+    via ``c >= num_contacts[0]``, so no launch dimension depends on the host.
+
+    ``two_objects_one_static`` is included deliberately: static partners are marked with
+    ``NULL_ELEMENT_INDEX`` (-1), a *different* concept from "unused slot". Guarding on
+    the index sign instead of the count would silently drop every contact against static
+    geometry, and this case is what catches that.
+    """
+    x0 = test_scenes['x0']
+    dx = test_scenes['dx']
+    obj_ids = test_scenes['obj_ids']
+    is_static = test_scenes['is_static']
+
+    max_pairs = 512
+    collision = collisions.Collision(
+        dt=0.01, collision_particle_radius=0.05, detection_ratio=1.5,
+        impenetrable_barrier_ratio=0.5, friction=0.5,
+        max_contacting_pairs=max_pairs)
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+
+    nc = collision.num_contacts
+    if nc == 0:
+        pytest.skip("scene produced no contacts; comparison would be vacuous")
+
+    # Host-sized launches, freshly allocated outputs (the long-standing behaviour).
+    collision.capturable = False
+    g_host = torch.as_tensor(collision.gradient(dx, x0, 1.0).numpy()).clone()
+    h_host = torch.as_tensor(collision.hessian(dx, x0, 1.0).numpy()).clone()
+
+    # Full-capacity launches into preallocated buffers.
+    collision.capturable = True
+    g_buf = wp.zeros(max_pairs, dtype=wp.vec3, device=dx.device)
+    h_buf = wp.zeros(max_pairs, dtype=wp.mat33, device=dx.device)
+    g_cap = torch.as_tensor(
+        collision.gradient(dx, x0, 1.0, gradient=g_buf).numpy()).clone()
+    h_cap = torch.as_tensor(
+        collision.hessian(dx, x0, 1.0, hessian_blocks=h_buf).numpy()).clone()
+    collision.capturable = False
+
+    # Per-slot writes with no reduction, so these must be exact -- not merely close.
+    assert torch.equal(g_host, g_cap[:nc]), "gradient differs under capacity launch"
+    assert torch.equal(h_host, h_cap[:nc]), "hessian differs under capacity launch"
+
+    # The padded tail must be exactly zero or it pollutes J^T H J downstream.
+    assert torch.count_nonzero(g_cap[nc:]) == 0, "gradient tail not zeroed"
+    assert torch.count_nonzero(h_cap[nc:]) == 0, "hessian tail not zeroed"
+
+
+@pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
+def test_count_guard_suppresses_stale_slots(test_scenes):
+    r"""The count guard must suppress slots left populated by a denser previous frame.
+
+    This is the test that can actually fail. `test_capturable_launch_matches_host` cannot:
+    it detects once on a freshly constructed Collision, so every padded slot still holds
+    the construction-time `wp.zeros` (indices 0, zero normal), which evaluates to an
+    exactly-zero gradient anyway. Deleting the guard leaves that test green.
+
+    Here detection runs twice -- first on a configuration that produces many contacts,
+    then on one that produces fewer -- without reconstructing the Collision. The tail
+    slots are therefore populated with *valid* indices and normals from the dense frame.
+    If the guard is removed or inverted, those stale contacts contribute real forces and
+    the assertions below fail.
+    """
+    x0 = test_scenes['x0']
+    obj_ids = test_scenes['obj_ids']
+    is_static = test_scenes['is_static']
+    n_pts = x0.shape[0]
+
+    max_pairs = 4096
+    collision = collisions.Collision(
+        dt=0.01, collision_particle_radius=0.05, detection_ratio=1.5,
+        impenetrable_barrier_ratio=0.5, friction=0.5,
+        max_contacting_pairs=max_pairs)
+
+    # Dense frame: a large radius pulls many pairs into contact.
+    collision.collision_radius = 0.5
+    dense_dx = wp.array(torch.zeros(n_pts, 3, device='cuda'), dtype=wp.vec3)
+    collision.detect_collisions(dense_dx, x0, obj_ids, is_static)
+    n_dense = collision.num_contacts
+
+    # Sparse frame: shrink the radius so far fewer pairs qualify. Slots
+    # [n_sparse, n_dense) now hold live data from the dense frame.
+    collision.collision_radius = 0.02
+    collision.detect_collisions(dense_dx, x0, obj_ids, is_static)
+    n_sparse = collision.num_contacts
+
+    assert n_dense > n_sparse > 0, \
+        f"need a strictly denser first frame to leave stale slots ({n_dense} vs {n_sparse})"
+
+    g = torch.as_tensor(collision.gradient(dense_dx, x0, 1.0).numpy())
+    h = torch.as_tensor(collision.hessian(dense_dx, x0, 1.0).numpy())
+
+    # The host-sized launch only covers [0, n_sparse), so stale slots are out of range.
+    # The capacity launch covers all of them and must rely on the guard.
+    g_buf = wp.zeros(max_pairs, dtype=wp.vec3, device='cuda')
+    h_buf = wp.zeros(max_pairs, dtype=wp.mat33, device='cuda')
+    collision.capturable = True
+    g_cap = torch.as_tensor(
+        collision.gradient(dense_dx, x0, 1.0, gradient=g_buf).numpy()).clone()
+    h_cap = torch.as_tensor(
+        collision.hessian(dense_dx, x0, 1.0, hessian_blocks=h_buf).numpy()).clone()
+    collision.capturable = False
+
+    # Live slots agree exactly.
+    assert torch.equal(g, g_cap[:n_sparse])
+    assert torch.equal(h, h_cap[:n_sparse])
+
+    # The stale range must contribute nothing. Without the guard these hold real
+    # contact forces carried over from the dense frame.
+    stale_g = g_cap[n_sparse:n_dense]
+    stale_h = h_cap[n_sparse:n_dense]
+    assert torch.count_nonzero(stale_g) == 0, (
+        f"{int(torch.count_nonzero(stale_g))} stale gradient entries survived in slots "
+        f"[{n_sparse}, {n_dense}) -- the count guard is not suppressing them")
+    assert torch.count_nonzero(stale_h) == 0, (
+        f"{int(torch.count_nonzero(stale_h))} stale hessian entries survived in slots "
+        f"[{n_sparse}, {n_dense})")
