@@ -27,7 +27,7 @@ from scipy.linalg import qr
 
 from ..utils import warp_utilities, torch_utilities
 
-from ..common import Collision, Gravity, Floor, Boundary
+from ..common import Collision, ChunkedCollisionHessian, Gravity, Floor, Boundary
 from ..materials import NeohookeanElasticMaterial
 from ..materials.material_utils import get_defo_grad, to_lame, _get_defo_grad_wp_kernel
 from ..common.optimization import newtons_method
@@ -670,6 +670,10 @@ class SimplicitsScene:
         self._kin_free_mask = wp.from_torch(free_mask.contiguous())
         self._has_kinematic = bool((free_mask == 0.0).any())
 
+        # Set by _create_capturable_collision_variables, which runs later: collisions are
+        # enabled after the scene is built. Read on every assembly, so it must exist.
+        self._has_collision = False
+
         # Baked into the graph (as kernel immediates and into the folded BMB+reg
         # matrix). Recorded so a later change can be detected rather than silently
         # producing wrong results from a stale graph.
@@ -1055,7 +1059,93 @@ class SimplicitsScene:
         self.force_dict["collision"]["object"] = collision_struct
         self.force_dict["collision"]["coeff"] = collision_penalty
 
+        if self.capturable:
+            self._create_capturable_collision_variables(collision_struct)
+
         self._detect_collision(self.sim_z)
+
+    def _create_capturable_collision_variables(self, collision_struct,
+                                               chunk_size=2048):  # pragma: no cover
+        r"""Allocates the buffers the captured step needs for contact.
+
+        Separate from :func:`_create_capturable_variables` only because collisions are
+        enabled after the scene is built, so these cannot be allocated alongside the rest.
+
+        Args:
+            collision_struct (Collision): The scene's collision struct.
+            chunk_size (int, optional): Contacts reduced per chunk. Clamped down to the
+                contact capacity when that is smaller. Defaults to 2048.
+        """
+        if self.sim_qr_tfm is not None:
+            # calculate_jacobian's QR branch rotates through a dense matmul and then
+            # _warp_csr_from_torch_dense -> torch.nonzero, which host-syncs; the rotation
+            # also destroys the Jacobian's sparsity. Nothing in tests or examples combines
+            # the two, so this raises rather than silently falling back to the host path.
+            raise NotImplementedError(
+                "capturable=True does not support inter-object collisions together with "
+                "apply_qr=True. Build the scene with apply_qr=False.")
+
+        num_dofs = self._num_dofs
+        capacity = collision_struct.max_contacting_pairs
+
+        # Chunking is a partition of a sum, so any divisor is correct; this picks the
+        # largest power of two that divides the capacity and does not exceed chunk_size,
+        # rather than rejecting capacities that are not multiples of 2048.
+        chunk = min(chunk_size, capacity)
+        while capacity % chunk != 0:
+            chunk -= 1
+
+        # Full-scene dense subspace basis, the array the Jacobian chunks gather from.
+        # Materialized once: it is constant for the scene's lifetime.
+        b_dense_th = warp_utilities._bsr_to_torch(self.sim_B).to_dense().contiguous()
+        self._cap_B_dense_th = b_dense_th
+        self._cap_B_dense = wp.from_torch(b_dense_th)
+
+        # Fixed-capacity outputs for Collision.gradient / .hessian. Both are zeroed on
+        # entry and count-guarded, so the tail past the live contact count is always zero.
+        self._cap_collision_dEdx = wp.zeros(capacity, dtype=wp.vec3, device=self.device)
+        self._cap_collision_hess = wp.zeros(capacity, dtype=wp.mat33, device=self.device)
+
+        self._cap_collision_reducer = ChunkedCollisionHessian(
+            collision_struct, num_dofs, chunk_size=chunk, device=self.device)
+
+        # Flat view of the scene gradient, which the chunked GEMV accumulates into.
+        # wp.to_torch aliases, so this stays valid as long as _scene_gradient does.
+        self._cap_scene_gradient_th = wp.to_torch(
+            self._scene_gradient).reshape(num_dofs)
+
+        # Intersection-free step bounds. Preallocated because the bounds function runs
+        # inside the line search, i.e. inside a conditional graph node.
+        self._cap_bounds_dx = wp.zeros(self._num_pts, dtype=wp.vec3,
+                                       device=self.device)
+        self._cap_bounds_delta_dx = wp.zeros_like(self._cap_bounds_dx)
+        self._cap_dof_bounds = wp.zeros(num_dofs, dtype=wp.float32, device=self.device)
+
+        self._has_collision = True
+
+    def _compute_collision_bounds_capturable(self, dz, z):  # pragma: no cover
+        r"""Capturable ``bounds_fcn``: per-DOF cap on the line-search step.
+
+        The host path skips this entirely when there are no contacts; here the kernel's
+        count guard handles that case, so the launch shape stays fixed either way.
+
+        Args:
+            dz (wp.array): Newton direction.
+            z (wp.array): Current DOFs.
+
+        Returns:
+            wp.array(dtype=float): Per-DOF bounds, or ``None`` if collisions are off.
+        """
+        if not self._has_collision:
+            return None
+
+        wps.bsr_mv(A=self.sim_B, x=z, y=self._cap_bounds_dx)
+        wps.bsr_mv(A=self.sim_B, x=dz, y=self._cap_bounds_delta_dx)
+        return self.force_dict["collision"]["object"].get_bounds_capturable(
+            cp_delta_dx=self._cap_bounds_delta_dx,
+            cp_dx=self._cap_bounds_dx,
+            b_dense=self._cap_B_dense,
+            dof_bounds=self._cap_dof_bounds)
 
     def _detect_collision(self, z):  # pragma: no cover
         r"""Resets the collision jacobian when new contact pairs are found.
@@ -1092,6 +1182,13 @@ class SimplicitsScene:
                                            cp_obj_ids=self.qp_to_object_map,
                                            cp_is_static=None)
         
+        if self.capturable:
+            # The captured path never touches collision_J: gradient assembly, Hessian
+            # assembly and the step bounds all read the dense basis instead. Building the
+            # sparse Jacobian anyway would cost two bsr_from_triplets and three nnz_sync
+            # host syncs per step for a matrix nothing reads.
+            return
+
         # Builds collision jacobian. sim_skinning_weights is the raw (pre-QR) block-diag
         # weight matrix; collision_J_a/_b stay in this basis (so the bounds kernel reads
         # the original per-handle sparsity), while collision_J is rotated into the post-QR
@@ -1488,6 +1585,15 @@ class SimplicitsScene:
         for e, entry in self.force_dict["defo_grad_wise"].items():
             entry["object"].energy(F_ele, entry["coeff"], self._scene_energy)
 
+        if self._has_collision:
+            # Launches over the fixed contact capacity with an in-kernel count guard, and
+            # atomic-adds into the same slot 0 as the other potential terms, so no host
+            # value is involved. Detection is eager (once per step); only the solve is
+            # captured, and the contact set is frozen for the whole solve either way.
+            entry = self.force_dict["collision"]
+            entry["object"].energy(self._eval_dx, self.sim_pts, entry["coeff"],
+                                   self._scene_energy)
+
         wps.bsr_mv(A=self.sim_BMB, x=self._eval_delta_dz, y=self._eval_BMBz)
         # Not wp.utils.array_inner: it allocates an internal reduction buffer even
         # when given out=, which a conditional graph node body forbids.
@@ -1519,6 +1625,19 @@ class SimplicitsScene:
                    beta=1.0, transpose=True)
         wps.bsr_mv(A=self.sim_dFdz, x=self._scene_dEdF, y=self._scene_gradient,
                    beta=1.0, transpose=True)
+
+        if self._has_collision:
+            # Contact points may differ from quadrature points, so this cannot ride the
+            # sim_B product above. The host path applies J^T with one bsr_mv against the
+            # sparse collision Jacobian; its topology changes with the contact set, so
+            # here the same product is accumulated from gathered chunks instead.
+            entry = self.force_dict["collision"]
+            entry["object"].gradient(self._eval_dx, self.sim_pts, entry["coeff"],
+                                     gradient=self._cap_collision_dEdx)
+            self._cap_collision_reducer.accumulate_gradient_capturable(
+                self._cap_B_dense, self._cap_collision_dEdx,
+                self._cap_scene_gradient_th)
+
         if self._has_kinematic:
             mask_in_place(self._scene_gradient, self._kin_free_mask)
         return self._scene_gradient
@@ -1555,6 +1674,22 @@ class SimplicitsScene:
             self._eval_H_dense_th[z0:z1, z0:z1] += s['out_B']
             self._eval_H_dense_th[z0:z1, z0:z1] += s['out_F']
 
+        if self._has_collision:
+            # Added before the dt*dt scaling below, like every other potential term.
+            #
+            # The full-width reduction is written straight into the scene Hessian rather
+            # than assembled per object pair. J's columns already span every DOF, so
+            # J^T H J contains each H_ij block in place; the host path's object_pairs
+            # loop only exists because it feeds a sparse block assembly. This does more
+            # GEMM work than slicing per pair but in one kernel instead of one per pair,
+            # and it needs no host-side pair list.
+            entry = self.force_dict["collision"]
+            entry["object"].hessian(self._eval_dx, self.sim_pts, entry["coeff"],
+                                    hessian_blocks=self._cap_collision_hess)
+            self._cap_collision_reducer.reduce_capturable(
+                self._cap_B_dense, self._cap_collision_hess,
+                self._eval_H_dense_th, accumulate=True)
+
         # H = dt*dt * H_potential + (BMB + reg*I)
         self._eval_H_dense_th *= (self.timestep * self.timestep)
         self._eval_H_dense_th += self._sim_BMB_plus_reg_dense_th
@@ -1590,7 +1725,8 @@ class SimplicitsScene:
             self._newton_G_capturable,
             self._assemble_hessians_capturable,
             buf=self._nm_buf,
-            bounds_fcn=None,
+            bounds_fcn=(self._compute_collision_bounds_capturable
+                        if self._has_collision else None),
             nm_max_iters=self.max_newton_steps,
             conv_tol=self.conv_tol,
             max_ls_steps=self.max_ls_steps)
@@ -1601,13 +1737,6 @@ class SimplicitsScene:
         self.sim_z_dot /= self.timestep
 
     def _run_sim_step_capturable(self):  # pragma: no cover
-        if "collision" in self.force_dict:
-            raise NotImplementedError(
-                "capturable=True does not yet support inter-object collisions. "
-                "Collision detection host-syncs on the contact count "
-                "(Collision.detect_collisions), which sizes downstream "
-                "launches and allocations. Floor and boundary contact are supported.")
-
         for attr, captured in (
                 ("timestep", self._captured_timestep),
                 ("newton_hessian_regularizer", self._captured_regularizer),
@@ -1619,6 +1748,17 @@ class SimplicitsScene:
                     f"{attr} changed from {captured} to {getattr(self, attr)} after the "
                     "capturable buffers were built. It is baked into the graph; the "
                     "replay would silently use the old value. Rebuild the scene.")
+
+        # Detection is eager -- stage 1. It runs once per step against roughly a hundred
+        # solver evaluations, so leaving it outside the graph gives up very little, and
+        # it is the only remaining host sync in the step (Collision.num_contacts). What
+        # matters for capture is that the count never reaches the host *inside* the
+        # solve, which the count-guarded kernels and the capture_while trip count ensure.
+        #
+        # Must come before the launch: run_sim_step dispatches straight here for
+        # capturable scenes, so without this the contact set stays frozen at whatever
+        # enable_collisions detected and the trajectory silently drifts from the host's.
+        self._detect_collision(self.sim_z)
 
         if self.check_solve_info:
             # Device-to-device, no sync. Needed to make a failed step atomic.

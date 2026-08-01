@@ -23,6 +23,9 @@ the host-side Newton solve. The rest of the tests cover the guards that turn
 import pytest
 import torch
 import warp as wp
+import warp.sparse as wps
+
+from kaolin.physics.utils.torch_utilities import hess_reduction
 
 from kaolin.physics.simplicits import PhysicsPoints, SimplicitsObject, SimplicitsScene
 
@@ -311,11 +314,23 @@ def test_kinematic_object_can_be_animated_under_capture():
 
 
 @cuda_only
-def test_collisions_rejected():
-    r"""Inter-object collision detection host-syncs on the contact count."""
-    scene = _make_scene(_make_object(), True, collisions=True)
-    with pytest.raises(NotImplementedError, match="collision"):
-        scene.run_sim_step()
+def test_collisions_with_qr_rejected():
+    r"""QR plus collisions plus capture is the one combination that still cannot work.
+
+    calculate_jacobian's QR branch rotates through a dense matmul and then
+    _warp_csr_from_torch_dense -> torch.nonzero, which host-syncs, and the rotation
+    destroys the Jacobian sparsity the chunked gather relies on. Raising beats silently
+    producing a graph that bakes in one step's contact set.
+    """
+    obj = _make_object()
+    scene = SimplicitsScene(device="cuda", timestep=0.03, max_newton_steps=4,
+                            capturable=True)
+    T = torch.eye(4, device="cuda", dtype=torch.float32)
+    scene.add_object(obj, num_qp=96, init_transform=T, apply_qr=True)
+    scene.set_scene_gravity(torch.tensor([0.0, 9.8, 0.0]))
+    with pytest.raises(NotImplementedError, match="apply_qr"):
+        scene.enable_collisions(collision_particle_radius=0.1,
+                                collision_penalty=1000.0, max_contact_pairs=4096)
 
 
 # The next two only exercise __init__ argument validation, which raises before the
@@ -482,3 +497,193 @@ def test_check_solve_info_false_skips_the_check():
     scene.run_sim_step()
     scene._sim_BMB_plus_reg_dense_th.fill_(float("nan"))
     scene.run_sim_step()  # must not raise; result is garbage by design
+
+
+def _contact_scene(capturable, n_obj=3, gap=0.9, radius=0.1, kinematic_ids=(),
+                   max_contact_pairs=4096):
+    r"""Scene whose objects actually touch, unlike ``_make_scene``'s 1.2-spaced stack.
+
+    Gravity is ``+9.8`` because ``set_scene_gravity`` treats +y as down, so the objects
+    settle onto the floor and into each other instead of drifting apart.
+
+    The radius/gap defaults are deliberately milder than they could be. Pushed harder
+    (radius 0.15 at gap 0.75) the scene reaches roughly 1400 contacts but the *host*
+    solve then hits a singular Hessian in about one run in four, which would make any
+    test built on it flaky for reasons unrelated to capture.
+    """
+    obj = _make_object()
+    scene = SimplicitsScene(device="cuda", timestep=0.03, max_newton_steps=4,
+                            max_ls_steps=10, capturable=capturable)
+    for i in range(n_obj):
+        T = torch.eye(4, device="cuda", dtype=torch.float32)
+        T[1, 3] = 0.6 + gap * i
+        scene.add_object(obj, num_qp=96, init_transform=T, apply_qr=False,
+                         is_kinematic=(i in kinematic_ids))
+    scene.set_scene_gravity(torch.tensor([0.0, 9.8, 0.0]))
+    scene.set_scene_floor(floor_height=0.0, floor_axis=1, floor_penalty=1e4,
+                          flip_floor=False)
+    scene.enable_collisions(collision_particle_radius=radius,
+                            collision_penalty=1000.0,
+                            max_contact_pairs=max_contact_pairs)
+    return scene
+
+
+@cuda_only
+def test_capturable_collision_assembly_matches_host():
+    r"""Gradient, Hessian and step bounds must match the host on the *same* contacts.
+
+    Trajectory comparison cannot establish this. Contact detection compacts with
+    ``wp.atomic_add``, so two runs from an identical state produce the same contact set
+    in a different storage order, and the energy reduction over that permuted order
+    differs in the last bits -- which flips borderline Armijo decisions. Two host runs
+    diverge from each other as fast as host and captured do.
+
+    So this drives both assemblies from one Collision object with one frozen detection.
+    Everything measured here is then attributable to assembly alone.
+    """
+    scene = _contact_scene(True)
+    for _ in range(3):
+        scene.run_sim_step()
+
+    cs = scene.force_dict["collision"]["object"]
+    coeff = scene.force_dict["collision"]["coeff"]
+    num_contacts = cs.num_contacts
+    assert num_contacts > 20, f"only {num_contacts} contacts; scene is not in contact"
+
+    # The captured path skips this (it gathers from the dense basis instead), so build
+    # the sparse Jacobian explicitly to give the host formulas something to read.
+    cs.calculate_jacobian(cp_w=scene.sim_skinning_weights, cp_x0=scene.sim_pts,
+                          cp_is_static=scene.qp_is_kinematic, qr_tfm=None)
+    J_dense = cs.collision_J_dense
+    wps.bsr_mv(A=scene.sim_B, x=scene.sim_z, y=scene._eval_dx)
+
+    # ---- Hessian: J^T H J ----
+    cs.hessian(scene._eval_dx, scene.sim_pts, coeff,
+               hessian_blocks=scene._cap_collision_hess)
+    h_blocks = wp.to_torch(scene._cap_collision_hess)[:num_contacts]
+    want_H = hess_reduction(J_dense, h_blocks)
+    got_H = torch.zeros_like(want_H)
+    scene._cap_collision_reducer.reduce_capturable(
+        scene._cap_B_dense, scene._cap_collision_hess, got_H)
+
+    # One monolithic GEMM versus a sum of per-chunk GEMMs: same products, different
+    # accumulation order, so the bound is float32 epsilon scaled by the term count.
+    tol_H = torch.finfo(torch.float32).eps * (3 * num_contacts) * float(want_H.abs().max())
+    err_H = (want_H - got_H).abs().max().item()
+    assert err_H <= tol_H, f"collision Hessian differs by {err_H:.3e} (bound {tol_H:.3e})"
+
+    # ---- Gradient: J^T dE/dx. Exact: one GEMV either way, no reassociation. ----
+    cs.gradient(scene._eval_dx, scene.sim_pts, coeff,
+                gradient=scene._cap_collision_dEdx)
+    dEdx = wp.to_torch(scene._cap_collision_dEdx)[:num_contacts].reshape(-1)
+    want_g = J_dense.transpose(0, 1) @ dEdx
+    got_g = torch.zeros(scene._num_dofs, device=want_g.device, dtype=want_g.dtype)
+    scene._cap_collision_reducer.accumulate_gradient_capturable(
+        scene._cap_B_dense, scene._cap_collision_dEdx, got_g)
+    assert torch.equal(want_g, got_g), "collision gradient is not bit-identical"
+
+    # ---- Step bounds. Also exact: the same atomic_min over the same block set. ----
+    # The clamp only engages for a step that closes more than 0.375 of the current gap,
+    # so the direction is scaled up until it does. Asserting equality on an all-ones
+    # bounds vector would pass against any implementation at all.
+    torch.manual_seed(3)
+    direction = torch.randn(scene._num_dofs, device="cuda")
+    wps.bsr_mv(A=scene.sim_B, x=scene.sim_z, y=scene._cap_bounds_dx)
+
+    want_b = got_b = None
+    for scale in (0.05, 0.2, 1.0, 5.0, 25.0):
+        dz = wp.from_torch((direction * scale).contiguous())
+        wps.bsr_mv(A=scene.sim_B, x=dz, y=scene._cap_bounds_delta_dx)
+        want_b = wp.to_torch(cs.get_bounds(cp_delta_dx=scene._cap_bounds_delta_dx,
+                                           cp_dx=scene._cap_bounds_dx,
+                                           cp_x0=scene.sim_pts)).clone()
+        got_b = wp.to_torch(cs.get_bounds_capturable(
+            cp_delta_dx=scene._cap_bounds_delta_dx, cp_dx=scene._cap_bounds_dx,
+            b_dense=scene._cap_B_dense, dof_bounds=scene._cap_dof_bounds)).clone()
+        if bool((want_b < 1.0).any()):
+            break
+
+    assert bool((want_b < 1.0).any()), \
+        "no step size clamped any DOF; the bounds comparison would be vacuous"
+    assert torch.equal(want_b, got_b), "capturable step bounds differ from the host's"
+
+
+@cuda_only
+def test_capturable_collisions_preserve_contact_invariants():
+    r"""Long-run invariants, which is as much as a contact trajectory can be held to.
+
+    A tolerance-based trajectory comparison against the host is not a meaningful test
+    here and this docstring is the record of why: contact detection compacts slots with
+    ``wp.atomic_add``, so the storage order varies run to run, the energy reduction over
+    that order differs in the last bits, and stiff penalty contact amplifies it. Measured
+    on this scene, two *host* runs six steps apart disagree by up to 9e-2 relative -- more
+    than host-versus-captured does -- and the contact count swings between 40 and 96.
+
+    What must hold regardless of ordering is checked instead. Assembly correctness is
+    covered separately, and exactly, by
+    :func:`test_capturable_collision_assembly_matches_host`.
+    """
+    scene = _contact_scene(True, n_obj=3)
+    cs = scene.force_dict["collision"]["object"]
+    seen_contacts = []
+
+    for step in range(12):
+        scene.run_sim_step()
+        z = wp.to_torch(scene.sim_z)
+        seen_contacts.append(cs.num_contacts)
+
+        assert torch.isfinite(z).all(), f"step {step + 1}: non-finite DOFs"
+        assert float(z.abs().max()) < 1e3, \
+            f"step {step + 1}: |z| blew up to {float(z.abs().max()):.3e}"
+        # Saturating capacity would silently drop contacts rather than error.
+        assert cs.num_contacts < cs.max_contacting_pairs, \
+            f"step {step + 1}: contact capacity saturated"
+
+    assert max(seen_contacts) > 20, \
+        f"scene never made meaningful contact (max {max(seen_contacts)})"
+
+    # No interpenetration: every detected pair must stay outside the impenetrable
+    # barrier. This is what the step bounds exist to guarantee, so it fails if
+    # bounds_fcn is dropped from the captured Newton.
+    num_contacts = cs.num_contacts
+    if num_contacts > 0:
+        pts = wp.to_torch(scene.sim_pts) + wp.to_torch(scene._eval_dx)
+        ia = wp.to_torch(cs.collision_indices_a[:num_contacts]).long()
+        ib = wp.to_torch(cs.collision_indices_b[:num_contacts]).long()
+        live = (ia >= 0) & (ib >= 0)
+        d = (pts[ia[live]] - pts[ib[live]]).norm(dim=1)
+        barrier = cs.collision_radius * cs.collision_barrier_ratio
+        assert float(d.min()) > 0.0, "contact points coincide exactly"
+        assert float(d.min()) >= barrier * 0.5, (
+            f"interpenetration: closest pair {float(d.min()):.4f} is well inside the "
+            f"{barrier:.4f} barrier")
+
+
+@cuda_only
+def test_capturable_kinematic_object_pinned_while_in_contact():
+    r"""A kinematic object in contact must not move, which needs the off-diagonal mask.
+
+    This is the test the kinematic work could not have: with only floor and elastic
+    forces the scene Hessian is block diagonal per object, so ``H_kf`` is already zero
+    and ``apply_kinematic_bc``'s off-diagonal zeroing is provably a no-op. Contact is
+    what finally assembles genuine object-object blocks, so zeroing rows *and* columns
+    becomes load-bearing: keep only the diagonal and the kinematic DOFs get dragged by
+    whatever is resting on them.
+    """
+    scene = _contact_scene(True, n_obj=3, kinematic_ids=(1,))
+    kin_dofs = wp.to_torch(scene.kin_obj_to_z_map[1]).cpu()
+    z0 = wp.to_torch(scene.sim_z).cpu().clone()
+
+    for _ in range(5):
+        scene.run_sim_step()
+
+    cs = scene.force_dict["collision"]["object"]
+    assert cs.num_contacts > 20, "kinematic object is not actually in contact"
+
+    z1 = wp.to_torch(scene.sim_z).cpu()
+    moved = (z1[kin_dofs] - z0[kin_dofs]).abs().max().item()
+    assert moved == 0.0, f"kinematic DOFs moved by {moved:.3e} while in contact"
+    # And the rest of the scene must have moved, or "pinned" is trivially satisfied.
+    free = torch.ones(z0.numel(), dtype=torch.bool)
+    free[kin_dofs] = False
+    assert (z1[free] - z0[free]).abs().max().item() > 1e-4

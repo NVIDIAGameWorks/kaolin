@@ -179,6 +179,22 @@ def _collision_hessian_chunk_wp_kernel(
 
 
 @wp.kernel
+def _collision_gradient_chunk_wp_kernel(
+    g_full: wp.array(dtype=wp.vec3),
+    num_contacts: wp.array(dtype=int),
+    chunk_start: wp.array(dtype=int),
+    g_chunk: wp.array(dtype=wp.vec3),
+):  # pragma: no cover
+    r"""Gathers the per-contact :math:`dE/dx` for one chunk, zeroing the padding."""
+    c = wp.tid()
+    g = chunk_start[0] + c
+    if g >= num_contacts[0]:
+        g_chunk[c] = wp.vec3(0.0)
+    else:
+        g_chunk[c] = g_full[g]
+
+
+@wp.kernel
 def _advance_chunk_start_wp_kernel(
     chunk_start: wp.array(dtype=int),
     chunk_size: int,
@@ -729,6 +745,92 @@ def _get_collision_bounds_wp_kernel(
                 wp.atomic_min(dof_t_max, jacobian_b_columns[dof], t_max)
 
 
+@wp.kernel
+def _get_collision_bounds_dense_wp_kernel(
+    radius: float,
+    barrier_distance_ratio: float,
+    dx_cur: wp.array(dtype=wp.vec3),
+    dx_start_of_timestep: wp.array(dtype=wp.vec3),
+    kinematic_gaps: wp.array(dtype=wp.vec3),
+    normals: wp.array(dtype=wp.vec3),
+    indices_a: wp.array(dtype=int),
+    indices_b: wp.array(dtype=int),
+    delta_dx: wp.array(dtype=wp.vec3),
+    b_dense: wp.array2d(dtype=wp.float32),
+    block_width: int,
+    num_contacts: wp.array(dtype=int),
+    dof_t_max: wp.array(dtype=float),
+):  # pragma: no cover
+    r"""Capturable form of :func:`_get_collision_bounds_wp_kernel`.
+
+    Identical math; the only difference is where the "which DOFs does this contact point
+    move?" question is answered. The original walks the BSR structure of ``collision_J_a``
+    / ``collision_J_b``, which the capturable path no longer builds. Since those Jacobians
+    are row gathers of the dense basis, row ``3c`` of :math:`J_a` *is* row ``3*idx_a`` of
+    ``B``, so the same block sparsity is read straight from ``b_dense``.
+
+    Launched 2D over (contact, DOF block). Each thread redoes the (cheap) gap arithmetic
+    so that the sparsity test parallelizes over DOFs instead of looping inside one thread.
+    """
+    c, blk = wp.tid()
+
+    if c >= num_contacts[0]:
+        return
+
+    nor = normals[c]
+    idx_a = indices_a[c]
+    idx_b = indices_b[c]
+
+    if idx_a == NULL_ELEMENT_INDEX:
+        delta_d_a = 0.0
+    else:
+        delta_d_a = wp.dot(nor, delta_dx[idx_a])
+
+    if idx_b == NULL_ELEMENT_INDEX:
+        delta_d_b = 0.0
+    else:
+        delta_d_b = -wp.dot(nor, delta_dx[idx_b])
+
+    offset = _collision_offset_wp_func(
+        c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
+    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
+    rp = barrier_distance_ratio * rc
+    gap_cur = rp - wp.dot(offset, nor)
+
+    if gap_cur >= 0.0:
+        # Missed due to too large timestep. Can't do anything now
+        return
+
+    MAX_PROGRESS = 0.75
+    max_delta_d = 0.5 * MAX_PROGRESS * gap_cur
+
+    col0 = block_width * blk
+
+    if delta_d_a < 0.0 and idx_a != NULL_ELEMENT_INDEX:  # getting closer
+        t_max = wp.clamp(max_delta_d / delta_d_a, 0.0, 1.0)
+        if t_max < 1.0:
+            # int(0) rather than False: Warp requires an explicit dynamic-variable
+            # declaration for anything mutated inside a dynamic loop.
+            touched = int(0)
+            for m in range(block_width):
+                if b_dense[3 * idx_a, col0 + m] != 0.0:
+                    touched = 1
+            if touched == 1:
+                for m in range(block_width):
+                    wp.atomic_min(dof_t_max, col0 + m, t_max)
+
+    if delta_d_b < 0.0 and idx_b != NULL_ELEMENT_INDEX:  # getting closer
+        t_max = wp.clamp(max_delta_d / delta_d_b, 0.0, 1.0)
+        if t_max < 1.0:
+            touched = int(0)
+            for m in range(block_width):
+                if b_dense[3 * idx_b, col0 + m] != 0.0:
+                    touched = 1
+            if touched == 1:
+                for m in range(block_width):
+                    wp.atomic_min(dof_t_max, col0 + m, t_max)
+
+
 class Collision:
     def __init__(self,
                  dt,
@@ -894,6 +996,23 @@ class Collision:
                     self.count, chunk_start],
             outputs=[j_chunk],
             device=b_dense.device)
+
+    def gather_gradient_chunk(self, g_full, chunk_start, g_chunk):
+        r"""Gathers the per-contact :math:`dE/dx` vectors for one chunk.
+
+        Args:
+            g_full (wp.array(dtype=wp.vec3)): Per-contact gradients over the full
+                capacity, as written by :func:`gradient`.
+            chunk_start (wp.array(dtype=int)): Single-element device array holding the
+                index of the first contact in this chunk.
+            g_chunk (wp.array(dtype=wp.vec3)): Output of size ``chunk``.
+        """
+        wp.launch(
+            kernel=_collision_gradient_chunk_wp_kernel,
+            dim=g_chunk.shape[0],
+            inputs=[g_full, self.count, chunk_start],
+            outputs=[g_chunk],
+            device=g_full.device)
 
     def gather_hessian_chunk(self, h_full, chunk_start, h_chunk):
         r"""Gathers the per-contact :math:`3 \times 3` Hessian blocks for one chunk.
@@ -1165,6 +1284,60 @@ class Collision:
 
         return dof_bounds
 
+    def get_bounds_capturable(self, cp_delta_dx, cp_dx, b_dense, dof_bounds,
+                              block_width=4):
+        r"""Per-DOF step bounds, without touching the sparse Jacobian.
+
+        Capturable counterpart of :func:`get_bounds`: fixed launch dimension, preallocated
+        output, no allocation and no host read. See
+        :func:`_get_collision_bounds_dense_wp_kernel` for why ``b_dense`` can stand in for
+        the BSR structure.
+
+        Args:
+            cp_delta_dx (wp.array(dtype=wp.vec3)): :math:`B \, dz`, the proposed step at
+                the contact points.
+            cp_dx (wp.array(dtype=wp.vec3)): :math:`B \, z`, current displacements.
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis.
+            dof_bounds (wp.array(dtype=float)): Preallocated ``(num_dofs,)`` output. Reset
+                to 1.0 here, so callers need not.
+            block_width (int, optional): DOF block granularity at which bounds are
+                applied, matching ``collision_J_a``'s block shape. Defaults to 4.
+
+        Returns:
+            wp.array(dtype=float): ``dof_bounds``.
+        """
+        num_dofs = b_dense.shape[1]
+        if dof_bounds.shape[0] != num_dofs:
+            raise ValueError(
+                f"dof_bounds has {dof_bounds.shape[0]} entries but b_dense has "
+                f"{num_dofs} columns.")
+        if num_dofs % block_width != 0:
+            raise ValueError(
+                f"num_dofs ({num_dofs}) must be a multiple of block_width "
+                f"({block_width}).")
+
+        dof_bounds.fill_(1.0)
+        wp.launch(
+            _get_collision_bounds_dense_wp_kernel,
+            dim=(self._contact_launch_dim(), num_dofs // block_width),
+            inputs=[
+                self.collision_radius,
+                self.collision_barrier_ratio,
+                cp_dx,
+                self.cp_dx_at_nm_iteration_0,
+                self.collision_kinematic_gaps,
+                self.collision_normals,
+                self.collision_indices_a,
+                self.collision_indices_b,
+                cp_delta_dx,
+                b_dense,
+                block_width,
+                self.count,
+            ],
+            outputs=[dof_bounds],
+            device=b_dense.device)
+        return dof_bounds
+
     def energy(self, dx, x0, coeff, energy=None):
         r"""
         Compute the collision energy.
@@ -1374,12 +1547,15 @@ class ChunkedCollisionHessian:
         self.j_chunk = wp.zeros((3 * chunk_size, num_dofs),
                                 dtype=wp.float32, device=device)
         self.h_chunk = wp.zeros(chunk_size, dtype=wp.mat33, device=device)
+        self.g_chunk = wp.zeros(chunk_size, dtype=wp.vec3, device=device)
 
         # Torch views onto the same memory -- the reduction is a pair of GEMMs, which
         # torch does far better than a hand-written kernel. wp.to_torch aliases rather
         # than copies, so these stay valid for the lifetime of the buffers above.
         self._t_j_chunk = wp.to_torch(self.j_chunk)
         self._t_h_chunk = wp.to_torch(self.h_chunk)
+        # (chunk, 3) -> (3*chunk,), a view: this is the vector J_c^T multiplies.
+        self._t_g_chunk = wp.to_torch(self.g_chunk).reshape(3 * chunk_size)
         # Scratch for the intermediate H @ J. Preallocated because torch.bmm would
         # otherwise allocate inside the capture region.
         self._hj = torch.zeros(chunk_size, 3, num_dofs,
@@ -1394,11 +1570,14 @@ class ChunkedCollisionHessian:
         # computes nothing; only the handle matters. The rest of the capturable path gets
         # away without this only because scene setup incidentally runs matmuls first,
         # which is not something a standalone reducer should have to rely on.
-        hess_reduction(self._t_j_chunk, self._t_h_chunk,
-                       out=torch.zeros(num_dofs, num_dofs,
-                                       dtype=self._t_j_chunk.dtype,
-                                       device=self._t_j_chunk.device),
-                       HJ=self._hj)
+        _warm = torch.zeros(num_dofs, num_dofs, dtype=self._t_j_chunk.dtype,
+                            device=self._t_j_chunk.device)
+        hess_reduction(self._t_j_chunk, self._t_h_chunk, out=_warm, HJ=self._hj)
+        _warm[0].addmv_(self._t_j_chunk.transpose(0, 1), self._t_g_chunk)
+
+    def _advance(self):
+        wp.launch(kernel=_advance_chunk_start_wp_kernel, dim=1,
+                  inputs=[self.chunk_start, self.chunk_size], device=self.device)
 
     def _reduce_one_chunk(self, b_dense, h_full, out):
         r"""Builds the chunk at the current cursor and accumulates its contribution."""
@@ -1406,8 +1585,47 @@ class ChunkedCollisionHessian:
         self.collision.gather_hessian_chunk(h_full, self.chunk_start, self.h_chunk)
         hess_reduction(self._t_j_chunk, self._t_h_chunk, out=out, HJ=self._hj,
                        accumulate=True)
-        wp.launch(kernel=_advance_chunk_start_wp_kernel, dim=1,
-                  inputs=[self.chunk_start, self.chunk_size], device=self.device)
+        self._advance()
+
+    def _reduce_one_gradient_chunk(self, b_dense, g_full, out):
+        r"""Accumulates :math:`J_c^T \, (dE/dx)_c` for the chunk at the current cursor."""
+        self.collision.build_jacobian_chunk(b_dense, self.chunk_start, self.j_chunk)
+        self.collision.gather_gradient_chunk(g_full, self.chunk_start, self.g_chunk)
+        # addmv_ is the in-place out += A @ v GEMV; no allocation, no extra buffer.
+        out.addmv_(self._t_j_chunk.transpose(0, 1), self._t_g_chunk)
+        self._advance()
+
+    def accumulate_gradient_capturable(self, b_dense, g_full, out):
+        r"""Adds :math:`J^T \, dE/dx` into ``out``, chunked, under ``wp.capture_while``.
+
+        The host path does this with one ``bsr_mv`` against the sparse collision
+        Jacobian, whose topology changes with the contact set and so cannot be captured.
+        This is the same product, accumulated chunk by chunk from gathered rows.
+
+        Unlike the Hessian reduction this deliberately does **not** zero ``out``: the
+        scene gradient already holds the elastic and point-wise terms by the time
+        collisions are added.
+
+        Args:
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis.
+            g_full (wp.array(dtype=wp.vec3)): Per-contact :math:`dE/dx` over capacity.
+            out (torch.Tensor): ``(num_dofs,)`` accumulator, added into.
+
+        Returns:
+            torch.Tensor: ``out``.
+        """
+        if out.numel() != self.num_dofs:
+            raise ValueError(
+                f"out has {out.numel()} entries, expected {self.num_dofs}.")
+        self.chunk_start.zero_()
+        self._update_cond()
+
+        def while_body():
+            self._reduce_one_gradient_chunk(b_dense, g_full, out)
+            self._update_cond()
+
+        wp.capture_while(self.loop_cond, while_body=while_body)
+        return out
 
     def reduce(self, b_dense, h_full, out):
         r"""Accumulates :math:`J^T H J` into ``out`` with a host-side chunk loop.
@@ -1433,7 +1651,7 @@ class ChunkedCollisionHessian:
             self._reduce_one_chunk(b_dense, h_full, out)
         return out
 
-    def reduce_capturable(self, b_dense, h_full, out):
+    def reduce_capturable(self, b_dense, h_full, out, accumulate=False):
         r"""Same reduction, but with the chunk loop as a ``wp.capture_while``.
 
         Two things change versus :func:`reduce`. The loop becomes a device-side
@@ -1444,13 +1662,17 @@ class ChunkedCollisionHessian:
         Args:
             b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis.
             h_full (wp.array(dtype=wp.mat33)): Per-contact Hessian blocks over capacity.
-            out (torch.Tensor): Preallocated ``(num_dofs, num_dofs)`` output, overwritten.
+            out (torch.Tensor): Preallocated ``(num_dofs, num_dofs)`` output.
+            accumulate (bool, optional): Add into ``out`` rather than overwriting it.
+                Lets the scene Hessian be accumulated in place, avoiding a second
+                ``(num_dofs, num_dofs)`` scratch -- 56 MiB at 3840 DOF. Defaults to False.
 
         Returns:
             torch.Tensor: ``out``.
         """
         self._validate(b_dense, h_full, out)
-        out.zero_()
+        if not accumulate:
+            out.zero_()
         self.chunk_start.zero_()
         self._update_cond()
 
