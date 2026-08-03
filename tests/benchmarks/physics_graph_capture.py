@@ -7,8 +7,11 @@ subtly wrong when moved onto the device.
 Usage:
     python tests/benchmarks/physics_graph_capture.py
     python tests/benchmarks/physics_graph_capture.py --only-correctness
+    python tests/benchmarks/physics_graph_capture.py --stacking-cubes
 """
 import argparse
+import os
+import sys
 import time
 
 import torch
@@ -153,11 +156,107 @@ def newton_iters_per_step(cfg, n_steps=10):
     return total / n_steps
 
 
+def stacking_cubes(steps=200):
+    r"""Times ``examples/tutorial/physics/simplicits_stacking_cubes.py``, capture on/off.
+
+    Drives the example's own ``create_cube_object()`` / ``build_scene()`` rather than a
+    reimplementation, so the parameters -- 50000 cube points, 1000 qp/object, 10 handles,
+    5 Newton steps, contact radius 0.05, penalty 5000, 50000 contact capacity -- cannot
+    drift away from the example. Only the ``capturable`` flag is injected.
+
+    Reports a phase split because the run has two regimes: the stack collapses partway
+    through (the cubes interpenetrate and pass through each other), after which there are
+    no contacts and a step is ~3.5x cheaper, so a single 200-step average blends them. The
+    collapse is pre-existing and unrelated to capture -- at the branch point (631550e3) it
+    happens earlier, by step 81. Which step it lands on varies run to run, because contact
+    detection compacts slots with wp.atomic_add, so the two columns generally spend
+    different numbers of steps in the expensive regime; the per-step means are the
+    comparable figures, not the phase totals.
+
+    Polyscope is imported by the example at module scope but never initialized, so this
+    runs headless.
+    """
+    import kaolin as kal
+    sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "..", "..", "examples", "tutorial", "physics"))
+    import simplicits_stacking_cubes as example
+
+    base = kal.physics.simplicits.SimplicitsScene
+
+    def run(capturable):
+        if capturable:
+            class _Capturable(base):
+                def __init__(self, *a, **kw):
+                    kw["capturable"] = True
+                    super().__init__(*a, **kw)
+            kal.physics.simplicits.SimplicitsScene = _Capturable
+        else:
+            kal.physics.simplicits.SimplicitsScene = base
+        try:
+            cube, pts = example.create_cube_object()
+            scene, _ = example.build_scene(cube, pts)
+            collision = scene.force_dict["collision"]["object"]
+            per_step, contacts = [], []
+            torch.cuda.synchronize()
+            for _ in range(steps):
+                t0 = time.perf_counter()
+                scene.run_sim_step()
+                torch.cuda.synchronize()
+                per_step.append(time.perf_counter() - t0)
+                contacts.append(collision.num_contacts)
+            return per_step, contacts
+        finally:
+            kal.physics.simplicits.SimplicitsScene = base
+
+    host_t, host_n = run(False)
+    torch.cuda.empty_cache()
+    cap_t, cap_n = run(True)
+
+    def split(times, counts):
+        hot = [t for t, n in zip(times, counts) if n > 0]
+        cold = [t for t, n in zip(times, counts) if n == 0]
+        return hot, cold
+
+    host_hot, host_cold = split(host_t, host_n)
+    cap_hot, cap_cold = split(cap_t, cap_n)
+
+    print("\n" + "=" * 78)
+    print(f"STACKING CUBES ({steps} steps, 3 cubes, 360 dof, 50000 contact capacity)")
+    print("=" * 78)
+    print(f"{'':<26}{'host (s)':>12}{'captured (s)':>14}{'speedup':>10}")
+    print("-" * 78)
+    print(f"{'all ' + str(steps) + ' steps':<26}{sum(host_t):>12.3f}"
+          f"{sum(cap_t):>14.3f}{sum(host_t) / sum(cap_t):>9.2f}x")
+
+    print(f"\n{'':<22}{'host ms':>10}{'captured ms':>13}{'speedup':>10}"
+          f"{'host steps':>12}{'cap steps':>11}")
+    print("-" * 78)
+    for label, h, c in (("contact phase", host_hot, cap_hot),
+                        ("zero-contact phase", host_cold, cap_cold)):
+        mh = 1e3 * sum(h) / len(h) if h else float("nan")
+        mc = 1e3 * sum(c) / len(c) if c else float("nan")
+        speed = f"{mh / mc:>9.2f}x" if h and c else f"{'n/a':>10}"
+        print(f"{label:<22}{mh:>10.2f}{mc:>13.2f}{speed}{len(h):>12}{len(c):>11}")
+    print(f"\npeak contacts: host {max(host_n)}, captured {max(cap_n)}")
+    if len(host_hot) != len(cap_hot):
+        print(f"NOTE: the two runs spent different numbers of steps in contact "
+              f"({len(host_hot)} vs {len(cap_hot)}), so the phase totals are not "
+              f"comparable\n      and the overall speedup is skewed toward whichever "
+              f"run collapsed sooner. Compare the per-step means.")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only-correctness", action="store_true")
+    ap.add_argument("--stacking-cubes", action="store_true",
+                    help="Time the stacking-cubes example instead of the synthetic "
+                         "configs. Opt-in: it rebuilds the RKPM basis twice.")
     ap.add_argument("--steps", type=int, default=20)
     args = ap.parse_args()
+
+    if args.stacking_cubes:
+        return stacking_cubes()
 
     print("\n" + "=" * 78)
     print("CORRECTNESS: captured vs host Newton (25 steps, trajectory comparison)")

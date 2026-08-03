@@ -1048,9 +1048,6 @@ class SimplicitsScene:
             friction=friction,
             max_contacting_pairs=max_contact_pairs,
             bounds=True,
-            # Sizes the device-side object-pair matrix, which is how the capturable
-            # Hessian assembly skips non-touching object pairs without a host readback.
-            num_objects=len(self.sim_obj_dict),
             capturable=self.capturable,
         )
 
@@ -1088,12 +1085,13 @@ class SimplicitsScene:
         num_dofs = self._num_dofs
         capacity = collision_struct.max_contacting_pairs
 
-        # Chunking is a partition of a sum, so any divisor is correct; this picks the
-        # largest power of two that divides the capacity and does not exceed chunk_size,
-        # rather than rejecting capacities that are not multiples of 2048.
+        # Chunking is a partition of a sum, so any chunk size is correct -- including one
+        # that leaves a partial final chunk, which the gather kernels handle by zeroing
+        # lanes past the live contact count. This used to search downward for a divisor of
+        # the capacity, which silently collapsed to chunk=1 (one capture_while iteration
+        # per contact) for capacities with no convenient factor, and divided by zero for
+        # a capacity of zero.
         chunk = min(chunk_size, capacity)
-        while capacity % chunk != 0:
-            chunk -= 1
 
         # Full-scene dense subspace basis, the array the Jacobian chunks gather from.
         # Materialized once: it is constant for the scene's lifetime.
@@ -1750,10 +1748,11 @@ class SimplicitsScene:
                     "replay would silently use the old value. Rebuild the scene.")
 
         # Detection is eager -- stage 1. It runs once per step against roughly a hundred
-        # solver evaluations, so leaving it outside the graph gives up very little, and
-        # it is the only remaining host sync in the step (Collision.num_contacts). What
-        # matters for capture is that the count never reaches the host *inside* the
-        # solve, which the count-guarded kernels and the capture_while trip count ensure.
+        # solver evaluations, so leaving it outside the graph gives up very little. It is
+        # nonetheless free of host syncs: detection clamps the count on device, skips the
+        # object_pairs build (host-Newton-only), and Collision.num_contacts is a lazy
+        # property nothing in this path reads. So the count never reaches the host at all,
+        # not merely never inside the solve.
         #
         # Must come before the launch: run_sim_step dispatches straight here for
         # capturable scenes, so without this the contact set stays frozen at whatever

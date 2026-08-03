@@ -50,7 +50,6 @@ def _detect_particle_collisions_wp_kernel(
     kinematic_gaps: wp.array(dtype=wp.vec3),  # kinematic gaps
     indices_a: wp.array(dtype=int),       # collision indices pairs a-b
     indices_b: wp.array(dtype=int),       # collision indices pairs a-b
-    pair_matrix: wp.array2d(dtype=wp.int32),  # which object pairs are in contact
 ):  # pragma: no cover
     tid = wp.tid()
 
@@ -103,19 +102,6 @@ def _detect_particle_collisions_wp_kernel(
                 indices_b[idx] = NULL_ELEMENT_INDEX
             else:
                 indices_b[idx] = idx_b
-
-            # Record which object pairs are touching, device-side. Done HERE rather than
-            # in a later kernel because obj_a/obj_b are still in scope: once the sentinel
-            # has been written, a static point's index is -1 and its object identity is
-            # gone (and a -1 subscript into qp_to_object_map would wrap to the last
-            # point, misattributing the contact). Writes are symmetric plus self-pairs,
-            # matching the host-side object_pairs construction. Plain stores, not atomics
-            # -- every write is the same constant, so races are benign.
-            if obj_a < pair_matrix.shape[0] and obj_b < pair_matrix.shape[0]:
-                pair_matrix[obj_a, obj_b] = 1
-                pair_matrix[obj_b, obj_a] = 1
-                pair_matrix[obj_a, obj_a] = 1
-                pair_matrix[obj_b, obj_b] = 1
 
 
 @wp.kernel
@@ -192,6 +178,26 @@ def _collision_gradient_chunk_wp_kernel(
         g_chunk[c] = wp.vec3(0.0)
     else:
         g_chunk[c] = g_full[g]
+
+
+@wp.kernel
+def _clamp_contact_count_wp_kernel(
+    count: wp.array(dtype=int),
+    capacity: int,
+):  # pragma: no cover
+    r"""Clamps the detected contact count to the buffer capacity, on device.
+
+    The detection kernel increments ``count`` *before* testing the capacity, so on
+    overflow it holds the raw detected total while only ``capacity`` slots were written.
+    Every per-contact kernel guards on this array, so an unclamped count would let threads
+    read slots that were never filled.
+
+    Done here rather than from the host because ``count <= capacity`` has to hold without
+    anyone reading it back: it is what makes a partial final chunk safe in
+    :class:`ChunkedCollisionHessian` (a thread passing ``g >= count`` therefore also
+    satisfies ``g < capacity``), and it is the last thing that forced a D2H per step.
+    """
+    count[0] = wp.min(count[0], capacity)
 
 
 @wp.kernel
@@ -276,8 +282,23 @@ def _collision_target_distance_wp_func(
     indices_a: wp.array(dtype=int),
     indices_b: wp.array(dtype=int),
 ):  # pragma: no cover
-    return wp.where(indices_b[c] == NULL_ELEMENT_INDEX, 1.0, 2.0) * radius
-    # return 2.0 * radius
+    r"""Target separation for contact ``c``: one radius against static geometry, two
+    between two dynamic particles.
+
+    Both indices are tested, not just ``indices_b``. Detection enforces ``idx_a < idx_b``,
+    so a kinematic object added early in the scene -- as ``simplicits_friction_slab`` adds
+    its slab -- puts the sentinel in ``indices_a`` for *every* one of its contacts, not
+    occasionally. Testing only ``indices_b`` would then return ``2*radius`` for all of
+    them, and since ``rc`` divides through everything downstream (``d_hat = d/rc``,
+    ``rp = barrier_ratio*rc``, gradient ``~ dE/rc``, Hessian ``~ d2E/rc^2``) the barrier
+    would engage at twice the intended gap with the force halved and the Hessian quartered.
+    Warp folds a ``-1`` subscript to the last element rather than raising, so it would fail
+    silently.
+    """
+    # No short-circuit `or` inside wp.where, so combine the two tests arithmetically.
+    static_a = wp.where(indices_a[c] == NULL_ELEMENT_INDEX, 1, 0)
+    static_b = wp.where(indices_b[c] == NULL_ELEMENT_INDEX, 1, 0)
+    return wp.where(static_a + static_b > 0, 1.0, 2.0) * radius
 
 
 @wp.kernel
@@ -317,9 +338,10 @@ def _collision_energy_wp_kernel(
     # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
     # no-op when the launch dim is exactly num_contacts (every tid passes), so the
     # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
-    # sentinel means "partner is static geometry", a distinct concept the offset and
-    # target-distance helpers handle, and conflating the two silently drops every
-    # contact against a kinematic collider.
+    # sentinel means "partner is static geometry", a distinct concept that
+    # _collision_offset_wp_func and _collision_target_distance_wp_func each handle by
+    # testing both indices, and conflating the two silently drops every contact against a
+    # kinematic collider.
     if c >= num_contacts[0]:
         return
 
@@ -422,9 +444,10 @@ def _collision_gradient_wp_kernel(coeff: float,
     # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
     # no-op when the launch dim is exactly num_contacts (every tid passes), so the
     # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
-    # sentinel means "partner is static geometry", a distinct concept the offset and
-    # target-distance helpers handle, and conflating the two silently drops every
-    # contact against a kinematic collider.
+    # sentinel means "partner is static geometry", a distinct concept that
+    # _collision_offset_wp_func and _collision_target_distance_wp_func each handle by
+    # testing both indices, and conflating the two silently drops every contact against a
+    # kinematic collider.
     if c >= num_contacts[0]:
         return
 
@@ -542,9 +565,10 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
     # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
     # no-op when the launch dim is exactly num_contacts (every tid passes), so the
     # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
-    # sentinel means "partner is static geometry", a distinct concept the offset and
-    # target-distance helpers handle, and conflating the two silently drops every
-    # contact against a kinematic collider.
+    # sentinel means "partner is static geometry", a distinct concept that
+    # _collision_offset_wp_func and _collision_target_distance_wp_func each handle by
+    # testing both indices, and conflating the two silently drops every contact against a
+    # kinematic collider.
     if c >= num_contacts[0]:
         return
 
@@ -683,9 +707,10 @@ def _get_collision_bounds_wp_kernel(
     # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
     # no-op when the launch dim is exactly num_contacts (every tid passes), so the
     # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
-    # sentinel means "partner is static geometry", a distinct concept the offset and
-    # target-distance helpers handle, and conflating the two silently drops every
-    # contact against a kinematic collider.
+    # sentinel means "partner is static geometry", a distinct concept that
+    # _collision_offset_wp_func and _collision_target_distance_wp_func each handle by
+    # testing both indices, and conflating the two silently drops every contact against a
+    # kinematic collider.
     if c >= num_contacts[0]:
         return
 
@@ -844,7 +869,6 @@ class Collision:
                  friction=0.5,
                  max_contacting_pairs=10000,
                  bounds=True,
-                 num_objects=1,
                  capturable=False):
         r"""
         Initialize the collision class. This class operates on the whole scene
@@ -861,11 +885,6 @@ class Collision:
             friction (float): Friction coefficient. Defaults to 0.5.
             max_contacting_pairs (int): Number of contact points. Defaults to 10000.
             bounds (bool): Bounds the dofs in the line search to prevent any interpenetration. Defaults to True.
-            num_objects (int): Number of objects in the scene, sizing the device-side
-                object-pair matrix that records which pairs are touching. That matrix is
-                the capturable replacement for the host-side ``object_pairs`` list. Leave
-                at the default and the matrix is a 1x1 stub that detection skips writing.
-                Defaults to 1.
             capturable (bool): Launch every per-contact kernel over the fixed
                 ``max_contacting_pairs`` capacity, relying on the in-kernel device-count
                 guard, so no launch dimension depends on a host value. Required for cuda
@@ -874,7 +893,10 @@ class Collision:
         """
 
         # Collision constants
-        self.num_contacts = 0
+        # num_contacts is a property backed by self.count -- see below.
+        # Initialized here because get_bounds and _assemble_hessians read it before the
+        # first detect_collisions call on a freshly built scene.
+        self.object_pairs = []
         self.bounds = bounds
         self.collision_radius = collision_particle_radius
 
@@ -889,6 +911,9 @@ class Collision:
         self.friction = friction
         self.dt = dt
 
+        if max_contacting_pairs <= 0:
+            raise ValueError(
+                f"max_contacting_pairs must be positive, got {max_contacting_pairs}.")
         self.max_contacting_pairs = max_contacting_pairs
 
         # Buffers for collisions get updated per timestep.
@@ -902,9 +927,9 @@ class Collision:
         self.collision_kinematic_gaps = wp.zeros(
             max_contacting_pairs, dtype=wp.vec3)
 
-        # Contact count, kept on device. The host-side self.num_contacts mirror below is
-        # still read by the non-capturable path; the capturable path will consume this
-        # array instead so the count never reaches the host.
+        # Contact count, kept on device. This is the single source of truth: the
+        # num_contacts property below reads it on demand rather than at detection time,
+        # so a captured step never pays a D2H for a number it does not use.
         self.count = wp.zeros(1, dtype=int)
 
         # When True, every per-contact kernel launches over the fixed
@@ -912,14 +937,6 @@ class Collision:
         # so no launch dimension depends on a host-side value. Required for graph
         # capture; off by default so the existing path is unchanged.
         self.capturable = capturable
-
-        # Device-side record of which object pairs are touching, written during detection
-        # and symmetrized with self-pairs to match the host-side object_pairs list. A
-        # single element of this is a legal wp.capture_if predicate, which is how the
-        # per-pair Hessian blocks get skipped without a host readback.
-        self.num_objects = num_objects
-        self.collision_pair_matrix = wp.zeros(
-            (num_objects, num_objects), dtype=wp.int32)
 
         # Jacobians used to map from cps of contact pairs back to dofs
         self.collision_J_a = None  # Size 3*num_cps x num_dofs
@@ -952,6 +969,29 @@ class Collision:
             # stable for every subsequent timestep.
             self.cp_dx_at_nm_iteration_0 = wp.zeros_like(cp_dx)
         wp.copy(dest=self.cp_dx_at_nm_iteration_0, src=cp_dx)
+
+    @property
+    def num_contacts(self):
+        r"""Number of live contacts, read back from the device on access.
+
+        Lazy rather than cached at detection time. The count is already on device and
+        every per-contact kernel guards against it there, so under ``capturable`` nothing
+        in a step needs it -- reading it eagerly cost one blocking D2H per step for a
+        value that was usually discarded. The host path still reads it constantly, and
+        pays for it exactly when it asks.
+
+        The clamp mirrors :func:`_clamp_contact_count_wp_kernel`, which has already
+        applied it on device; it is repeated here so the warning has somewhere to live
+        now that detection does not look at the count.
+
+        Returns:
+            int: Contact count, capped at ``max_contacting_pairs``.
+        """
+        n = int(self.count.numpy()[0])
+        if n > self.max_contacting_pairs:
+            logging.warning('contact buffer size exceed, some have been ignored')
+            return self.max_contacting_pairs
+        return n
 
     def _contact_launch_dim(self):
         r"""Launch dimension for per-contact kernels.
@@ -1081,9 +1121,6 @@ class Collision:
         # must live at a stable address.
         self.count.zero_()
         count = self.count
-        # Stale pairs from the previous frame must not persist; detection only ever
-        # sets entries, never clears them.
-        self.collision_pair_matrix.zero_()
 
         # Find collisions
         wp.launch(
@@ -1102,25 +1139,24 @@ class Collision:
                     self.collision_normals,
                     self.collision_kinematic_gaps,
                     self.collision_indices_a,
-                    self.collision_indices_b,
-                    self.collision_pair_matrix],
+                    self.collision_indices_b],
         )
         
 
-        self.num_contacts = int(count.numpy()[0])
+        # Enforce count <= capacity on device. Nothing reads the count back here; see
+        # _clamp_contact_count_wp_kernel for why that invariant has to hold anyway.
+        wp.launch(_clamp_contact_count_wp_kernel, dim=1,
+                  inputs=[self.count, max_contacts], device=self.count.device)
 
-        if self.num_contacts > max_contacts:
-            logging.warning('contact buffer size exceed, some have been ignored')
-            self.num_contacts = max_contacts
-            # Clamp the device count too. The detection kernel increments before it
-            # tests the capacity, so on overflow count[0] holds the raw detected total
-            # while only max_contacts slots were actually written. The kernels guard on
-            # this array, so leaving it unclamped makes "slot validity" untrue exactly
-            # in the case we just detected -- harmless while every launch dim is
-            # <= capacity, but not an invariant worth leaving broken.
-            self.count.fill_(max_contacts)
-
-        # self.build_jacobian(cp_w, cp_x0, cp_obj_ids)
+        if self.capturable:
+            # object_pairs below costs two blocking D2H (torch.unique with dim= has a
+            # data-dependent output shape, so it sizes its output from the host, then
+            # .cpu()/.numpy() again). Its only consumer is the host Newton path's
+            # _assemble_hessians, which builds a sparse block matrix from the pair list.
+            # The capturable assembly reduces J^T H J full-width and never reads it, so
+            # for a captured scene this is pure dead work plus the last host syncs in the
+            # step. Returning here is what makes the step actually sync-free.
+            return
 
         # If there are any collision contacts detected
         if self.num_contacts > 0:
@@ -1511,8 +1547,10 @@ class ChunkedCollisionHessian:
     Args:
         collision (Collision): Source of the contact arrays and the device contact count.
         num_dofs (int): Number of simulation DOFs, i.e. columns of the subspace basis.
-        chunk_size (int, optional): Contacts per chunk. Must divide
-            ``collision.max_contacting_pairs`` exactly. Defaults to 2048.
+        chunk_size (int, optional): Contacts per chunk. Need not divide
+            ``collision.max_contacting_pairs``; a partial final chunk is safe because the
+            gather kernels zero any lane past the live contact count. Clamped down to the
+            capacity. Defaults to 2048.
         device (optional): Warp device for the buffers. Defaults to ``collision.count``'s.
     """
 
@@ -1520,21 +1558,23 @@ class ChunkedCollisionHessian:
         capacity = collision.max_contacting_pairs
         if chunk_size <= 0:
             raise ValueError(f"chunk_size must be positive, got {chunk_size}.")
-        if capacity % chunk_size != 0:
-            # Not a stylistic preference. An indivisible capacity leaves a final chunk
-            # that runs off the end of the contact arrays, and the gather has no bound
-            # to check against other than the count -- which does not stop an
-            # out-of-range read once chunk_start exceeds capacity.
-            raise ValueError(
-                f"max_contacting_pairs ({capacity}) must be an exact multiple of "
-                f"chunk_size ({chunk_size}); the final chunk would read out of bounds.")
+
+        # chunk_size deliberately need NOT divide the capacity. A final chunk that hangs
+        # off the end is safe because `count <= capacity` is an enforced invariant --
+        # detection drops slots past the capacity (_detect_particle_collisions_wp_kernel)
+        # and _clamp_contact_count_wp_kernel pins the count on device afterwards. So a
+        # lane with `g >= count` also has `g >= capacity`, and all three gather kernels
+        # return early on exactly that test, zeroing their output. Requiring exact
+        # divisibility bought nothing and forced callers into a divisor search that
+        # collapsed to chunk_size=1 for capacities with no convenient factor.
+        chunk_size = min(chunk_size, capacity)
 
         if device is None:
             device = collision.count.device
 
         self.collision = collision
         self.chunk_size = chunk_size
-        self.num_chunks = capacity // chunk_size
+        self.num_chunks = -(-capacity // chunk_size)  # ceil
         self.num_dofs = num_dofs
         self.device = device
 

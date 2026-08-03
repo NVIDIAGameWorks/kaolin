@@ -26,6 +26,12 @@ from kaolin.physics.utils.torch_utilities import hess_reduction
 from kaolin.physics.utils.warp_utilities import capture_function_torch
 from kaolin.utils.testing import with_seed
 
+# Every fixture and test in this file builds tensors directly on 'cuda' -- the collision
+# kernels are Warp CUDA kernels with no CPU path. Without this the whole file reports as
+# errors rather than skips on a CPU-only lane.
+pytestmark = pytest.mark.skipif(not torch.cuda.is_available(),
+                                reason="collision kernels require CUDA")
+
 
 def _collision_contact_energy_analytical(
         offset, nor, rc, rp_ratio, mu, mu_dt, nu):
@@ -732,8 +738,9 @@ def test_capturable_launch_matches_host(test_scenes):
     collision.detect_collisions(dx, x0, obj_ids, is_static)
 
     nc = collision.num_contacts
-    if nc == 0:
-        pytest.skip("scene produced no contacts; comparison would be vacuous")
+    # Asserted, not skipped: the fixture is seeded, so zero contacts here means detection
+    # regressed, and a skip would report that as green.
+    assert nc > 0, "scene produced no contacts; detection has regressed"
 
     # Host-sized launches, freshly allocated outputs (the long-standing behaviour).
     collision.capturable = False
@@ -828,122 +835,6 @@ def test_count_guard_suppresses_stale_slots(test_scenes):
     assert torch.count_nonzero(stale_h) == 0, (
         f"{int(torch.count_nonzero(stale_h))} stale hessian entries survived in slots "
         f"[{n_sparse}, {n_dense})")
-
-
-@pytest.mark.parametrize("test_scenes", ["two_objects", "three_objects"], indirect=True)
-def test_pair_matrix_matches_host_object_pairs(test_scenes):
-    r"""The device-side pair matrix must agree exactly with the host object_pairs list.
-
-    `object_pairs` is built with torch.unique(...).cpu().numpy() -- three device syncs
-    and a variable-length host array driving a Python loop in the Hessian assembly. The
-    matrix is its capturable replacement: a single element of it is a legal
-    `wp.capture_if` predicate, so per-pair blocks can be skipped on device.
-
-    It is filled during detection rather than by a later kernel, because after detection
-    a static point's index is NULL_ELEMENT_INDEX and its object identity is gone -- and
-    a -1 subscript into the object map would wrap to the last point, attributing the
-    contact to the wrong object. `two_objects_one_static` is what covers that.
-    """
-    x0 = test_scenes['x0']
-    dx = test_scenes['dx']
-    obj_ids = test_scenes['obj_ids']
-    is_static = test_scenes['is_static']
-    n_obj = int(wp.to_torch(obj_ids).max()) + 1
-
-    collision = collisions.Collision(
-        dt=0.01, collision_particle_radius=0.5, detection_ratio=1.5,
-        impenetrable_barrier_ratio=0.5, friction=0.5,
-        max_contacting_pairs=4096, num_objects=n_obj)
-    collision.detect_collisions(dx, x0, obj_ids, is_static)
-
-    if collision.num_contacts == 0:
-        pytest.skip("scene produced no contacts")
-
-    device_matrix = torch.as_tensor(collision.collision_pair_matrix.numpy())
-
-    # Rebuild the same relation from the host-side list.
-    host_matrix = torch.zeros(n_obj, n_obj, dtype=device_matrix.dtype)
-    for i, j in collision.object_pairs:
-        host_matrix[int(i), int(j)] = 1
-
-    assert torch.equal(device_matrix, host_matrix), (
-        f"device pair matrix disagrees with host object_pairs\n"
-        f"device:\n{device_matrix}\nhost:\n{host_matrix}")
-
-    # Symmetric with self-pairs set, matching what the Hessian assembly needs.
-    assert torch.equal(device_matrix, device_matrix.T), "pair matrix must be symmetric"
-
-
-@pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
-def test_pair_matrix_clears_between_detections(test_scenes):
-    r"""Stale pairs must not persist: detection only ever sets entries, never clears."""
-    x0 = test_scenes['x0']
-    dx = test_scenes['dx']
-    obj_ids = test_scenes['obj_ids']
-    is_static = test_scenes['is_static']
-    n_obj = int(wp.to_torch(obj_ids).max()) + 1
-
-    collision = collisions.Collision(
-        dt=0.01, collision_particle_radius=0.5, detection_ratio=1.5,
-        impenetrable_barrier_ratio=0.5, friction=0.5,
-        max_contacting_pairs=4096, num_objects=n_obj)
-
-    collision.detect_collisions(dx, x0, obj_ids, is_static)
-    dense = torch.as_tensor(collision.collision_pair_matrix.numpy()).clone()
-
-    # Shrink the radius so nothing is in contact; the matrix must go empty.
-    collision.collision_radius = 1e-6
-    collision.detect_collisions(dx, x0, obj_ids, is_static)
-    sparse = torch.as_tensor(collision.collision_pair_matrix.numpy())
-
-    assert dense.sum() > 0, "first detection should have found contacts"
-    assert collision.num_contacts == 0, "second detection should have found none"
-    assert sparse.sum() == 0, (
-        f"pair matrix retained {int(sparse.sum())} stale entries from the previous frame")
-
-
-@pytest.mark.parametrize("test_scenes", ["two_objects_one_static"], indirect=True)
-def test_pair_matrix_records_static_contacts_that_host_list_loses(test_scenes):
-    r"""With a static object the device matrix is correct and `object_pairs` is not.
-
-    `object_pairs` is built host-side as `obj_ids[ind_a]`, but by then a static point's
-    index is NULL_ELEMENT_INDEX (-1), and torch wraps a -1 subscript to the LAST entry.
-    So the static object's contacts get attributed to whichever object owns the last
-    contact point, and the genuine (static, dynamic) coupling disappears from the list.
-    The Hessian assembly loops over that list, so the block coupling a kinematic collider
-    to a dynamic body would never be assembled.
-
-    It is not fixable host-side: once the sentinel is written the object identity is
-    gone. That is precisely why the pair matrix is filled inside the detection kernel,
-    where obj_a and obj_b are still in scope. This test pins the difference so the
-    device matrix is not "corrected" to match the broken list.
-    """
-    x0 = test_scenes['x0']
-    dx = test_scenes['dx']
-    obj_ids = test_scenes['obj_ids']
-    is_static = test_scenes['is_static']
-
-    collision = collisions.Collision(
-        dt=0.01, collision_particle_radius=0.5, detection_ratio=1.5,
-        impenetrable_barrier_ratio=0.5, friction=0.5,
-        max_contacting_pairs=4096, num_objects=2)
-    collision.detect_collisions(dx, x0, obj_ids, is_static)
-    assert collision.num_contacts > 0
-
-    device_matrix = torch.as_tensor(collision.collision_pair_matrix.numpy())
-
-    # Object 0 is static, object 1 dynamic, and they are in contact. The device matrix
-    # must record the cross coupling in both directions.
-    assert device_matrix[0, 1] == 1 and device_matrix[1, 0] == 1, (
-        f"device matrix lost the static/dynamic coupling:\n{device_matrix}")
-
-    # The host list, by contrast, never mentions object 0 -- documenting the bug rather
-    # than asserting the matrix should reproduce it.
-    host_objects = {int(i) for pair in collision.object_pairs for i in pair}
-    assert 0 not in host_objects, (
-        "object_pairs unexpectedly contains the static object -- if this now passes, "
-        "the host-side -1 wraparound has been fixed and this test should become an "
-        "equality check against the device matrix")
 
 
 def _make_collision(**kwargs):
@@ -1189,7 +1080,7 @@ def test_chunked_hessian_is_invariant_to_chunk_size(test_scenes):
     collision.hessian(dx, x0, 1.0, hessian_blocks=h_full)
 
     results = []
-    for chunk_size in (4, 8, 16, 64):
+    for chunk_size in (4, 7, 8, 16, 64):
         reducer = collisions.ChunkedCollisionHessian(
             collision, num_dofs, chunk_size=chunk_size)
         out = torch.zeros(num_dofs, num_dofs, device=t_B.device)
@@ -1197,18 +1088,60 @@ def test_chunked_hessian_is_invariant_to_chunk_size(test_scenes):
 
     scale = max(float(results[0].abs().max()), 1.0)
     tol = torch.finfo(torch.float32).eps * 3 * collision.num_contacts * scale
-    for chunk_size, got in zip((8, 16, 64), results[1:]):
+    for chunk_size, got in zip((7, 8, 16, 64), results[1:]):
         err = (got - results[0]).abs().max().item()
         assert err <= tol, \
             f"chunk_size={chunk_size} differs from chunk_size=4 by {err:.3e}"
 
 
 @pytest.mark.parametrize("test_scenes", ["two_objects"], indirect=True)
-def test_chunked_hessian_rejects_indivisible_chunk_size(test_scenes):
-    r"""An indivisible capacity leaves a final chunk that reads past the arrays."""
+def test_chunked_hessian_accepts_indivisible_chunk_size(test_scenes):
+    r"""A chunk size that does not divide the capacity is allowed, and agrees.
+
+    This used to raise, on the theory that a partial final chunk would read past the
+    contact arrays. It cannot: ``count <= capacity`` is enforced by detection and by the
+    device-side clamp, and all three gather kernels return early on ``g >= count``, so an
+    over-hanging lane zeroes itself before touching memory. The old restriction forced
+    callers to search downward for a divisor, which collapsed to a chunk size of 1 -- one
+    ``capture_while`` iteration per contact -- for a capacity like 10007.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    weights, obj_ids = test_scenes['weights'], test_scenes['obj_ids']
+
     collision = _make_collision(max_contacting_pairs=64, capturable=True)
-    with pytest.raises(ValueError, match="exact multiple"):
-        collisions.ChunkedCollisionHessian(collision, 24, chunk_size=7)
+    collision.detect_collisions(dx, x0, obj_ids, test_scenes['is_static'])
+    t_B = lbs_matrix(wp.to_torch(x0), wp.to_torch(weights)).contiguous()
+    num_dofs = t_B.shape[1]
+    b_dense = wp.from_torch(t_B)
+    h_full = wp.zeros(64, dtype=wp.mat33)
+    collision.hessian(dx, x0, 1.0, hessian_blocks=h_full)
+    assert collision.num_contacts > 1
+
+    out = torch.zeros(num_dofs, num_dofs, device=t_B.device)
+    reference = collisions.ChunkedCollisionHessian(
+        collision, num_dofs, chunk_size=8).reduce(b_dense, h_full, out).clone()
+
+    scale = max(float(reference.abs().max()), 1.0)
+    tol = torch.finfo(torch.float32).eps * (3 * collision.num_contacts) * scale
+    for chunk_size in (7, 13, 60, 100):   # 100 > capacity, so it clamps to 64
+        reducer = collisions.ChunkedCollisionHessian(
+            collision, num_dofs, chunk_size=chunk_size)
+        got = reducer.reduce(b_dense, h_full, torch.zeros_like(out))
+        err = (got - reference).abs().max().item()
+        assert err <= tol, f"chunk_size={chunk_size} differs by {err:.3e}"
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects"], indirect=True)
+def test_chunked_hessian_rejects_nonpositive_chunk_size(test_scenes):
+    collision = _make_collision(max_contacting_pairs=64, capturable=True)
+    with pytest.raises(ValueError, match="chunk_size must be positive"):
+        collisions.ChunkedCollisionHessian(collision, 24, chunk_size=0)
+
+
+def test_collision_rejects_nonpositive_capacity():
+    r"""A zero capacity used to surface as a bare ZeroDivisionError from the chunk sizing."""
+    with pytest.raises(ValueError, match="max_contacting_pairs must be positive"):
+        _make_collision(max_contacting_pairs=0)
 
 
 @pytest.mark.parametrize("test_scenes", ["two_objects"], indirect=True)
@@ -1268,8 +1201,10 @@ def _forge_extra_contacts(collision, h_full, num_contacts, upto):
     t_h[num_contacts:upto] = t_h[big]
 
 
+@pytest.mark.parametrize("chunk_size", [8, 7],
+                         ids=["divides-capacity", "partial-final-chunk"])
 @pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
-def test_chunked_hessian_captures_and_tracks_live_contact_count(test_scenes):
+def test_chunked_hessian_captures_and_tracks_live_contact_count(test_scenes, chunk_size):
     r"""The captured reduction replays correctly at contact counts it never saw.
 
     This is the point of expressing the chunk loop as ``wp.capture_while`` rather than a
@@ -1296,9 +1231,14 @@ def test_chunked_hessian_captures_and_tracks_live_contact_count(test_scenes):
     h_full = wp.zeros(64, dtype=wp.mat33)
     collision.hessian(dx, x0, 1.0, hessian_blocks=h_full)
 
-    reducer = collisions.ChunkedCollisionHessian(collision, num_dofs, chunk_size=8)
+    reducer = collisions.ChunkedCollisionHessian(collision, num_dofs,
+                                                 chunk_size=chunk_size)
     out = torch.zeros(num_dofs, num_dofs, device=t_B.device)
 
+    # chunk_size=7 does not divide the 64-contact capacity, so the last chunk hangs off
+    # the end. Captured, that is the case where an unguarded lane would read past the
+    # arrays -- the count guard is what makes it read nothing instead.
+    #
     # No eager call first: capture must succeed from cold, which it only does because
     # the reducer forces cuBLAS to create its handle in __init__.
     graph, _ = capture_function_torch(lambda: reducer.reduce_capturable(b_dense, h_full, out))
@@ -1367,3 +1307,148 @@ def test_chunked_hessian_capture_allocates_nothing_on_replay(test_scenes):
     after = torch.cuda.memory_stats()['allocation.all.allocated']
 
     assert after == before, f"{after - before} allocations during graph replay"
+
+
+@pytest.mark.parametrize("test_scenes", ["two_objects_one_static"], indirect=True)
+def test_target_distance_guards_static_sentinel_on_both_sides(test_scenes):
+    r"""A contact against static geometry gets a one-radius target, not two.
+
+    Detection enforces ``idx_a < idx_b``, so a static object added early in the scene puts
+    ``NULL_ELEMENT_INDEX`` in ``indices_a`` for *all* of its contacts -- which is exactly
+    what this fixture produces. A helper that tested only ``indices_b`` would return
+    ``2*radius`` for every one of them.
+
+    Asserted through the energy, because ``rc`` is not observable on its own: the barrier
+    is active only for ``rp_ratio < d/rc <= 1``, so doubling ``rc`` halves ``d_hat`` and
+    changes the energy by a large factor rather than a roundoff. The analytical helper is
+    evaluated at both candidate ``rc`` values and the kernel must match the one-radius one.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    obj_ids, is_static = test_scenes['obj_ids'], test_scenes['is_static']
+
+    radius, barrier_ratio, friction = 0.05, 0.5, 0.5
+    dt = 0.01
+    collision = _make_collision(collision_particle_radius=radius,
+                                impenetrable_barrier_ratio=barrier_ratio,
+                                friction=friction, dt=dt)
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+    num_contacts = collision.num_contacts
+
+    ind_a = wp.to_torch(collision.collision_indices_a[:num_contacts]).cpu()
+    ind_b = wp.to_torch(collision.collision_indices_b[:num_contacts]).cpu()
+    assert num_contacts > 0 and bool((ind_a == collisions.NULL_ELEMENT_INDEX).all()), (
+        "fixture must put the sentinel in indices_a; it is the case the old code missed")
+    assert bool((ind_b >= 0).all()), "indices_b should be live for this fixture"
+
+    coeff = 1.0
+    energy = wp.zeros(1, dtype=float)
+    collision.energy(dx, x0, coeff, energy)
+    got = float(wp.to_torch(energy)[0])
+
+    t_dx = wp.to_torch(dx)
+    t_gaps = wp.to_torch(collision.collision_kinematic_gaps)
+    t_nor = wp.to_torch(collision.collision_normals)
+    t_start = wp.to_torch(collision.cp_dx_at_nm_iteration_0)
+    mu_dt = dt * collision.friction_reg
+
+    def analytical(rc):
+        total = 0.0
+        for c in range(num_contacts):
+            # idx_a is the sentinel here, so side a contributes no motion.
+            b = int(ind_b[c])
+            offset = t_gaps[c] - (t_dx[b] - t_start[b])
+            total += float(_collision_contact_energy_analytical(
+                offset, t_nor[c], rc, barrier_ratio, friction, mu_dt,
+                collision.friction_fluid))
+        return total
+
+    want_1r = analytical(1.0 * radius)
+    want_2r = analytical(2.0 * radius)
+    assert abs(want_1r - want_2r) > 1e-6 * max(abs(want_1r), 1.0), (
+        "the two target distances give the same energy here, so this test cannot "
+        "distinguish them -- adjust the fixture geometry")
+
+    tol = 1e-4 * max(abs(want_1r), 1.0)
+    assert abs(got - want_1r) <= tol, (
+        f"energy {got:.6e} does not match the one-radius target {want_1r:.6e}; "
+        f"the two-radius value is {want_2r:.6e}, so the sentinel guard on indices_a "
+        f"is not being applied")
+
+    # want_1r is 0.0 for this fixture -- at one radius these pairs sit outside the
+    # barrier band entirely, which is the point: the unguarded helper invented contact
+    # forces for pairs that are not touching. But "expected 0" would also be satisfied by
+    # an energy kernel that always returned 0, so cross-check against a scene where the
+    # correct answer is non-zero. Doubling the radius makes the guarded one-radius target
+    # equal the old unguarded two-radius one, so the kernel must now reproduce want_2r.
+    doubled = _make_collision(collision_particle_radius=2.0 * radius,
+                              impenetrable_barrier_ratio=barrier_ratio,
+                              friction=friction, dt=dt)
+    doubled.detect_collisions(dx, x0, obj_ids, is_static)
+    energy_2r = wp.zeros(1, dtype=float)
+    doubled.energy(dx, x0, coeff, energy_2r)
+    got_2r = float(wp.to_torch(energy_2r)[0])
+    assert abs(want_2r) > 1e-6, "cross-check is vacuous if the two-radius energy is zero"
+    assert abs(got_2r - want_2r) <= 1e-4 * abs(want_2r), (
+        f"at twice the radius the guarded helper should reproduce the two-radius energy "
+        f"{want_2r:.6e}, got {got_2r:.6e}")
+
+
+@pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
+def test_capturable_energy_ignores_stale_contacts_past_the_count(test_scenes):
+    r"""The energy kernel's stale-slot guard is load-bearing and until now untested.
+
+    Every other ``.energy(`` call in this file builds a ``Collision`` with the default
+    ``capturable=False``, where the launch dimension *is* the contact count and the guard
+    is trivially true. So deleting ``if c >= num_contacts[0]: return`` from
+    ``_collision_energy_wp_kernel`` left the whole suite green while feeding a captured
+    line search barrier energy from the previous frame's contacts.
+
+    Same shape as ``test_count_guard_suppresses_stale_slots``, which covers the gradient
+    and hessian kernels. Tolerance rather than equality: energy is an ``atomic_add`` into
+    a single scalar, so the accumulation order varies between launches even for identical
+    inputs.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    obj_ids, is_static = test_scenes['obj_ids'], test_scenes['is_static']
+
+    collision = _make_collision(max_contacting_pairs=64, capturable=True)
+    collision.detect_collisions(dx, x0, obj_ids, is_static)
+    num_contacts = collision.num_contacts
+    assert 0 < num_contacts < 60, f"need headroom for stale slots, got {num_contacts}"
+
+    coeff = 1.0
+    baseline = wp.zeros(1, dtype=float)
+    collision.energy(dx, x0, coeff, baseline)
+    want = float(wp.to_torch(baseline)[0])
+    assert abs(want) > 0.0, "energy is zero, so stale contributions would be invisible"
+
+    # Fill the dead tail with copies of a real contact: valid indices, valid normals,
+    # valid gaps. Only the device count marks them as no longer live.
+    #
+    # Copy the most *active* contact, not slot 0. The barrier is piecewise -- zero unless
+    # rp_ratio < d/rc <= 1 -- so a typical contact contributes exactly nothing to the
+    # energy, and forging from one makes this test pass against a kernel with no guard at
+    # all. Per-contact gradient magnitude identifies an active one.
+    dEdx = wp.zeros(collision.max_contacting_pairs, dtype=wp.vec3)
+    collision.gradient(dx, x0, coeff, gradient=dEdx)
+    per_contact = wp.to_torch(dEdx)[:num_contacts].abs().sum(dim=1)
+    active = int(per_contact.argmax())
+    assert float(per_contact[active]) > 0.0, \
+        "no contact is inside the barrier, so a forged copy would contribute nothing"
+
+    t_ia = wp.to_torch(collision.collision_indices_a)
+    t_ib = wp.to_torch(collision.collision_indices_b)
+    t_nor = wp.to_torch(collision.collision_normals)
+    t_gap = wp.to_torch(collision.collision_kinematic_gaps)
+    for arr in (t_ia, t_ib, t_nor, t_gap):
+        arr[num_contacts:] = arr[active]
+
+    after = wp.zeros(1, dtype=float)
+    collision.energy(dx, x0, coeff, after)
+    got = float(wp.to_torch(after)[0])
+
+    # float32 atomic reduction over the same summands in a different order.
+    tol = torch.finfo(torch.float32).eps * (num_contacts ** 0.5) * abs(want)
+    assert abs(got - want) <= max(tol, 1e-12), (
+        f"stale contacts past the device count contributed {got - want:.6e} to the "
+        f"energy (baseline {want:.6e}); the count guard is not suppressing them")

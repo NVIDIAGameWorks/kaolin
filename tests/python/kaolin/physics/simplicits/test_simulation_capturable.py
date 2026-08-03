@@ -218,7 +218,7 @@ def test_kinematic_dofs_are_bitwise_zero_in_dz():
 
 
 @cuda_only
-@pytest.mark.xfail(strict=True, reason=(
+@pytest.mark.xfail(strict=True, raises=RuntimeError, reason=(
     "Pre-existing host-path bug, not capture-related: an all-kinematic scene crashes at "
     "setup in warp_utilities._block_diagonalize with 'torch.cat(): expected a non-empty "
     "list of Tensors'. A kinematic object's dFdz is structurally all-zero, so when every "
@@ -500,7 +500,7 @@ def test_check_solve_info_false_skips_the_check():
 
 
 def _contact_scene(capturable, n_obj=3, gap=0.9, radius=0.1, kinematic_ids=(),
-                   max_contact_pairs=4096):
+                   max_contact_pairs=4096, **scene_kwargs):
     r"""Scene whose objects actually touch, unlike ``_make_scene``'s 1.2-spaced stack.
 
     Gravity is ``+9.8`` because ``set_scene_gravity`` treats +y as down, so the objects
@@ -513,7 +513,7 @@ def _contact_scene(capturable, n_obj=3, gap=0.9, radius=0.1, kinematic_ids=(),
     """
     obj = _make_object()
     scene = SimplicitsScene(device="cuda", timestep=0.03, max_newton_steps=4,
-                            max_ls_steps=10, capturable=capturable)
+                            max_ls_steps=10, capturable=capturable, **scene_kwargs)
     for i in range(n_obj):
         T = torch.eye(4, device="cuda", dtype=torch.float32)
         T[1, 3] = 0.6 + gap * i
@@ -687,3 +687,59 @@ def test_capturable_kinematic_object_pinned_while_in_contact():
     free = torch.ones(z0.numel(), dtype=torch.bool)
     free[kin_dofs] = False
     assert (z1[free] - z0[free]).abs().max().item() > 1e-4
+
+
+@cuda_only
+def test_capturable_contact_step_does_no_host_sync():
+    r"""A captured contact step must not block on the device.
+
+    Contact used to cost three D2H per step: ``torch.unique(..., dim=0)`` and the
+    following ``.cpu()`` / ``.numpy()`` in the ``object_pairs`` build (whose only consumer
+    is the *host* Newton path's sparse block assembly), plus an eager readback of the
+    contact count. None of the three fed anything the captured step used.
+
+    ``check_solve_info=False`` because that check reads ``solve_info`` back deliberately
+    and documents itself as costing a sync; it is opt-out, not part of the contact path.
+
+    Caveat: ``set_sync_debug_mode`` instruments torch, so it catches the ``torch.unique``
+    / ``.cpu()`` syncs directly but would not see a Warp-side ``.numpy()``. The count
+    readback is covered instead by ``num_contacts`` being a property -- nothing on this
+    path reads it.
+    """
+    scene = _contact_scene(True, n_obj=3, check_solve_info=False)
+    for _ in range(3):
+        scene.run_sim_step()
+
+    collision = scene.force_dict["collision"]["object"]
+    assert collision.num_contacts > 20, "scene is not in contact; this would prove nothing"
+
+    torch.cuda.synchronize()
+    torch.cuda.set_sync_debug_mode("error")
+    try:
+        scene.run_sim_step()
+    except RuntimeError as e:  # pragma: no cover - only on regression
+        raise AssertionError(
+            f"captured contact step performed a synchronizing CUDA operation: {e}")
+    finally:
+        torch.cuda.set_sync_debug_mode("default")
+
+
+@cuda_only
+def test_object_pairs_skipped_when_capturable():
+    r"""The host-only ``object_pairs`` list is not built for a captured scene.
+
+    It exists to drive ``_assemble_hessians``'s sparse per-pair block assembly, which the
+    capturable path replaces with a full-width reduction. Building it anyway was the
+    source of two of the three per-step syncs.
+    """
+    host = _contact_scene(False, n_obj=3)
+    host.run_sim_step()
+    assert len(host.force_dict["collision"]["object"].object_pairs) > 0, \
+        "host path must still build object_pairs -- _assemble_hessians reads it"
+
+    cap = _contact_scene(True, n_obj=3)
+    cap.run_sim_step()
+    cs = cap.force_dict["collision"]["object"]
+    assert cs.num_contacts > 20
+    assert len(cs.object_pairs) == 0, \
+        "capturable scene built object_pairs despite having no consumer for it"
