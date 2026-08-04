@@ -1626,3 +1626,77 @@ def test_sparse_collision_jacobian_guards_the_static_sentinel():
     B = lbs_matrix(x0, weights)
     assert torch.equal(got[0:3], B[0:3]) and torch.equal(got[6:9], B[6:9]), \
         "the live contacts either side of the sentinel were disturbed"
+
+
+def test_dropped_jacobian_rows_would_weaken_the_intersection_free_bound():
+    r"""The triplet compaction bug's real consequence: a far too permissive step bound.
+
+    ``get_bounds`` walks ``collision_J_a`` / ``collision_J_b``'s *structure* to decide
+    which DOF blocks a contact constrains. Rows silently dropped by the old dense write
+    index therefore cost those contacts their clamp entirely. Measured before the fix on
+    this configuration: ``J_a`` nnz 6 instead of 15, and a minimum bound of 0.1259 against
+    0.0049 -- a step 26x larger than the barrier intends, i.e. interpenetration.
+
+    Reachability is the subtle part, and is why this survived several rounds. Detection
+    enforces ``idx_a < idx_b``, so a single kinematic object added *first* puts static
+    points on the a-side of every contact; ``count`` then hits either 0 or nnz and the
+    dense index happens to agree with the compacted one. The bug needs an index array
+    that *mixes* static and dynamic points, which is what a kinematic object in the middle
+    of the scene ordering -- or more than one -- produces.
+    """
+    device = 'cuda'
+    torch.manual_seed(2)
+    stacked_x0, stacked_dx, stacked_ids, stacked_static, stacked_w = [], [], [], [], []
+    for i in range(3):
+        n = 20
+        d = torch.zeros(n, 3, device=device)
+        d[:, 1] += 0.5 * i
+        stacked_x0.append(torch.rand(n, 3, device=device))
+        stacked_dx.append(d)
+        stacked_ids.append(torch.ones(n, device=device, dtype=torch.int32) * i)
+        # Object 1 -- the middle one -- is kinematic, so neither side is uniform.
+        stacked_static.append(
+            torch.full((n,), 1 if i == 1 else 0, device=device, dtype=torch.int32))
+        stacked_w.append(torch.ones(n, 1, device=device))
+
+    x0 = wp.array(torch.cat(stacked_x0), dtype=wp.vec3)
+    dx = wp.array(torch.cat(stacked_dx), dtype=wp.vec3)
+    obj_ids = wp.array(torch.cat(stacked_ids), dtype=wp.int32)
+    is_static = wp.array(torch.cat(stacked_static), dtype=wp.int32)
+    weights = wp.from_torch(torch.block_diag(*stacked_w).contiguous())
+
+    collision = _make_collision()
+    # cp_is_static=None at detection, as simulation.py does; staticness enters through
+    # calculate_jacobian, which is the path the triplet kernel is on.
+    collision.detect_collisions(dx, x0, obj_ids, None)
+    collision.calculate_jacobian(weights, x0, is_static)
+
+    num_contacts = collision.num_contacts
+    ind_a = wp.to_torch(collision.collision_indices_a[:num_contacts]).cpu()
+    static_flags = wp.to_torch(is_static).cpu()
+    num_static_a = int((static_flags[ind_a] == 1).sum())
+    assert 0 < num_static_a < num_contacts, (
+        "the a-side is uniform, which masks the bug -- this fixture must mix static and "
+        "dynamic points or it proves nothing")
+
+    # Every non-static contact must contribute its 3 rows to whichever side it is on.
+    ind_b = wp.to_torch(collision.collision_indices_b[:num_contacts]).cpu()
+    for label, ind, J in (("J_a", ind_a, collision.collision_J_a),
+                          ("J_b", ind_b, collision.collision_J_b)):
+        live = sum(1 for c in range(num_contacts)
+                   if int(ind[c]) >= 0 and not bool(static_flags[int(ind[c])]))
+        # One 1x4 block per (row, handle-with-weight); these fixtures give one handle
+        # per point, so 3 rows per live contact.
+        assert J.nnz == 3 * live, (
+            f"{label} has {J.nnz} blocks for {live} live contacts (expected {3 * live}); "
+            f"rows were dropped, and get_bounds would leave those contacts unclamped")
+
+    torch.manual_seed(7)
+    delta = wp.array(torch.randn(60, 3, device=device) * 0.5, dtype=wp.vec3)
+    bounds = wp.to_torch(collision.get_bounds(cp_delta_dx=delta, cp_dx=dx, cp_x0=x0))
+    assert bool((bounds < 1.0).any()), "no DOF clamped; the bound is not being exercised"
+    # Pre-fix this configuration produced 0.1259. Anything near that means rows are
+    # missing again; the correct value is ~0.0049.
+    assert float(bounds.min()) < 0.05, (
+        f"minimum step bound {float(bounds.min()):.6f} is far too permissive -- "
+        f"jacobian rows are missing, so some contacts are unconstrained")
