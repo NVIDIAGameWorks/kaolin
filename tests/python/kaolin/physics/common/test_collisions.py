@@ -23,7 +23,7 @@ from functools import partial
 import kaolin.physics.common.collisions as collisions
 from kaolin.physics.simplicits.precomputed import lbs_matrix
 from kaolin.physics.utils.torch_utilities import hess_reduction
-from kaolin.physics.utils.warp_utilities import capture_function_torch
+from kaolin.physics.utils.warp_utilities import capture_function_torch, _bsr_to_torch
 from kaolin.utils.testing import with_seed
 
 # Every fixture and test in this file builds tensors directly on 'cuda' -- the collision
@@ -273,16 +273,25 @@ def test_collision_jacobian(test_scenes):
     t_ind_a = wp.to_torch(collision.collision_indices_a[:collision.num_contacts])
     t_ind_b = wp.to_torch(collision.collision_indices_b[:collision.num_contacts])
 
-    # 3n x h jacobian matrix where the flattened x = t_B@z
-    # triplicated indices
-    # multiply indices by 3 and repeat interleave increasing by 1 each time
-    # Create indices for x,y,z components by multiplying by 3 and adding offsets
-    t3_ind_a = torch.repeat_interleave(
-        3*t_ind_a, 3) + torch.tile(torch.arange(3, device=t_x0.device), (t_ind_a.shape[0],))
-    t3_ind_b = torch.repeat_interleave(
-        3*t_ind_b, 3) + torch.tile(torch.arange(3, device=t_x0.device), (t_ind_b.shape[0],))
-    # Grab the rows of the jacobian that correspond to the indices above
-    expected_jacobian = t_B[t3_ind_a, :] - t_B[t3_ind_b, :]
+    # 3n x h jacobian matrix where the flattened x = t_B@z.
+    # Rows are gathered per side and per contact, skipping any side that has no DOFs to
+    # differentiate against: a NULL_ELEMENT_INDEX partner (static geometry) or a point
+    # belonging to a kinematic object. Written as an explicit loop rather than a fancy
+    # index because both torch and Warp fold a negative subscript to the end of the
+    # array -- so an unguarded gather silently attributes a static contact to whichever
+    # object owns the last point, in the reference *and* in the implementation, and the
+    # two agree on the wrong answer.
+    def _gather(t_ind):
+        out = torch.zeros(3 * t_ind.shape[0], t_B.shape[1],
+                          device=t_B.device, dtype=t_B.dtype)
+        for c in range(t_ind.shape[0]):
+            p = int(t_ind[c])
+            if p < 0 or bool(t_is_static[p] == 1):
+                continue
+            out[3 * c:3 * c + 3] = t_B[3 * p:3 * p + 3]
+        return out
+
+    expected_jacobian = _gather(t_ind_a) - _gather(t_ind_b)
 
     assert torch.allclose(collision_jacobian, expected_jacobian, rtol=1e-5), \
         "Collision jacobian doesn't match analytical calculation"
@@ -955,11 +964,12 @@ def test_jacobian_chunk_guards_static_sentinel(test_scenes):
     an unguarded gather at a static contact silently reads the *last* contact point's
     rows and attributes that motion to whichever object owns it.
 
-    The host sparse path does exactly that today (``sparse_collision_jacobian_matrix``
-    populates all 3 rows for a contact whose index is -1), so ``collision_J_dense`` is
-    deliberately *not* the oracle here -- the guarded gather is. This is latent rather
-    than live: ``simulation.py`` calls ``detect_collisions`` with ``cp_is_static=None``,
-    so production never writes the sentinel.
+    ``collision_J_dense`` is deliberately not the oracle here -- the guarded gather is --
+    because the two are derived independently. The host sparse path used to disagree,
+    populating all three rows for a contact whose index is -1; that was
+    ``precomputed.py``'s unguarded ``pt_is_static[p]``, now fixed and covered by
+    ``test_sparse_collision_jacobian_guards_the_static_sentinel``. Keeping the reference
+    independent means a future regression in either path shows up here.
     """
     collision, b_dense, t_B = _detect_and_gather(test_scenes)
     num_contacts = collision.num_contacts
@@ -1452,3 +1462,167 @@ def test_capturable_energy_ignores_stale_contacts_past_the_count(test_scenes):
     assert abs(got - want) <= max(tol, 1e-12), (
         f"stale contacts past the device count contributed {got - want:.6e} to the "
         f"energy (baseline {want:.6e}); the count guard is not suppressing them")
+
+
+@pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
+def test_num_contacts_is_memoized_until_the_next_detection(test_scenes):
+    r"""Repeated reads of ``num_contacts`` must not re-sync.
+
+    Making the read lazy is what lets the capturable path never pay for a count it does
+    not use, but making it *uncached* traded one device stall per step for one per read.
+    The host path reads it constantly -- ``_assemble_energies`` touches it once per energy
+    evaluation, so with the default ``max_newton_steps=5`` / ``max_ls_steps=10`` a single
+    step reaches ~111 reads.
+
+    Asserted through observable behaviour rather than by counting syncs: the cache is
+    proven by writing ``count`` on device *without* invalidating and checking that the
+    property does not notice.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    collision = _make_collision(max_contacting_pairs=64, capturable=False)
+    collision.detect_collisions(dx, x0, test_scenes['obj_ids'], test_scenes['is_static'])
+
+    detected = collision.num_contacts
+    assert detected > 1, "need a non-trivial count for this to mean anything"
+
+    # Change the device count behind the property's back. A cached property cannot see it.
+    collision.count.fill_(detected + 7)
+    assert collision.num_contacts == detected, (
+        "num_contacts re-read the device count on a repeat access; it is not memoized, "
+        "which costs the host path ~111 blocking syncs per step instead of 1")
+
+    collision.invalidate_contact_count()
+    assert collision.num_contacts == detected + 7, (
+        "invalidate_contact_count did not force a re-read")
+
+    # And a fresh detection must invalidate on its own, or the count silently freezes.
+    collision.detect_collisions(dx, x0, test_scenes['obj_ids'], test_scenes['is_static'])
+    assert collision.num_contacts == detected, (
+        f"detect_collisions left a stale cache: got {collision.num_contacts}, "
+        f"expected {detected}")
+
+
+@pytest.mark.parametrize("test_scenes", ["three_objects"], indirect=True)
+def test_num_contacts_reads_device_once_per_detection(test_scenes):
+    r"""Counts the actual device reads, which is the quantity that regressed.
+
+    The behavioural test above pins the semantics; this pins the cost, so that a future
+    refactor that keeps the semantics but reintroduces the per-access sync still fails.
+    """
+    x0, dx = test_scenes['x0'], test_scenes['dx']
+    collision = _make_collision(max_contacting_pairs=64, capturable=False)
+    collision.detect_collisions(dx, x0, test_scenes['obj_ids'], test_scenes['is_static'])
+
+    reads = {"n": 0}
+    real_count = collision.count
+
+    class _CountingProxy:
+        r"""Forwards everything to the real wp.array, tallying host readbacks."""
+
+        def __getattr__(self, name):
+            return getattr(real_count, name)
+
+        def numpy(self):
+            reads["n"] += 1
+            return real_count.numpy()
+
+    collision.count = _CountingProxy()
+    try:
+        # detect_collisions already warmed the cache on this path (it builds object_pairs,
+        # which reads the count), so start from cold to measure the first read too.
+        collision.invalidate_contact_count()
+        for _ in range(20):
+            _ = collision.num_contacts
+        assert reads["n"] == 1, (
+            f"20 reads of num_contacts caused {reads['n']} device readbacks; expected 1")
+
+        collision.invalidate_contact_count()
+        _ = collision.num_contacts
+        assert reads["n"] == 2, "invalidation should permit exactly one more readback"
+    finally:
+        collision.count = real_count
+
+
+@pytest.mark.parametrize("num_static", [0, 2, 5])
+def test_sparse_collision_jacobian_compacts_around_static_points(num_static):
+    r"""Static points must drop rows without dropping anyone else's.
+
+    ``_get_collision_jacobian_triplets_wp_kernel`` used to write each triplet at a dense
+    index ``(t*H + k)*3 + i`` while incrementing ``count`` only for non-static threads.
+    The caller keeps ``rows[:count]``, so that prefix held slots belonging to skipped
+    static threads -- never written, so ``wp.empty`` garbage in ``rows``/``cols`` -- and
+    silently discarded valid entries past it. Measured at six populated rows where twelve
+    were expected with two of twelve points static.
+
+    Reachable on the shipped host path: ``_detect_collision`` passes
+    ``cp_is_static=self.qp_is_kinematic``, so any scene with a kinematic object in contact
+    hit it. ``simplicits_friction_slab.py`` is exactly that scene.
+    """
+    from kaolin.physics.simplicits.precomputed import sparse_collision_jacobian_matrix
+
+    device = 'cuda'
+    torch.manual_seed(0)
+    num_pts, num_handles, num_contacts = 12, 2, 6
+    x0 = torch.rand(num_pts, 3, device=device)
+    weights = torch.zeros(num_pts, num_handles, device=device)
+    weights[:num_pts // 2, 0] = 1.0
+    weights[num_pts // 2:, 1] = 1.0
+
+    indices = torch.arange(num_contacts, device=device, dtype=torch.int32)
+    is_static = torch.zeros(num_pts, device=device, dtype=torch.int32)
+    is_static[:num_static] = 1
+
+    J = sparse_collision_jacobian_matrix(
+        wp.from_torch(weights.contiguous()), wp.array(x0, dtype=wp.vec3),
+        wp.from_torch(indices), wp.from_torch(is_static))
+    J.nnz_sync()
+    got = _bsr_to_torch(J).to_dense()
+
+    B = lbs_matrix(x0, weights)
+    want = torch.zeros_like(got)
+    for c in range(num_contacts):
+        p = int(indices[c])
+        if not bool(is_static[p]):
+            want[3 * c:3 * c + 3] = B[3 * p:3 * p + 3]
+
+    live = num_contacts - min(num_static, num_contacts)
+    assert int((got.abs().sum(1) > 0).sum()) == 3 * live, (
+        f"expected {3 * live} populated rows for {num_static} static points, got "
+        f"{int((got.abs().sum(1) > 0).sum())}")
+    assert torch.equal(got, want), "sparse jacobian does not match the guarded row gather"
+
+
+def test_sparse_collision_jacobian_guards_the_static_sentinel():
+    r"""A ``NULL_ELEMENT_INDEX`` contact contributes no rows and reads no memory.
+
+    Warp folds a negative subscript to the end of the array, so an unguarded
+    ``pt_is_static[p]`` / ``sim_weights[p, k]`` would attribute the contact to whichever
+    object owns the last point instead of dropping it.
+    """
+    from kaolin.physics.simplicits.precomputed import sparse_collision_jacobian_matrix
+
+    device = 'cuda'
+    torch.manual_seed(1)
+    num_pts, num_handles = 8, 2
+    x0 = torch.rand(num_pts, 3, device=device)
+    weights = torch.zeros(num_pts, num_handles, device=device)
+    weights[:4, 0] = 1.0
+    weights[4:, 1] = 1.0
+
+    # Contact 1 has a static partner; the last point (7) is deliberately given a large
+    # distinct weight so a wrapped read would be unmistakable.
+    indices = torch.tensor([0, collisions.NULL_ELEMENT_INDEX, 2],
+                           device=device, dtype=torch.int32)
+    is_static = torch.zeros(num_pts, device=device, dtype=torch.int32)
+
+    J = sparse_collision_jacobian_matrix(
+        wp.from_torch(weights.contiguous()), wp.array(x0, dtype=wp.vec3),
+        wp.from_torch(indices), wp.from_torch(is_static))
+    J.nnz_sync()
+    got = _bsr_to_torch(J).to_dense()
+
+    assert torch.equal(got[3:6], torch.zeros_like(got[3:6])), (
+        "the sentinel contact produced rows; the -1 index wrapped to the last point")
+    B = lbs_matrix(x0, weights)
+    assert torch.equal(got[0:3], B[0:3]) and torch.equal(got[6:9], B[6:9]), \
+        "the live contacts either side of the sentinel were disturbed"

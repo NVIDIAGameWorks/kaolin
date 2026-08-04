@@ -893,7 +893,8 @@ class Collision:
         """
 
         # Collision constants
-        # num_contacts is a property backed by self.count -- see below.
+        # num_contacts is a memoized property backed by self.count -- see below.
+        self._num_contacts_cache = None
         # Initialized here because get_bounds and _assemble_hessians read it before the
         # first detect_collisions call on a freshly built scene.
         self.object_pairs = []
@@ -972,26 +973,48 @@ class Collision:
 
     @property
     def num_contacts(self):
-        r"""Number of live contacts, read back from the device on access.
+        r"""Number of live contacts. Read back from the device once per detection.
 
-        Lazy rather than cached at detection time. The count is already on device and
-        every per-contact kernel guards against it there, so under ``capturable`` nothing
-        in a step needs it -- reading it eagerly cost one blocking D2H per step for a
-        value that was usually discarded. The host path still reads it constantly, and
-        pays for it exactly when it asks.
+        Lazy *and* memoized, and it has to be both.
+
+        Lazy, so the capturable path never pays for it: the count is already on device
+        and every per-contact kernel guards against it there, so a captured step needs no
+        host-side copy at all. Reading it eagerly in ``detect_collisions`` cost one
+        blocking D2H per step for a value that path discards.
+
+        Memoized, so the host path does not pay for it repeatedly. It reads this
+        constantly -- ``_assemble_energies`` alone touches it once per energy evaluation,
+        which with the default ``max_newton_steps=5`` / ``max_ls_steps=10`` is up to ~55
+        times a step, and ``_contact_launch_dim`` reads it again inside each of those.
+        Measured at 111 reads per step. Uncached, every one of those is its own device
+        sync, which trades one stall per step for a hundred.
+
+        The cache is dropped at the start of each detection and nowhere else, so it is
+        valid for exactly as long as the contact set is. Code that writes ``self.count``
+        directly (tests do) must call :func:`invalidate_contact_count` afterwards.
 
         The clamp mirrors :func:`_clamp_contact_count_wp_kernel`, which has already
-        applied it on device; it is repeated here so the warning has somewhere to live
-        now that detection does not look at the count.
+        applied it on device; it is repeated here so the overflow warning has somewhere
+        to live now that detection does not look at the count.
 
         Returns:
             int: Contact count, capped at ``max_contacting_pairs``.
         """
-        n = int(self.count.numpy()[0])
-        if n > self.max_contacting_pairs:
-            logging.warning('contact buffer size exceed, some have been ignored')
-            return self.max_contacting_pairs
-        return n
+        if self._num_contacts_cache is None:
+            n = int(self.count.numpy()[0])
+            if n > self.max_contacting_pairs:
+                logging.warning('contact buffer size exceed, some have been ignored')
+                n = self.max_contacting_pairs
+            self._num_contacts_cache = n
+        return self._num_contacts_cache
+
+    def invalidate_contact_count(self):
+        r"""Drops the memoized :attr:`num_contacts`, forcing a re-read on next access.
+
+        Called automatically by :func:`detect_collisions`. Only needed externally by code
+        that writes ``self.count`` behind the scene's back.
+        """
+        self._num_contacts_cache = None
 
     def _contact_launch_dim(self):
         r"""Launch dimension for per-contact kernels.
@@ -1120,6 +1143,9 @@ class Collision:
         # fresh one per detection: a captured graph records the pointer, so the count
         # must live at a stable address.
         self.count.zero_()
+        # The memoized host mirror is stale from here on. Dropped before the launch, so
+        # any read after this point re-syncs and sees the new contact set.
+        self._num_contacts_cache = None
         count = self.count
 
         # Find collisions
