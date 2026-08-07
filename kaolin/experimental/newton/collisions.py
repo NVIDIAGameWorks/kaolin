@@ -60,6 +60,7 @@ def _contact_subspace_energy(
     friction_use_lagged_body_contact_force_norm: bool,
     coeff_of_restitution: float,
     velocity_penalty_kv: float,
+    coeff: float,
     # output
     contact_energy: wp.array(dtype=float),
 ):
@@ -100,6 +101,7 @@ def _contact_subspace_energy(
         friction_use_lagged_body_contact_force_norm (bool): If True, use lagged force norm for friction.
         coeff_of_restitution (float): Coefficient of restitution for velocity penalty.
         velocity_penalty_kv (float): Stiffness for velocity-level restitution penalty.
+        coeff (float): Scaling coefficient applied to each contact energy contribution.
         contact_energy (wp.array(dtype=float)): Single-element array; kernel atomically adds the total contact energy here.
     """
     tid = wp.tid()
@@ -202,7 +204,7 @@ def _contact_subspace_energy(
     # e = vol * (friction_energy)
     e = vol * (collision_energy + friction_energy + vel_energy)
     if shape_index >= 0:
-        wp.atomic_add(contact_energy, 0, e)
+        wp.atomic_add(contact_energy, 0, coeff * e)
 
 
 @wp.kernel
@@ -235,6 +237,7 @@ def _contact_subspace_gradient(
     friction_use_lagged_body_contact_force_norm: bool,
     coeff_of_restitution: float,
     velocity_penalty_kv: float,
+    coeff: float,
     # output
     particle_gradients: wp.array(dtype=wp.vec3),
 ):
@@ -275,6 +278,7 @@ def _contact_subspace_gradient(
         friction_use_lagged_body_contact_force_norm (bool): If True, use lagged force norm for friction.
         coeff_of_restitution (float): Coefficient of restitution for velocity penalty.
         velocity_penalty_kv (float): Stiffness for velocity-level restitution penalty.
+        coeff (float): Scaling coefficient applied to each contact gradient contribution.
         particle_gradients (wp.array(dtype=wp.vec3)): Gradient w.r.t. particle positions (sample layout); length num_samples.
             Kernel atomically adds the contact force (negative gradient) per contact to the
             corresponding sample index.
@@ -376,9 +380,9 @@ def _contact_subspace_gradient(
     neg_vn = -vn
     vel_grad = wp.vec3(0.0, 0.0, 0.0)
     if neg_vn > 0.0:
-        coeff = velocity_penalty_kv * (1.0 + coeff_of_restitution) * (1.0 + coeff_of_restitution) * neg_vn
+        vel_coeff = velocity_penalty_kv * (1.0 + coeff_of_restitution) * (1.0 + coeff_of_restitution) * neg_vn
         # d(neg_vn)/d(particle_pos) = -n / dt (since rel_trans depends linearly on pos)
-        vel_grad = - (coeff / dt) * n
+        vel_grad = - (vel_coeff / dt) * n
 
     # Contact force
     # contact_gradient = vol * (friction_gradient)
@@ -387,9 +391,8 @@ def _contact_subspace_gradient(
     # Write contact force directly to particle_f using atomic_sub
     # Note: particle_f is already sized for samples, so use sample_index
     if shape_index >= 0:
-        wp.atomic_add(particle_gradients, sample_index, contact_gradient)
+        wp.atomic_add(particle_gradients, sample_index, coeff * contact_gradient)
     
-
 
 @wp.func
 def outer_over_norm(u: wp.vec2) -> wp.mat22:
@@ -442,6 +445,7 @@ def _contact_subspace_hessian(
     friction_use_lagged_body_contact_force_norm: bool,
     coeff_of_restitution: float,
     velocity_penalty_kv: float,
+    coeff: float,
     # output
     particle_hessians: wp.array(dtype=wp.mat33),
 ):
@@ -483,6 +487,7 @@ def _contact_subspace_hessian(
         friction_use_lagged_body_contact_force_norm (bool): If True, use lagged force norm for friction.
         coeff_of_restitution (float): Coefficient of restitution for velocity penalty.
         velocity_penalty_kv (float): Stiffness for velocity-level restitution penalty.
+        coeff (float): Scaling coefficient applied to each contact Hessian contribution.
         particle_hessians (wp.array(dtype=wp.mat33)): 3x3 Hessian blocks per sample (sample layout); length num_samples.
             Each thread writes vol * (collision_hessian + friction_hessian + vel_hessian) at
             sample_index; caller should zero this array before launch if needed.
@@ -595,7 +600,7 @@ def _contact_subspace_hessian(
 
     if shape_index >= 0:
         wp.atomic_add(particle_hessians, sample_index,
-                      vol * (collision_hessian + friction_hessian + vel_hessian))
+                      coeff * vol * (collision_hessian + friction_hessian + vel_hessian))
 
 
 @wp.kernel
@@ -772,7 +777,6 @@ class SimplicitsParticleNewtonShapeSoftContact:
             self.integration_pt_volume.shape[0], dtype=float, device=self.integration_pt_volume.device)
         self.friction_use_lagged_body_contact_force_norm = friction_use_lagged_body_contact_force_norm
 
-        self.buffer = wp.zeros(2)
         self.particle_pos = wp.zeros(
             self.model.simplicits_scene.sim_pts.shape[0], dtype=wp.vec3, device=self.model.simplicits_scene.sim_pts.device)
 
@@ -878,8 +882,6 @@ class SimplicitsParticleNewtonShapeSoftContact:
         if self.contacts is None or self.contacts.soft_contact_max == 0:
             return energy
 
-        wp.copy(dest=self.buffer, src=energy, dest_offset=0, count=1)
-
         # particle_pos = dx + x0
         wp.copy(dest=self.particle_pos, src=dx)
         self.particle_pos += x0
@@ -915,12 +917,12 @@ class SimplicitsParticleNewtonShapeSoftContact:
                 self.friction_use_lagged_body_contact_force_norm,
                 self.coeff_of_restitution,
                 self.velocity_penalty_kv,
+                float(coeff),
             ],
             outputs=[energy],
             device=x0.device,
         )
-
-        return energy*coeff
+        return energy
 
     def gradient(self, dx, x0, coeff, gradients):
         r"""
@@ -978,13 +980,12 @@ class SimplicitsParticleNewtonShapeSoftContact:
                 self.friction_use_lagged_body_contact_force_norm,
                 self.coeff_of_restitution,
                 self.velocity_penalty_kv,
+                float(coeff),
             ],
             outputs=[gradients],
             device=x0.device,
         )
-
-
-        return gradients*coeff
+        return gradients
 
     def hessian(self, dx, x0, coeff):
         r"""
@@ -1044,11 +1045,9 @@ class SimplicitsParticleNewtonShapeSoftContact:
                 self.friction_use_lagged_body_contact_force_norm,
                 self.coeff_of_restitution,
                 self.velocity_penalty_kv,
+                float(coeff),
             ],
             outputs=[self.hessians_blocks],
             device=x0.device,
         )
-
-
-        return self.hessians_blocks*coeff
-
+        return self.hessians_blocks
