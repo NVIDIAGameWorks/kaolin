@@ -168,7 +168,7 @@ def floor_gradient_wp_func(floor_height: wp.float32,
             pass
     else:
         if p > floor_height:
-            return -1.0*force
+            return 1.0*force
         else:
             pass
 

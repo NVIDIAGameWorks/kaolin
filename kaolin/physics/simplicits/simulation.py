@@ -1747,7 +1747,7 @@ class SimplicitsScene:
                     "capturable buffers were built. It is baked into the graph; the "
                     "replay would silently use the old value. Rebuild the scene.")
 
-        # Detection is eager -- stage 1. It runs once per step against roughly a hundred
+        # Detection runs once per step against roughly a hundred
         # solver evaluations, so leaving it outside the graph gives up very little. It is
         # nonetheless free of host syncs: detection clamps the count on device, skips the
         # object_pairs build (host-Newton-only), and Collision.num_contacts is a lazy
