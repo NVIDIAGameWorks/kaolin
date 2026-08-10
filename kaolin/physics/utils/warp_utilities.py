@@ -96,8 +96,12 @@ def capture_and_run_torch(func, func_name, graph_dict, captured=True, device=Non
         graph_dict (dict): Name -> ``(warp.Graph, pool_handle)`` cache, owned by the
             caller. Clear it whenever scene topology changes, or the replay will use
             stale pointers.
-        captured (bool, optional): When False, calls ``func`` directly with no
-            capture. Defaults to True.
+        captured (bool, optional): When False, runs ``func`` directly instead of
+            capturing it -- the path to take when bisecting a wrong answer, since an
+            uncaptured run gives ordinary tracebacks and lets you print device values.
+            The stream redirection still happens, because callees may require it:
+            :func:`kaolin.physics.common.optimization_capturable.newtons_method_capturable`
+            raises if torch is left on the default stream. Defaults to True.
         device (optional): Warp device to capture on. Defaults to Warp's current device.
         pool (optional): Private allocator pool to reuse across re-captures. See
             :func:`capture_function_torch` -- passing one long-lived handle is what keeps
@@ -106,13 +110,23 @@ def capture_and_run_torch(func, func_name, graph_dict, captured=True, device=Non
     Returns:
         The pool handle actually used, so the caller can hold it and pass it back.
     """
-    if captured:
-        if func_name not in graph_dict:
-            graph_dict[func_name] = capture_function_torch(func, device=device, pool=pool)
-        wp.capture_launch(graph_dict[func_name][0])
-        return graph_dict[func_name][1]
-    func()
-    return pool
+    device = wp.get_device(device)
+
+    if not captured:
+        # Run on Warp's stream even though nothing is being captured, so that an
+        # uncaptured run is a faithful bisection aid rather than a different code path.
+        # Gated on is_cuda because wp.stream_to_torch raises for a CPU device.
+        if device.is_cuda:
+            with torch.cuda.stream(wp.stream_to_torch(device)):
+                func()
+        else:
+            func()
+        return pool
+
+    if func_name not in graph_dict:
+        graph_dict[func_name] = capture_function_torch(func, device=device, pool=pool)
+    wp.capture_launch(graph_dict[func_name][0])
+    return graph_dict[func_name][1]
 
 
 vec12 = wp.types.vector(12, dtype=wp.float32)

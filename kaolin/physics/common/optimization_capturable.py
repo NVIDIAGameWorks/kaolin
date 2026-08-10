@@ -166,6 +166,26 @@ def _launch_array_inner(a, b, out, alpha=0.0, take_abs=False):
         wp.launch(_array_abs_kernel, dim=out.shape, inputs=[out], outputs=[out])
 
 
+def _check_dofs(arr, buf, what):
+    r"""Checks that ``arr`` is a contiguous float32 DOF vector matching ``buf``.
+
+    Args:
+        arr: Value to check.
+        buf (CapturableNewtonBuffers): Buffers the solver was given.
+        what (str): Name of the argument or callback that produced ``arr``, so the
+            error says which one to go and fix.
+    """
+    if not isinstance(arr, wp.array):
+        raise TypeError(f"{what} must be a wp.array, got {type(arr)}.")
+    if arr.dtype != wp.float32:
+        raise TypeError(f"{what} must have dtype wp.float32, got {arr.dtype}.")
+    if arr.ndim != 1 or arr.shape[0] != buf.num_dofs:
+        raise ValueError(
+            f"{what} has shape {tuple(arr.shape)}, expected ({buf.num_dofs},) to match "
+            f"the buffers. CapturableNewtonBuffers was built for {buf.num_dofs} degrees "
+            "of freedom; build it with the same count you solve for.")
+
+
 def _apply_bounds_capturable(direction, bounds, t, bounded_direction):
     r"""Capturable form of :func:`kaolin.physics.common.optimization._apply_bounds`.
 
@@ -186,10 +206,13 @@ class CapturableNewtonBuffers:
 
     Args:
         num_dofs (int): Number of (reduced) degrees of freedom.
-        device (str, optional): Warp device. Defaults to 'cuda'.
+        device (optional): Warp device, as anything :func:`warp.get_device` accepts.
+            Defaults to Warp's current device, so this class is constructible on a
+            machine without a GPU rather than failing with a raw CUDA error.
     """
 
-    def __init__(self, num_dofs, device='cuda'):
+    def __init__(self, num_dofs, device=None):
+        device = wp.get_device(device)
         self.num_dofs = num_dofs
         self.device = device
 
@@ -272,7 +295,18 @@ def _line_search_capturable(energy_fcn, x, direction, gradient, bounds, buf,
         wp.array: ``buf.bounded_direction``, the update to add to ``x``.
     """
     buf.ls_t.fill_(initial_step_size)
-    wp.copy(dest=buf.ls_f, src=energy_fcn(x))
+    f0 = energy_fcn(x)
+    # Traced once, so free on replay. Without it a float return surfaces as "Copy
+    # source and destination must be arrays" from inside wp.copy, several frames away
+    # from the callback that caused it.
+    if not isinstance(f0, wp.array) or f0.dtype != wp.float32 or f0.shape != (1,):
+        raise TypeError(
+            "energy_fcn must return a one-element wp.array of float32 -- the energy "
+            "stays on the device so the Armijo test never reads it back. Got "
+            f"{type(f0).__name__}"
+            f"{f'(dtype={f0.dtype}, shape={tuple(f0.shape)})' if isinstance(f0, wp.array) else ''}"
+            ". A slice of a longer array is fine, e.g. `return self._energy[2:3]`.")
+    wp.copy(dest=buf.ls_f, src=f0)
 
     _apply_bounds_capturable(direction, bounds, buf.ls_t, buf.bounded_direction)
 
@@ -339,6 +373,67 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
     The Hessian is dense and preallocated: sparse BSR products reallocate and can
     change topology between iterations, which is not capturable.
 
+    **The callback contract**
+
+    The four callbacks are invoked *once*, while the graph is being recorded, from
+    inside ``wp.capture_while`` / ``wp.capture_if`` bodies. Everything below follows
+    from that, and none of it is enforced by Python -- most violations produce a wrong
+    answer rather than an error, so they are listed here rather than left to be
+    discovered.
+
+    Rules that apply to all four:
+
+    * **Do not allocate on the device.** Allocation inside a conditional graph node is
+      illegal. Preallocate every buffer the callback touches, once, before the first
+      call.
+    * **Do not wait on the GPU.** No ``.numpy()``, ``.item()``, ``int()`` of a device
+      value, or anything else that reads a result back to the host.
+    * **Do not defer first-time setup into the callback.** Creating a cuBLAS handle
+      during a capture poisons the context, and Warp compiling a kernel mid-capture is
+      not allowed. Run one throwaway call of anything lazy beforehand -- this class
+      factors an identity in its own constructor for exactly that reason.
+    * **Return the same addresses every time.** The graph records raw pointers. A fresh
+      Python object wrapping a stable buffer is fine (``return self._energy[2:3]``);
+      a freshly allocated array is not.
+    * **Every Python value a callback reads is frozen when the graph is recorded**,
+      including ``self.some_scalar`` and any ``if`` on a host value. To change one, the
+      graph has to be recorded again.
+    * A closure that assigns to a name from an enclosing scope needs ``nonlocal``, or
+      Python treats it as local and raises ``UnboundLocalError`` during tracing.
+    * **Any device array handed to a callback from outside must keep its address across
+      steps.** Where that array comes from a library that can either allocate or fill in
+      place, use the in-place form -- e.g. allocate a contacts buffer once and pass it
+      to every collision query, rather than letting each query return a new one.
+
+    Per callback:
+
+    * ``energy_fcn(x)`` returns a **one-element** ``wp.array`` of float32, not a Python
+      float -- the energy stays on the device so the Armijo test never reads it back. It
+      is called with two *different* arrays (``x`` itself, and the trial point), so it
+      must read its argument rather than assume a fixed input buffer.
+    * ``gradient_fcn(x)`` returns a contiguous float32 array of shape
+      :math:`(\text{num_dofs},)`. **Neither ``hessian_fcn`` nor ``energy_fcn`` may write
+      into it.** Its value is held across the whole line search, so clobbering it makes
+      the solver report convergence and return ``x`` unchanged -- silently, and only on
+      some problems, which is why it is stated here and not left to a test.
+    * ``hessian_fcn(x)`` returns a dense 2-D ``wp.array`` whose shape matches
+      ``buf.lu_th`` exactly. A mismatch makes the factorization resize its outputs,
+      which allocates.
+    * ``bounds_fcn(dz, x)`` returns per-DOF bounds or ``None``. Returning ``None`` must
+      be a fixed decision, not one that depends on device state -- it is evaluated once,
+      when the graph is recorded.
+
+    **Reading the outcome.** A singular Hessian does not raise: the factorization writes
+    a non-zero code into ``buf.solve_info_th`` and the solve produces NaNs. The in-graph
+    assertion only fires in Warp debug builds, so a caller that needs to know must read
+    ``buf.solve_info_th`` on the host after the replay and roll back its own state.
+
+    **The line search grows before it stops.** On the *first* step that satisfies Armijo
+    it does not return -- it increases the step (``t /= ls_beta``) and tries again,
+    returning only on a second consecutive success. This is deliberate and predates the
+    capturable version; it means the accepted step can exceed ``initial_step_size``
+    unless ``bounds_fcn`` caps it.
+
     Args:
         x (wp.array): DOFs of shape :math:`(\text{num_dofs},)`. Updated in place.
         energy_fcn (callable): DOFs -> one-element ``wp.array`` energy.
@@ -357,16 +452,31 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
     Returns:
         wp.array: ``x``, updated in place.
     """
-    # The torch solve below must be issued on Warp's capture stream. torch's default
-    # current stream is the legacy default stream, which CUDA forbids capturing on --
-    # the resulting graph would silently omit the linear solve. Callers go through
-    # warp_utilities.capture_and_run_torch, which establishes the context.
-    if torch.cuda.is_available() and \
-            torch.cuda.current_stream() == torch.cuda.default_stream():
-        raise RuntimeError(
-            "newtons_method_capturable must run inside "
-            "`with torch.cuda.stream(wp.stream_to_torch())`. Use "
-            "kaolin.physics.utils.warp_utilities.capture_and_run_torch to invoke it.")
+    # The torch solve below must be issued on the same stream Warp is recording on.
+    #
+    # Torch's default current stream is the legacy default stream, which CUDA forbids
+    # capturing on, so a graph recorded there silently omits the linear solve. But
+    # "anything except the default stream" is not sufficient: on any *other* stream the
+    # torch work still goes somewhere Warp is not watching, and is dropped just as
+    # silently. Warp resolves the active capture from its own device stream, so that is
+    # the stream to match.
+    #
+    # Compared by raw handle, which is an integer comparison on the host and therefore
+    # safe to run while a capture is in progress.
+    if buf.device.is_cuda:
+        warp_stream = wp.stream_to_torch(buf.device)
+        if torch.cuda.current_stream().cuda_stream != warp_stream.cuda_stream:
+            raise RuntimeError(
+                "newtons_method_capturable must run on Warp's stream for "
+                f"{buf.device}, but torch's current stream is "
+                f"{torch.cuda.current_stream()}. Any other stream -- including the "
+                "default one -- means the linear solve is issued where Warp is not "
+                "recording, and is dropped from the graph with no error. Wrap the call "
+                "in `with torch.cuda.stream(wp.stream_to_torch(device)):`, or invoke it "
+                "through kaolin.physics.utils.warp_utilities.capture_and_run_torch, "
+                "which establishes this for you.")
+
+    _check_dofs(x, buf, "x")
 
     buf.nm_while_cond.fill_(nm_max_iters)
     buf.nm_if_cond.fill_(0)
@@ -376,6 +486,29 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
     def newton_while_body():
         G_curr = gradient_fcn(x)
         H_curr = hessian_fcn(x)
+
+        # This body is traced once, so these checks cost nothing on replay. Without
+        # them the failures below surface far from their cause: a wrong Hessian shape
+        # becomes a torch resize warning (an allocation, which a capture forbids), and
+        # an energy function returning a float becomes "Copy source and destination
+        # must be arrays" from inside the line search.
+        _check_dofs(G_curr, buf, "gradient_fcn")
+        if G_curr.ptr == x.ptr:
+            raise ValueError(
+                "gradient_fcn returned x itself. Its result is read throughout the "
+                "line search, which advances x, so the two must be separate buffers.")
+        if not isinstance(H_curr, wp.array) or H_curr.ndim != 2:
+            raise TypeError(
+                f"hessian_fcn must return a dense 2-D wp.array, got {type(H_curr)}"
+                f"{'' if not isinstance(H_curr, wp.array) else f' with ndim={H_curr.ndim}'}"
+                ". Sparse matrices are not supported here: their products reallocate "
+                "and can change topology between iterations, neither of which can be "
+                "captured.")
+        if tuple(H_curr.shape) != tuple(buf.lu_th.shape):
+            raise ValueError(
+                f"hessian_fcn returned shape {tuple(H_curr.shape)}, but the buffers are "
+                f"sized {tuple(buf.lu_th.shape)}. A mismatch makes lu_factor_ex resize "
+                "its outputs, which allocates, which a capture forbids.")
 
         buf.dz.zero_()
         # Factor + solve with fully preallocated outputs. The _ex variant returns an
