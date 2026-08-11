@@ -684,6 +684,66 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
     hessian[c] = coeff * hessian[c]
 
 
+@wp.struct
+class _CollisionBoundsSetup:
+    valid_contact: int
+    delta_d_a: float
+    delta_d_b: float
+    max_delta_d: float
+    idx_a: int
+    idx_b: int
+
+
+@wp.func
+def _collision_bounds_setup(
+    c: int,
+    radius: float,
+    barrier_distance_ratio: float,
+    dx_cur: wp.array(dtype=wp.vec3),
+    dx_start_of_timestep: wp.array(dtype=wp.vec3),
+    kinematic_gaps: wp.array(dtype=wp.vec3),
+    normals: wp.array(dtype=wp.vec3),
+    indices_a: wp.array(dtype=int),
+    indices_b: wp.array(dtype=int),
+    delta_dx: wp.array(dtype=wp.vec3),
+    num_contacts: wp.array(dtype=int),
+):
+    setup = _CollisionBoundsSetup()
+    setup.valid_contact = 0
+    setup.delta_d_a = 0.0
+    setup.delta_d_b = 0.0
+    setup.max_delta_d = 0.0
+    setup.idx_a = 0
+    setup.idx_b = 0
+
+    # Captured callers launch the fixed contact capacity, so skip unused slots.
+    # A negative partner index is a valid fixed-geometry contact, not an unused slot.
+    if c >= num_contacts[0]:
+        return setup
+
+    nor = normals[c]
+    setup.idx_a = indices_a[c]
+    setup.idx_b = indices_b[c]
+
+    # A static point does not move. Without this check, delta_dx[-1] wraps to the last
+    # contact point.
+    if setup.idx_a != NULL_ELEMENT_INDEX:
+        setup.delta_d_a = wp.dot(nor, delta_dx[setup.idx_a])
+    if setup.idx_b != NULL_ELEMENT_INDEX:
+        setup.delta_d_b = -wp.dot(nor, delta_dx[setup.idx_b])
+
+    offset = _collision_offset_wp_func(
+        c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
+    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
+    gap_cur = barrier_distance_ratio * rc - wp.dot(offset, nor)
+    if gap_cur >= 0.0:
+        return setup
+
+    setup.max_delta_d = 0.5 * 0.75 * gap_cur
+    setup.valid_contact = 1
+    return setup
+
+
 @wp.kernel
 def _get_collision_bounds_wp_kernel(
     radius: float,
@@ -703,49 +763,11 @@ def _get_collision_bounds_wp_kernel(
     dof_t_max: wp.array(dtype=float),
 ):  # pragma: no cover
     c = wp.tid()
-
-    # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
-    # no-op when the launch dim is exactly num_contacts (every tid passes), so the
-    # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
-    # sentinel means "partner is static geometry", a distinct concept that
-    # _collision_offset_wp_func and _collision_target_distance_wp_func each handle by
-    # testing both indices, and conflating the two silently drops every contact against a
-    # kinematic collider.
-    if c >= num_contacts[0]:
+    setup = _collision_bounds_setup(
+        c, radius, barrier_distance_ratio, dx_cur, dx_start_of_timestep, kinematic_gaps,
+        normals, indices_a, indices_b, delta_dx, num_contacts)
+    if setup.valid_contact == 0:
         return
-
-    # Distance delta
-    nor = normals[c]
-
-    idx_a = indices_a[c]
-    idx_b = indices_b[c]
-
-    # If idx_a is -1 the first point is static and does not move. Mirrors the idx_b
-    # branch below; without it, delta_dx[-1] wraps to the last contact point.
-    if idx_a == NULL_ELEMENT_INDEX:
-        delta_d_a = 0.0
-    else:
-        delta_d_a = wp.dot(nor, delta_dx[idx_a])
-
-    # If idx_b is -1, then there is no second colliding particle
-    if idx_b == NULL_ELEMENT_INDEX:
-        delta_d_b = 0.0
-    else:
-        delta_d_b = -wp.dot(nor, delta_dx[idx_b])
-
-    # Current distance
-    offset = _collision_offset_wp_func(
-        c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
-    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
-    rp = barrier_distance_ratio * rc
-    gap_cur = rp - wp.dot(offset, nor)
-
-    if gap_cur >= 0.0:
-        # Missed due to too large timestep. Can't do anything now
-        return
-
-    MAX_PROGRESS = 0.75
-    max_delta_d = 0.5 * MAX_PROGRESS * gap_cur
 
     # TODO: Change this to use the cp_to_dof mapping in the future. In case I don't have these J_a, J_b matrices
     #
@@ -753,16 +775,16 @@ def _get_collision_bounds_wp_kernel(
     # Using two jacobians Ja, Jb you can tell which DOFs affect the first colliding particle
     # and the second colliding particle
     # Using warp sparse matrices I can use the same kernel to compute the bounds
-    if delta_d_a < 0.0:  # getting closer
-        t_max = wp.clamp(max_delta_d / delta_d_a, 0.0, 1.0)
+    if setup.delta_d_a < 0.0:  # getting closer
+        t_max = wp.clamp(setup.max_delta_d / setup.delta_d_a, 0.0, 1.0)
         if t_max < 1.0:
             dof_beg = jacobian_a_offsets[3*c]
             dof_end = jacobian_a_offsets[3*c + 1]
             for dof in range(dof_beg, dof_end):
                 wp.atomic_min(dof_t_max, jacobian_a_columns[dof], t_max)
 
-    if delta_d_b < 0.0:  # getting closer
-        t_max = wp.clamp(max_delta_d / delta_d_b, 0.0, 1.0)
+    if setup.delta_d_b < 0.0:  # getting closer
+        t_max = wp.clamp(setup.max_delta_d / setup.delta_d_b, 0.0, 1.0)
         if t_max < 1.0:
             dof_beg = jacobian_b_offsets[3*c]
             dof_end = jacobian_b_offsets[3*c + 1]
@@ -798,58 +820,33 @@ def _get_collision_bounds_dense_wp_kernel(
     so that the sparsity test parallelizes over DOFs instead of looping inside one thread.
     """
     c, blk = wp.tid()
-
-    if c >= num_contacts[0]:
+    setup = _collision_bounds_setup(
+        c, radius, barrier_distance_ratio, dx_cur, dx_start_of_timestep, kinematic_gaps,
+        normals, indices_a, indices_b, delta_dx, num_contacts)
+    if setup.valid_contact == 0:
         return
-
-    nor = normals[c]
-    idx_a = indices_a[c]
-    idx_b = indices_b[c]
-
-    if idx_a == NULL_ELEMENT_INDEX:
-        delta_d_a = 0.0
-    else:
-        delta_d_a = wp.dot(nor, delta_dx[idx_a])
-
-    if idx_b == NULL_ELEMENT_INDEX:
-        delta_d_b = 0.0
-    else:
-        delta_d_b = -wp.dot(nor, delta_dx[idx_b])
-
-    offset = _collision_offset_wp_func(
-        c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
-    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
-    rp = barrier_distance_ratio * rc
-    gap_cur = rp - wp.dot(offset, nor)
-
-    if gap_cur >= 0.0:
-        # Missed due to too large timestep. Can't do anything now
-        return
-
-    MAX_PROGRESS = 0.75
-    max_delta_d = 0.5 * MAX_PROGRESS * gap_cur
 
     col0 = block_width * blk
 
-    if delta_d_a < 0.0 and idx_a != NULL_ELEMENT_INDEX:  # getting closer
-        t_max = wp.clamp(max_delta_d / delta_d_a, 0.0, 1.0)
+    if setup.delta_d_a < 0.0:  # getting closer
+        t_max = wp.clamp(setup.max_delta_d / setup.delta_d_a, 0.0, 1.0)
         if t_max < 1.0:
             # int(0) rather than False: Warp requires an explicit dynamic-variable
             # declaration for anything mutated inside a dynamic loop.
             touched = int(0)
             for m in range(block_width):
-                if b_dense[3 * idx_a, col0 + m] != 0.0:
+                if b_dense[3 * setup.idx_a, col0 + m] != 0.0:
                     touched = 1
             if touched == 1:
                 for m in range(block_width):
                     wp.atomic_min(dof_t_max, col0 + m, t_max)
 
-    if delta_d_b < 0.0 and idx_b != NULL_ELEMENT_INDEX:  # getting closer
-        t_max = wp.clamp(max_delta_d / delta_d_b, 0.0, 1.0)
+    if setup.delta_d_b < 0.0:  # getting closer
+        t_max = wp.clamp(setup.max_delta_d / setup.delta_d_b, 0.0, 1.0)
         if t_max < 1.0:
             touched = int(0)
             for m in range(block_width):
-                if b_dense[3 * idx_b, col0 + m] != 0.0:
+                if b_dense[3 * setup.idx_b, col0 + m] != 0.0:
                     touched = 1
             if touched == 1:
                 for m in range(block_width):
