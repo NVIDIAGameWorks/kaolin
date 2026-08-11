@@ -21,7 +21,7 @@ from .testing import tensor_info
 
 _logger = _logging.getLogger(__name__)
 
-__all__ = ['default_log_setup', 'add_log_level_flag', 'log_tensor', 'print_tensor']
+__all__ = ['default_log_setup', 'add_log_level_flag', 'log_tensor', 'print_tensor', 'setup_log_file']
 
 
 def default_log_setup(level=_logging.INFO, force=True):
@@ -97,6 +97,52 @@ def log_tensor(t, name, use_logger=None, level=_logging.DEBUG, print_stats=False
         use_logger = _logger
 
     use_logger.log(level, tensor_info(t, name, print_stats=print_stats, detailed=detailed))
+
+
+def setup_log_file(log_dir: str, prefix: str = 'kaolin') -> str:
+    """Attach a :class:`logging.FileHandler` to the root logger and return the log file path.
+
+    The file is created immediately inside *log_dir* (which is made if it does not
+    already exist) and shares the same format as :func:`default_log_setup`::
+
+        %(asctime)s|%(levelname)8s|%(name)15s| %(message)s
+
+    This is a complement to :func:`default_log_setup`, not a replacement — call
+    both when you want logs on both stdout and in a file.
+
+    Args:
+        log_dir (str): Directory in which the log file will be created.
+        prefix (str): Filename prefix (default: ``'kaolin'``).  The final name
+            is ``<prefix>_<YYYY-MM-DD_HHMMSS>.log``.
+
+    Returns:
+        str: Absolute path of the created log file.
+
+    Examples:
+        >>> path = setup_log_file('/tmp/kaolin_logs', prefix='segment')
+        >>> # '/tmp/kaolin_logs/segment_2026-08-04_153000.log'
+    """
+    import os as _os
+    from datetime import datetime as _datetime
+
+    _os.makedirs(log_dir, exist_ok=True)
+    timestamp = _datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    log_path = _os.path.abspath(_os.path.join(log_dir, f'{prefix}_{timestamp}.log'))
+
+    root = _logging.getLogger()
+    if any(isinstance(h, _logging.FileHandler) and
+           _os.path.abspath(h.baseFilename) == log_path
+           for h in root.handlers):
+        _logger.debug(f'FileHandler for {log_path} already attached; skipping duplicate.')
+        return log_path
+
+    file_handler = _logging.FileHandler(log_path)
+    file_handler.setFormatter(_logging.Formatter(
+        '%(asctime)s|%(levelname)8s|%(name)15s| %(message)s'))
+    root.addHandler(file_handler)
+
+    _logger.info(f'Logging to file: {log_path}')
+    return log_path
 
 
 def print_tensor(t, name, print_stats=False, detailed=False):

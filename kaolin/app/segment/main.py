@@ -42,7 +42,7 @@ def read_cloud(fname, device, rep):
             gsmodel = kaolin.io.gaussians.import_gaussiancloud(fname).to(device)
             cloud = GaussianSplatInput(gsmodel)
             segmentation = None
-        print(cloud.gsmodel.to_string(print_stats=True))
+        logger.info(cloud.gsmodel.to_string(print_stats=True))
         return cloud, segmentation
     else:
         raise NotImplementedError(f'The segmentation API for representation {rep} not implemented')
@@ -75,6 +75,9 @@ if __name__ == '__main__':
                         help='World up axis for the camera controller (default: y)')
     parser.add_argument('--sam_model_id', type=str, default='facebook/sam2-hiera-large',
                         help='HuggingFace model ID for SAM2')
+    parser.add_argument('--debug', action='store_true', default=False,
+                        help='Enable debug mode: hot reloading, and unsafe dev features '
+                             '(log download endpoint, error details forwarded to client).')
     parser.add_arguments(ServerSideUserSettings, dest="settings")
     add_log_level_flag(parser)
     args = parser.parse_args()
@@ -104,7 +107,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # WebappBuilder: helps us create the whole app - layout, websockets, UI, etc.
     # ------------------------------------------------------------------------------------------------------------------
-    app_builder = WebappBuilder(debug=False)
+    app_builder = WebappBuilder(debug=args.debug)
     app_builder.add_raw_body_html(SVG_FILTER)  # Styling for the mask layer
     app_builder.add_raw_body_html(DEBUG_PANEL_HTML)
 
@@ -169,7 +172,7 @@ if __name__ == '__main__':
     BehaviorLibrary.register_user_directory(os.path.join(FILE_DIR, 'assets'))
 
     # List bundled and registered behaviors:
-    print(BehaviorLibrary.to_string())
+    logger.debug(BehaviorLibrary.to_string())
 
     # Shortcut behavior config for camera and remote rendering (see methods for what's under the hood)
     cam_controller_id = viewer_builder.add_camera_controller(options={"up": up_vec.tolist()})
@@ -253,9 +256,18 @@ if __name__ == '__main__':
 
     stop_btn = dbc.Button(
         [html.I(className='bi bi-stop-circle me-1'), 'Stop'],
-        id='stop-app-btn', color='danger', className='ms-auto me-2',
+        id='stop-app-btn', color='danger',
     )
-    layout_helper.navbar_content.children.append(stop_btn)
+    right_items = [stop_btn]
+    if args.debug:
+        right_items.insert(0, html.A(
+            [html.I(className='bi bi-file-earmark-text me-1'), 'Download Logs'],
+            href='/_kaolin_logs', download='',
+            className='btn btn-light btn-sm',
+        ))
+    layout_helper.navbar_content.children.append(html.Div(
+        right_items, className='ms-auto d-flex align-items-center gap-2 me-2'
+    ))
 
     stop_modal = dbc.Modal(
         id='stop-app-modal',
@@ -366,6 +378,7 @@ if __name__ == '__main__':
     app_builder.set_layout_helper(layout_helper)
     app, server = app_builder.build(ws_handlers)
 
+
     # Save As modal: open/close (clientside)
     clientside_callback(
         """
@@ -384,7 +397,7 @@ if __name__ == '__main__':
     )
 
     # Save As modal: server-side export
-    @callback(
+    @app_builder.callback(
         Output('save-as-status', 'children'),
         Output('save-as-modal', 'is_open', allow_duplicate=True),
         Input('save-as-confirm-btn', 'n_clicks'),
@@ -394,11 +407,8 @@ if __name__ == '__main__':
     def _save_as_callback(n_clicks, path):
         if n_clicks is None:
             return no_update, no_update
-        try:
-            export_scene_as_usd(application_state.fresh_cloud(), application_state.segmentation, path)
-            return f'Saved to {path}', False
-        except Exception as exc:
-            return str(exc), True
+        export_scene_as_usd(application_state.fresh_cloud(), application_state.segmentation, path)
+        return f'Saved to {path}', False
 
     # Stop modal: open/close (clientside)
     clientside_callback(
@@ -418,7 +428,7 @@ if __name__ == '__main__':
     )
 
     # Stop modal: kill the server process
-    @callback(
+    @app_builder.callback(
         Output('stop-app-modal', 'is_open', allow_duplicate=True),
         Input('stop-app-confirm-btn', 'n_clicks'),
         prevent_initial_call=True,

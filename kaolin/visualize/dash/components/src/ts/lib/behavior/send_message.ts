@@ -147,9 +147,11 @@ export function useSendValue<T>({
             return null;
         }
         let ws = WebSocketConnectionsManager.getOpenConnection(connectionId);
-        const isFirst = lastUpdateDate.current === null;
-        if (!ws && isFirst) {
-            const MAX_RETRIES = 10;
+        if (!ws) {
+            // On first send wait up to 2s for the connection to open; on subsequent
+            // sends (reconnect scenario) a shorter window avoids stale camera spam.
+            const isFirst = lastUpdateDate.current === null;
+            const MAX_RETRIES = isFirst ? 10 : 3;
             const RETRY_DELAY_MS = 200;
             for (let i = 0; i < MAX_RETRIES && !ws; i++) {
                 await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
@@ -157,7 +159,7 @@ export function useSendValue<T>({
             }
         }
         if (!ws) {
-            logger.error(`${errorPrefix} not yet open; ${errorSuffix}`);
+            logger.warn(`${errorPrefix} not yet open; ${errorSuffix}`);
         }
         return ws;
     }, [connectionId]);

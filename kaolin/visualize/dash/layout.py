@@ -131,7 +131,7 @@ class StandardLayoutHelper(AppLayoutHelper):
         extra_classes = _width_to_class(width) if width is not None else ''
 
         if min_width_px is not None:
-            self.sidebar_extra_styles['min-width'] = f'{min_width_px}px'
+            self.sidebar_extra_styles['minWidth'] = f'{min_width_px}px'
 
         self.sidebar_content = html.Div(children=[], className='kaolin-sidebar-content')
         children = [self.sidebar_content]
@@ -251,6 +251,26 @@ class StandardLayoutHelper(AppLayoutHelper):
     def add_sidebar_components(self, items: Iterable[Component], section_name=None):
         for item in items:
             self.add_sidebar_component(item, section_name=section_name)
+
+    def add_log_download_button(self, url: str = '/_kaolin_logs'):
+        """Inject a *Download Logs* anchor button into the navbar.
+
+        Called automatically by :meth:`~kaolin.visualize.dash.builder.WebappBuilder.build`
+        when ``unsafe_enable_log_download(download_button_id='default')`` has been
+        configured.  The button is appended to the right side of the navbar.
+
+        Args:
+            url (str): Href of the log-download endpoint
+                (default: ``'/_kaolin_logs'``).
+        """
+        btn = html.A(
+            [html.I(className='bi bi-file-earmark-text me-1'), 'Download Logs'],
+            href=url,
+            download='',
+            className='btn btn-light btn-sm ms-auto me-2 d-flex align-items-center',
+        )
+        self.navbar_content.children.append(btn)
+        return btn
 
     def add_navbar_component(self, item: Component):
         self.navbar_content.children.insert(0, item)

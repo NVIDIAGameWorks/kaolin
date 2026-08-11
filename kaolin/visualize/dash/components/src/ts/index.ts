@@ -3,6 +3,7 @@
 import '../css/common.css';
 
 export { default as KaolinViewerInternal } from './components/KaolinViewerInternal';
+export { default as KaolinErrorOverlay } from './components/KaolinErrorOverlay';
 export * as core from './core';
 export * as lib from './lib';
 export * as util from './util';

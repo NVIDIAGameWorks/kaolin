@@ -121,8 +121,9 @@ def download_model_if_needed(model, weights_dir=WEIGHTS_DIR):
     filename = link.split('/')[-1]
     full_fname = os.path.join(weights_dir, filename)
     if not os.path.exists(full_fname) or hashlib.md5(open(full_fname, 'rb').read()).hexdigest() != md5:
-        print(f'Downloading {filename}...')
-        r = requests.get(link, stream=True)
+        logger.info(f'Downloading {filename}...')
+        r = requests.get(link, stream=True, timeout=120)
+        r.raise_for_status()
         total_size = int(r.headers.get('content-length', 0))
         block_size = 1024
         t = tqdm(total=total_size, unit='iB', unit_scale=True)
