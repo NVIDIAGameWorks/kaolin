@@ -200,25 +200,14 @@ def _clamp_contact_count_wp_kernel(
 
 
 @wp.kernel
-def _advance_chunk_start_wp_kernel(
+def _advance_chunk_start_and_update_cond_wp_kernel(
     chunk_start: wp.array(dtype=int),
     chunk_size: int,
-):  # pragma: no cover
-    r"""Advances the chunk cursor on device, so the loop never syncs to advance it."""
-    chunk_start[0] = chunk_start[0] + chunk_size
-
-
-@wp.kernel
-def _chunk_loop_cond_wp_kernel(
-    chunk_start: wp.array(dtype=int),
     num_contacts: wp.array(dtype=int),
     cond: wp.array(dtype=int),
 ):  # pragma: no cover
-    r"""``wp.capture_while`` predicate: are there still live contacts left to reduce?
-
-    Written as a device array so the loop trip count follows the *actual* contact count
-    at replay rather than the capacity baked in at capture time.
-    """
+    r"""Advance the chunk cursor and update the captured-loop condition."""
+    chunk_start[0] = chunk_start[0] + chunk_size
     cond[0] = wp.where(chunk_start[0] < num_contacts[0], 1, 0)
 
 
@@ -1622,9 +1611,11 @@ class ChunkedCollisionHessian:
         hess_reduction(self._t_j_chunk, self._t_h_chunk, out=_warm, HJ=self._hj)
         _warm[0].addmv_(self._t_j_chunk.transpose(0, 1), self._t_g_chunk)
 
-    def _advance(self):
-        wp.launch(kernel=_advance_chunk_start_wp_kernel, dim=1,
-                  inputs=[self.chunk_start, self.chunk_size], device=self.device)
+    def _advance_and_update_cond(self, chunk_size):
+        r"""Move the cursor, then set whether the captured loop should continue."""
+        wp.launch(kernel=_advance_chunk_start_and_update_cond_wp_kernel, dim=1,
+                  inputs=[self.chunk_start, chunk_size, self.collision.count, self.loop_cond],
+                  device=self.device)
 
     def _reduce_one_chunk(self, b_dense, h_full, out):
         r"""Builds the chunk at the current cursor and accumulates its contribution."""
@@ -1632,7 +1623,7 @@ class ChunkedCollisionHessian:
         self.collision.gather_hessian_chunk(h_full, self.chunk_start, self.h_chunk)
         hess_reduction(self._t_j_chunk, self._t_h_chunk, out=out, HJ=self._hj,
                        accumulate=True)
-        self._advance()
+        self._advance_and_update_cond(self.chunk_size)
 
     def _reduce_one_gradient_chunk(self, b_dense, g_full, out):
         r"""Accumulates :math:`J_c^T \, (dE/dx)_c` for the chunk at the current cursor."""
@@ -1640,7 +1631,7 @@ class ChunkedCollisionHessian:
         self.collision.gather_gradient_chunk(g_full, self.chunk_start, self.g_chunk)
         # addmv_ is the in-place out += A @ v GEMV; no allocation, no extra buffer.
         out.addmv_(self._t_j_chunk.transpose(0, 1), self._t_g_chunk)
-        self._advance()
+        self._advance_and_update_cond(self.chunk_size)
 
     def accumulate_gradient_capturable(self, b_dense, g_full, out):
         r"""Adds :math:`J^T \, dE/dx` into ``out``, chunked, under ``wp.capture_while``.
@@ -1665,11 +1656,11 @@ class ChunkedCollisionHessian:
             raise ValueError(
                 f"out has {out.numel()} entries, expected {self.num_dofs}.")
         self.chunk_start.zero_()
-        self._update_cond()
+        # A zero-size advance initializes the condition without moving the cursor.
+        self._advance_and_update_cond(0)
 
         def while_body():
             self._reduce_one_gradient_chunk(b_dense, g_full, out)
-            self._update_cond()
 
         wp.capture_while(self.loop_cond, while_body=while_body)
         return out
@@ -1721,19 +1712,14 @@ class ChunkedCollisionHessian:
         if not accumulate:
             out.zero_()
         self.chunk_start.zero_()
-        self._update_cond()
+        # A zero-size advance initializes the condition without moving the cursor.
+        self._advance_and_update_cond(0)
 
         def while_body():
             self._reduce_one_chunk(b_dense, h_full, out)
-            self._update_cond()
 
         wp.capture_while(self.loop_cond, while_body=while_body)
         return out
-
-    def _update_cond(self):
-        wp.launch(kernel=_chunk_loop_cond_wp_kernel, dim=1,
-                  inputs=[self.chunk_start, self.collision.count, self.loop_cond],
-                  device=self.device)
 
     def _validate(self, b_dense, h_full, out):
         if b_dense.shape[1] != self.num_dofs:
