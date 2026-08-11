@@ -1598,18 +1598,11 @@ class ChunkedCollisionHessian:
                                dtype=self._t_j_chunk.dtype,
                                device=self._t_j_chunk.device)
 
-        # cuBLAS creates its handle lazily, on the first GEMM of a given device/dtype, and
-        # cublasCreate is illegal inside a capture region -- it fails with
-        # CUBLAS_STATUS_NOT_INITIALIZED and poisons the CUDA context. So force the handle
-        # into existence here, on the buffers that reduce_capturable will use, while we
-        # are still guaranteed to be outside any capture. The buffers are zeroed, so this
-        # computes nothing; only the handle matters. The rest of the capturable path gets
-        # away without this only because scene setup incidentally runs matmuls first,
-        # which is not something a standalone reducer should have to rely on.
-        _warm = torch.zeros(num_dofs, num_dofs, dtype=self._t_j_chunk.dtype,
-                            device=self._t_j_chunk.device)
-        hess_reduction(self._t_j_chunk, self._t_h_chunk, out=_warm, HJ=self._hj)
-        _warm[0].addmv_(self._t_j_chunk.transpose(0, 1), self._t_g_chunk)
+        # Initialize cuBLAS before CUDA graph capture. Its first matrix multiply creates
+        # a handle, which capture forbids. The handle does not depend on matrix size, so
+        # this 1x1 zero multiply is enough.
+        _warm = torch.zeros((1, 1), dtype=self._t_j_chunk.dtype, device=self._t_j_chunk.device)
+        torch.matmul(_warm, _warm, out=_warm)
 
     def _advance_and_update_cond(self, chunk_size):
         r"""Move the cursor, then set whether the captured loop should continue."""
