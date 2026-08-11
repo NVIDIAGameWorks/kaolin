@@ -23,7 +23,7 @@ from kaolin.physics.simplicits import PhysicsPoints, SimplicitsObject, Simplicit
 def build_scene(num_objects, n_pts, num_handles, num_qp, ym, capturable,
                 max_newton_steps=5, num_nodes=256, seed=0, check_solve_info=True):
     """Objects dropping onto a floor. No inter-object collisions: the capturable path
-    does not support them yet, so both paths are built identically without them."""
+    and the reference path are built identically to isolate the floor-contact workload."""
     device, dtype = "cuda", torch.float32
     torch.manual_seed(seed)
     pts = torch.rand(n_pts, 3, device=device, dtype=dtype) - 0.5

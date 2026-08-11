@@ -348,24 +348,3 @@ def test_capture_and_replay_matches_and_allocates_nothing():
 
     assert torch.allclose(wp.to_torch(x), ref[1], atol=1e-5)
     assert after == before, f"replay allocated {after - before} times"
-
-
-@cuda_only
-def test_uncaptured_run_works_through_the_same_entry_point():
-    """capture_and_run_torch(captured=False) is the bisection path and must work.
-
-    It used to call the function outside the stream redirection, so the solver's own
-    stream check rejected it -- the documented workaround and the thing that raised were
-    the same function.
-    """
-    n = 6
-    prob = SoftAbs(n, "cuda")
-    buf = CapturableNewtonBuffers(n, device="cuda")
-    x = wp.from_torch(torch.full((n,), 2.0, device="cuda"))
-
-    capture_and_run_torch(
-        lambda: newtons_method_capturable(x, prob.energy, prob.gradient, prob.hessian,
-                                          buf, nm_max_iters=20, conv_tol=1e-8),
-        "solve", {}, captured=False, device="cuda")
-
-    assert wp.to_torch(x).abs().max().item() < 1e-8

@@ -37,40 +37,17 @@ __all__ = ["_wp_bsr_to_torch_bsr",
 
 
 def capture_function_torch(func, device=None, pool=None):
-    r"""Captures a function that mixes Warp kernels and PyTorch ops into a CUDA graph.
+    r"""Record a Warp and PyTorch function in a CUDA graph.
 
-    Two things are required for this to be safe, and both fail silently or
-    catastrophically if omitted:
-
-    1. **Stream redirection.** By default ``torch.cuda.current_stream()`` is the
-       *legacy default stream*, and CUDA forbids graph capture on it under the
-       thread-local capture mode :class:`warp.ScopedCapture` uses. Without the
-       redirection the capture either aborts or omits every torch operation.
-    2. **A graph-private allocator pool.** Torch backends allocate below the
-       dispatcher -- cuSOLVER's ``lu_factor`` workspace is the case that bit us here.
-       Such buffers are returned to torch's ordinary cache when the call returns, so
-       their addresses end up baked into the graph while owned by nothing. A later
-       ``torch.cuda.empty_cache()`` frees them and the next replay writes into
-       unmapped memory (reproduced as CUDA error 700). Routing capture-time
-       allocations into a private pool prevents this.
+    Reuse ``pool`` when recording the same work again.
 
     Args:
         func (callable): Zero-argument function issuing the work to capture.
-        device (optional): Warp device to capture on. Defaults to Warp's current device.
-        pool (optional): Private pool handle from ``torch.cuda.graph_pool_handle()``.
-            **Pass the same handle back on every re-capture.** Minting a fresh pool each
-            time leaks: ``_cuda_endAllocateToPool`` only removes the stream filter, and
-            ``_cuda_releasePool`` is the sole decrementer of ``PrivatePool::use_count``,
-            so an unreleased pool never becomes reclaimable -- measured at exactly
-            2.00 MiB per re-capture, surviving ``empty_cache()``. Reusing one pool lets
-            buffers freed by an earlier capture be served from its free list instead.
-            Defaults to minting one, which is correct for a single capture only.
+        device (optional): Warp device. Defaults to the current device.
+        pool (optional): Allocation pool to reuse when recording again.
 
     Returns:
-        tuple: ``(warp.Graph, pool_handle)``. Returned so the caller can pass the handle
-        back on the next capture. Note ``graph_pool_handle()`` is a bare ``tuple[int, int]``
-        with no finalizer: dropping it releases nothing, so retaining it is not what keeps
-        the pool alive -- it is what lets you reuse the pool.
+        tuple: Recorded graph and allocation pool.
     """
     torch_index = torch.device(wp.device_to_torch(wp.get_device(device))).index or 0
     if pool is None:
@@ -86,47 +63,35 @@ def capture_function_torch(func, device=None, pool=None):
     return capture.graph, pool
 
 
-def capture_and_run_torch(func, func_name, graph_dict, captured=True, device=None,
-                          pool=None):
-    r"""Lazily captures ``func`` on first call, then replays the cached graph.
+def capture_and_run_torch(func, func_name, graph_dict, device=None, pool=None):
+    r"""Record ``func`` once, then run the recorded graph.
 
     Args:
         func (callable): Zero-argument function issuing the work.
         func_name (str): Cache key.
-        graph_dict (dict): Name -> ``(warp.Graph, pool_handle)`` cache, owned by the
-            caller. Clear it whenever scene topology changes, or the replay will use
-            stale pointers.
-        captured (bool, optional): When False, runs ``func`` directly instead of
-            capturing it -- the path to take when bisecting a wrong answer, since an
-            uncaptured run gives ordinary tracebacks and lets you print device values.
-            The stream redirection still happens, because callees may require it:
-            :func:`kaolin.physics.common.optimization_capturable.newtons_method_capturable`
-            raises if torch is left on the default stream. Defaults to True.
-        device (optional): Warp device to capture on. Defaults to Warp's current device.
-        pool (optional): Private allocator pool to reuse across re-captures. See
-            :func:`capture_function_torch` -- passing one long-lived handle is what keeps
-            repeated invalidate/re-capture cycles from leaking 2 MiB apiece.
+        graph_dict (dict): Cache owned by the caller.
+        device (optional): Warp device. Defaults to the current device.
+        pool (optional): Allocation pool to reuse when recording again.
 
     Returns:
-        The pool handle actually used, so the caller can hold it and pass it back.
+        The allocation pool in use.
     """
     device = wp.get_device(device)
-
-    if not captured:
-        # Run on Warp's stream even though nothing is being captured, so that an
-        # uncaptured run is a faithful bisection aid rather than a different code path.
-        # Gated on is_cuda because wp.stream_to_torch raises for a CPU device.
-        if device.is_cuda:
-            with torch.cuda.stream(wp.stream_to_torch(device)):
-                func()
-        else:
-            func()
-        return pool
 
     if func_name not in graph_dict:
         graph_dict[func_name] = capture_function_torch(func, device=device, pool=pool)
     wp.capture_launch(graph_dict[func_name][0])
     return graph_dict[func_name][1]
+
+
+@wp.kernel
+def _debug_assert_zero_kernel(a: wp.array(dtype=wp.int32), i: int):  # pragma: no cover
+    assert a[i] == 0
+
+
+def _debug_assert_zero(a, i=0):
+    r"""Assert that ``a[i]`` is zero when Warp runs in debug mode."""
+    wp.launch(_debug_assert_zero_kernel, dim=1, inputs=[a, i])
 
 
 vec12 = wp.types.vector(12, dtype=wp.float32)

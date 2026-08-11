@@ -279,24 +279,13 @@ class SimplicitsScene:
             direct_solve (bool, optional): Whether to use direct solve for linear system. Defaults to True.
             use_cuda_graphs (bool, optional): Whether to capture the energy and gradient
                 inner loops as individual cuda graphs. Defaults to False.
-            capturable (bool, optional): Whether to capture the *entire* sim step --
-                Newton's method, line search, linear solve and all -- as a single cuda
-                graph. Much faster than ``use_cuda_graphs`` when the step is launch-bound,
-                but requires CUDA 12.4+ for conditional graph nodes, and requires
-                ``direct_solve=True``. Kinematic objects are supported: rather than
-                reducing the system with ``sim_P``/``sim_Pt`` as the non-capturable path
-                does, their DOFs are pinned by zeroing the corresponding Hessian rows and
-                columns (unit diagonal) and gradient entries. That is algebraically
-                identical, since the projection matrix is a pure row selection, and it
-                keeps shapes fixed as capture requires -- at the cost of factorizing over
-                DOFs the reduced path would project away. Inter-object collisions are not
-                yet supported and raise. Defaults to False.
-            check_solve_info (bool, optional): Only used when ``capturable=True``. Reads
-                the LU factorization's info code back to the host after each graph launch
-                and raises on a singular Hessian, restoring the ``LinAlgError`` the
-                non-capturable path gives. Costs one device-to-host sync per step;
-                setting it False removes that sync but lets a singular Hessian silently
-                produce NaN/garbage DOFs. Defaults to True.
+            capturable (bool, optional): Record the whole simulation step as one CUDA
+                graph. Requires CUDA 12.4+ and ``direct_solve=True``. Kinematic objects
+                work. Inter-object collisions work when every object uses
+                ``apply_qr=False``; :func:`add_object` defaults it to True. Defaults to
+                False.
+            check_solve_info (bool, optional): Raise when the recorded solve fails. This
+                adds one GPU-to-CPU wait per step. Defaults to True.
             timestep (float, optional): Sim time-step. Defaults to 0.03.
             max_newton_steps (int, optional): Newton steps used in time integrator. Defaults to 5.
             max_ls_steps (int, optional): Line search steps used in time integrator. Defaults to 10.
@@ -644,11 +633,7 @@ class SimplicitsScene:
             self._create_capturable_variables()
 
     def _create_capturable_variables(self):  # pragma: no cover
-        r"""Allocates every buffer the captured step writes to.
-
-        A captured graph records raw device pointers, so all of these are allocated
-        once here and only ever written in place -- never reassigned.
-        """
+        r"""Allocate the buffers used by a recorded step."""
         num_dofs = self.sim_z.shape[0]
         num_pts = int(self.sim_B.shape[0] / 3)
         self._num_dofs = num_dofs
@@ -693,7 +678,9 @@ class SimplicitsScene:
         # captured body, hence still clean), but sim_z_dot is overwritten in-graph.
         self._cap_z_dot_backup = wp.zeros_like(self.sim_z)
 
-        # dt lives on device so it is not baked into the graph as a kernel immediate.
+        # The energy weights live on device so _launch_array_inner can combine the
+        # potential and kinetic terms without a purpose-built kernel. The timestep is
+        # still baked into the captured graph and checked before every replay.
         # energy_coeff = (dt*dt, 0.5) so combined E = dt*dt*PE + 0.5*KE.
         self._scene_energy_coeff = wp.array(
             [self.timestep * self.timestep, 0.5], dtype=wp.float32, device=self.device)
@@ -1063,10 +1050,7 @@ class SimplicitsScene:
 
     def _create_capturable_collision_variables(self, collision_struct,
                                                chunk_size=2048):  # pragma: no cover
-        r"""Allocates the buffers the captured step needs for contact.
-
-        Separate from :func:`_create_capturable_variables` only because collisions are
-        enabled after the scene is built, so these cannot be allocated alongside the rest.
+        r"""Allocate contact buffers for a recorded step.
 
         Args:
             collision_struct (Collision): The scene's collision struct.
@@ -1079,8 +1063,9 @@ class SimplicitsScene:
             # also destroys the Jacobian's sparsity. Nothing in tests or examples combines
             # the two, so this raises rather than silently falling back to the host path.
             raise NotImplementedError(
-                "capturable=True does not support inter-object collisions together with "
-                "apply_qr=True. Build the scene with apply_qr=False.")
+                "capturable=True with inter-object collisions requires apply_qr=False. "
+                "Build every object with apply_qr=False; see "
+                "simplicits_collision_scene_1.py for an example.")
 
         num_dofs = self._num_dofs
         capacity = collision_struct.max_contacting_pairs
@@ -1122,21 +1107,15 @@ class SimplicitsScene:
         self._has_collision = True
 
     def _compute_collision_bounds_capturable(self, dz, z):  # pragma: no cover
-        r"""Capturable ``bounds_fcn``: per-DOF cap on the line-search step.
-
-        The host path skips this entirely when there are no contacts; here the kernel's
-        count guard handles that case, so the launch shape stays fixed either way.
+        r"""Return per-value limits for the line search.
 
         Args:
             dz (wp.array): Newton direction.
             z (wp.array): Current DOFs.
 
         Returns:
-            wp.array(dtype=float): Per-DOF bounds, or ``None`` if collisions are off.
+            wp.array(dtype=float): Per-DOF bounds.
         """
-        if not self._has_collision:
-            return None
-
         wps.bsr_mv(A=self.sim_B, x=z, y=self._cap_bounds_dx)
         wps.bsr_mv(A=self.sim_B, x=dz, y=self._cap_bounds_delta_dx)
         return self.force_dict["collision"]["object"].get_bounds_capturable(
@@ -1241,15 +1220,7 @@ class SimplicitsScene:
         self._invalidate_graphs()
 
     def _invalidate_graphs(self):  # pragma: no cover
-        r"""Drops every cached CUDA graph so the next step re-captures.
-
-        Must be called whenever anything a graph baked in changes: state buffers being
-        rebound, or a force struct being replaced. A stale graph replays the old kernel
-        immediates *and* holds pointers into device arrays that are freed once the
-        replaced struct's refcount hits zero.
-
-        Covers the ``use_cuda_graphs`` fragment graphs too, which had the same gap.
-        """
+        r"""Clear recorded graphs after changing scene buffers or forces."""
         if getattr(self, "_graph_dict", None):
             self._graph_dict.clear()
         self._energy_graph = None
@@ -1466,20 +1437,20 @@ class SimplicitsScene:
         return H
 
     @staticmethod
-    def _displacement_delta(wp_z, wp_z_prev, wp_z_dot, dt):  # pragma: no cover
-        r"""Timestep displacement update, to use in inertia computations
+    def _displacement_delta_capturable(wp_z, wp_z_prev, wp_z_dot, dt, out):  # pragma: no cover
+        r"""Writes the timestep displacement update into a preallocated buffer.
 
         Args:
             wp_z (wp.array): Transforms
             wp_z_prev (wp.array): Previous transforms
             wp_z_dot (wp.array): Time derivative of transforms
             dt (float): Timestep
+            out (wp.array): Preallocated output buffer.
         """
 
-        delta_dz = wp.empty_like(wp_z)
-        wp.launch(warp_utilities._displacement_delta_kernel, dim=delta_dz.shape, inputs=[
-                  dt, wp_z, wp_z_prev, wp_z_dot], outputs=[delta_dz])
-        return delta_dz
+        wp.launch(warp_utilities._displacement_delta_kernel, dim=out.shape, inputs=[
+                  dt, wp_z, wp_z_prev, wp_z_dot], outputs=[out])
+        return out
 
     def _newton_E(self, wp_z, wp_z_prev, wp_z_dot, wp_B, dt):  # pragma: no cover
         r"""Backward's euler energy used in newton's method
@@ -1495,7 +1466,8 @@ class SimplicitsScene:
             float: Backward's euler energy scalar.
         """
         assert wp_z.shape[0] == wp_B.shape[1]
-        wp_delta_dz = self._displacement_delta(wp_z, wp_z_prev, wp_z_dot, dt)
+        wp_delta_dz = self._displacement_delta_capturable(
+            wp_z, wp_z_prev, wp_z_dot, dt, out=wp.empty_like(wp_z))
         pe_sum, ke = self._assemble_energies(wp_z, wp_delta_dz)
 
         wp_newton_energy = ke + dt*dt * pe_sum
@@ -1519,7 +1491,8 @@ class SimplicitsScene:
 
         newton_gradient = self._assemble_gradients(wp_z)
 
-        wp_delta_dz = self._displacement_delta(wp_z, wp_z_prev, wp_z_dot, dt)
+        wp_delta_dz = self._displacement_delta_capturable(
+            wp_z, wp_z_prev, wp_z_dot, dt, out=wp.empty_like(wp_z))
         wps.bsr_mv(wp_BMB, x=wp_delta_dz,
                    y=newton_gradient, alpha=1.0, beta=dt*dt)
 
@@ -1558,14 +1531,14 @@ class SimplicitsScene:
     # ------------------------------------------------------------------
 
     def _defo_grad_capturable(self, z):  # pragma: no cover
-        r"""Allocation-free equivalent of :func:`get_defo_grad`, writing into ``_eval_F``."""
+        r"""Write deformation gradients into the saved output buffer."""
         wps.bsr_mv(A=self.sim_dFdz, x=z, y=self._eval_F)
         wp.launch(kernel=_get_defo_grad_wp_kernel, dim=self._eval_F.shape,
                   inputs=[self._eval_F], adjoint=False)
         return self._eval_F
 
     def _assemble_energies_capturable(self, z, delta_dz):  # pragma: no cover
-        r"""Scene energy, left on device.
+        r"""Compute scene energy on the GPU.
 
         Returns:
             wp.array: One-element view holding ``dt*dt*PE + 0.5*KE``.
@@ -1697,24 +1670,20 @@ class SimplicitsScene:
         return self._eval_H_dense
 
     def _newton_E_capturable(self, wp_z):  # pragma: no cover
-        wp.launch(warp_utilities._displacement_delta_kernel,
-                  dim=self._cap_delta_dz.shape,
-                  inputs=[self.timestep, wp_z, self.sim_z_prev, self.sim_z_dot],
-                  outputs=[self._cap_delta_dz])
+        self._displacement_delta_capturable(
+            wp_z, self.sim_z_prev, self.sim_z_dot, self.timestep, out=self._cap_delta_dz)
         return self._assemble_energies_capturable(wp_z, self._cap_delta_dz)
 
     def _newton_G_capturable(self, wp_z):  # pragma: no cover
         grad = self._assemble_gradients_capturable(wp_z)
-        wp.launch(warp_utilities._displacement_delta_kernel,
-                  dim=self._cap_delta_dz.shape,
-                  inputs=[self.timestep, wp_z, self.sim_z_prev, self.sim_z_dot],
-                  outputs=[self._cap_delta_dz])
+        self._displacement_delta_capturable(
+            wp_z, self.sim_z_prev, self.sim_z_dot, self.timestep, out=self._cap_delta_dz)
         wps.bsr_mv(self.sim_BMB, x=self._cap_delta_dz, y=grad,
                    alpha=1.0, beta=self.timestep * self.timestep)
         return grad
 
     def _run_sim_step_capturable_body(self):  # pragma: no cover
-        r"""The whole step, issued with no host syncs so it can be captured."""
+        r"""Run one recorded simulation step."""
         wp.copy(src=self.sim_z, dest=self.sim_z_prev)
 
         newtons_method_capturable(
@@ -1765,7 +1734,7 @@ class SimplicitsScene:
 
         self._graph_pool = warp_utilities.capture_and_run_torch(
             self._run_sim_step_capturable_body, "sim_step", self._graph_dict,
-            captured=True, device=self.device, pool=self._graph_pool)
+            device=self.device, pool=self._graph_pool)
 
         if self.check_solve_info:
             # One D2H sync per step. The in-graph assert_zero only fires in Warp debug

@@ -13,16 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-r"""Scene forces: gravity, a floor plane, and pinned boundary conditions.
+r"""Gravity, floor, and pinning forces for ``wp.array`` point positions.
 
-Each class wraps a set of Warp kernels behind the same three methods, and none of them
-depends on Simplicits -- they act on plain ``wp.array`` positions, so they can be driven
-directly from a point cloud with no scene object. ``tests/python/kaolin/physics/common/
-test_scene_forces.py`` does exactly that.
-
-The rules for calling these correctly -- what accumulates, what is frozen when a CUDA
-graph is recorded -- are in the :mod:`kaolin.physics.common` package docstring, which is
-where they render on the docs site. This module is excluded from the generated API pages.
+They can be used with or without a Simplicits scene. See
+:mod:`kaolin.physics.common` for CUDA-graph rules.
 """
 
 import torch
@@ -391,15 +385,9 @@ def boundary_hessian_wp_kernel(
 
 
 class Gravity:
-    r""" Gravity class acts as a wrapper for the gravity energy, gradient, and hessian kernels.
+    r"""Gravity force for a point cloud.
 
-    Usable on its own against any point cloud; no scene object required. See
-    :ref:`scene_forces_capture` before driving this inside a CUDA graph -- in particular,
-    ``g`` and ``coeff`` are frozen when the graph is recorded.
-
-    Note that ``hessian`` ignores its arguments entirely: gravity is linear in position,
-    so the blocks are zero and are sized once from ``integration_pt_volume``. Passing a
-    ``dx`` of a different length does not resize the result and does not raise.
+    Re-record a CUDA graph after changing ``g`` or ``coeff``.
     """
 
     def __init__(self, g, integration_pt_density, integration_pt_volume):
@@ -495,15 +483,9 @@ class Gravity:
 
 
 class Floor:
-    r""" Floor class acts as a wrapper for the floor energy, gradient, and hessian kernels.
+    r"""One-sided floor force for a point cloud.
 
-    A one-sided quadratic penalty: points past the plane are pulled back, points on the
-    free side contribute nothing. Usable on its own against any point cloud; no scene
-    object required.
-
-    See :ref:`scene_forces_capture` before driving this inside a CUDA graph. Note that
-    ``floor_height``, ``floor_axis`` and ``flip_floor`` are all frozen when the graph is
-    recorded -- an animated floor needs the graph recorded again on each change.
+    Re-record a CUDA graph after changing the floor settings.
     """
 
     def __init__(self,
@@ -621,23 +603,9 @@ class Floor:
 
 
 class Boundary:
-    r""" Boundary class acts as a wrapper for the boundary energy, gradient, and hessian kernels for all sample points in the scene.
+    r"""Pins selected points to target positions.
 
-    Pins a chosen subset of points towards target positions with a quadratic penalty.
-    ``set_pinned`` must be called before any of the three methods; until then there is no
-    index set and they raise. Usable on its own against any point cloud; no scene object
-    required.
-
-    Unlike gravity and the floor, the pinning penalty is **not** weighted by
-    ``integration_pt_volume`` -- the volume array is used only to size the internal
-    Hessian buffer.
-
-    See :ref:`scene_forces_capture` before driving this inside a CUDA graph, and note one
-    extra hazard specific to this class: the launch size is ``pinned_indices.shape[0]``,
-    read on the host when the graph is recorded, and ``set_pinned`` **rebinds** its arrays
-    rather than copying into them. So re-pinning after recording is ignored twice over --
-    the graph keeps both the old count and the old arrays. Record again after changing the
-    pinned set.
+    Call :func:`set_pinned` first. Re-record a CUDA graph after changing the pinned set.
     """
 
     def __init__(self, integration_pt_volume):
