@@ -335,13 +335,8 @@ def _collision_energy_wp_kernel(
     """
     c = wp.tid()
 
-    # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
-    # no-op when the launch dim is exactly num_contacts (every tid passes), so the
-    # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
-    # sentinel means "partner is static geometry", a distinct concept that
-    # _collision_offset_wp_func and _collision_target_distance_wp_func each handle by
-    # testing both indices, and conflating the two silently drops every contact against a
-    # kinematic collider.
+    # Only captured callers launch unused slots; see _collision_bounds_setup for why this
+    # count guard checks c, not indices_b[c].
     if c >= num_contacts[0]:
         return
 
@@ -441,13 +436,8 @@ def _collision_gradient_wp_kernel(coeff: float,
     """
     c = wp.tid()
 
-    # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
-    # no-op when the launch dim is exactly num_contacts (every tid passes), so the
-    # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
-    # sentinel means "partner is static geometry", a distinct concept that
-    # _collision_offset_wp_func and _collision_target_distance_wp_func each handle by
-    # testing both indices, and conflating the two silently drops every contact against a
-    # kinematic collider.
+    # Only captured callers launch unused slots; see _collision_bounds_setup for why this
+    # count guard checks c, not indices_b[c].
     if c >= num_contacts[0]:
         return
 
@@ -562,13 +552,8 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
     """
     c = wp.tid()
 
-    # Slot validity, launched over the fixed max_contacting_pairs capacity. This is a
-    # no-op when the launch dim is exactly num_contacts (every tid passes), so the
-    # non-capturable path is unaffected. Deliberately NOT `indices_b[c] < 0`: that
-    # sentinel means "partner is static geometry", a distinct concept that
-    # _collision_offset_wp_func and _collision_target_distance_wp_func each handle by
-    # testing both indices, and conflating the two silently drops every contact against a
-    # kinematic collider.
+    # Only captured callers launch unused slots; see _collision_bounds_setup for why this
+    # count guard checks c, not indices_b[c].
     if c >= num_contacts[0]:
         return
 
