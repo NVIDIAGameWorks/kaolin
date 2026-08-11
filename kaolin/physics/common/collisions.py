@@ -14,6 +14,8 @@
 # limitations under the License.
 
 import logging
+from typing import Any
+
 import torch
 import warp as wp
 import warp.sparse as wps
@@ -149,35 +151,32 @@ def _collision_jacobian_chunk_wp_kernel(
 
 
 @wp.kernel
-def _collision_hessian_chunk_wp_kernel(
-    h_full: wp.array(dtype=wp.mat33),
+def _collision_chunk_wp_kernel(
+    full: wp.array(dtype=Any),
     num_contacts: wp.array(dtype=int),
     chunk_start: wp.array(dtype=int),
-    h_chunk: wp.array(dtype=wp.mat33),
+    chunk: wp.array(dtype=Any),
 ):  # pragma: no cover
-    r"""Gathers the per-contact 3x3 Hessian blocks for one chunk, zeroing the padding."""
     c = wp.tid()
     g = chunk_start[0] + c
     if g >= num_contacts[0]:
-        h_chunk[c] = wp.mat33(0.0)
+        chunk[c] = type(chunk).dtype(0.0)
     else:
-        h_chunk[c] = h_full[g]
+        chunk[c] = full[g]
 
 
-@wp.kernel
-def _collision_gradient_chunk_wp_kernel(
-    g_full: wp.array(dtype=wp.vec3),
-    num_contacts: wp.array(dtype=int),
-    chunk_start: wp.array(dtype=int),
-    g_chunk: wp.array(dtype=wp.vec3),
-):  # pragma: no cover
-    r"""Gathers the per-contact :math:`dE/dx` for one chunk, zeroing the padding."""
-    c = wp.tid()
-    g = chunk_start[0] + c
-    if g >= num_contacts[0]:
-        g_chunk[c] = wp.vec3(0.0)
-    else:
-        g_chunk[c] = g_full[g]
+wp.overload(_collision_chunk_wp_kernel, [
+    wp.array(dtype=wp.vec3),
+    wp.array(dtype=int),
+    wp.array(dtype=int),
+    wp.array(dtype=wp.vec3),
+])
+wp.overload(_collision_chunk_wp_kernel, [
+    wp.array(dtype=wp.mat33),
+    wp.array(dtype=int),
+    wp.array(dtype=int),
+    wp.array(dtype=wp.mat33),
+])
 
 
 @wp.kernel
@@ -1053,7 +1052,7 @@ class Collision:
             g_chunk (wp.array(dtype=wp.vec3)): Output of size ``chunk``.
         """
         wp.launch(
-            kernel=_collision_gradient_chunk_wp_kernel,
+            kernel=_collision_chunk_wp_kernel,
             dim=g_chunk.shape[0],
             inputs=[g_full, self.count, chunk_start],
             outputs=[g_chunk],
@@ -1074,7 +1073,7 @@ class Collision:
             h_chunk (wp.array(dtype=wp.mat33)): Output of size ``chunk``.
         """
         wp.launch(
-            kernel=_collision_hessian_chunk_wp_kernel,
+            kernel=_collision_chunk_wp_kernel,
             dim=h_chunk.shape[0],
             inputs=[h_full, self.count, chunk_start],
             outputs=[h_chunk],
