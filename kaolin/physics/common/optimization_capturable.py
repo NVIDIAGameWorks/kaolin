@@ -21,6 +21,8 @@ It keeps its working values on the GPU and needs CUDA 12.4 or later.
 import torch
 import warp as wp
 
+from kaolin.physics.utils import warp_utilities
+
 __all__ = ['CapturableNewtonBuffers', 'newtons_method_capturable',
            'apply_kinematic_bc', 'mask_in_place']
 
@@ -59,21 +61,6 @@ def _update_if_cond_kernel(if_cond: wp.array(dtype=wp.int32),
 
 
 @wp.kernel
-def _array_inner_kernel(a: wp.array(dtype=wp.float32),
-                        b: wp.array(dtype=wp.float32),
-                        out: wp.array(dtype=wp.float32)):  # pragma: no cover
-    tid = wp.tid()
-    wp.atomic_add(out, 0, a[tid] * b[tid])
-
-
-@wp.kernel
-def _array_abs_kernel(a: wp.array(dtype=wp.float32),
-                      out: wp.array(dtype=wp.float32)):  # pragma: no cover
-    tid = wp.tid()
-    out[tid] = wp.abs(a[tid])
-
-
-@wp.kernel
 def _apply_kinematic_bc_kernel(H: wp.array2d(dtype=wp.float32),
                                free_mask: wp.array(dtype=wp.float32)):  # pragma: no cover
     r"""Pins kinematic DOFs in a dense Hessian: ``H[i,j] = H[i,j]m[i]m[j] + d_ij(1-m[i])``.
@@ -105,29 +92,11 @@ def _array_min_scalar_kernel(x: wp.array(dtype=wp.float32),
                              y: wp.array(dtype=wp.float32)):  # pragma: no cover
     r"""``y[i] = min(x[i], t[ti])`` where the scalar step size lives on device.
 
-    Taking ``a`` as an array rather than a Python float is what lets the line
+    Taking ``t`` as an array rather than a Python float is what lets the line
     search vary its step size inside a captured graph.
     """
     tid = wp.tid()
     y[tid] = wp.min(x[tid], t[ti])
-
-
-def _launch_array_inner(a, b, out, take_abs=False):
-    r"""Device-side inner product accumulating into ``out[0]``.
-
-    Args:
-        a (wp.array): Left operand.
-        b (wp.array): Right operand.
-        out (wp.array): One-element output, reset before accumulating.
-        take_abs (bool, optional): Take the absolute value of the result. Defaults to False.
-    """
-    # Use zero_() instead of `out *= 0.0`: multiplying inf or NaN by zero leaves NaN.
-    # A stuck NaN makes the solver predicates false and needlessly runs every
-    # remaining iteration.
-    out.zero_()
-    wp.launch(_array_inner_kernel, dim=a.shape, inputs=[a, b], outputs=[out])
-    if take_abs:
-        wp.launch(_array_abs_kernel, dim=out.shape, inputs=[out], outputs=[out])
 
 
 def _check_dofs(arr, buf, what):
@@ -289,7 +258,8 @@ def _line_search_capturable(energy_fcn, x, direction, gradient, bounds, buf,
         f_new = energy_fcn(buf.ls_x_new)
 
         # residual = f + alpha * (g . d) - f_new;  >= 0 means Armijo is satisfied.
-        _launch_array_inner(gradient, buf.bounded_direction, buf.ls_compare_value)
+        warp_utilities.array_inner_capturable(
+            gradient, buf.bounded_direction, buf.ls_compare_value)
         buf.ls_compare_value *= alpha
         buf.ls_compare_value += buf.ls_f
         buf.ls_compare_value -= f_new
@@ -413,7 +383,8 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
 
         # Converged if |g . dz| < conv_tol. Evaluated on device; the sign of
         # (conv_tol - |g.dz|) becomes the branch predicate.
-        _launch_array_inner(G_curr, buf.dz, buf.nm_compare_value, take_abs=True)
+        warp_utilities.array_inner_capturable(
+            G_curr, buf.dz, buf.nm_compare_value, take_abs=True)
         buf.nm_compare_value *= -1.0
         buf.nm_compare_value += conv_tol
         wp.launch(_update_if_cond_kernel, dim=1,

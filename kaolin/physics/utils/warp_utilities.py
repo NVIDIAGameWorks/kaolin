@@ -27,6 +27,7 @@ import kaolin.physics.utils.torch_utilities as torch_utilities
 __all__ = ["_wp_bsr_to_torch_bsr",
            "_bsr_to_torch",
            "_displacement_delta_kernel",
+           "array_inner_capturable",
            "capture_function_torch",
            "capture_and_run_torch",
            "vec12",
@@ -92,6 +93,34 @@ def _debug_assert_zero_kernel(a: wp.array(dtype=wp.int32), i: int):  # pragma: n
 def _debug_assert_zero(a, i=0):
     r"""Assert that ``a[i]`` is zero when Warp runs in debug mode."""
     wp.launch(_debug_assert_zero_kernel, dim=1, inputs=[a, i])
+
+
+@wp.kernel
+def _array_inner_capturable_kernel(a: wp.array(dtype=wp.float32),
+                                   b: wp.array(dtype=wp.float32),
+                                   out: wp.array(dtype=wp.float32)):  # pragma: no cover
+    i = wp.tid()
+    wp.atomic_add(out, 0, a[i] * b[i])
+
+
+@wp.kernel
+def _array_abs_in_place_kernel(x: wp.array(dtype=wp.float32)):  # pragma: no cover
+    i = wp.tid()
+    x[i] = wp.abs(x[i])
+
+
+def array_inner_capturable(a, b, out, take_abs=False):
+    r"""Write an inner product into ``out`` without allocating workspace.
+
+    Unlike :func:`wp.utils.array_inner`, this is safe to call while recording a graph.
+    """
+    # Use zero_() instead of `out *= 0.0`: multiplying inf or NaN by zero leaves NaN.
+    # A stuck NaN makes the solver predicates false and needlessly runs every
+    # remaining iteration.
+    out.zero_()
+    wp.launch(_array_inner_capturable_kernel, dim=a.shape, inputs=[a, b], outputs=[out])
+    if take_abs:
+        wp.launch(_array_abs_in_place_kernel, dim=out.shape, inputs=[out])
 
 
 vec12 = wp.types.vector(12, dtype=wp.float32)

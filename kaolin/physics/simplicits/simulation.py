@@ -32,8 +32,7 @@ from ..materials import NeohookeanElasticMaterial
 from ..materials.material_utils import get_defo_grad, to_lame, _get_defo_grad_wp_kernel
 from ..common.optimization import newtons_method
 from ..common.optimization_capturable import (
-    CapturableNewtonBuffers, newtons_method_capturable, _launch_array_inner,
-    apply_kinematic_bc, mask_in_place)
+    CapturableNewtonBuffers, newtons_method_capturable, apply_kinematic_bc, mask_in_place)
 from .precomputed import sparse_lbs_matrix, sparse_dFdz_matrix
 from .skinning import standard_lbs
 from .training import SkinnedPointsProtocol, SkinnedPhysicsPoints, SimplicitsObject
@@ -622,7 +621,7 @@ class SimplicitsScene:
         # search can read a device scalar instead of syncing.
         # Explicit device: without it this lands on warp's default device while
         # _scene_energy_coeff is on self.device, which mixes devices inside
-        # _launch_array_inner for a scene built on anything but cuda:0.
+        # array_inner_capturable for a scene built on anything but cuda:0.
         self._scene_energy = wp.zeros(3, dtype=float, device=self.device)
         self._scene_gradient = wp.empty_like(self.sim_z)
         self._eval_dx = wp.empty_like(self.sim_pts)
@@ -678,7 +677,7 @@ class SimplicitsScene:
         # captured body, hence still clean), but sim_z_dot is overwritten in-graph.
         self._cap_z_dot_backup = wp.zeros_like(self.sim_z)
 
-        # The energy weights live on device so _launch_array_inner can combine the
+        # The energy weights live on device so array_inner_capturable can combine the
         # potential and kinetic terms without a purpose-built kernel. The timestep is
         # still baked into the captured graph and checked before every replay.
         # energy_coeff = (dt*dt, 0.5) so combined E = dt*dt*PE + 0.5*KE.
@@ -1260,9 +1259,9 @@ class SimplicitsScene:
             BMBz = wp.array(self.sim_BMB @ self._eval_delta_dz,
                             dtype=float).flatten()
             # Explicit [1:2] rather than [1:]: _scene_energy has a third slot used by
-            # the capturable path, and array_inner requires an exactly (1,) output.
-            wp.utils.array_inner(self._eval_delta_dz, BMBz,
-                                 out=self._scene_energy[1:2])
+            # the capturable path, and array_inner_capturable needs a one-element output.
+            warp_utilities.array_inner_capturable(self._eval_delta_dz, BMBz,
+                                                   self._scene_energy[1:2])
         if self.use_cuda_graphs:
             if self._energy_graph is None:
                 eval_fixed_energies()  # dry-run to force load all the modules required for energy eval
@@ -1566,14 +1565,12 @@ class SimplicitsScene:
                                    self._scene_energy)
 
         wps.bsr_mv(A=self.sim_BMB, x=self._eval_delta_dz, y=self._eval_BMBz)
-        # Not wp.utils.array_inner: it allocates an internal reduction buffer even
-        # when given out=, which a conditional graph node body forbids.
-        _launch_array_inner(self._eval_delta_dz, self._eval_BMBz,
-                            self._scene_energy[1:2])
+        warp_utilities.array_inner_capturable(self._eval_delta_dz, self._eval_BMBz,
+                                               self._scene_energy[1:2])
 
         # Combine on device: E[2] = coeff . E[:2], coeff = (dt*dt, 0.5).
-        _launch_array_inner(self._scene_energy[:2], self._scene_energy_coeff,
-                            self._scene_energy[2:3])
+        warp_utilities.array_inner_capturable(self._scene_energy[:2], self._scene_energy_coeff,
+                                               self._scene_energy[2:3])
         return self._scene_energy[2:3]
 
     def _assemble_gradients_capturable(self, z):  # pragma: no cover
