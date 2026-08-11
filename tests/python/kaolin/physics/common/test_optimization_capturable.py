@@ -30,7 +30,7 @@ import torch
 import warp as wp
 
 from kaolin.physics.common import CapturableNewtonBuffers, newtons_method_capturable
-from kaolin.physics.utils.warp_utilities import capture_and_run_torch
+from kaolin.physics.utils.warp_utilities import replay_or_capture
 
 cuda_only = pytest.mark.skipif(not torch.cuda.is_available(),
                                reason="graph capture requires CUDA")
@@ -329,20 +329,20 @@ def test_capture_and_replay_matches_and_allocates_nothing():
     prob = SoftAbs(n, "cuda")
     buf = CapturableNewtonBuffers(n, device="cuda")
     x = wp.from_torch(start_a.clone())
-    graphs, pool = {}, None
+    graph, pool = None, None
 
     def step():
         newtons_method_capturable(x, prob.energy, prob.gradient, prob.hessian,
                                   buf, nm_max_iters=8)
 
-    pool = capture_and_run_torch(step, "solve", graphs, device="cuda", pool=pool)
+    graph, pool = replay_or_capture(step, graph, device="cuda", pool=pool)
     assert torch.allclose(wp.to_torch(x), ref[0], atol=1e-5)
 
     # Replay from a different start: the graph must recompute, not reproduce.
     wp.to_torch(x).copy_(start_b)
     torch.cuda.synchronize()
     before = torch.cuda.memory_stats()["allocation.all.allocated"]
-    pool = capture_and_run_torch(step, "solve", graphs, device="cuda", pool=pool)
+    graph, pool = replay_or_capture(step, graph, device="cuda", pool=pool)
     torch.cuda.synchronize()
     after = torch.cuda.memory_stats()["allocation.all.allocated"]
 

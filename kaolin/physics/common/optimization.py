@@ -18,7 +18,7 @@ import logging
 import warp as wp
 from warp.optim.linear import cg, preconditioner
 
-from kaolin.physics.utils import _wp_bsr_to_torch_bsr
+from kaolin.physics.utils.warp_utilities import _wp_bsr_to_torch_bsr
 
 logger = logging.getLogger(__name__)
 

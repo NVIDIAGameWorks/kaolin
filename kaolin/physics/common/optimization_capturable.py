@@ -24,19 +24,19 @@ import warp as wp
 from kaolin.physics.utils import warp_utilities
 
 __all__ = ['CapturableNewtonBuffers', 'newtons_method_capturable',
-           'apply_kinematic_bc', 'mask_in_place']
+           'pin_kinematic_dofs', 'mask_in_place']
 
 
-def apply_kinematic_bc(H_dense, free_mask):
+def pin_kinematic_dofs(H_dense, free_dof_mask):
     r"""Pins kinematic DOFs in a dense Hessian, in place.
 
     Args:
         H_dense (wp.array2d): Dense Hessian of shape :math:`(n, n)`. Modified in place.
-        free_mask (wp.array): Length-:math:`n` mask, 1.0 for free DOFs and 0.0 for
+        free_dof_mask (wp.array): Length-:math:`n` mask, 1.0 for free DOFs and 0.0 for
             kinematic ones.
     """
-    wp.launch(_apply_kinematic_bc_kernel, dim=H_dense.shape,
-              inputs=[H_dense, free_mask])
+    wp.launch(_pin_kinematic_dofs_kernel, dim=H_dense.shape,
+              inputs=[H_dense, free_dof_mask])
 
 
 def mask_in_place(x, mask):
@@ -61,8 +61,8 @@ def _update_if_cond_kernel(if_cond: wp.array(dtype=wp.int32),
 
 
 @wp.kernel
-def _apply_kinematic_bc_kernel(H: wp.array2d(dtype=wp.float32),
-                               free_mask: wp.array(dtype=wp.float32)):  # pragma: no cover
+def _pin_kinematic_dofs_kernel(H: wp.array2d(dtype=wp.float32),
+                               free_dof_mask: wp.array(dtype=wp.float32)):  # pragma: no cover
     r"""Pins kinematic DOFs in a dense Hessian: ``H[i,j] = H[i,j]m[i]m[j] + d_ij(1-m[i])``.
 
     Zeroing the kinematic rows *and* columns and putting 1 on their diagonal makes the
@@ -72,8 +72,8 @@ def _apply_kinematic_bc_kernel(H: wp.array2d(dtype=wp.float32),
     leave the off-diagonal coupling blocks and give a different answer.
     """
     i, j = wp.tid()
-    mi = free_mask[i]
-    H[i, j] = H[i, j] * mi * free_mask[j]
+    mi = free_dof_mask[i]
+    H[i, j] = H[i, j] * mi * free_dof_mask[j]
     if i == j:
         H[i, j] = H[i, j] + (1.0 - mi)
 
@@ -99,12 +99,12 @@ def _array_min_scalar_kernel(x: wp.array(dtype=wp.float32),
     y[tid] = wp.min(x[tid], t[ti])
 
 
-def _check_dofs(arr, buf, what):
-    r"""Checks that ``arr`` is a contiguous float32 DOF vector matching ``buf``.
+def _check_dofs(arr, buffers, what):
+    r"""Checks that ``arr`` is a contiguous float32 DOF vector matching ``buffers``.
 
     Args:
         arr: Value to check.
-        buf (CapturableNewtonBuffers): Buffers the solver was given.
+        buffers (CapturableNewtonBuffers): Buffers the solver was given.
         what (str): Name of the argument or callback that produced ``arr``, so the
             error says which one to go and fix.
     """
@@ -112,10 +112,10 @@ def _check_dofs(arr, buf, what):
         raise TypeError(f"{what} must be a wp.array, got {type(arr)}.")
     if arr.dtype != wp.float32:
         raise TypeError(f"{what} must have dtype wp.float32, got {arr.dtype}.")
-    if arr.ndim != 1 or arr.shape[0] != buf.num_dofs:
+    if arr.ndim != 1 or arr.shape[0] != buffers.num_dofs:
         raise ValueError(
-            f"{what} has shape {tuple(arr.shape)}, expected ({buf.num_dofs},) to match "
-            f"the buffers. CapturableNewtonBuffers was built for {buf.num_dofs} degrees "
+            f"{what} has shape {tuple(arr.shape)}, expected ({buffers.num_dofs},) to match "
+            f"the buffers. CapturableNewtonBuffers was built for {buffers.num_dofs} degrees "
             "of freedom; build it with the same count you solve for.")
 
 
@@ -156,13 +156,13 @@ class CapturableNewtonBuffers:
         # Newton loop control.
         self.nm_while_cond = wp.zeros(1, dtype=wp.int32, device=device)
         self.nm_if_cond = wp.zeros(1, dtype=wp.int32, device=device)
-        self.nm_compare_value = wp.zeros(1, dtype=wp.float32, device=device)
+        self.nm_branch_value = wp.zeros(1, dtype=wp.float32, device=device)
         self.nm_step_count = wp.zeros(1, dtype=wp.int32, device=device)
 
         # Line search control.
         self.ls_t = wp.zeros(1, dtype=wp.float32, device=device)
         self.ls_f = wp.zeros(1, dtype=wp.float32, device=device)
-        self.ls_compare_value = wp.zeros(1, dtype=wp.float32, device=device)
+        self.ls_branch_value = wp.zeros(1, dtype=wp.float32, device=device)
         self.ls_while_cond = wp.zeros(1, dtype=wp.int32, device=device)
         self.ls_if_cond = wp.zeros(1, dtype=wp.int32, device=device)
         self.ls_can_break = wp.zeros(1, dtype=wp.int32, device=device)
@@ -190,7 +190,7 @@ class CapturableNewtonBuffers:
         self.dz_2d_th = self.dz_th.unsqueeze(1)
         del eye, rhs
 
-def _line_search_capturable(energy_fcn, x, direction, gradient, bounds, buf,
+def _line_search_capturable(energy_fcn, x, direction, gradient, bounds, buffers,
                             initial_step_size=1.0, alpha=1e-3, beta=0.6,
                             max_steps=10):
     r"""Choose a safe Newton step without leaving the GPU.
@@ -205,16 +205,16 @@ def _line_search_capturable(energy_fcn, x, direction, gradient, bounds, buf,
         direction (wp.array): Search direction.
         gradient (wp.array): Energy gradient at ``x``.
         bounds (wp.array): Per-DOF upper bound on the step size.
-        buf (CapturableNewtonBuffers): Preallocated scratch.
+        buffers (CapturableNewtonBuffers): Preallocated scratch.
         initial_step_size (float, optional): Starting step size. Defaults to 1.0.
         alpha (float, optional): Armijo parameter. Defaults to 1e-3.
         beta (float, optional): Backtracking factor. Defaults to 0.6.
         max_steps (int, optional): Maximum line search iterations. Defaults to 10.
 
     Returns:
-        wp.array: ``buf.bounded_direction``, the update to add to ``x``.
+        wp.array: ``buffers.bounded_direction``, the update to add to ``x``.
     """
-    buf.ls_t.fill_(initial_step_size)
+    buffers.ls_t.fill_(initial_step_size)
     f0 = energy_fcn(x)
     # Traced once, so free on replay. Without it a float return surfaces as "Copy
     # source and destination must be arrays" from inside wp.copy, several frames away
@@ -226,62 +226,62 @@ def _line_search_capturable(energy_fcn, x, direction, gradient, bounds, buf,
             f"{type(f0).__name__}"
             f"{f'(dtype={f0.dtype}, shape={tuple(f0.shape)})' if isinstance(f0, wp.array) else ''}"
             ". A slice of a longer array is fine, e.g. `return self._energy[2:3]`.")
-    wp.copy(dest=buf.ls_f, src=f0)
+    wp.copy(dest=buffers.ls_f, src=f0)
 
-    _apply_bounds_capturable(direction, bounds, buf.ls_t, buf.bounded_direction)
+    _apply_bounds_capturable(direction, bounds, buffers.ls_t, buffers.bounded_direction)
 
-    buf.ls_while_cond.fill_(max_steps)
-    buf.ls_if_cond.fill_(0)
-    buf.ls_can_break.fill_(0)
-    buf.ls_compare_value.fill_(0.0)
+    buffers.ls_while_cond.fill_(max_steps)
+    buffers.ls_if_cond.fill_(0)
+    buffers.ls_can_break.fill_(0)
+    buffers.ls_branch_value.fill_(0.0)
 
     def while_body():
         def set_break():
             # Set to 1 so the unconditional decrement at the end of the body
             # drives it to 0, terminating the loop.
-            buf.ls_while_cond.fill_(1)
+            buffers.ls_while_cond.fill_(1)
 
         def increase_t():
-            buf.ls_can_break += 1
-            buf.ls_t /= beta
-            _apply_bounds_capturable(direction, bounds, buf.ls_t, buf.bounded_direction)
+            buffers.ls_can_break += 1
+            buffers.ls_t /= beta
+            _apply_bounds_capturable(direction, bounds, buffers.ls_t, buffers.bounded_direction)
 
         def on_armijo_satisfied():
-            wp.capture_if(buf.ls_can_break, on_true=set_break, on_false=increase_t)
+            wp.capture_if(buffers.ls_can_break, on_true=set_break, on_false=increase_t)
 
         def on_armijo_violated():
-            buf.ls_t *= beta
-            _apply_bounds_capturable(direction, bounds, buf.ls_t, buf.bounded_direction)
+            buffers.ls_t *= beta
+            _apply_bounds_capturable(direction, bounds, buffers.ls_t, buffers.bounded_direction)
 
-        wp.copy(dest=buf.ls_x_new, src=x)
-        buf.ls_x_new += buf.bounded_direction
-        f_new = energy_fcn(buf.ls_x_new)
+        wp.copy(dest=buffers.ls_x_new, src=x)
+        buffers.ls_x_new += buffers.bounded_direction
+        f_new = energy_fcn(buffers.ls_x_new)
 
         # residual = f + alpha * (g . d) - f_new;  >= 0 means Armijo is satisfied.
         warp_utilities.array_inner_capturable(
-            gradient, buf.bounded_direction, buf.ls_compare_value)
-        buf.ls_compare_value *= alpha
-        buf.ls_compare_value += buf.ls_f
-        buf.ls_compare_value -= f_new
+            gradient, buffers.bounded_direction, buffers.ls_branch_value)
+        buffers.ls_branch_value *= alpha
+        buffers.ls_branch_value += buffers.ls_f
+        buffers.ls_branch_value -= f_new
         wp.launch(_update_if_cond_kernel, dim=1,
-                  inputs=[buf.ls_if_cond, buf.ls_compare_value])
+                  inputs=[buffers.ls_if_cond, buffers.ls_branch_value])
 
-        wp.capture_if(buf.ls_if_cond,
+        wp.capture_if(buffers.ls_if_cond,
                       on_true=on_armijo_satisfied,
                       on_false=on_armijo_violated)
-        buf.ls_while_cond -= 1
+        buffers.ls_while_cond -= 1
 
-    wp.capture_while(buf.ls_while_cond, while_body=while_body)
-    return buf.bounded_direction
+    wp.capture_while(buffers.ls_while_cond, while_body=while_body)
+    return buffers.bounded_direction
 
 
-def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
+def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buffers,
                               bounds_fcn=None, nm_max_iters=5, conv_tol=1e-4,
                               max_ls_steps=10, ls_alpha=1e-3, ls_beta=0.6):
     r"""Solve a dense Newton system inside a CUDA graph.
 
     ``x`` is updated in place. Pin fixed values before calling this function with
-    :func:`apply_kinematic_bc` and :func:`mask_in_place`.
+    :func:`pin_kinematic_dofs` and :func:`mask_in_place`.
 
     Callbacks run while the graph is recorded. They must use preallocated GPU arrays,
     must not read values back to Python, and must return the same buffers on every run.
@@ -292,7 +292,7 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
     of the same size. Energy and Hessian callbacks must not change the gradient buffer.
     ``bounds_fcn`` returns per-value limits or ``None``.
 
-    Check ``buf.solve_info_th`` after replay if a failed solve must be reported. The
+    Check ``buffers.solve_info_th`` after replay if a failed solve must be reported. The
     line search may try a larger step after its first accepted step.
 
     Args:
@@ -301,7 +301,7 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
         gradient_fcn (callable): DOFs -> ``wp.array`` gradient of shape :math:`(\text{num_dofs},)`.
         hessian_fcn (callable): DOFs -> dense ``wp.array2d`` Hessian of shape
             :math:`(\text{num_dofs}, \text{num_dofs})`.
-        buf (CapturableNewtonBuffers): Preallocated scratch sized to ``num_dofs``.
+        buffers (CapturableNewtonBuffers): Preallocated scratch sized to ``num_dofs``.
         bounds_fcn (callable, optional): ``(dz, x)`` -> per-DOF step bounds, or ``None``
             for unbounded (bounds of 1.0). Defaults to None.
         nm_max_iters (int, optional): Maximum Newton iterations. Defaults to 5.
@@ -324,25 +324,25 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
     #
     # Compared by raw handle, which is an integer comparison on the host and therefore
     # safe to run while a capture is in progress.
-    if buf.device.is_cuda:
-        warp_stream = wp.stream_to_torch(buf.device)
+    if buffers.device.is_cuda:
+        warp_stream = wp.stream_to_torch(buffers.device)
         if torch.cuda.current_stream().cuda_stream != warp_stream.cuda_stream:
             raise RuntimeError(
                 "newtons_method_capturable must run on Warp's stream for "
-                f"{buf.device}, but torch's current stream is "
+                f"{buffers.device}, but torch's current stream is "
                 f"{torch.cuda.current_stream()}. Any other stream -- including the "
                 "default one -- means the linear solve is issued where Warp is not "
                 "recording, and is dropped from the graph with no error. Wrap the call "
                 "in `with torch.cuda.stream(wp.stream_to_torch(device)):`, or invoke it "
-                "through kaolin.physics.utils.warp_utilities.capture_and_run_torch, "
+                "through kaolin.physics.utils.warp_utilities.replay_or_capture, "
                 "which establishes this for you.")
 
-    _check_dofs(x, buf, "x")
+    _check_dofs(x, buffers, "x")
 
-    buf.nm_while_cond.fill_(nm_max_iters)
-    buf.nm_if_cond.fill_(0)
-    buf.nm_compare_value.fill_(0.0)
-    buf.nm_step_count.fill_(0)
+    buffers.nm_while_cond.fill_(nm_max_iters)
+    buffers.nm_if_cond.fill_(0)
+    buffers.nm_branch_value.fill_(0.0)
+    buffers.nm_step_count.fill_(0)
 
     def newton_while_body():
         G_curr = gradient_fcn(x)
@@ -353,7 +353,7 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
         # becomes a torch resize warning (an allocation, which a capture forbids), and
         # an energy function returning a float becomes "Copy source and destination
         # must be arrays" from inside the line search.
-        _check_dofs(G_curr, buf, "gradient_fcn")
+        _check_dofs(G_curr, buffers, "gradient_fcn")
         if G_curr.ptr == x.ptr:
             raise ValueError(
                 "gradient_fcn returned x itself. Its result is read throughout the "
@@ -365,57 +365,57 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buf,
                 ". Sparse matrices are not supported here: their products reallocate "
                 "and can change topology between iterations, neither of which can be "
                 "captured.")
-        if tuple(H_curr.shape) != tuple(buf.lu_th.shape):
+        if tuple(H_curr.shape) != tuple(buffers.lu_th.shape):
             raise ValueError(
                 f"hessian_fcn returned shape {tuple(H_curr.shape)}, but the buffers are "
-                f"sized {tuple(buf.lu_th.shape)}. A mismatch makes lu_factor_ex resize "
+                f"sized {tuple(buffers.lu_th.shape)}. A mismatch makes lu_factor_ex resize "
                 "its outputs, which allocates, which a capture forbids.")
 
-        buf.dz.zero_()
+        buffers.dz.zero_()
         # Factor + solve with fully preallocated outputs. The _ex variant returns an
         # info code rather than raising, since raising would need a host readback.
         torch.linalg.lu_factor_ex(
-            wp.to_torch(H_curr), out=(buf.lu_th, buf.piv_th, buf.solve_info_th))
+            wp.to_torch(H_curr), out=(buffers.lu_th, buffers.piv_th, buffers.solve_info_th))
         torch.linalg.lu_solve(
-            buf.lu_th, buf.piv_th, wp.to_torch(G_curr).unsqueeze(1),
-            out=buf.dz_2d_th)
-        buf.dz *= -1.0
+            buffers.lu_th, buffers.piv_th, wp.to_torch(G_curr).unsqueeze(1),
+            out=buffers.dz_2d_th)
+        buffers.dz *= -1.0
 
         # Converged if |g . dz| < conv_tol. Evaluated on device; the sign of
         # (conv_tol - |g.dz|) becomes the branch predicate.
         warp_utilities.array_inner_capturable(
-            G_curr, buf.dz, buf.nm_compare_value, take_abs=True)
-        buf.nm_compare_value *= -1.0
-        buf.nm_compare_value += conv_tol
+            G_curr, buffers.dz, buffers.nm_branch_value, take_abs=True)
+        buffers.nm_branch_value *= -1.0
+        buffers.nm_branch_value += conv_tol
         wp.launch(_update_if_cond_kernel, dim=1,
-                  inputs=[buf.nm_if_cond, buf.nm_compare_value])
+                  inputs=[buffers.nm_if_cond, buffers.nm_branch_value])
 
         def exit_while():
-            buf.nm_while_cond.fill_(0)
+            buffers.nm_while_cond.fill_(0)
 
         def run_line_search():
             # Required: `x += ...` below would otherwise bind x as a local to this
             # function and raise UnboundLocalError.
             nonlocal x
             if bounds_fcn is None:
-                wp_bounds = buf.default_bounds
+                wp_bounds = buffers.default_bounds
             else:
-                wp_bounds = bounds_fcn(buf.dz, x)
+                wp_bounds = bounds_fcn(buffers.dz, x)
                 if wp_bounds is None:
-                    buf.default_bounds.fill_(1.0)
-                    wp_bounds = buf.default_bounds
+                    buffers.default_bounds.fill_(1.0)
+                    wp_bounds = buffers.default_bounds
 
             _line_search_capturable(
-                energy_fcn=energy_fcn, x=x, direction=buf.dz,
-                gradient=G_curr, bounds=wp_bounds, buf=buf,
+                energy_fcn=energy_fcn, x=x, direction=buffers.dz,
+                gradient=G_curr, bounds=wp_bounds, buffers=buffers,
                 initial_step_size=1.0, alpha=ls_alpha, beta=ls_beta,
                 max_steps=max_ls_steps)
 
-            x += buf.bounded_direction
-            buf.nm_while_cond -= 1
+            x += buffers.bounded_direction
+            buffers.nm_while_cond -= 1
 
-        wp.capture_if(buf.nm_if_cond, on_true=exit_while, on_false=run_line_search)
-        buf.nm_step_count += 1
+        wp.capture_if(buffers.nm_if_cond, on_true=exit_while, on_false=run_line_search)
+        buffers.nm_step_count += 1
 
-    wp.capture_while(buf.nm_while_cond, while_body=newton_while_body)
+    wp.capture_while(buffers.nm_while_cond, while_body=newton_while_body)
     return x

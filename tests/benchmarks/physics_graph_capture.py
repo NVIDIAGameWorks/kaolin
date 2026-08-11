@@ -150,7 +150,7 @@ def newton_iters_per_step(cfg, n_steps=10):
     total = 0
     for _ in range(n_steps):
         sc.run_sim_step()
-        total += int(sc._nm_buf.nm_step_count.numpy()[0])
+        total += int(sc.newton_buffers.nm_step_count.numpy()[0])
     del sc
     torch.cuda.empty_cache()
     return total / n_steps
@@ -343,7 +343,7 @@ def main():
         tot = 0
         for _ in range(10):
             cap.run_sim_step()
-            tot += int(cap._nm_buf.nm_step_count.numpy()[0])
+            tot += int(cap.newton_buffers.nm_step_count.numpy()[0])
         nit = tot / 10.0
         ms_cap, _ = measure(cap, 15, warmup=2)
         del cap

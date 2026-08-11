@@ -23,7 +23,7 @@ from functools import partial
 import kaolin.physics.common.collisions as collisions
 from kaolin.physics.simplicits.precomputed import lbs_matrix
 from kaolin.physics.utils.torch_utilities import hess_reduction
-from kaolin.physics.utils.warp_utilities import capture_function_torch, _bsr_to_torch
+from kaolin.physics.utils.warp_utilities import capture_graph_with_torch, _bsr_to_torch
 from kaolin.utils.testing import with_seed
 
 # Every fixture and test in this file builds tensors directly on 'cuda' -- the collision
@@ -911,7 +911,7 @@ def test_jacobian_chunk_matches_dense_jacobian(test_scenes):
 
     for start in range(0, num_contacts, chunk):
         chunk_start.fill_(start)
-        collision.build_jacobian_chunk(b_dense, chunk_start, j_chunk)
+        collision.gather_jacobian_chunk(b_dense, chunk_start, j_chunk)
 
         rows = min(chunk, num_contacts - start)
         got = wp.to_torch(j_chunk)[:3 * rows]
@@ -942,7 +942,7 @@ def test_jacobian_chunk_zeroes_past_contact_count(test_scenes):
 
     straddle = num_contacts - 1
     chunk_start.fill_(straddle)
-    collision.build_jacobian_chunk(b_dense, chunk_start, j_chunk)
+    collision.gather_jacobian_chunk(b_dense, chunk_start, j_chunk)
     got = wp.to_torch(j_chunk)
     assert got[:3].abs().sum() > 0, "the one live contact in the straddling chunk is zero"
     assert torch.equal(got[3:], torch.zeros_like(got[3:])), \
@@ -950,7 +950,7 @@ def test_jacobian_chunk_zeroes_past_contact_count(test_scenes):
 
     wp.to_torch(j_chunk).fill_(7.0)
     chunk_start.fill_(num_contacts)
-    collision.build_jacobian_chunk(b_dense, chunk_start, j_chunk)
+    collision.gather_jacobian_chunk(b_dense, chunk_start, j_chunk)
     got = wp.to_torch(j_chunk)
     assert torch.equal(got, torch.zeros_like(got)), \
         "a chunk entirely past the contact count must be all zero"
@@ -982,7 +982,7 @@ def test_jacobian_chunk_guards_static_sentinel(test_scenes):
 
     chunk_start = wp.zeros(1, dtype=int)
     j_chunk = wp.zeros((3 * num_contacts, t_B.shape[1]), dtype=wp.float32)
-    collision.build_jacobian_chunk(b_dense, chunk_start, j_chunk)
+    collision.gather_jacobian_chunk(b_dense, chunk_start, j_chunk)
     got = wp.to_torch(j_chunk)
 
     want = _chunk_reference(t_B, ind_a, ind_b, 0, num_contacts, num_contacts)
@@ -1251,7 +1251,7 @@ def test_chunked_hessian_captures_and_tracks_live_contact_count(test_scenes, chu
     #
     # No eager call first: capture must succeed from cold, which it only does because
     # the reducer forces cuBLAS to create its handle in __init__.
-    graph, _ = capture_function_torch(lambda: reducer.reduce_capturable(b_dense, h_full, out))
+    graph, _ = capture_graph_with_torch(lambda: reducer.reduce_capturable(b_dense, h_full, out))
 
     out.zero_()
     wp.capture_launch(graph)
@@ -1262,7 +1262,7 @@ def test_chunked_hessian_captures_and_tracks_live_contact_count(test_scenes, chu
 
     seen_sums = []
     for n_live in (40, 24, 8, 0, num_contacts):
-        collision.count.fill_(n_live)
+        collision.contact_count.fill_(n_live)
 
         out.zero_()
         wp.capture_launch(graph)
@@ -1307,7 +1307,7 @@ def test_chunked_hessian_capture_allocates_nothing_on_replay(test_scenes):
 
     reducer = collisions.ChunkedCollisionHessian(collision, num_dofs, chunk_size=8)
     out = torch.zeros(num_dofs, num_dofs, device=t_B.device)
-    graph, _ = capture_function_torch(lambda: reducer.reduce_capturable(b_dense, h_full, out))
+    graph, _ = capture_graph_with_torch(lambda: reducer.reduce_capturable(b_dense, h_full, out))
 
     torch.cuda.synchronize()
     before = torch.cuda.memory_stats()['allocation.all.allocated']
@@ -1486,7 +1486,7 @@ def test_num_contacts_is_memoized_until_the_next_detection(test_scenes):
     assert detected > 1, "need a non-trivial count for this to mean anything"
 
     # Change the device count behind the property's back. A cached property cannot see it.
-    collision.count.fill_(detected + 7)
+    collision.contact_count.fill_(detected + 7)
     assert collision.num_contacts == detected, (
         "num_contacts re-read the device count on a repeat access; it is not memoized, "
         "which costs the host path ~111 blocking syncs per step instead of 1")
@@ -1514,19 +1514,19 @@ def test_num_contacts_reads_device_once_per_detection(test_scenes):
     collision.detect_collisions(dx, x0, test_scenes['obj_ids'], test_scenes['is_static'])
 
     reads = {"n": 0}
-    real_count = collision.count
+    real_contact_count = collision.contact_count
 
     class _CountingProxy:
         r"""Forwards everything to the real wp.array, tallying host readbacks."""
 
         def __getattr__(self, name):
-            return getattr(real_count, name)
+            return getattr(real_contact_count, name)
 
         def numpy(self):
             reads["n"] += 1
-            return real_count.numpy()
+            return real_contact_count.numpy()
 
-    collision.count = _CountingProxy()
+    collision.contact_count = _CountingProxy()
     try:
         # detect_collisions already warmed the cache on this path (it builds object_pairs,
         # which reads the count), so start from cold to measure the first read too.
@@ -1540,7 +1540,7 @@ def test_num_contacts_reads_device_once_per_detection(test_scenes):
         _ = collision.num_contacts
         assert reads["n"] == 2, "invalidation should permit exactly one more readback"
     finally:
-        collision.count = real_count
+        collision.contact_count = real_contact_count
 
 
 @pytest.mark.parametrize("num_static", [0, 2, 5])

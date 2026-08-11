@@ -24,12 +24,9 @@ from warp.fem.linalg import inverse_qr
 
 import kaolin.physics.utils.torch_utilities as torch_utilities
 
-__all__ = ["_wp_bsr_to_torch_bsr",
-           "_bsr_to_torch",
-           "_displacement_delta_kernel",
-           "array_inner_capturable",
-           "capture_function_torch",
-           "capture_and_run_torch",
+__all__ = ["array_inner_capturable",
+           "capture_graph_with_torch",
+           "replay_or_capture",
            "vec12",
            "mat1212",
            "mat312",
@@ -37,7 +34,7 @@ __all__ = ["_wp_bsr_to_torch_bsr",
            "mat99"]
 
 
-def capture_function_torch(func, device=None, pool=None):
+def capture_graph_with_torch(func, device=None, pool=None):
     r"""Record a Warp and PyTorch function in a CUDA graph.
 
     Reuse ``pool`` when recording the same work again.
@@ -64,25 +61,24 @@ def capture_function_torch(func, device=None, pool=None):
     return capture.graph, pool
 
 
-def capture_and_run_torch(func, func_name, graph_dict, device=None, pool=None):
-    r"""Record ``func`` once, then run the recorded graph.
+def replay_or_capture(func, graph=None, device=None, pool=None):
+    r"""Run ``graph``, recording ``func`` first when no graph exists.
 
     Args:
         func (callable): Zero-argument function issuing the work.
-        func_name (str): Cache key.
-        graph_dict (dict): Cache owned by the caller.
+        graph (wp.Graph, optional): Previously recorded graph. Defaults to None.
         device (optional): Warp device. Defaults to the current device.
         pool (optional): Allocation pool to reuse when recording again.
 
     Returns:
-        The allocation pool in use.
+        tuple: Recorded graph and allocation pool.
     """
     device = wp.get_device(device)
 
-    if func_name not in graph_dict:
-        graph_dict[func_name] = capture_function_torch(func, device=device, pool=pool)
-    wp.capture_launch(graph_dict[func_name][0])
-    return graph_dict[func_name][1]
+    if graph is None:
+        graph, pool = capture_graph_with_torch(func, device=device, pool=pool)
+    wp.capture_launch(graph)
+    return graph, pool
 
 
 @wp.kernel

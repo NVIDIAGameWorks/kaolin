@@ -32,7 +32,7 @@ from ..materials import NeohookeanElasticMaterial
 from ..materials.material_utils import get_defo_grad, to_lame, _get_defo_grad_wp_kernel
 from ..common.optimization import newtons_method
 from ..common.optimization_capturable import (
-    CapturableNewtonBuffers, newtons_method_capturable, apply_kinematic_bc, mask_in_place)
+    CapturableNewtonBuffers, newtons_method_capturable, pin_kinematic_dofs, mask_in_place)
 from .precomputed import sparse_lbs_matrix, sparse_dFdz_matrix
 from .skinning import standard_lbs
 from .training import SkinnedPointsProtocol, SkinnedPhysicsPoints, SimplicitsObject
@@ -310,9 +310,10 @@ class SimplicitsScene:
                 "capturable=True always uses a dense direct solve (a data-dependent CG "
                 "iteration count is not capturable), so direct_solve=False would be "
                 "silently ignored. Pass direct_solve=True.")
-        # name -> (wp.Graph, pool). Must be cleared whenever scene topology changes,
-        # since a captured graph hard-codes device pointers and launch dimensions.
-        self._graph_dict = {}
+        # Must be cleared whenever scene topology changes, since a captured graph
+        # hard-codes device pointers and launch dimensions.
+        self._sim_step_graph = None
+        self._fragment_graphs = {}
         # One private allocator pool for the whole scene, reused by every re-capture.
         # Minting a fresh pool per capture leaks 2 MiB each time, because nothing ever
         # calls _cuda_releasePool -- and _invalidate_graphs makes re-capture routine
@@ -614,13 +615,12 @@ class SimplicitsScene:
     def _create_sim_variables(self):  # pragma: no cover
         self.reset_scene()
 
-        self._energy_graph = None
-        self._gradient_graph = None
-        self._graph_dict = {}
+        self._sim_step_graph = None
+        self._fragment_graphs = {}
         # Slot 2 holds the combined Newton energy for the capturable path, so the line
         # search can read a device scalar instead of syncing.
         # Explicit device: without it this lands on warp's default device while
-        # _scene_energy_coeff is on self.device, which mixes devices inside
+        # energy_weights is on self.device, which mixes devices inside
         # array_inner_capturable for a scene built on anything but cuda:0.
         self._scene_energy = wp.zeros(3, dtype=float, device=self.device)
         self._scene_gradient = wp.empty_like(self.sim_z)
@@ -629,16 +629,16 @@ class SimplicitsScene:
         self._eval_delta_dz = wp.empty_like(self.sim_z)
 
         if self.capturable:
-            self._create_capturable_variables()
+            self._alloc_capture_buffers()
 
-    def _create_capturable_variables(self):  # pragma: no cover
+    def _alloc_capture_buffers(self):  # pragma: no cover
         r"""Allocate the buffers used by a recorded step."""
         num_dofs = self.sim_z.shape[0]
         num_pts = int(self.sim_B.shape[0] / 3)
         self._num_dofs = num_dofs
         self._num_pts = num_pts
 
-        self._nm_buf = CapturableNewtonBuffers(num_dofs, device=self.device)
+        self.newton_buffers = CapturableNewtonBuffers(num_dofs, device=self.device)
 
         # Kinematic DOFs are pinned by zeroing their rows/columns in the Hessian and
         # their gradient entries, rather than by reducing the system with sim_P/sim_Pt.
@@ -648,24 +648,26 @@ class SimplicitsScene:
         # capture requires. A length-n mask is used rather than precomputed (n, n)
         # mask/diagonal matrices, which would cost ~112 MiB at 3840 DOF
         # (3840^2 x 4 B = 56.25 MiB each, two of them).
-        free_mask = torch.ones(num_dofs, device=self.device, dtype=self.dtype)
+        free_dof_mask = torch.ones(num_dofs, device=self.device, dtype=self.dtype)
         for kin_id in getattr(self, "kin_obj_list", []) or []:
-            free_mask[wp.to_torch(self.kin_obj_to_z_map[kin_id])] = 0.0
-        self._kin_free_mask = wp.from_torch(free_mask.contiguous())
-        self._has_kinematic = bool((free_mask == 0.0).any())
+            free_dof_mask[wp.to_torch(self.kin_obj_to_z_map[kin_id])] = 0.0
+        self.free_dof_mask = wp.from_torch(free_dof_mask.contiguous())
+        self._has_kinematic = bool((free_dof_mask == 0.0).any())
 
-        # Set by _create_capturable_collision_variables, which runs later: collisions are
+        # Set by _alloc_capture_contact_buffers, which runs later: collisions are
         # enabled after the scene is built. Read on every assembly, so it must exist.
         self._has_collision = False
 
         # Baked into the graph (as kernel immediates and into the folded BMB+reg
         # matrix). Recorded so a later change can be detected rather than silently
         # producing wrong results from a stale graph.
-        self._captured_timestep = self.timestep
-        self._captured_regularizer = self.newton_hessian_regularizer
-        self._captured_max_newton_steps = self.max_newton_steps
-        self._captured_max_ls_steps = self.max_ls_steps
-        self._captured_conv_tol = self.conv_tol
+        self._baked = {
+            "timestep": self.timestep,
+            "newton_hessian_regularizer": self.newton_hessian_regularizer,
+            "max_newton_steps": self.max_newton_steps,
+            "max_ls_steps": self.max_ls_steps,
+            "conv_tol": self.conv_tol,
+        }
 
         # The capturable path writes sim_z_prev / sim_z_dot in place rather than
         # rebinding them the way run_sim_step does, so the public attributes stay
@@ -681,7 +683,7 @@ class SimplicitsScene:
         # potential and kinetic terms without a purpose-built kernel. The timestep is
         # still baked into the captured graph and checked before every replay.
         # energy_coeff = (dt*dt, 0.5) so combined E = dt*dt*PE + 0.5*KE.
-        self._scene_energy_coeff = wp.array(
+        self.energy_weights = wp.array(
             [self.timestep * self.timestep, 0.5], dtype=wp.float32, device=self.device)
 
         # Dense Hessian. Sparse BSR products reallocate and change topology between
@@ -714,8 +716,8 @@ class SimplicitsScene:
 
         # Per-object DOF/qp ranges resolved to Python ints at setup time so the
         # captured body performs no device reads to index them.
-        self._obj_z_ranges = {}
-        self._obj_qp_ranges = {}
+        self.z_slices = {}
+        self.qp_slices = {}
         for obj_id in self.sim_obj_dict:
             z_idx = wp.to_torch(self.object_to_z_map[obj_id])
             qp_idx = wp.to_torch(self.object_to_qp_map[obj_id])
@@ -729,8 +731,8 @@ class SimplicitsScene:
                     raise RuntimeError(
                         f"capturable=True requires contiguous {label} indices per "
                         f"object; object {obj_id} has a gap or duplicate.")
-            self._obj_z_ranges[obj_id] = (int(z_idx.min()), int(z_idx.max()) + 1)
-            self._obj_qp_ranges[obj_id] = (int(qp_idx.min()), int(qp_idx.max()) + 1)
+            self.z_slices[obj_id] = (int(z_idx.min()), int(z_idx.max()) + 1)
+            self.qp_slices[obj_id] = (int(qp_idx.min()), int(qp_idx.max()) + 1)
 
         # Force the lazy B_dense / dFdz_dense properties to materialize now. They
         # allocate on first access, which must not happen inside a capture.
@@ -741,13 +743,13 @@ class SimplicitsScene:
         # Preallocated hess_reduction scratch, one set per object.
         self._hess_scratch = {}
         for obj_id, obj in self.sim_obj_dict.items():
-            z0, z1 = self._obj_z_ranges[obj_id]
-            q0, q1 = self._obj_qp_ranges[obj_id]
+            z0, z1 = self.z_slices[obj_id]
+            q0, q1 = self.qp_slices[obj_id]
             nq = q1 - q0
             nz = z1 - z0
             self._hess_scratch[obj_id] = {
-                'HJ_B': torch.zeros(nq, 3, nz, device=self.device, dtype=self.dtype),
-                'HJ_F': torch.zeros(nq, 9, nz, device=self.device, dtype=self.dtype),
+                'hj_B': torch.zeros(nq, 3, nz, device=self.device, dtype=self.dtype),
+                'hj_F': torch.zeros(nq, 9, nz, device=self.device, dtype=self.dtype),
                 'out_B': torch.zeros(nz, nz, device=self.device, dtype=self.dtype),
                 'out_F': torch.zeros(nz, nz, device=self.device, dtype=self.dtype),
             }
@@ -1043,12 +1045,12 @@ class SimplicitsScene:
         self.force_dict["collision"]["coeff"] = collision_penalty
 
         if self.capturable:
-            self._create_capturable_collision_variables(collision_struct)
+            self._alloc_capture_contact_buffers(collision_struct)
 
         self._detect_collision(self.sim_z)
 
-    def _create_capturable_collision_variables(self, collision_struct,
-                                               chunk_size=2048):  # pragma: no cover
+    def _alloc_capture_contact_buffers(self, collision_struct,
+                                      chunk_size=2048):  # pragma: no cover
         r"""Allocate contact buffers for a recorded step.
 
         Args:
@@ -1101,7 +1103,7 @@ class SimplicitsScene:
         self._cap_bounds_dx = wp.zeros(self._num_pts, dtype=wp.vec3,
                                        device=self.device)
         self._cap_bounds_delta_dx = wp.zeros_like(self._cap_bounds_dx)
-        self._cap_dof_bounds = wp.zeros(num_dofs, dtype=wp.float32, device=self.device)
+        self._cap_dof_step_bounds = wp.zeros(num_dofs, dtype=wp.float32, device=self.device)
 
         self._has_collision = True
 
@@ -1121,7 +1123,7 @@ class SimplicitsScene:
             cp_delta_dx=self._cap_bounds_delta_dx,
             cp_dx=self._cap_bounds_dx,
             b_dense=self._cap_B_dense,
-            dof_bounds=self._cap_dof_bounds)
+            dof_step_bounds=self._cap_dof_step_bounds)
 
     def _detect_collision(self, z):  # pragma: no cover
         r"""Resets the collision jacobian when new contact pairs are found.
@@ -1220,10 +1222,8 @@ class SimplicitsScene:
 
     def _invalidate_graphs(self):  # pragma: no cover
         r"""Clear recorded graphs after changing scene buffers or forces."""
-        if getattr(self, "_graph_dict", None):
-            self._graph_dict.clear()
-        self._energy_graph = None
-        self._gradient_graph = None
+        self._sim_step_graph = None
+        self._fragment_graphs.clear()
 
     def _assemble_energies(self, z, delta_dz):  # pragma: no cover
         x0 = self.sim_pts
@@ -1263,13 +1263,13 @@ class SimplicitsScene:
             warp_utilities.array_inner_capturable(self._eval_delta_dz, BMBz,
                                                    self._scene_energy[1:2])
         if self.use_cuda_graphs:
-            if self._energy_graph is None:
+            if "energy" not in self._fragment_graphs:
                 eval_fixed_energies()  # dry-run to force load all the modules required for energy eval
                 with wp.ScopedCapture(force_module_load=False) as capture:
                     eval_fixed_energies()
 
-                self._energy_graph = capture.graph
-            wp.capture_launch(self._energy_graph)
+                self._fragment_graphs["energy"] = capture.graph
+            wp.capture_launch(self._fragment_graphs["energy"])
         else:
             eval_fixed_energies()
 
@@ -1329,12 +1329,12 @@ class SimplicitsScene:
                        y=self._scene_gradient, beta=1.0, transpose=True)
 
         if self.use_cuda_graphs:
-            if self._gradient_graph is None:
+            if "gradient" not in self._fragment_graphs:
                 with wp.ScopedCapture(force_module_load=False) as capture:
                     eval_fixed_gradients()
 
-                self._gradient_graph = capture.graph
-            wp.capture_launch(self._gradient_graph)
+                self._fragment_graphs["gradient"] = capture.graph
+            wp.capture_launch(self._fragment_graphs["gradient"])
         else:
             eval_fixed_gradients()
 
@@ -1569,7 +1569,7 @@ class SimplicitsScene:
                                                self._scene_energy[1:2])
 
         # Combine on device: E[2] = coeff . E[:2], coeff = (dt*dt, 0.5).
-        warp_utilities.array_inner_capturable(self._scene_energy[:2], self._scene_energy_coeff,
+        warp_utilities.array_inner_capturable(self._scene_energy[:2], self.energy_weights,
                                                self._scene_energy[2:3])
         return self._scene_energy[2:3]
 
@@ -1607,7 +1607,7 @@ class SimplicitsScene:
                 self._cap_scene_gradient_th)
 
         if self._has_kinematic:
-            mask_in_place(self._scene_gradient, self._kin_free_mask)
+            mask_in_place(self._scene_gradient, self.free_dof_mask)
         return self._scene_gradient
 
     def _assemble_hessians_capturable(self, z):  # pragma: no cover
@@ -1632,13 +1632,13 @@ class SimplicitsScene:
 
         self._eval_H_dense_th.zero_()
         for obj_id, obj in self.sim_obj_dict.items():
-            z0, z1 = self._obj_z_ranges[obj_id]
-            q0, q1 = self._obj_qp_ranges[obj_id]
+            z0, z1 = self.z_slices[obj_id]
+            q0, q1 = self.qp_slices[obj_id]
             s = self._hess_scratch[obj_id]
             torch_utilities.hess_reduction(
-                obj.B_dense, self._scene_d2Edx2_th[q0:q1], out=s['out_B'], HJ=s['HJ_B'])
+                obj.B_dense, self._scene_d2Edx2_th[q0:q1], out=s['out_B'], hj_out=s['hj_B'])
             torch_utilities.hess_reduction(
-                obj.dFdz_dense, self._scene_d2EdF2_th[q0:q1], out=s['out_F'], HJ=s['HJ_F'])
+                obj.dFdz_dense, self._scene_d2EdF2_th[q0:q1], out=s['out_F'], hj_out=s['hj_F'])
             self._eval_H_dense_th[z0:z1, z0:z1] += s['out_B']
             self._eval_H_dense_th[z0:z1, z0:z1] += s['out_F']
 
@@ -1663,7 +1663,7 @@ class SimplicitsScene:
         self._eval_H_dense_th += self._sim_BMB_plus_reg_dense_th
         if self._has_kinematic:
             # Applied last, so it is not undone by the BMB/regularizer add.
-            apply_kinematic_bc(self._eval_H_dense, self._kin_free_mask)
+            pin_kinematic_dofs(self._eval_H_dense, self.free_dof_mask)
         return self._eval_H_dense
 
     def _newton_E_capturable(self, wp_z):  # pragma: no cover
@@ -1679,7 +1679,7 @@ class SimplicitsScene:
                    alpha=1.0, beta=self.timestep * self.timestep)
         return grad
 
-    def _run_sim_step_capturable_body(self):  # pragma: no cover
+    def _sim_step_capturable(self):  # pragma: no cover
         r"""Run one recorded simulation step."""
         wp.copy(src=self.sim_z, dest=self.sim_z_prev)
 
@@ -1688,7 +1688,7 @@ class SimplicitsScene:
             self._newton_E_capturable,
             self._newton_G_capturable,
             self._assemble_hessians_capturable,
-            buf=self._nm_buf,
+            buffers=self.newton_buffers,
             bounds_fcn=(self._compute_collision_bounds_capturable
                         if self._has_collision else None),
             nm_max_iters=self.max_newton_steps,
@@ -1700,16 +1700,11 @@ class SimplicitsScene:
         self.sim_z_dot -= self.sim_z_prev
         self.sim_z_dot /= self.timestep
 
-    def _run_sim_step_capturable(self):  # pragma: no cover
-        for attr, captured in (
-                ("timestep", self._captured_timestep),
-                ("newton_hessian_regularizer", self._captured_regularizer),
-                ("max_newton_steps", self._captured_max_newton_steps),
-                ("max_ls_steps", self._captured_max_ls_steps),
-                ("conv_tol", self._captured_conv_tol)):
-            if getattr(self, attr) != captured:
+    def _run_captured_sim_step(self):  # pragma: no cover
+        for attr, baked in self._baked.items():
+            if getattr(self, attr) != baked:
                 raise RuntimeError(
-                    f"{attr} changed from {captured} to {getattr(self, attr)} after the "
+                    f"{attr} changed from {baked} to {getattr(self, attr)} after the "
                     "capturable buffers were built. It is baked into the graph; the "
                     "replay would silently use the old value. Rebuild the scene.")
 
@@ -1729,8 +1724,8 @@ class SimplicitsScene:
             # Device-to-device, no sync. Needed to make a failed step atomic.
             wp.copy(src=self.sim_z_dot, dest=self._cap_z_dot_backup)
 
-        self._graph_pool = warp_utilities.capture_and_run_torch(
-            self._run_sim_step_capturable_body, "sim_step", self._graph_dict,
+        self._sim_step_graph, self._graph_pool = warp_utilities.replay_or_capture(
+            self._sim_step_capturable, self._sim_step_graph,
             device=self.device, pool=self._graph_pool)
 
         if self.check_solve_info:
@@ -1742,7 +1737,7 @@ class SimplicitsScene:
             # (measured info=1/2), so a failure at any iteration poisons x and is still
             # visible at the end. LAPACK does not do this -- it returns info=0 for the
             # same NaN input -- so this reasoning must not be carried over to a CPU path.
-            info = int(self._nm_buf.solve_info_th.item())
+            info = int(self.newton_buffers.solve_info_th.item())
             if info != 0:
                 # Roll back so the step is atomic, matching the reference path, which
                 # raises from inside newtons_method before assigning anything. Otherwise
@@ -1861,7 +1856,7 @@ class SimplicitsScene:
             raise RuntimeError("Forces need to be set")
 
         if self.capturable:
-            self._run_sim_step_capturable()
+            self._run_captured_sim_step()
             return
 
         self._detect_collision(self.sim_z)

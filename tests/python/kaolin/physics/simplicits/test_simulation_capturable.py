@@ -156,18 +156,18 @@ def test_kinematic_object_stays_pinned():
 
 
 @cuda_only
-def test_apply_kinematic_bc_zeroes_off_diagonal():
+def test_pin_kinematic_dofs_zeroes_off_diagonal():
     r"""Direct unit test of the boundary-condition mask on a fully coupled matrix.
 
     This is the only test that currently distinguishes a correct
-    ``apply_kinematic_bc`` from one that zeroes just the diagonal. The scene-level
+    ``pin_kinematic_dofs`` from one that zeroes just the diagonal. The scene-level
     kinematic tests cannot: with collisions off, ``_assemble_hessians_capturable``
     writes only the per-object diagonal blocks and ``BMB``/``reg*I`` are themselves
     block-diagonal, so ``H_kf`` is already zero and the off-diagonal term is a no-op.
     Inter-object contact is what makes it load-bearing, by producing genuine ``H_ij``
     blocks for ``i != j``.
     """
-    from kaolin.physics.common.optimization_capturable import apply_kinematic_bc
+    from kaolin.physics.common.optimization_capturable import pin_kinematic_dofs
 
     n = 8
     kin = [1, 4, 5]
@@ -180,7 +180,7 @@ def test_apply_kinematic_bc_zeroes_off_diagonal():
 
     mask_th = torch.ones(n, device="cuda", dtype=torch.float32)
     mask_th[kin] = 0.0
-    apply_kinematic_bc(H, wp.from_torch(mask_th.contiguous()))
+    pin_kinematic_dofs(H, wp.from_torch(mask_th.contiguous()))
 
     out = wp.to_torch(H)
     assert torch.equal(out[kin][:, free], torch.zeros(len(kin), len(free), device="cuda")), \
@@ -289,7 +289,7 @@ def test_kinematic_object_can_be_animated_under_capture():
     scene = _make_scene(_make_object(), True, is_kinematic=True)
     for _ in range(3):
         scene.run_sim_step()
-    graph_before = dict(scene._graph_dict)
+    graph_before = scene._sim_step_graph
     y0 = float(scene.get_object_deformed_pts(0)[:, 1].mean())
 
     # Assert on the *change* in y, not an absolute position. Transforms are relative to
@@ -308,8 +308,7 @@ def test_kinematic_object_can_be_animated_under_capture():
     assert abs((y1 - y0) - SHIFT) < 1e-3, \
         f"kinematic object did not follow its scripted transform: moved {y1 - y0:.5f}, " \
         f"expected {SHIFT}"
-    assert scene._graph_dict.keys() == graph_before.keys(), "should not have re-captured"
-    assert all(scene._graph_dict[k][0] is graph_before[k][0] for k in graph_before), \
+    assert scene._sim_step_graph is graph_before, \
         "graph was re-captured despite only a kinematic transform changing"
 
 
@@ -405,11 +404,11 @@ def test_force_setter_invalidates_graph():
     r"""Replacing a force struct must force a re-capture, not replay stale immediates."""
     scene = _make_scene(_make_object(), True)
     scene.run_sim_step()
-    assert scene._graph_dict, "expected a cached graph after the first step"
+    assert scene._sim_step_graph is not None, "expected a cached graph after the first step"
 
     scene.set_scene_floor(floor_height=0.5, floor_axis=1,
                           floor_penalty=1e4, flip_floor=False)
-    assert not scene._graph_dict, "force setter must clear the graph cache"
+    assert scene._sim_step_graph is None, "force setter must clear the graph cache"
 
     scene.run_sim_step()
     assert torch.isfinite(torch.as_tensor(scene.sim_z.numpy())).all()
@@ -429,7 +428,7 @@ def test_newton_loop_exits_early_on_convergence():
     scene.max_newton_steps  # noqa: B018  (documents what the bound is)
     for _ in range(4):
         scene.run_sim_step()
-    iters = int(scene._nm_buf.nm_step_count.numpy()[0])
+    iters = int(scene.newton_buffers.nm_step_count.numpy()[0])
     assert 0 < iters < scene.max_newton_steps, (
         f"expected early convergence exit, got {iters} of "
         f"{scene.max_newton_steps} iterations")
@@ -450,7 +449,7 @@ def test_newton_iterations_scale_with_difficulty():
                               floor_penalty=1e4, flip_floor=False)
         for _ in range(4):
             scene.run_sim_step()
-        return int(scene._nm_buf.nm_step_count.numpy()[0])
+        return int(scene.newton_buffers.nm_step_count.numpy()[0])
 
     easy = iters_for(ym=1e4, dt=0.01, conv_tol=1e-3)
     hard = iters_for(ym=1e8, dt=0.20, conv_tol=1e-12)
@@ -599,7 +598,7 @@ def test_capturable_collision_assembly_matches_host():
                                            cp_x0=scene.sim_pts)).clone()
         got_b = wp.to_torch(cs.get_bounds_capturable(
             cp_delta_dx=scene._cap_bounds_delta_dx, cp_dx=scene._cap_bounds_dx,
-            b_dense=scene._cap_B_dense, dof_bounds=scene._cap_dof_bounds)).clone()
+            b_dense=scene._cap_B_dense, dof_step_bounds=scene._cap_dof_step_bounds)).clone()
         if bool((want_b < 1.0).any()):
             break
 
@@ -665,7 +664,7 @@ def test_capturable_kinematic_object_pinned_while_in_contact():
 
     This is the test the kinematic work could not have: with only floor and elastic
     forces the scene Hessian is block diagonal per object, so ``H_kf`` is already zero
-    and ``apply_kinematic_bc``'s off-diagonal zeroing is provably a no-op. Contact is
+    and ``pin_kinematic_dofs``'s off-diagonal zeroing is provably a no-op. Contact is
     what finally assembles genuine object-object blocks, so zeroing rows *and* columns
     becomes load-bearing: keep only the diagonal and the kinematic DOFs get dragged by
     whatever is resting on them.

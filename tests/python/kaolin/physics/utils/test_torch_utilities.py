@@ -140,7 +140,7 @@ def test_hess_reduction_two_sided(device, dtype):
 @pytest.mark.parametrize('device', ['cuda', 'cpu'])
 @pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
 def test_hess_reduction_preallocated_matches(device, dtype):
-    r"""The out=/HJ= path must match the allocating path exactly.
+    r"""The out=/hj_out= path must match the allocating path exactly.
 
     These kwargs exist so Hessian assembly is allocation-free under CUDA graph
     capture, where allocating inside a conditional graph node body is illegal.
@@ -153,8 +153,8 @@ def test_hess_reduction_preallocated_matches(device, dtype):
     expected = hess_reduction(Ja, H)
 
     out = torch.zeros(n_dofs, n_dofs, device=device, dtype=dtype)
-    HJ = torch.zeros(n_blocks, block_size, n_dofs, device=device, dtype=dtype)
-    returned = hess_reduction(Ja, H, out=out, HJ=HJ)
+    hj_out = torch.zeros(n_blocks, block_size, n_dofs, device=device, dtype=dtype)
+    returned = hess_reduction(Ja, H, out=out, hj_out=hj_out)
 
     check_allclose(out, expected)
     # Must return the same object it was handed, not a copy.
@@ -162,21 +162,21 @@ def test_hess_reduction_preallocated_matches(device, dtype):
 
     # Reusing the buffers overwrites rather than accumulates -- the capturable path
     # relies on this across Newton iterations.
-    hess_reduction(Ja, H, out=out, HJ=HJ)
+    hess_reduction(Ja, H, out=out, hj_out=hj_out)
     check_allclose(out, expected)
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(),
                     reason="torch.cuda.memory_stats is the only sound instrument here")
 def test_hess_reduction_out_is_allocation_free():
-    r"""No allocation may occur when out= and HJ= are supplied.
+    r"""No allocation may occur when out= and hj_out= are supplied.
 
     Allocation inside a CUDA graph conditional-node body is illegal, so this property
     is what lets Hessian assembly be captured.
 
     Instrument choice matters. ``TorchDispatchMode`` pops the mode while running the op,
     so it never observes the ``at::empty`` an out-of-place kernel performs in C++ below
-    the Python dispatch key -- it scores an implementation that ignores ``out=``/``HJ=``
+    the Python dispatch key -- it scores an implementation that ignores ``out=``/``hj_out=``
     and ends in ``out.copy_(...)`` as 0 allocations, i.e. it cannot fail. It is fine for
     dispatcher-visible allocations (it did correctly catch ``solve_ex``'s two
     ``new_empty`` calls) but blind to exactly the class that matters here.
@@ -188,16 +188,15 @@ def test_hess_reduction_out_is_allocation_free():
     Ja = torch.randn(n_blocks * block_size, n_dofs, device='cuda')
     H = torch.randn(n_blocks, block_size, block_size, device='cuda')
     out = torch.zeros(n_dofs, n_dofs, device='cuda')
-    HJ = torch.zeros(n_blocks, block_size, n_dofs, device='cuda')
+    hj_out = torch.zeros(n_blocks, block_size, n_dofs, device='cuda')
 
-    hess_reduction(Ja, H, out=out, HJ=HJ)  # warm up any lazy init
+    hess_reduction(Ja, H, out=out, hj_out=hj_out)  # warm up any lazy init
     torch.cuda.synchronize()
 
     before = torch.cuda.memory_stats()['allocation.all.allocated']
-    hess_reduction(Ja, H, out=out, HJ=HJ)
+    hess_reduction(Ja, H, out=out, hj_out=hj_out)
     torch.cuda.synchronize()
     n_alloc = torch.cuda.memory_stats()['allocation.all.allocated'] - before
 
     assert n_alloc == 0, \
-        f"hess_reduction made {n_alloc} allocation(s) despite out=/HJ="
-
+        f"hess_reduction made {n_alloc} allocation(s) despite out=/hj_out="

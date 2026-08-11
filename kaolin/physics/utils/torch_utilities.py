@@ -65,7 +65,7 @@ def create_projection_matrix(num_dofs, list_of_kin_dofs):
     return P
 
 
-def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None, out=None, HJ=None,
+def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None, out=None, hj_out=None,
                    accumulate=False):
     r""" This does :math:`\text{Ja}^T \times \text{H} \times \text{Jb}` for a block-wise diagonal :math:`\text{H}` matrix.
 
@@ -76,7 +76,7 @@ def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None, out=None, HJ=None,
         out (torch.Tensor, optional): Preallocated output of shape
             :math:`(\text{Ja.shape[1]}, \text{Jb.shape[1]})`. Required for CUDA graph
             capture, which forbids allocation. When ``None`` a new tensor is allocated.
-        HJ (torch.Tensor, optional): Preallocated scratch for the intermediate
+        hj_out (torch.Tensor, optional): Preallocated scratch for the intermediate
             :math:`\text{H} \times \text{Jb}` of shape ``(batch, block, Jb.shape[1])``.
             Also required for capture. When ``None`` a new tensor is allocated.
         accumulate (bool, optional): When ``True``, add into ``out`` instead of
@@ -102,14 +102,14 @@ def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None, out=None, HJ=None,
     Jb_reshaped = dense_Jb.reshape(-1, block_size, dense_Jb.shape[1])
 
     # Batch matrix multiply H and J_reshaped
-    if HJ is None:
-        HJ = torch.bmm(block_wise_H, Jb_reshaped)
+    if hj_out is None:
+        hj_out = torch.bmm(block_wise_H, Jb_reshaped)
     else:
-        torch.bmm(block_wise_H, Jb_reshaped, out=HJ)
+        torch.bmm(block_wise_H, Jb_reshaped, out=hj_out)
 
     # Reshape result to 2D and multiply with J.T
     # Final: (num_handles*12, num_handles*12)
-    HJ_2d = HJ.reshape(-1, dense_Jb.shape[1])
+    HJ_2d = hj_out.reshape(-1, dense_Jb.shape[1])
     if out is None:
         return torch.matmul(dense_Ja.transpose(0, 1), HJ_2d)
     if accumulate:
