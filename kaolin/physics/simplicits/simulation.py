@@ -1729,19 +1729,16 @@ class SimplicitsScene:
             device=self.device, pool=self._graph_pool)
 
         if self.check_solve_info:
-            # One D2H sync per step. The in-graph assert_zero only fires in Warp debug
-            # builds, so without this a singular Hessian is silent.
+            # One D2H sync per step; without this check a singular Hessian is silent.
             #
-            # Only the last Newton iteration's code is read, which is sufficient *on the
-            # GPU path only*: cuSOLVER reports nonzero info for NaN-contaminated input
-            # (measured info=1/2), so a failure at any iteration poisons x and is still
-            # visible at the end. LAPACK does not do this -- it returns info=0 for the
-            # same NaN input -- so this reasoning must not be carried over to a CPU path.
+            # The Newton loop reuses this buffer, so it contains only the final
+            # iteration's result. An earlier factorization failure makes later iterates
+            # non-finite, and cuSOLVER continues to report failure, leaving a nonzero
+            # result here.
             info = int(self.newton_buffers.solve_info_th.item())
             if info != 0:
-                # Roll back so the step is atomic, matching the reference path, which
-                # raises from inside newtons_method before assigning anything. Otherwise
-                # a caller's halve-timestep-and-retry loop would retry from a NaN scene.
+                # Roll back so a caller can retry the step from valid state rather than
+                # from the non-finite values produced by the failed solve.
                 wp.copy(src=self.sim_z_prev, dest=self.sim_z)
                 wp.copy(src=self._cap_z_dot_backup, dest=self.sim_z_dot)
                 if info < 0:
