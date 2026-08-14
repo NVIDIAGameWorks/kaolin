@@ -71,6 +71,7 @@ def farthest_point_sampling(points, k):
     assert len(points.shape) == 3, f'Points have unexpected shape {points.shape}'
     assert points.is_cuda, f'Points should be on a CUDA device, only CUDA is supported for farthest point sampling. Device is {points.device}'
     assert points.dtype == torch.float32, f'Points should have dtype float32. dtype is {points.dtype}'
+    assert 0 <= k <= points.shape[1], f'k must satisfy 0 <= k <= num_points, but got k={k} and num_points={points.shape[1]}'
 
     # TODO check CUDA >= 12 for warp support
 
@@ -149,7 +150,7 @@ def _farthest_point_sampling_warp_headchunk(points, k):
     N = points.shape[0]
     N_PADDED = max(N,_M_TOP_PROCESS)
     PAD_LEN = N_PADDED - N
-    if PAD_LEN < 0:
+    if PAD_LEN > 0:
         points = torch.concatenate((points, torch.zeros((PAD_LEN,3), device=device, dtype=torch.float32)), axis=0)
     points = wp.from_torch(points, requires_grad=False, dtype=wp.vec3)
     
@@ -505,12 +506,23 @@ def _find_farthest_point_ind_kernel(
     my_dist = distancesSq[i]
 
     curr_farthest_ind = farthest_point_inds[i_round]
-    while(curr_farthest_ind < 0 or my_dist > distancesSq[curr_farthest_ind]):
+    while True:
         # this loop says "if this distance is greater than current farthest distance, swap it in
         # however, if another thread has already changed it in the meantime, fetch the new value 
-        # and check again
-        wp.atomic_cas(farthest_point_inds, i_round, curr_farthest_ind, i)
-        curr_farthest_ind = farthest_point_inds[i_round]
+        # and check again (plus some confusing structure to guard aginst the initialization case 
+        # when curr_farthest_ind=-1)
+
+        do_swap = curr_farthest_ind < 0
+        if not do_swap:
+            do_swap = my_dist > distancesSq[curr_farthest_ind]
+
+        if do_swap:
+            wp.atomic_cas(farthest_point_inds, i_round, curr_farthest_ind, i)
+            curr_farthest_ind = farthest_point_inds[i_round]
+
+        else:
+            break
+
 
 @wp.kernel
 def _increment_round_kernel(

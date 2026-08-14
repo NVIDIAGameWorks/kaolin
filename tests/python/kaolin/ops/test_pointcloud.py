@@ -246,3 +246,16 @@ def test_farthest_point_sampling(device):
     points[1:N//2,:] = np.inf
     indices = kaolin.ops.pointcloud.farthest_point_sampling(points, k)
     validate_farthest_points_np(points, indices, k)
+
+
+@pytest.mark.parametrize('device', ['cuda'])
+def test_farthest_point_sampling_k_greater_than_num_points(device):
+    """
+    Ensure that farthest point sampling throws a meaningful error for k > N
+    """
+    N = 32
+    k = N + 1
+    points = torch.rand(1, N, 3, device=device)
+
+    with pytest.raises(AssertionError, match='k.*<=.*num_points'):
+        kaolin.ops.pointcloud.farthest_point_sampling(points, k)
