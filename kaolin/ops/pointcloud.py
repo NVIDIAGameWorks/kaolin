@@ -150,7 +150,7 @@ def _farthest_point_sampling_warp_headchunk(points, k):
     N = points.shape[0]
     N_PADDED = max(N,_M_TOP_PROCESS)
     PAD_LEN = N_PADDED - N
-    if PAD_LEN < 0:
+    if PAD_LEN > 0:
         points = torch.concatenate((points, torch.zeros((PAD_LEN,3), device=device, dtype=torch.float32)), axis=0)
     points = wp.from_torch(points, requires_grad=False, dtype=wp.vec3)
     
