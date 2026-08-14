@@ -506,12 +506,23 @@ def _find_farthest_point_ind_kernel(
     my_dist = distancesSq[i]
 
     curr_farthest_ind = farthest_point_inds[i_round]
-    while(curr_farthest_ind < 0 or my_dist > distancesSq[curr_farthest_ind]):
+    while True:
         # this loop says "if this distance is greater than current farthest distance, swap it in
         # however, if another thread has already changed it in the meantime, fetch the new value 
-        # and check again
-        wp.atomic_cas(farthest_point_inds, i_round, curr_farthest_ind, i)
-        curr_farthest_ind = farthest_point_inds[i_round]
+        # and check again (plus some confusing structure to guard aginst the initialization case 
+        # when curr_farthest_ind=-1)
+
+        do_swap = curr_farthest_ind < 0
+        if not do_swap:
+            do_swap = my_dist > distancesSq[curr_farthest_ind]
+
+        if do_swap:
+            wp.atomic_cas(farthest_point_inds, i_round, curr_farthest_ind, i)
+            curr_farthest_ind = farthest_point_inds[i_round]
+
+        else:
+            break
+
 
 @wp.kernel
 def _increment_round_kernel(
