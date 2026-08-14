@@ -314,6 +314,27 @@ class TestFlexiCubes:
         assert torch.allclose(output[0], expected_tetmesh_output[0], atol=1e-4)
         assert torch.equal(output[1], expected_tetmesh_output[1])
 
+    def test_tetmesh_extraction_local_connectivity(self, device):
+        # Regression test: a sphere SDF has many distinct interior vertices (unlike the single-cube
+        # `input_data` fixture above, which only ever has one interior vertex at the origin, shared by
+        # every tet, and so can't expose a face/interior-vertex pairing bug). Every tetrahedron should
+        # stay local to a single grid cell; a bug that pairs a face with an unrelated interior vertex
+        # (e.g. from the opposite side of the object) shows up as tets with much longer edges.
+        fc = FlexiCubes(device)
+        res = 16
+        x_nx3, cube_fx8 = fc.construct_voxel_grid(res)
+        sdf = torch.linalg.norm(x_nx3, dim=-1) - 0.3
+        tet_vertices, tets, _ = fc(x_nx3, sdf, cube_fx8, res, output_tetmesh=True)
+
+        edges = torch.cat([tets[:, [0, 1]], tets[:, [0, 2]], tets[:, [0, 3]],
+                           tets[:, [1, 2]], tets[:, [1, 3]], tets[:, [2, 3]]], dim=0)
+        edge_lengths = (tet_vertices[edges[:, 0]] - tet_vertices[edges[:, 1]]).norm(dim=-1)
+
+        voxel_size = 1.0 / res
+        assert edge_lengths.max() < 3 * voxel_size, \
+            f'Found tet edge of length {edge_lengths.max().item()}, ' \
+            f'much larger than the voxel size {voxel_size}; tets should stay local to a single grid cell.'
+
     def test_qef_extraction_grad_func(self, expected_qef_vertices, expected_qef_possible_tri,
                                       expected_qef_features, device):
         fc = FlexiCubes(device)

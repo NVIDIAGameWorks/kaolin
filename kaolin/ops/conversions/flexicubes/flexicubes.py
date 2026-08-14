@@ -571,6 +571,15 @@ class FlexiCubes:
             flip_mask = s_edges[:, 0] > 0
             quad_vd_idx = torch.cat((quad_vd_idx[flip_mask][:, [0, 1, 3, 2]],
                                      quad_vd_idx[~flip_mask][:, [2, 3, 1, 0]]))
+            # `quad_vd_idx` above is reordered by `flip_mask` (all flip_mask==True quads first, then the
+            # rest), via boolean-mask selection rather than in-place assignment. `edge_indices`/`s_edges`
+            # (returned below and later consumed by `_tetrahedralize` to pair each output face with its
+            # corresponding "inside" tet vertex) must be reordered the same way, or they end up describing
+            # a different quad than the one at the same row in `faces` -- silently pairing faces with
+            # unrelated, potentially far-away vertices when `output_tetmesh=True`.
+            edge_indices = torch.cat((edge_indices.reshape(-1, 4)[flip_mask],
+                                      edge_indices.reshape(-1, 4)[~flip_mask])).reshape(-1)
+            s_edges = torch.cat((s_edges[flip_mask], s_edges[~flip_mask]))
         if grad_func is not None:
             # when grad_func is given, split quadrilaterals along the diagonals with more consistent gradients.
             with torch.no_grad():
