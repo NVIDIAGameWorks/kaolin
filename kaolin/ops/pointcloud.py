@@ -71,6 +71,7 @@ def farthest_point_sampling(points, k):
     assert len(points.shape) == 3, f'Points have unexpected shape {points.shape}'
     assert points.is_cuda, f'Points should be on a CUDA device, only CUDA is supported for farthest point sampling. Device is {points.device}'
     assert points.dtype == torch.float32, f'Points should have dtype float32. dtype is {points.dtype}'
+    assert 0 <= k <= points.shape[1], f'k must satisfy 0 <= k <= num_points, but got k={k} and num_points={points.shape[1]}'
 
     # TODO check CUDA >= 12 for warp support
 
