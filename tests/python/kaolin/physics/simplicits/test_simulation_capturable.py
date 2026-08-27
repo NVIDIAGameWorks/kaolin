@@ -46,15 +46,25 @@ def _make_object(n_pts=600, num_handles=4, num_nodes=128, ym=1e6, seed=0):
 
 
 def _make_scene(sim_obj, capturable, num_objects=2, num_qp=96, max_ls_steps=10,
-                is_kinematic=False, kinematic_ids=None, collisions=False, **kwargs):
+                is_kinematic=False, kinematic_ids=None, collisions=False, seed=0,
+                **kwargs):
     r"""Build a test scene.
+
+    Seeded, because add_object(num_qp=...) subsamples quadrature points at random.
+    Two unseeded builds get different points and therefore different dynamics: measured
+    at 1.0e-1 relative error between two runs of the *same* path over 15 steps, which is
+    a thousand times the tolerance the comparisons below use. Any test that builds two
+    scenes and compares them is otherwise comparing two different problems.
 
     Args:
         is_kinematic: shorthand for ``kinematic_ids=(0,)``.
         kinematic_ids: explicit set of kinematic object indices. Use this to cover
             configurations other than "object 0 only" -- multiple kinematic objects, a
             kinematic object that is not first, or an entirely kinematic scene.
+        seed: fixes the quadrature subsampling. Two scenes built with the same seed have
+            identical points; pass different seeds only if you want different geometry.
     """
+    torch.manual_seed(seed)
     if kinematic_ids is None:
         kinematic_ids = (0,) if is_kinematic else ()
     kinematic_ids = set(kinematic_ids)
@@ -66,7 +76,11 @@ def _make_scene(sim_obj, capturable, num_objects=2, num_qp=96, max_ls_steps=10,
         T[1, 3] = _KIN_INIT_Y + 1.2 * i
         scene.add_object(sim_obj, num_qp=num_qp, init_transform=T, apply_qr=False,
                          is_kinematic=(i in kinematic_ids))
-    scene.set_scene_gravity(torch.tensor([0.0, -9.8, 0.0]))
+    # +9.8, not -9.8: set_scene_gravity treats +y as down (its own default is
+    # [0, 9.8, 0], documented as downward), because the energy is dot(g, x) * m and
+    # motion follows -g. With -9.8 the objects drift upward away from the floor and
+    # the floor term contributes nothing to the trajectory comparisons below.
+    scene.set_scene_gravity(torch.tensor([0.0, 9.8, 0.0]))
     scene.set_scene_floor(floor_height=0.0, floor_axis=1,
                           floor_penalty=1e4, flip_floor=False)
     if collisions:
@@ -93,8 +107,14 @@ def test_capturable_matches_host(max_ls_steps):
     for any other value.
     """
     obj = _make_object()
-    ref = _trajectory(_make_scene(obj, False, max_ls_steps=max_ls_steps), 15)
-    cap = _trajectory(_make_scene(obj, True, max_ls_steps=max_ls_steps), 15)
+    ref_scene = _make_scene(obj, False, max_ls_steps=max_ls_steps)
+    cap_scene = _make_scene(obj, True, max_ls_steps=max_ls_steps)
+    # The comparison only means anything if both scenes are the same scene. _make_scene
+    # seeds the quadrature subsampling for this; without it two builds differ by ~1e-1,
+    # a thousand times the tolerance below, and the test measures sampling noise.
+    assert torch.equal(wp.to_torch(ref_scene.sim_pts), wp.to_torch(cap_scene.sim_pts))
+    ref = _trajectory(ref_scene, 15)
+    cap = _trajectory(cap_scene, 15)
 
     # Sanity: the scene must actually move, or matching is meaningless.
     assert ref.abs().max() > 1e-3
@@ -269,8 +289,14 @@ def test_capturable_matches_host_with_kinematic():
     A failure here means that argument is wrong; do not loosen the tolerance.
     """
     obj = _make_object()
-    ref = _trajectory(_make_scene(obj, False, is_kinematic=True), 20)
-    cap = _trajectory(_make_scene(obj, True, is_kinematic=True), 20)
+    ref_scene = _make_scene(obj, False, is_kinematic=True)
+    cap_scene = _make_scene(obj, True, is_kinematic=True)
+    # The comparison only means anything if both scenes are the same scene. _make_scene
+    # seeds the quadrature subsampling for this; without it two builds differ by ~1e-1,
+    # a thousand times the tolerance below, and the test measures sampling noise.
+    assert torch.equal(wp.to_torch(ref_scene.sim_pts), wp.to_torch(cap_scene.sim_pts))
+    ref = _trajectory(ref_scene, 20)
+    cap = _trajectory(cap_scene, 20)
 
     assert ref.abs().max() > 1e-3
     rel = (ref - cap).abs().max() / ref.abs().max()
