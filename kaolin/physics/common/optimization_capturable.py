@@ -190,6 +190,14 @@ class CapturableNewtonBuffers:
         self.dz_2d_th = self.dz_th.unsqueeze(1)
         del eye, rhs
 
+        # Warp view of the factorization's info code, so the recorded graph can check it
+        # without a readback. .view(1) on the 0-dim info tensor shares storage;
+        # .reshape().contiguous() may copy, and would then never see what lu_factor_ex
+        # writes -- hence the assert.
+        self.solve_info = wp.from_torch(self.solve_info_th.view(1))
+        assert self.solve_info.ptr == self.solve_info_th.data_ptr(), \
+            "solve_info must alias solve_info_th"
+
 def _line_search_capturable(energy_fcn, x, direction, gradient, bounds, buffers,
                             initial_step_size=1.0, alpha=1e-3, beta=0.6,
                             max_steps=10):
@@ -379,6 +387,10 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buffers,
         torch.linalg.lu_solve(
             buffers.lu_th, buffers.piv_th, wp.to_torch(G_curr).unsqueeze(1),
             out=buffers.dz_2d_th)
+        # Costs nothing and needs no readback, but Warp only emits kernel asserts when
+        # wp.config.mode == "debug", so this is not a substitute for the host-side check
+        # a caller does after replay -- see SimplicitsScene(check_solve_info=...).
+        warp_utilities._debug_assert_zero(buffers.solve_info, 0)
         buffers.dz *= -1.0
 
         # Converged if |g . dz| < conv_tol. Evaluated on device; the sign of

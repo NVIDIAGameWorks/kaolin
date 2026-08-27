@@ -284,7 +284,10 @@ class SimplicitsScene:
                 ``apply_qr=False``; :func:`add_object` defaults it to True. Defaults to
                 False.
             check_solve_info (bool, optional): Raise when the recorded solve fails. This
-                adds one GPU-to-CPU wait per step. Defaults to True.
+                adds one GPU-to-CPU wait per step. Setting it False removes that wait,
+                but a singular Hessian then goes undetected in a release build: the
+                in-graph check only fires when Warp runs in debug mode, and the
+                factorization writes NaN into the DOFs without raising. Defaults to True.
             timestep (float, optional): Sim time-step. Defaults to 0.03.
             max_newton_steps (int, optional): Newton steps used in time integrator. Defaults to 5.
             max_ls_steps (int, optional): Line search steps used in time integrator. Defaults to 10.
@@ -1258,10 +1261,16 @@ class SimplicitsScene:
             # Kinetic energy
             BMBz = wp.array(self.sim_BMB @ self._eval_delta_dz,
                             dtype=float).flatten()
+            # wp.utils.array_inner, not array_inner_capturable: this is the path the
+            # captured one is validated against, so it has to be reproducible. The
+            # former is a tree reduction that gives the same answer every run and
+            # raises on a size, device or dtype mismatch; the latter is one atomic add
+            # per element with no checks, so two identical runs can land on opposite
+            # sides of the Armijo test below and take different step sizes.
             # Explicit [1:2] rather than [1:]: _scene_energy has a third slot used by
-            # the capturable path, and array_inner_capturable needs a one-element output.
-            warp_utilities.array_inner_capturable(self._eval_delta_dz, BMBz,
-                                                   self._scene_energy[1:2])
+            # the captured path, and array_inner wants a one-element output.
+            wp.utils.array_inner(self._eval_delta_dz, BMBz,
+                                 out=self._scene_energy[1:2])
         if self.use_cuda_graphs:
             if "energy" not in self._fragment_graphs:
                 eval_fixed_energies()  # dry-run to force load all the modules required for energy eval
