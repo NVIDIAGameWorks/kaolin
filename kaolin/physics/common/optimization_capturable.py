@@ -100,7 +100,11 @@ def _array_min_scalar_kernel(x: wp.array(dtype=wp.float32),
 
 
 def _check_dofs(arr, buffers, what):
-    r"""Checks that ``arr`` is a contiguous float32 DOF vector matching ``buffers``.
+    r"""Checks that ``arr`` is a float32 DOF vector sized to match ``buffers``.
+
+    Deliberately does not check contiguity: Warp arrays carry strides, and a strided
+    result would make ``lu_solve`` materialize a copy -- an allocation, inside the
+    recording. Worth adding if that shows up; for now the docstring matches the body.
 
     Args:
         arr: Value to check.
@@ -288,8 +292,14 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buffers,
                               max_ls_steps=10, ls_alpha=1e-3, ls_beta=0.6):
     r"""Solve a dense Newton system inside a CUDA graph.
 
-    ``x`` is updated in place. Pin fixed values before calling this function with
-    :func:`pin_kinematic_dofs` and :func:`mask_in_place`.
+    ``x`` is updated in place.
+
+    Pinning values is the caller's job, and there is no "before calling" moment to do it
+    in: the Hessian and gradient only exist inside the recorded loop, so
+    :func:`pin_kinematic_dofs` has to be applied to whatever ``hessian_fcn`` returns
+    (last, after any other term is added to it) and :func:`mask_in_place` to whatever
+    ``gradient_fcn`` returns. Masking ``x`` once up front does nothing: the solve then
+    produces an unpinned step and the pinned values drift, without raising.
 
     Callbacks run while the graph is recorded. They must use preallocated GPU arrays,
     must not read values back to Python, and must return the same buffers on every run.
@@ -334,11 +344,18 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buffers,
     # safe to run while a capture is in progress.
     if buffers.device.is_cuda:
         warp_stream = wp.stream_to_torch(buffers.device)
-        if torch.cuda.current_stream().cuda_stream != warp_stream.cuda_stream:
+        # Ask for the stream of *this* device. Bare torch.cuda.current_stream() answers
+        # for torch's current device, which entering a stream context does not change --
+        # so a scene on cuda:1 while torch sits on cuda:0 would compare against the wrong
+        # device. Raw stream handles are per-context pointers and can coincide across
+        # devices, so that comparison can pass while the solve is issued where Warp is
+        # not recording.
+        torch_stream = torch.cuda.current_stream(wp.device_to_torch(buffers.device))
+        if torch_stream.cuda_stream != warp_stream.cuda_stream:
             raise RuntimeError(
                 "newtons_method_capturable must run on Warp's stream for "
-                f"{buffers.device}, but torch's current stream is "
-                f"{torch.cuda.current_stream()}. Any other stream -- including the "
+                f"{buffers.device}, but torch's current stream there is "
+                f"{torch_stream}. Any other stream -- including the "
                 "default one -- means the linear solve is issued where Warp is not "
                 "recording, and is dropped from the graph with no error. Wrap the call "
                 "in `with torch.cuda.stream(wp.stream_to_torch(device)):`, or invoke it "
@@ -416,6 +433,14 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buffers,
                 if wp_bounds is None:
                     buffers.default_bounds.fill_(1.0)
                     wp_bounds = buffers.default_bounds
+                else:
+                    # Checked for the same reason as the other callbacks, and it is the
+                    # one whose absence is silent: the bounds kernel launches over the
+                    # full DOF count and indexes bounds[tid] regardless of length, so a
+                    # per-block return where a per-DOF one was expected reads past the
+                    # allocation. Warp strips that assert in release builds, leaving
+                    # wrong step limits rather than an error.
+                    _check_dofs(wp_bounds, buffers, "bounds_fcn")
 
             _line_search_capturable(
                 energy_fcn=energy_fcn, x=x, direction=buffers.dz,

@@ -290,6 +290,25 @@ class TestCallbackValidation:
         with pytest.raises(TypeError, match="hessian_fcn must return a dense 2-D"):
             _run(prob, x, buf)
 
+    def test_bounds_fcn_returning_the_wrong_length(self):
+        """The one that used to be silent.
+
+        The bounds kernel launches over the full DOF count and indexes bounds[tid]
+        whatever its length, so a short return reads past the allocation. Warp strips
+        that assert in release builds, so before this check it produced wrong step
+        limits and a wrong trajectory rather than an error.
+        """
+        n = 4
+        prob, buf, x = self._fixture(n)
+        short = wp.zeros(n // 2, dtype=wp.float32, device=_device())
+        with pytest.raises(ValueError, match="^bounds_fcn has shape"):
+            _run(prob, x, buf, bounds_fcn=lambda dz, x_: short)
+
+    def test_bounds_fcn_returning_a_non_array(self):
+        prob, buf, x = self._fixture()
+        with pytest.raises(TypeError, match="bounds_fcn must be a wp.array"):
+            _run(prob, x, buf, bounds_fcn=lambda dz, x_: 1.0)
+
 
 @cuda_only
 def test_rejects_the_wrong_stream():
@@ -308,11 +327,23 @@ def test_rejects_the_wrong_stream():
 
 
 @cuda_only
-def test_capture_and_replay_matches_and_allocates_nothing():
-    """A replayed graph must give the uncaptured answer and allocate nothing.
+def test_capture_and_replay_matches_and_survives_empty_cache():
+    """A replayed graph must recompute, and must not be corrupted by empty_cache().
 
     Replay is checked from a *different* starting point than the one recorded, so a graph
     that had baked in its answer instead of recomputing would be caught.
+
+    The second half is the regression the buffer class exists for. Torch backends
+    (cuSOLVER's LU workspace) allocate below the dispatcher and hand the block back to
+    torch's ordinary cache when the call returns; recorded into a graph, that address is
+    baked in while owned by nothing, and empty_cache() frees it, so the next replay wrote
+    into unmapped memory. This is what catches a revert to torch.linalg.solve_ex.
+
+    An earlier version of this test bracketed torch's allocation counter around the
+    replay instead. That could not fail: a replay is a single wp.capture_launch and never
+    touches torch's allocator, so the count was invariant by construction. Counting
+    around the *capture* does not work either -- an eager solve allocates ~127 times
+    steadily, because capture_while and capture_if allocate when no recording is active.
     """
     n = 6
     start_a = torch.full((n,), 2.0, device="cuda")
@@ -340,11 +371,19 @@ def test_capture_and_replay_matches_and_allocates_nothing():
 
     # Replay from a different start: the graph must recompute, not reproduce.
     wp.to_torch(x).copy_(start_b)
-    torch.cuda.synchronize()
-    before = torch.cuda.memory_stats()["allocation.all.allocated"]
     graph, pool = replay_or_capture(step, graph, device="cuda", pool=pool)
-    torch.cuda.synchronize()
-    after = torch.cuda.memory_stats()["allocation.all.allocated"]
-
     assert torch.allclose(wp.to_torch(x), ref[1], atol=1e-5)
-    assert after == before, f"replay allocated {after - before} times"
+
+    # Free everything torch will let go of, then churn the allocator so any address the
+    # graph is holding gets handed to something else.
+    torch.cuda.empty_cache()
+    junk = [torch.randn(1024, 1024, device="cuda") for _ in range(4)]
+    del junk
+    torch.cuda.empty_cache()
+
+    wp.to_torch(x).copy_(start_a)
+    graph, pool = replay_or_capture(step, graph, device="cuda", pool=pool)
+    out = wp.to_torch(x)
+    assert torch.isfinite(out).all(), "replay after empty_cache produced non-finite DOFs"
+    assert torch.allclose(out, ref[0], atol=1e-5), (
+        "replay after empty_cache no longer matches the uncaptured answer")
