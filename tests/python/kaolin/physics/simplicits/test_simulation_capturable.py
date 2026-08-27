@@ -464,13 +464,20 @@ def test_newton_loop_exits_early_on_convergence():
 def test_newton_iterations_scale_with_difficulty():
     r"""Iteration count must respond to the problem, confirming genuine data dependence."""
     def iters_for(ym, dt, conv_tol):
+        # Seeded like _make_scene: add_object subsamples quadrature points at random,
+        # and an iteration count should not move because the sampling did.
+        torch.manual_seed(0)
         scene = SimplicitsScene(device="cuda", timestep=dt, max_newton_steps=8,
                                 max_ls_steps=10, conv_tol=conv_tol, capturable=True)
         obj = _make_object(ym=ym)
         T = torch.eye(4, device="cuda", dtype=torch.float32)
         T[1, 3] = 0.55
         scene.add_object(obj, num_qp=96, init_transform=T, apply_qr=False)
-        scene.set_scene_gravity(torch.tensor([0.0, -9.8, 0.0]))
+        # +9.8 is downward here; see _make_scene. With -9.8 the object rose away from
+        # the floor at y=0 and the floor term did nothing. Iteration counts are the same
+        # either way (1 and 8, measured) since the difficulty comes from ym/dt/conv_tol,
+        # but the scene should still describe what it claims to.
+        scene.set_scene_gravity(torch.tensor([0.0, 9.8, 0.0]))
         scene.set_scene_floor(floor_height=0.0, floor_axis=1,
                               floor_penalty=1e4, flip_floor=False)
         for _ in range(4):
