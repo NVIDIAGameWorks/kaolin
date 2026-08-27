@@ -214,7 +214,7 @@ def floor_hessian_wp_func(floor_height: wp.float32,
             pass
     else:
         if p > floor_height:
-            return -1.0*local_hess
+            return 1.0*local_hess
         else:
             pass
     return wp.mat33(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)

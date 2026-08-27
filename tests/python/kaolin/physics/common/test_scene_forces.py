@@ -412,3 +412,58 @@ def test_settings_are_frozen_when_the_graph_is_recorded():
     # And the change does take effect once it is evaluated outside the graph.
     eval_energy()
     assert float(e.numpy()[0]) != pytest.approx(recorded)
+
+
+@pytest.mark.parametrize("flip", [0, 1])
+def test_floor_derivatives_match_finite_differences(flip):
+    """Energy -> gradient -> Hessian must agree, for a floor and for a ceiling.
+
+    Nothing else in this file sets flip_floor=1, which is how the flipped branch came to
+    carry a sign its energy did not. Both derivatives are differenced here rather than
+    compared against hand-written expressions, so the two branches cannot drift apart
+    again without this failing.
+
+    A negated Hessian is the dangerous half: lu_factor_ex succeeds on an indefinite
+    matrix, so the solve reports no error and the Newton step simply points uphill.
+    """
+    axis, height, eps = 1, 0.5, 1e-3
+    # Put the point on the penalised side of the plane so the branch is live: below for
+    # a floor, above for a ceiling.
+    p = height - 1.0 if flip == 0 else height + 1.0
+
+    device = wp.get_device()
+    td = wp.device_to_torch(device)
+    x0 = wp.from_torch(torch.tensor([[0.0, p, 0.0]], device=td), dtype=wp.vec3)
+    vol = wp.from_torch(torch.ones(1, device=td))
+    floor = Floor(height, axis, flip, vol)
+
+    def at(offset):
+        return wp.from_torch(torch.tensor([[0.0, offset, 0.0]], device=td), dtype=wp.vec3)
+
+    def energy(offset):
+        out = wp.zeros(1, dtype=wp.float32, device=device)
+        floor.energy(at(offset), x0, 1.0, out)
+        return float(_read(out)[0])
+
+    def gradient(offset):
+        out = wp.zeros(1, dtype=wp.vec3, device=device)
+        floor.gradient(at(offset), x0, 1.0, out)
+        return float(_read(out)[0, axis])
+
+    def hessian(offset):
+        return float(_read(floor.hessian(at(offset), x0, 1.0))[0, axis, axis])
+
+    assert energy(0.0) > 0.0, "test is vacuous unless the penalty is active"
+
+    g_fd = (energy(eps) - energy(-eps)) / (2.0 * eps)
+    assert gradient(0.0) == pytest.approx(g_fd, rel=1e-2), (
+        f"flip_floor={flip}: gradient {gradient(0.0):.4f} does not match the derivative "
+        f"of its own energy ({g_fd:.4f})")
+
+    h_fd = (gradient(eps) - gradient(-eps)) / (2.0 * eps)
+    assert hessian(0.0) == pytest.approx(h_fd, rel=1e-2), (
+        f"flip_floor={flip}: Hessian {hessian(0.0):.4f} does not match the derivative "
+        f"of its own gradient ({h_fd:.4f})")
+
+    # A penalty must curve upward on both sides, or the Newton step walks into the wall.
+    assert hessian(0.0) > 0.0, f"flip_floor={flip}: Hessian block is not positive"
