@@ -455,8 +455,13 @@ def _contact_subspace_hessian(
     This kernel computes the second derivative (Hessian) of the contact energy with respect to
     particle positions. The Hessian includes contributions from collision stiffness, IPC-style
     friction Hessian, and optional velocity-level restitution penalty Hessian. Used for implicit
-    time integration. Launched with dim=soft_contact_max; each thread writes to
-    particle_hessians[sample_index] (overwrites, no atomic; one sample may have multiple contacts).
+    time integration. Launched with dim=soft_contact_max; each thread *accumulates* into
+    particle_hessians[sample_index] with an atomic add, because one sample can carry more
+    than one contact -- soft_contact_max is num_particles x num_bodies, so a particle
+    touching two bodies produces two entries at the same sample index. Correctness
+    therefore depends on hessian() zeroing the array first, which it does; that call is
+    not redundant, and dropping it would fold the previous Newton iteration's Hessian into
+    the current one and leave stale stiffness on samples that lost all their contacts.
 
     Args:
         particle_pos (wp.array(dtype=wp.vec3)): Current particle positions (world), length num_particles.
@@ -489,8 +494,9 @@ def _contact_subspace_hessian(
         velocity_penalty_kv (float): Stiffness for velocity-level restitution penalty.
         coeff (float): Scaling coefficient applied to each contact Hessian contribution.
         particle_hessians (wp.array(dtype=wp.mat33)): 3x3 Hessian blocks per sample (sample layout); length num_samples.
-            Each thread writes vol * (collision_hessian + friction_hessian + vel_hessian) at
-            sample_index; caller should zero this array before launch if needed.
+            Each thread adds coeff * vol * (collision_hessian + friction_hessian +
+            vel_hessian) into sample_index. The caller must zero this array before the
+            launch -- see above.
     """
     tid = wp.tid()
 
