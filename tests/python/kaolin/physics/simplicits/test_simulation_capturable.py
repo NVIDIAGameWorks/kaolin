@@ -773,5 +773,23 @@ def test_object_pairs_skipped_when_capturable():
     cap.run_sim_step()
     cs = cap.force_dict["collision"]["object"]
     assert cs.num_contacts > 20
-    assert len(cs.object_pairs) == 0, \
-        "capturable scene built object_pairs despite having no consumer for it"
+    # It used to return [] here, which reads as "nothing is in contact" while 20+ pairs
+    # are touching. Not building it is still correct; saying so out loud is the fix.
+    with pytest.raises(RuntimeError, match="not built on a captured scene"):
+        cs.object_pairs
+    assert cs._object_pairs == [], "nothing should have built the list"
+
+
+@cuda_only
+def test_get_bounds_rejects_a_captured_scene():
+    """The sparse Jacobian get_bounds needs is never built on a captured scene.
+
+    It used to fall through to `self.collision_J_a.ncol` and raise AttributeError on
+    None, which says nothing about what to do instead.
+    """
+    cap = _contact_scene(True, n_obj=2)
+    cap.run_sim_step()
+    cs = cap.force_dict["collision"]["object"]
+    assert cs.num_contacts > 0, "test is vacuous without contacts"
+    with pytest.raises(RuntimeError, match="get_bounds_capturable"):
+        cs.get_bounds(cp_delta_dx=cap.sim_pts, cp_dx=cap.sim_pts, cp_x0=cap.sim_pts)

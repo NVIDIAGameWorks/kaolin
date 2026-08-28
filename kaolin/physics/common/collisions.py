@@ -865,9 +865,9 @@ class Collision:
         # Collision constants
         # num_contacts is a memoized property backed by self.contact_count -- see below.
         self._num_contacts_cache = None
-        # Initialized here because get_bounds and _assemble_hessians read it before the
-        # first detect_collisions call on a freshly built scene.
-        self.object_pairs = []
+        # _assemble_hessians reads this before the first detect_collisions call on a
+        # freshly built scene. (get_bounds does not, despite an earlier comment here.)
+        self._object_pairs = []
         self.bounds = bounds
         self.collision_radius = collision_particle_radius
 
@@ -940,6 +940,25 @@ class Collision:
             # stable for every subsequent timestep.
             self.cp_dx_at_nm_iteration_0 = wp.zeros_like(cp_dx)
         wp.copy(dest=self.cp_dx_at_nm_iteration_0, src=cp_dx)
+
+    @property
+    def object_pairs(self):
+        r"""Object index pairs that are in contact, for the non-captured Hessian assembly.
+
+        Raises on a captured scene rather than returning an empty list. That path never
+        builds this -- the assembly it feeds reduces over the full DOF width instead, and
+        the build costs two blocking device-to-host copies the captured step exists to
+        avoid -- so an empty list there means "not computed", not "nothing is touching".
+        """
+        if self.capturable:
+            raise RuntimeError(
+                "object_pairs is not built on a captured scene: the captured Hessian "
+                "assembly reduces over the full DOF width instead, and building this "
+                "would need two blocking device-to-host copies. An empty list here would "
+                "read as 'no objects are in contact', which is not what it means. Use "
+                "contact_count for whether anything is touching, or build the scene with "
+                "capturable=False if you need the pair list.")
+        return self._object_pairs
 
     @property
     def num_contacts(self):
@@ -1184,10 +1203,10 @@ class Collision:
                 )
             )
             # Get unique interaction pairs
-            self.object_pairs = torch.unique(object_pairs, dim=0).numpy() # needed for indexing in the hessian matrix
+            self._object_pairs = torch.unique(object_pairs, dim=0).numpy() # needed for indexing in the hessian matrix
         else:
             # If no collisions, empty list
-            self.object_pairs = []
+            self._object_pairs = []
 
         return
 
@@ -1272,6 +1291,13 @@ class Collision:
         """
         if self.num_contacts == 0 and not self.bounds:
             return None
+
+        if self.collision_J_a is None:
+            raise RuntimeError(
+                "get_bounds needs the sparse collision Jacobian, which calculate_jacobian "
+                "builds and a captured scene never calls. Use get_bounds_capturable, which "
+                "reads the same sparsity out of the dense basis, or call calculate_jacobian "
+                "first on a non-captured scene.")
 
         # Inputs: Position increments of the contact points
 
