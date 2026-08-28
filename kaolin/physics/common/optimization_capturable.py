@@ -88,15 +88,14 @@ def _mask_in_place_kernel(x: wp.array(dtype=wp.float32),
 @wp.kernel
 def _array_min_scalar_kernel(x: wp.array(dtype=wp.float32),
                              t: wp.array(dtype=wp.float32),
-                             ti: int,
                              y: wp.array(dtype=wp.float32)):  # pragma: no cover
-    r"""``y[i] = min(x[i], t[ti])`` where the scalar step size lives on device.
+    r"""``y[i] = min(x[i], t[0])`` where the scalar step size lives on device.
 
     Taking ``t`` as an array rather than a Python float is what lets the line
     search vary its step size inside a captured graph.
     """
     tid = wp.tid()
-    y[tid] = wp.min(x[tid], t[ti])
+    y[tid] = wp.min(x[tid], t[0])
 
 
 def _check_dofs(arr, buffers, what):
@@ -130,7 +129,7 @@ def _apply_bounds_capturable(direction, bounds, t, bounded_direction):
     step size ``t`` from a device array instead of a Python float.
     """
     wp.launch(_array_min_scalar_kernel, dim=direction.shape,
-              inputs=[bounds, t, 0], outputs=[bounded_direction])
+              inputs=[bounds, t], outputs=[bounded_direction])
     bounded_direction *= direction
     return bounded_direction
 
@@ -407,7 +406,7 @@ def newtons_method_capturable(x, energy_fcn, gradient_fcn, hessian_fcn, buffers,
         # Costs nothing and needs no readback, but Warp only emits kernel asserts when
         # wp.config.mode == "debug", so this is not a substitute for the host-side check
         # a caller does after replay -- see SimplicitsScene(check_solve_info=...).
-        warp_utilities._debug_assert_zero(buffers.solve_info, 0)
+        warp_utilities._debug_assert_zero(buffers.solve_info)
         buffers.dz *= -1.0
 
         # Converged if |g . dz| < conv_tol. Evaluated on device; the sign of

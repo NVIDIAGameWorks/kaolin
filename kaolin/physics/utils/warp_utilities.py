@@ -96,13 +96,13 @@ def replay_or_capture(func, graph=None, device=None, pool=None):
 
 
 @wp.kernel
-def _debug_assert_zero_kernel(a: wp.array(dtype=wp.int32), i: int):  # pragma: no cover
-    assert a[i] == 0
+def _debug_assert_zero_kernel(a: wp.array(dtype=wp.int32)):  # pragma: no cover
+    assert a[0] == 0
 
 
-def _debug_assert_zero(a, i=0):
-    r"""Assert that ``a[i]`` is zero when Warp runs in debug mode."""
-    wp.launch(_debug_assert_zero_kernel, dim=1, inputs=[a, i])
+def _debug_assert_zero(a):
+    r"""Assert that ``a[0]`` is zero when Warp runs in debug mode."""
+    wp.launch(_debug_assert_zero_kernel, dim=1, inputs=[a])
 
 
 @wp.kernel

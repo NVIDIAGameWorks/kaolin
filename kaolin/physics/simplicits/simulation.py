@@ -1072,8 +1072,8 @@ class SimplicitsScene:
             # the two, so this raises rather than silently falling back to the host path.
             raise NotImplementedError(
                 "capturable=True with inter-object collisions requires apply_qr=False. "
-                "Build every object with apply_qr=False; see "
-                "simplicits_collision_scene_1.py for an example.")
+                "Pass apply_qr=False to every add_object call. Note this is not the "
+                "add_object default, so it has to be set explicitly.")
 
         num_dofs = self._num_dofs
         capacity = collision_struct.max_contacting_pairs
