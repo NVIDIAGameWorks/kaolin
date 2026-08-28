@@ -35,29 +35,43 @@ __all__ = ["array_inner_capturable",
 
 
 def capture_graph_with_torch(func, device=None, pool=None):
-    r"""Record a Warp and PyTorch function in a CUDA graph.
+    r"""Capture mixed Warp and PyTorch work in one CUDA graph.
 
-    Reuse ``pool`` when recording the same work again.
+    Warp captures the GPU work issued by ``func`` while PyTorch directs any
+    allocations on the active stream into ``pool``.  This ensures that PyTorch
+    tensors allocated during capture are owned by a graph-safe allocation pool
+    and can be reused when the graph is replayed. Reuse ``pool`` when
+    recapturing the same work to avoid growing the CUDA memory footprint.
 
     Args:
         func (callable): Zero-argument function issuing the work to capture.
-        device (optional): Warp device. Defaults to the current device.
+        device (optional): Warp device for the capture. Defaults to the
+            current Warp device.
         pool (optional): Allocation pool to reuse when recording again.
 
     Returns:
-        tuple: Recorded graph and allocation pool.
+        tuple: The Warp graph and its PyTorch allocation pool.
     """
+    # Map the Warp capture device to its PyTorch CUDA device index.
     torch_index = torch.device(wp.device_to_torch(wp.get_device(device))).index or 0
+    # Create a graph-private allocation pool unless the caller supplied one.
     if pool is None:
+        # Let PyTorch create a pool handle shared by this capture and future recaptures.
         pool = torch.cuda.graph_pool_handle()
 
+    # Issue all PyTorch work on the same CUDA stream that Warp will capture.
     with torch.cuda.stream(wp.stream_to_torch(device)):
+        # Route PyTorch allocations on this stream into the graph-private pool.
         torch._C._cuda_beginAllocateCurrentStreamToPool(torch_index, pool)
         try:
+            # Begin Warp's CUDA-graph capture on the selected device.
             with wp.ScopedCapture(device=device) as capture:
+                # Record the caller's Warp and PyTorch GPU operations.
                 func()
         finally:
+            # Always restore PyTorch's normal allocation behavior, even if func() fails.
             torch._C._cuda_endAllocateToPool(torch_index, pool)
+    # Return the completed CUDA graph together with the pool needed for recapture.
     return capture.graph, pool
 
 
