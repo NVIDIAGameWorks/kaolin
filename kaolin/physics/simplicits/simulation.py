@@ -260,15 +260,15 @@ class SimplicitsScene:
     def __init__(self, device='cuda',
         direct_solve=True,
         use_cuda_graphs=False,
-        capturable=False,
-        check_solve_info=True,
         timestep=0.03,
         max_newton_steps=5,
         max_ls_steps=10,
         newton_hessian_regularizer=1e-4,
         cg_tol=1e-4,
         cg_iters=100,
-        conv_tol=1e-4):
+        conv_tol=1e-4,
+        capturable=False,
+        check_solve_info=True):
         r"""Initializes a simplicits scene. SimplicitsObjects can be added to the scene.
         Scene forces such as floor and gravity can be set on the scene.
         The scene defaults to using float32 for all computations.
@@ -278,7 +278,11 @@ class SimplicitsScene:
             direct_solve (bool, optional): Whether to use direct solve for linear system. Defaults to True.
             use_cuda_graphs (bool, optional): Whether to capture the energy and gradient
                 inner loops as individual cuda graphs. Defaults to False.
-            capturable (bool, optional): Record the whole simulation step as one CUDA
+            capturable (bool, optional): Kept last in the signature, rather than beside
+                ``use_cuda_graphs`` where it belongs by topic, because it was originally
+                inserted mid-signature and silently shifted every positional argument
+                after it -- ``SimplicitsScene('cuda', True, False, 0.01)`` set
+                ``capturable=0.01`` and left ``timestep`` at its default. Record the whole simulation step as one CUDA
                 graph. Requires CUDA 12.4+ and ``direct_solve=True``. Kinematic objects
                 work. Inter-object collisions work when every object uses
                 ``apply_qr=False``; :func:`add_object` defaults it to True. Defaults to
