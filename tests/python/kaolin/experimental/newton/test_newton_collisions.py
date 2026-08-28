@@ -703,3 +703,75 @@ def test_contact_energy_with_velocity_penalty(simplicits_object):
         f"energy without ({energy_no_kv:.6f}); "
         "check that particles are approaching the contact surface"
     )
+
+
+def test_coeff_reaches_the_output_buffers(simplicits_object):
+    """coeff must scale what lands in the caller's buffer, not just the return value.
+
+    This is the one thing no other test here can see. Every other coeff in this file is
+    literally 1.0, and all four assembler call sites in SimplicitsScene discard the
+    return and read the buffer they passed in. So the previous shape -- kernels with no
+    coeff parameter and `return buffer * coeff` at the end -- looked correct from the
+    return value while contributing an unscaled term to the scene, and reverting to it
+    would pass the rest of this file unchanged.
+
+    Scaling is checked between two coeffs rather than against an absolute value, so the
+    test says nothing about what the contact model should compute.
+    """
+    FLOOR_HEIGHT, OBJECT_HEIGHT = 0, 1.5
+    builder = SimplicitsModelBuilder(up_axis="y")
+    builder.add_simplicits_object(
+        simplicits_object, num_qp=100,
+        init_transform=torch.tensor([[1.0, 0.0, 0.0, 0.0],
+                                     [0.0, 1.0, 0.0, OBJECT_HEIGHT],
+                                     [0.0, 0.0, 1.0, 0.0],
+                                     [0.0, 0.0, 0.0, 1.0]], dtype=torch.float32, device='cuda'))
+    builder.add_shape_plane(
+        plane=(*builder.up_vector, FLOOR_HEIGHT), width=0.0, length=0.0,
+        cfg=SimplicitsModelBuilder.ShapeConfig(ke=1e4, mu=0.5, kd=100.0, kf=1.0),
+        label="ground_plane")
+    xform = wp.transform(wp.vec3(0.4, 0.5, 0.0), wp.quat_identity())
+    builder.add_shape_box(body=builder.add_body(xform=xform), hx=0.5, hy=0.5, hz=0.5)
+
+    model = builder.finalize()
+    state0 = model.state()
+    contacts = model.collide(state0)
+    assert contacts.soft_contact_count.numpy()[0] > 0, "test is vacuous without contacts"
+
+    handler = model.simplicits_scene.force_dict["pt_wise"]["newton_soft_collisions"]["object"]
+    handler._set_state(state0)
+    handler._set_contacts(contacts)
+
+    x0 = state0.particle_q
+    dx = wp.zeros_like(x0)
+    n = x0.shape[0]
+    small, large = 0.25, 1.0
+    ratio = large / small
+
+    def energy_at(coeff):
+        out = wp.zeros(1, dtype=wp.float32, device=x0.device)
+        handler.energy(dx=dx, x0=x0, coeff=coeff, energy=out)
+        return float(out.numpy()[0])
+
+    def gradient_at(coeff):
+        out = wp.zeros(n, dtype=wp.vec3, device=x0.device)
+        handler.gradient(dx, x0, coeff, out)
+        return wp.to_torch(out).clone()
+
+    def hessian_at(coeff):
+        return wp.to_torch(handler.hessian(dx, x0, coeff)).clone()
+
+    e_small, e_large = energy_at(small), energy_at(large)
+    assert e_small != 0.0, "test is vacuous if the contact energy is zero"
+    assert e_large == pytest.approx(ratio * e_small, rel=1e-4), (
+        "coeff did not reach the energy buffer the assembler reads")
+
+    g_small, g_large = gradient_at(small), gradient_at(large)
+    assert g_small.abs().max() > 0.0, "test is vacuous if the contact gradient is zero"
+    assert torch.allclose(g_large, ratio * g_small, rtol=1e-4), (
+        "coeff did not reach the gradient buffer the assembler reads")
+
+    h_small, h_large = hessian_at(small), hessian_at(large)
+    assert h_small.abs().max() > 0.0, "test is vacuous if the contact hessian is zero"
+    assert torch.allclose(h_large, ratio * h_small, rtol=1e-4), (
+        "coeff did not scale the hessian")
