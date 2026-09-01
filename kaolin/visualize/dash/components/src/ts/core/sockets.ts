@@ -2,18 +2,56 @@ import { logger } from '../util/logging';
 import { getTabUuid } from '../util';
 
 
+/**
+ * If current page is secure, upgrades http to https and ws to wss in input url string.
+ * An unparseable string is returned unchanged.
+ */
+export function upgradeUrlScheme(urlString: string): string {
+    const pageIsSecure = window.location.protocol === 'https:';
+    if (!pageIsSecure) {
+        return urlString;
+    }
+    try {
+        const url = new URL(urlString);
+
+        // Extract: url.protocol includes the colon (e.g., "http:")
+        const currentScheme = url.protocol;
+
+        if (currentScheme === 'http:') {
+          url.protocol = 'https:';
+        } else if (currentScheme === 'ws:') {
+          url.protocol = 'wss:';
+        }
+        return url.href;
+      } catch (error) {
+        // Through the logger, not console directly, so this follows the configured level like
+        // every other message here. Names the likely cause, because the usual way to land in
+        // here is an unregistered connection id being retried as an address, and "invalid URL"
+        // on its own sends readers looking for a typo instead.
+        logger.warn(
+            `upgradeUrlScheme: cannot parse "${urlString}" as a URL, leaving unchanged.`,
+            error);
+        return urlString;
+    }
+}
 
 /**
  * Replaces special string "WINDOW_LOCATION" with window's current location,
- * if present, or returns original url.
- * 
- * @param url the address stirng such as wss://0.19.18.70:8080/websocket or any other
+ * if present, or returns original url. Either way the scheme is then upgraded
+ * to https or wss if current page is secure.
+ *
+ * @param url the address string such as wss://0.19.18.70:8080/websocket or any other
  */
-function resolveWindowLocation(url: string): string {
-    if (url.includes('WINDOW_LOCATION')) {
-        return url.replace('WINDOW_LOCATION', window.location.host);
+export function resolveWindowLocation(urlString: string): string {
+    // Substitute the host BEFORE upgrading, never after: upgradeUrlScheme parses through
+    // `new URL`, which lowercases the host, so an upgrade-first order would leave
+    // "window_location" behind and the substitution would silently miss. Falling through to
+    // the upgrade is what lets the sentinel's ws:// reach wss:// on an https page, instead of
+    // being blocked as mixed content.
+    if (urlString.includes('WINDOW_LOCATION')) {
+        urlString = urlString.replace('WINDOW_LOCATION', window.location.host);
     }
-    return url;
+    return upgradeUrlScheme(urlString);
 }
 
 /**
@@ -22,7 +60,7 @@ function resolveWindowLocation(url: string): string {
  * override for tests. Used internally; the registry is keyed on the unparameterized
  * address so callers like `getOpenConnection('main-ws')` need not know about the param.
  */
-function appendTabUuid(address: string): string {
+export function appendTabUuid(address: string): string {
     try {
         const u = new URL(address);
         if (!u.searchParams.has('tab')) {

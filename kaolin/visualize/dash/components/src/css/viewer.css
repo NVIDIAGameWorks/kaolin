@@ -18,6 +18,15 @@
     width: 100%;
 }
 
+.kaolin-viewer,
+.kaolin-viewer-container,
+.kaolin-viewer-container canvas {
+  -webkit-touch-callout: none; /* Prevents the default context menu/magnifier */
+  -webkit-user-select: none;   /* Prevents text selection */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent; /* Removes the blue tap overlay */
+}
+
 .kaolin-viewer-container .sub-canvas {
     position: absolute;
     top: 0;
