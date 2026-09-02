@@ -199,10 +199,25 @@ body {
 }
 
 @media (min-width: 768px) {
+    /** Fixed-height app shell, so the page itself never scrolls and the sidebar
+        owns its own vertical overflow (see .kaolin-sidebar below). Without a
+        definite height here, a tall sidebar would instead stretch the flex row
+        and scroll the whole page. */
+    #kaolin-app {
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+    }
+
     .kaolin-sidebar {
         box-shadow: 2px 0 5px 0px rgba(0, 0, 0, 0.3);
         flex-grow: 0;
         min-height: unset;
+        /** Fill all vertical space left by the navbar, and scroll internally
+            when the sections don't fit. */
+        height: 100%;
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
 
     .kaolin-sidebar-content {
@@ -217,6 +232,9 @@ body {
     .kaolin-primary-container {
         display: flex;
         flex-direction: row;
+        /** Flex items default to min-height:auto; without this the row would
+            refuse to shrink below its tallest child and overflow the shell. */
+        min-height: 0;
     }
 }
 
