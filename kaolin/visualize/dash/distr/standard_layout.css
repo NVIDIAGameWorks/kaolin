@@ -239,14 +239,47 @@ body {
 }
 
 @media (max-width: 767px) {
+    /** Stacked layout: the sidebar sits above the main area, so there is no flex
+        row to stretch this container and its only content (the viewer) is made of
+        absolutely positioned layers with no intrinsic height -- it would collapse
+        to zero. Must be a definite `height`, not `min-height`: the viewer sizes
+        itself with height:100%, which only resolves against a definite parent. */
+    .kaolin-main-container {
+        height: 100vh;
+        height: 100dvh;
+    }
+
     .kaolin-sidebar {
         width: 100%;
         min-height: 100%;
         padding: 20px;
     }
 
+    /** Disappearing sidebar overlays the content (position: absolute), so the main
+        area is the only in-flow child and should take exactly the height the navbar
+        leaves it -- the 100dvh above would make the page one navbar taller than the
+        viewport and scroll. This is the same flex row used at >=768px: the height
+        then comes from flex stretch, which (unlike a flex-grown height) counts as a
+        definite parent for the viewer's own height:100%. */
+    .kaolin-primary-container:has(> .kaolin-sliding-sidebar) {
+        display: flex;
+        flex-direction: row;
+        min-height: 0;
+    }
+
+    .kaolin-sliding-sidebar ~ .kaolin-main-container {
+        flex-grow: 1;
+        height: auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+
     .kaolin-sliding-sidebar {
         min-width: 300px;
+        /** Now bounded by the viewport height, so it has to scroll internally or
+            its lower controls are unreachable (cf. the >=768px rule). */
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
 }
 

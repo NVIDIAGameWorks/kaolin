@@ -140,7 +140,7 @@ if __name__ == '__main__':
     # Layout: sidebar with the auto-generated per-behavior controls + a File menu.
     # ------------------------------------------------------------------------------------------------------------------
     title = html.Span([html.I(className='p-2 bi bi-vector-pen me-2'), html.Span('2D Interaction Playground')])
-    layout_helper = StandardLayoutHelper(title, max_width='flex')
+    layout_helper = StandardLayoutHelper(title, max_width='fluid')
     layout_helper.add_sidebar(disappearing=False)
 
     layout_helper.add_sidebar_section('Brush (drawing)')

@@ -3,7 +3,7 @@ import { setCanvasBufferSize } from '../util/canvas';
 export enum ViewportResizeMode {
     FIXED = 'fixed',
     ADAPTIVE = 'adaptive',
-    FIX_ASPECT = 'fix_aspect'
+    FIXED_ASPECT = 'fixed_aspect'
 }
 
 
@@ -37,7 +37,7 @@ export function computeContainedFixedAspectSize(
  *
  * - FIXED: canvas keeps its initial pixel size regardless of the container.
  * - ADAPTIVE: canvas fills the container; aspect ratio follows the container.
- * - FIX_ASPECT: largest size preserving the initial aspect ratio that still
+ * - FIXED_ASPECT: largest size preserving the initial aspect ratio that still
  *   fits inside the container (letterboxed; never overflows).
  *
  * When `incorporateDevicePixelRatio` is true, the result is multiplied by
@@ -60,7 +60,7 @@ export function computeContainedDisplaySize(
             height = initialSize.height;
             break;
 
-        case ViewportResizeMode.FIX_ASPECT: {
+        case ViewportResizeMode.FIXED_ASPECT: {
             ({ width, height } = computeContainedFixedAspectSize(initialSize, containerSize));
             break;
         }
