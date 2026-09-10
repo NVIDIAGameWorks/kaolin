@@ -204,7 +204,9 @@ def test_solver_with_newton_floor(simplicits_object):
         state_in, state_out = state_out, state_in
 
     deformed_pts = wp.to_torch(model.sim_z_to_full(state_in.sim_z))
-    assert deformed_pts[:, AXIS].mean() > -1.0  # stayed above floor due to collision
+
+    # Stayed above the floor due to collision.
+    assert deformed_pts[:, AXIS].mean() > -1.0
 
 
 def test_solver_kinematic_object_does_not_move(simplicits_object):

@@ -14,14 +14,17 @@
 # limitations under the License.
 
 import logging
+from typing import Any
+
 import torch
 import warp as wp
 import warp.sparse as wps
 
 from kaolin.physics.simplicits.precomputed import sparse_collision_jacobian_matrix
 from kaolin.physics.utils.warp_utilities import _bsr_to_torch, _warp_csr_from_torch_dense
+from kaolin.physics.utils.torch_utilities import hess_reduction
 
-__all__ = ['Collision']
+__all__ = ['Collision', 'ChunkedCollisionHessian']
 
 # TODO: Separate the cps from qps. Currently we use qps for both.
 # TODO: Currently self collisions are disabled via high immune radius.
@@ -35,7 +38,7 @@ NULL_ELEMENT_INDEX = wp.constant(-1)
 
 @wp.kernel
 def _detect_particle_collisions_wp_kernel(
-    max_contacts: int,                    # max number of contacts to detect
+    capacity: int,                        # max number of contacts to detect
     grid: wp.uint64,                      # hashgrid for current points
     radius: float,                        # collision radius
     self_collision_immune_radius: float,  # ignore self collisions within radius
@@ -44,7 +47,7 @@ def _detect_particle_collisions_wp_kernel(
     pos_delta: wp.array(dtype=wp.vec3),   # displacements of points ... velocity of points * dt (how much they moved in current timestep)B*z_k - B*z_0 where k is newton iteration
     qp_obj_ids: wp.array(dtype=int),      # point to object id mapping
     cp_is_static: wp.array(dtype=int),    # 1 for true, 0 for false
-    count: wp.array(dtype=int),           # number of contacts detected
+    contact_count: wp.array(dtype=int),   # number of contacts detected
     normals: wp.array(dtype=wp.vec3),     # contact normals
     kinematic_gaps: wp.array(dtype=wp.vec3),  # kinematic gaps
     indices_a: wp.array(dtype=int),       # collision indices pairs a-b
@@ -78,8 +81,8 @@ def _detect_particle_collisions_wp_kernel(
         d = wp.length(pos_a - pos_b)
         if d <= radius:
             # indx of the current collision pair
-            idx = wp.atomic_add(count, 0, 1)
-            if idx >= max_contacts:
+            idx = wp.atomic_add(contact_count, 0, 1)
+            if idx >= capacity:
                 return
 
             n = wp.normalize(pos_a - pos_b)
@@ -101,6 +104,111 @@ def _detect_particle_collisions_wp_kernel(
                 indices_b[idx] = NULL_ELEMENT_INDEX
             else:
                 indices_b[idx] = idx_b
+
+
+@wp.kernel
+def _collision_jacobian_chunk_wp_kernel(
+    b_dense: wp.array2d(dtype=wp.float32),    # (3*num_cps, num_dofs) subspace basis
+    indices_a: wp.array(dtype=int),
+    indices_b: wp.array(dtype=int),
+    contact_count: wp.array(dtype=int),
+    chunk_start: wp.array(dtype=int),         # device-resident, so the loop never syncs
+    j_chunk: wp.array2d(dtype=wp.float32),    # (3*chunk, num_dofs) output
+):  # pragma: no cover
+    r"""Materializes one chunk of the collision Jacobian as a row gather from ``B``.
+
+    ``J[3c+k, :] = B[3*idx_a[c]+k, :] - B[3*idx_b[c]+k, :]`` -- verified exactly equal to
+    the sparse-assembled ``collision_J_dense``. Because it is only a gather, a chunk can
+    be built directly at any offset, so the full ``(3*max_contacting_pairs, num_dofs)``
+    Jacobian never has to exist: memory is ``chunk * 3 * num_dofs`` regardless of
+    capacity. At the capacities kaolin's examples use that is 14 MiB rather than 343 MiB.
+
+    ``chunk_start`` is an array, not an int, because the enclosing ``wp.capture_while``
+    advances it on device; a Python int would bake the offset into the graph.
+    """
+    c, j = wp.tid()
+    g = chunk_start[0] + c
+
+    # Past the live contact count: zero the rows. The reduction runs over the whole
+    # chunk, so padding must contribute exactly nothing to J^T H J.
+    if g >= contact_count[0]:
+        for k in range(3):
+            j_chunk[3 * c + k, j] = 0.0
+        return
+
+    idx_a = indices_a[g]
+    idx_b = indices_b[g]
+    for k in range(3):
+        v = float(0.0)
+        # A static side has no DOFs to differentiate against, so it contributes no rows.
+        # Guarded for the same reason as _collision_offset_wp_func: NULL_ELEMENT_INDEX is
+        # a marker, and gathering at -1 would wrap to the last row of B.
+        if idx_a != NULL_ELEMENT_INDEX:
+            v += b_dense[3 * idx_a + k, j]
+        if idx_b != NULL_ELEMENT_INDEX:
+            v -= b_dense[3 * idx_b + k, j]
+        j_chunk[3 * c + k, j] = v
+
+
+@wp.kernel
+def _collision_chunk_wp_kernel(
+    full: wp.array(dtype=Any),
+    contact_count: wp.array(dtype=int),
+    chunk_start: wp.array(dtype=int),
+    chunk: wp.array(dtype=Any),
+):  # pragma: no cover
+    c = wp.tid()
+    g = chunk_start[0] + c
+    if g >= contact_count[0]:
+        chunk[c] = type(chunk).dtype(0.0)
+    else:
+        chunk[c] = full[g]
+
+
+wp.overload(_collision_chunk_wp_kernel, [
+    wp.array(dtype=wp.vec3),
+    wp.array(dtype=int),
+    wp.array(dtype=int),
+    wp.array(dtype=wp.vec3),
+])
+wp.overload(_collision_chunk_wp_kernel, [
+    wp.array(dtype=wp.mat33),
+    wp.array(dtype=int),
+    wp.array(dtype=int),
+    wp.array(dtype=wp.mat33),
+])
+
+
+@wp.kernel
+def _clamp_contact_count_wp_kernel(
+    contact_count: wp.array(dtype=int),
+    capacity: int,
+):  # pragma: no cover
+    r"""Clamps the detected contact count to the buffer capacity, on device.
+
+    The detection kernel increments ``contact_count`` *before* testing the capacity, so on
+    overflow it holds the raw detected total while only ``capacity`` slots were written.
+    Every per-contact kernel guards on this array, so an unclamped count would let threads
+    read slots that were never filled.
+
+    Done here rather than from the host because ``contact_count <= capacity`` has to hold without
+    anyone reading it back: it is what makes a partial final chunk safe in
+    :class:`ChunkedCollisionHessian` (a thread passing ``g >= contact_count`` therefore also
+    satisfies ``g < capacity``), and it is the last thing that forced a D2H per step.
+    """
+    contact_count[0] = wp.min(contact_count[0], capacity)
+
+
+@wp.kernel
+def _advance_chunk_start_and_update_cond_wp_kernel(
+    chunk_start: wp.array(dtype=int),
+    chunk_size: int,
+    contact_count: wp.array(dtype=int),
+    while_cond: wp.array(dtype=int),
+):  # pragma: no cover
+    r"""Advance the chunk cursor and update the captured-loop condition."""
+    chunk_start[0] = chunk_start[0] + chunk_size
+    while_cond[0] = wp.where(chunk_start[0] < contact_count[0], 1, 0)
 
 
 @wp.func
@@ -129,18 +237,29 @@ def _collision_offset_wp_func(
         
     Returns:
         wp.vec3: The relative offset vector from point B to point A, accounting for
-                motion and kinematic gaps. If point B is static (NULL_ELEMENT_INDEX),
-                only point A's motion is considered.
+                motion and kinematic gaps. Either side may be static
+                (NULL_ELEMENT_INDEX), in which case that side contributes no motion;
+                if both are, the offset is just the kinematic gap.
     """
     idx_a = indices_a[c]
     idx_b = indices_b[c]
 
-    pos_delta_a = dx_cur[idx_a] - dx_start_of_timestep[idx_a]
-    pos_delta_b = dx_cur[idx_b] - dx_start_of_timestep[idx_b]
-
-    offset = pos_delta_a + kinematic_gaps[c]
+    # A static point contributes no motion, so its term is simply omitted -- the same
+    # semantics the idx_b branch below has always had. NULL_ELEMENT_INDEX is a marker,
+    # not an index: Warp's index() does `if (i < 0) i += shape[0]`, so gathering at -1
+    # silently returns the LAST contact point in the scene and folds an unrelated
+    # particle's displacement into the offset.
+    #
+    # Unreachable today (simulation.py calls detect_collisions with cp_is_static=None,
+    # so the sentinel is never written), but detect_collisions is public and takes
+    # cp_is_static; the moment a caller supplies it, detection's `idx_a < idx_b`
+    # ordering puts the sentinel in indices_a for *every* contact against a
+    # low-indexed static object, not occasionally.
+    offset = kinematic_gaps[c]
+    if idx_a != NULL_ELEMENT_INDEX:
+        offset += dx_cur[idx_a] - dx_start_of_timestep[idx_a]
     if idx_b != NULL_ELEMENT_INDEX:
-        offset -= pos_delta_b
+        offset -= dx_cur[idx_b] - dx_start_of_timestep[idx_b]
     return offset
 
 
@@ -151,8 +270,23 @@ def _collision_target_distance_wp_func(
     indices_a: wp.array(dtype=int),
     indices_b: wp.array(dtype=int),
 ):  # pragma: no cover
-    return wp.where(indices_b[c] == NULL_ELEMENT_INDEX, 1.0, 2.0) * radius
-    # return 2.0 * radius
+    r"""Target separation for contact ``c``: one radius against static geometry, two
+    between two dynamic particles.
+
+    Both indices are tested, not just ``indices_b``. Detection enforces ``idx_a < idx_b``,
+    so a kinematic object added early in the scene -- as ``simplicits_friction_slab`` adds
+    its slab -- puts the sentinel in ``indices_a`` for *every* one of its contacts, not
+    occasionally. Testing only ``indices_b`` would then return ``2*radius`` for all of
+    them, and since ``rc`` divides through everything downstream (``d_hat = d/rc``,
+    ``rp = barrier_ratio*rc``, gradient ``~ dE/rc``, Hessian ``~ d2E/rc^2``) the barrier
+    would engage at twice the intended gap with the force halved and the Hessian quartered.
+    Warp folds a ``-1`` subscript to the last element rather than raising, so it would fail
+    silently.
+    """
+    # No short-circuit `or` inside wp.where, so combine the two tests arithmetically.
+    static_a = wp.where(indices_a[c] == NULL_ELEMENT_INDEX, 1, 0)
+    static_b = wp.where(indices_b[c] == NULL_ELEMENT_INDEX, 1, 0)
+    return wp.where(static_a + static_b > 0, 1.0, 2.0) * radius
 
 
 @wp.kernel
@@ -169,6 +303,7 @@ def _collision_energy_wp_kernel(
     normals: wp.array(dtype=wp.vec3),
     indices_a: wp.array(dtype=int),
     indices_b: wp.array(dtype=int),
+    contact_count: wp.array(dtype=int),
     energies: wp.array(dtype=float),
 ):  # pragma: no cover
     r"""
@@ -187,6 +322,11 @@ def _collision_energy_wp_kernel(
         energies (wp.array(dtype=float)): Energy of each collision pair
     """
     c = wp.tid()
+
+    # Only captured callers launch unused slots; see _collision_bounds_setup for why this
+    # count guard checks c, not indices_b[c].
+    if c >= contact_count[0]:
+        return
 
     offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
@@ -265,6 +405,7 @@ def _collision_gradient_wp_kernel(coeff: float,
                         normals: wp.array(dtype=wp.vec3),
                         indices_a: wp.array(dtype=int),
                         indices_b: wp.array(dtype=int),
+                        contact_count: wp.array(dtype=int),
                                   gradient: wp.array(dtype=wp.vec3)):  # pragma: no cover
     r"""
     Calculates the collision gradient for each collision pair.
@@ -282,6 +423,11 @@ def _collision_gradient_wp_kernel(coeff: float,
         gradient (wp.array(dtype=wp.vec3)): Gradient of the collision energy for each collision pair
     """
     c = wp.tid()
+
+    # Only captured callers launch unused slots; see _collision_bounds_setup for why this
+    # count guard checks c, not indices_b[c].
+    if c >= contact_count[0]:
+        return
 
     offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
@@ -375,6 +521,7 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
                                    normals: wp.array(dtype=wp.vec3),
                                    indices_a: wp.array(dtype=int),
                                    indices_b: wp.array(dtype=int),
+                                   contact_count: wp.array(dtype=int),
                                              hessian: wp.array(dtype=wp.mat33)):  # pragma: no cover
     r"""
     Compute the Hessian of the collision energy for each collision pair.
@@ -392,6 +539,11 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
         hessian (wp.array(dtype=wp.mat33)): Hessian of the collision energy for each collision pair
     """
     c = wp.tid()
+
+    # Only captured callers launch unused slots; see _collision_bounds_setup for why this
+    # count guard checks c, not indices_b[c].
+    if c >= contact_count[0]:
+        return
 
     offset = _collision_offset_wp_func(
         c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
@@ -505,8 +657,68 @@ def _collision_hessian_diag_blocks_wp_kernel(coeff: float,
     hessian[c] = coeff * hessian[c]
 
 
+@wp.struct
+class _CollisionBoundsSetup:
+    valid_contact: int
+    delta_d_a: float
+    delta_d_b: float
+    max_delta_d: float
+    idx_a: int
+    idx_b: int
+
+
+@wp.func
+def _collision_bounds_setup(
+    c: int,
+    radius: float,
+    barrier_distance_ratio: float,
+    dx_cur: wp.array(dtype=wp.vec3),
+    dx_start_of_timestep: wp.array(dtype=wp.vec3),
+    kinematic_gaps: wp.array(dtype=wp.vec3),
+    normals: wp.array(dtype=wp.vec3),
+    indices_a: wp.array(dtype=int),
+    indices_b: wp.array(dtype=int),
+    delta_dx: wp.array(dtype=wp.vec3),
+    contact_count: wp.array(dtype=int),
+):
+    setup = _CollisionBoundsSetup()
+    setup.valid_contact = 0
+    setup.delta_d_a = 0.0
+    setup.delta_d_b = 0.0
+    setup.max_delta_d = 0.0
+    setup.idx_a = 0
+    setup.idx_b = 0
+
+    # Captured callers launch the fixed contact capacity, so skip unused slots.
+    # A negative partner index is a valid fixed-geometry contact, not an unused slot.
+    if c >= contact_count[0]:
+        return setup
+
+    nor = normals[c]
+    setup.idx_a = indices_a[c]
+    setup.idx_b = indices_b[c]
+
+    # A static point does not move. Without this check, delta_dx[-1] wraps to the last
+    # contact point.
+    if setup.idx_a != NULL_ELEMENT_INDEX:
+        setup.delta_d_a = wp.dot(nor, delta_dx[setup.idx_a])
+    if setup.idx_b != NULL_ELEMENT_INDEX:
+        setup.delta_d_b = -wp.dot(nor, delta_dx[setup.idx_b])
+
+    offset = _collision_offset_wp_func(
+        c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
+    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
+    gap_cur = barrier_distance_ratio * rc - wp.dot(offset, nor)
+    if gap_cur >= 0.0:
+        return setup
+
+    setup.max_delta_d = 0.5 * 0.75 * gap_cur
+    setup.valid_contact = 1
+    return setup
+
+
 @wp.kernel
-def _get_collision_bounds_wp_kernel(
+def _collision_bounds_bsr_wp_kernel(
     radius: float,
     barrier_distance_ratio: float,
     dx_cur: wp.array(dtype=wp.vec3),
@@ -520,37 +732,15 @@ def _get_collision_bounds_wp_kernel(
     jacobian_a_columns: wp.array(dtype=int),
     jacobian_b_offsets: wp.array(dtype=int),
     jacobian_b_columns: wp.array(dtype=int),
-    dof_t_max: wp.array(dtype=float),
+    contact_count: wp.array(dtype=int),
+    block_step_bounds: wp.array(dtype=float),
 ):  # pragma: no cover
     c = wp.tid()
-
-    # Distance delta
-    nor = normals[c]
-
-    idx_a = indices_a[c]
-    idx_b = indices_b[c]
-
-    delta_d_a = wp.dot(nor, delta_dx[idx_a])
-
-    # If idx_b is -1, then there is no second colliding particle
-    if idx_b == NULL_ELEMENT_INDEX:
-        delta_d_b = 0.0
-    else:
-        delta_d_b = -wp.dot(nor, delta_dx[idx_b])
-
-    # Current distance
-    offset = _collision_offset_wp_func(
-        c, dx_cur, dx_start_of_timestep, kinematic_gaps, indices_a, indices_b)
-    rc = _collision_target_distance_wp_func(c, radius, indices_a, indices_b)
-    rp = barrier_distance_ratio * rc
-    gap_cur = rp - wp.dot(offset, nor)
-
-    if gap_cur >= 0.0:
-        # Missed due to too large timestep. Can't do anything now
+    setup = _collision_bounds_setup(
+        c, radius, barrier_distance_ratio, dx_cur, dx_start_of_timestep, kinematic_gaps,
+        normals, indices_a, indices_b, delta_dx, contact_count)
+    if setup.valid_contact == 0:
         return
-
-    MAX_PROGRESS = 0.75
-    max_delta_d = 0.5 * MAX_PROGRESS * gap_cur
 
     # TODO: Change this to use the cp_to_dof mapping in the future. In case I don't have these J_a, J_b matrices
     #
@@ -558,21 +748,82 @@ def _get_collision_bounds_wp_kernel(
     # Using two jacobians Ja, Jb you can tell which DOFs affect the first colliding particle
     # and the second colliding particle
     # Using warp sparse matrices I can use the same kernel to compute the bounds
-    if delta_d_a < 0.0:  # getting closer
-        t_max = wp.clamp(max_delta_d / delta_d_a, 0.0, 1.0)
+    if setup.delta_d_a < 0.0:  # getting closer
+        t_max = wp.clamp(setup.max_delta_d / setup.delta_d_a, 0.0, 1.0)
         if t_max < 1.0:
             dof_beg = jacobian_a_offsets[3*c]
             dof_end = jacobian_a_offsets[3*c + 1]
             for dof in range(dof_beg, dof_end):
-                wp.atomic_min(dof_t_max, jacobian_a_columns[dof], t_max)
+                wp.atomic_min(block_step_bounds, jacobian_a_columns[dof], t_max)
 
-    if delta_d_b < 0.0:  # getting closer
-        t_max = wp.clamp(max_delta_d / delta_d_b, 0.0, 1.0)
+    if setup.delta_d_b < 0.0:  # getting closer
+        t_max = wp.clamp(setup.max_delta_d / setup.delta_d_b, 0.0, 1.0)
         if t_max < 1.0:
             dof_beg = jacobian_b_offsets[3*c]
             dof_end = jacobian_b_offsets[3*c + 1]
             for dof in range(dof_beg, dof_end):
-                wp.atomic_min(dof_t_max, jacobian_b_columns[dof], t_max)
+                wp.atomic_min(block_step_bounds, jacobian_b_columns[dof], t_max)
+
+
+@wp.kernel
+def _collision_bounds_dense_wp_kernel(
+    radius: float,
+    barrier_distance_ratio: float,
+    dx_cur: wp.array(dtype=wp.vec3),
+    dx_start_of_timestep: wp.array(dtype=wp.vec3),
+    kinematic_gaps: wp.array(dtype=wp.vec3),
+    normals: wp.array(dtype=wp.vec3),
+    indices_a: wp.array(dtype=int),
+    indices_b: wp.array(dtype=int),
+    delta_dx: wp.array(dtype=wp.vec3),
+    b_dense: wp.array2d(dtype=wp.float32),
+    block_width: int,
+    contact_count: wp.array(dtype=int),
+    dof_step_bounds: wp.array(dtype=float),
+):  # pragma: no cover
+    r"""Capturable form of :func:`_collision_bounds_bsr_wp_kernel`.
+
+    Identical math; the only difference is where the "which DOFs does this contact point
+    move?" question is answered. The original walks the BSR structure of ``collision_J_a``
+    / ``collision_J_b``, which the capturable path no longer builds. Since those Jacobians
+    are row gathers of the dense basis, row ``3c`` of :math:`J_a` *is* row ``3*idx_a`` of
+    ``B``, so the same block sparsity is read straight from ``b_dense``.
+
+    Launched 2D over (contact, DOF block). Each thread redoes the (cheap) gap arithmetic
+    so that the sparsity test parallelizes over DOFs instead of looping inside one thread.
+    """
+    c, blk = wp.tid()
+    setup = _collision_bounds_setup(
+        c, radius, barrier_distance_ratio, dx_cur, dx_start_of_timestep, kinematic_gaps,
+        normals, indices_a, indices_b, delta_dx, contact_count)
+    if setup.valid_contact == 0:
+        return
+
+    col0 = block_width * blk
+
+    if setup.delta_d_a < 0.0:  # getting closer
+        t_max = wp.clamp(setup.max_delta_d / setup.delta_d_a, 0.0, 1.0)
+        if t_max < 1.0:
+            # int(0) rather than False: Warp requires an explicit dynamic-variable
+            # declaration for anything mutated inside a dynamic loop.
+            touched = int(0)
+            for m in range(block_width):
+                if b_dense[3 * setup.idx_a, col0 + m] != 0.0:
+                    touched = 1
+            if touched == 1:
+                for m in range(block_width):
+                    wp.atomic_min(dof_step_bounds, col0 + m, t_max)
+
+    if setup.delta_d_b < 0.0:  # getting closer
+        t_max = wp.clamp(setup.max_delta_d / setup.delta_d_b, 0.0, 1.0)
+        if t_max < 1.0:
+            touched = int(0)
+            for m in range(block_width):
+                if b_dense[3 * setup.idx_b, col0 + m] != 0.0:
+                    touched = 1
+            if touched == 1:
+                for m in range(block_width):
+                    wp.atomic_min(dof_step_bounds, col0 + m, t_max)
 
 
 class Collision:
@@ -587,7 +838,8 @@ class Collision:
                  friction_fluid=0.1,
                  friction=0.5,
                  max_contacting_pairs=10000,
-                 bounds=True):
+                 bounds=True,
+                 capturable=False):
         r"""
         Initialize the collision class. This class operates on the whole scene
 
@@ -603,10 +855,19 @@ class Collision:
             friction (float): Friction coefficient. Defaults to 0.5.
             max_contacting_pairs (int): Number of contact points. Defaults to 10000.
             bounds (bool): Bounds the dofs in the line search to prevent any interpenetration. Defaults to True.
+            capturable (bool): Launch every per-contact kernel over the fixed
+                ``max_contacting_pairs`` capacity, relying on the in-kernel device-count
+                guard, so no launch dimension depends on a host value. Required for cuda
+                graph capture. Note this changes the length of the arrays ``gradient`` and
+                ``hessian`` return when given preallocated outputs. Defaults to False.
         """
 
         # Collision constants
-        self.num_contacts = 0
+        # num_contacts is a memoized property backed by self.contact_count -- see below.
+        self._num_contacts_cache = None
+        # _assemble_hessians reads this before the first detect_collisions call on a
+        # freshly built scene. (get_bounds does not, despite an earlier comment here.)
+        self._object_pairs = []
         self.bounds = bounds
         self.collision_radius = collision_particle_radius
 
@@ -621,12 +882,32 @@ class Collision:
         self.friction = friction
         self.dt = dt
 
-        # Buffers for collisions get updated per timestep
-        self.collision_indices_a = wp.empty(max_contacting_pairs, dtype=int)
-        self.collision_indices_b = wp.empty(max_contacting_pairs, dtype=int)
-        self.collision_normals = wp.empty(max_contacting_pairs, dtype=wp.vec3)
-        self.collision_kinematic_gaps = wp.empty(
+        if max_contacting_pairs <= 0:
+            raise ValueError(
+                f"max_contacting_pairs must be positive, got {max_contacting_pairs}.")
+        self.max_contacting_pairs = max_contacting_pairs
+
+        # Buffers for collisions get updated per timestep.
+        # wp.zeros rather than wp.empty: kernels launched over the full capacity read
+        # the tail as well, and uninitialized indices would be out-of-bounds gathers in
+        # _collision_offset_wp_func. The device-side count guard is what makes the tail
+        # inert, but the buffers must still be deterministic.
+        self.collision_indices_a = wp.zeros(max_contacting_pairs, dtype=int)
+        self.collision_indices_b = wp.zeros(max_contacting_pairs, dtype=int)
+        self.collision_normals = wp.zeros(max_contacting_pairs, dtype=wp.vec3)
+        self.collision_kinematic_gaps = wp.zeros(
             max_contacting_pairs, dtype=wp.vec3)
+
+        # Contact count, kept on device. This is the single source of truth: the
+        # num_contacts property below reads it on demand rather than at detection time,
+        # so a captured step never pays a D2H for a number it does not use.
+        self.contact_count = wp.zeros(1, dtype=int)
+
+        # When True, every per-contact kernel launches over the fixed
+        # max_contacting_pairs capacity and relies on the in-kernel device-count guard,
+        # so no launch dimension depends on a host-side value. Required for graph
+        # capture; off by default so the existing path is unchanged.
+        self.capturable = capturable
 
         # Jacobians used to map from cps of contact pairs back to dofs
         self.collision_J_a = None  # Size 3*num_cps x num_dofs
@@ -639,6 +920,172 @@ class Collision:
 
         # Hashgrid for broadphase collision detection
         self.hashgrid = wp.HashGrid(128, 128, 128)
+
+    def set_start_of_timestep_dx(self, cp_dx):
+        r"""Records the contact-point displacements at the start of the timestep.
+
+        Writes **in place** into a persistent buffer rather than rebinding the attribute.
+        All four per-contact kernels read this array, so a captured graph records its
+        pointer; rebinding it (``wp.clone``, or an assignment from outside) would leave
+        the graph replaying against memory the scene no longer owns. Same reasoning as
+        the persistent ``self.contact_count``.
+
+        Args:
+            cp_dx (wp.array(dtype=wp.vec3)): Displacements to record.
+        """
+        if (self.cp_dx_at_nm_iteration_0 is None
+                or self.cp_dx_at_nm_iteration_0.shape[0] != cp_dx.shape[0]):
+            # First call, or the contact-point count changed (scene rebuilt). Allocating
+            # here is fine: it happens outside any capture, and the pointer is then
+            # stable for every subsequent timestep.
+            self.cp_dx_at_nm_iteration_0 = wp.zeros_like(cp_dx)
+        wp.copy(dest=self.cp_dx_at_nm_iteration_0, src=cp_dx)
+
+    @property
+    def object_pairs(self):
+        r"""Object index pairs that are in contact, for the non-captured Hessian assembly.
+
+        Raises on a captured scene rather than returning an empty list. That path never
+        builds this -- the assembly it feeds reduces over the full DOF width instead, and
+        the build costs two blocking device-to-host copies the captured step exists to
+        avoid -- so an empty list there means "not computed", not "nothing is touching".
+        """
+        if self.capturable:
+            raise RuntimeError(
+                "object_pairs is not built on a captured scene: the captured Hessian "
+                "assembly reduces over the full DOF width instead, and building this "
+                "would need two blocking device-to-host copies. An empty list here would "
+                "read as 'no objects are in contact', which is not what it means. Use "
+                "contact_count for whether anything is touching, or build the scene with "
+                "capturable=False if you need the pair list.")
+        return self._object_pairs
+
+    @property
+    def num_contacts(self):
+        r"""Number of live contacts. Read back from the device once per detection.
+
+        Lazy *and* memoized, and it has to be both.
+
+        Lazy, so the capturable path never pays for it: the count is already on device
+        and every per-contact kernel guards against it there, so a captured step needs no
+        host-side copy at all. Reading it eagerly in ``detect_collisions`` cost one
+        blocking D2H per step for a value that path discards.
+
+        Memoized, so the host path does not pay for it repeatedly. It reads this
+        constantly -- ``_assemble_energies`` alone touches it once per energy evaluation,
+        which with the default ``max_newton_steps=5`` / ``max_ls_steps=10`` is up to ~55
+        times a step, and ``_contact_launch_dim`` reads it again inside each of those.
+        Measured at 111 reads per step. Uncached, every one of those is its own device
+        sync, which trades one stall per step for a hundred.
+
+        The cache is dropped at the start of each detection and nowhere else, so it is
+        valid for exactly as long as the contact set is. Code that writes ``self.contact_count``
+        directly (tests do) must call :func:`invalidate_contact_count` afterwards.
+
+        The clamp mirrors :func:`_clamp_contact_count_wp_kernel`, which has already
+        applied it on device; it is repeated here so the overflow warning has somewhere
+        to live now that detection does not look at the count.
+
+        Returns:
+            int: Contact count, capped at ``max_contacting_pairs``.
+        """
+        if self._num_contacts_cache is None:
+            n = int(self.contact_count.numpy()[0])
+            if n > self.max_contacting_pairs:
+                logging.warning('contact buffer size exceed, some have been ignored')
+                n = self.max_contacting_pairs
+            self._num_contacts_cache = n
+        return self._num_contacts_cache
+
+    def invalidate_contact_count(self):
+        r"""Drops the memoized :attr:`num_contacts`, forcing a re-read on next access.
+
+        Called automatically by :func:`detect_collisions`. Only needed externally by code
+        that writes ``self.contact_count`` behind the scene's back.
+        """
+        self._num_contacts_cache = None
+
+    def _contact_launch_dim(self):
+        r"""Launch dimension for per-contact kernels.
+
+        ``max_contacting_pairs`` under ``capturable`` (fixed at capture time, with the
+        in-kernel ``c >= contact_count[0]`` guard making the unused tail inert), otherwise
+        the live host-side count, which is what the non-capturable path has always used.
+        """
+        return self.max_contacting_pairs if self.capturable else self.num_contacts
+
+    def gather_jacobian_chunk(self, b_dense, chunk_start, j_chunk):
+        r"""Materializes ``chunk`` consecutive contacts of the collision Jacobian.
+
+        Equivalent to ``self.collision_J_dense[3*s : 3*(s+chunk), :]`` for
+        ``s = chunk_start[0]``, but built as a direct row gather from the dense subspace
+        basis rather than assembled sparsely, so no ``bsr_from_triplets``, no
+        ``nnz_sync()``, and no host readback. Rows past the live contact count are zeroed.
+
+        This is what lets the full ``(3*max_contacting_pairs, num_dofs)`` Jacobian stay
+        unallocated: peak memory is set by ``chunk``, not by capacity.
+
+        Args:
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis of size
+                :math:`(3 \times \text{num_pts}, \text{num_dofs})`.
+            chunk_start (wp.array(dtype=int)): Single-element device array holding the
+                index of the first contact in this chunk. Device-resident so the
+                enclosing ``wp.capture_while`` can advance it without a host sync.
+            j_chunk (wp.array2d(dtype=wp.float32)): Output of size
+                :math:`(3 \times \text{chunk}, \text{num_dofs})`. Fully overwritten.
+        """
+        if j_chunk.shape[0] % 3 != 0:
+            raise ValueError(
+                f"j_chunk must have a multiple of 3 rows, got {j_chunk.shape[0]}.")
+        if j_chunk.shape[1] != b_dense.shape[1]:
+            raise ValueError(
+                f"j_chunk has {j_chunk.shape[1]} columns but b_dense has "
+                f"{b_dense.shape[1]}; both must be num_dofs.")
+        wp.launch(
+            kernel=_collision_jacobian_chunk_wp_kernel,
+            dim=(j_chunk.shape[0] // 3, j_chunk.shape[1]),
+            inputs=[b_dense, self.collision_indices_a, self.collision_indices_b,
+                    self.contact_count, chunk_start],
+            outputs=[j_chunk],
+            device=b_dense.device)
+
+    def gather_gradient_chunk(self, g_full, chunk_start, g_chunk):
+        r"""Gathers the per-contact :math:`dE/dx` vectors for one chunk.
+
+        Args:
+            g_full (wp.array(dtype=wp.vec3)): Per-contact gradients over the full
+                capacity, as written by :func:`gradient`.
+            chunk_start (wp.array(dtype=int)): Single-element device array holding the
+                index of the first contact in this chunk.
+            g_chunk (wp.array(dtype=wp.vec3)): Output of size ``chunk``.
+        """
+        wp.launch(
+            kernel=_collision_chunk_wp_kernel,
+            dim=g_chunk.shape[0],
+            inputs=[g_full, self.contact_count, chunk_start],
+            outputs=[g_chunk],
+            device=g_full.device)
+
+    def gather_hessian_chunk(self, h_full, chunk_start, h_chunk):
+        r"""Gathers the per-contact :math:`3 \times 3` Hessian blocks for one chunk.
+
+        The companion to :func:`gather_jacobian_chunk`: together they give the
+        :math:`J_c^T H_c J_c` operands for one chunk. Blocks past the live contact count
+        are zeroed, so padded slots contribute nothing to the reduction.
+
+        Args:
+            h_full (wp.array(dtype=wp.mat33)): Per-contact blocks over the full capacity,
+                as written by :func:`hessian`.
+            chunk_start (wp.array(dtype=int)): Single-element device array holding the
+                index of the first contact in this chunk.
+            h_chunk (wp.array(dtype=wp.mat33)): Output of size ``chunk``.
+        """
+        wp.launch(
+            kernel=_collision_chunk_wp_kernel,
+            dim=h_chunk.shape[0],
+            inputs=[h_full, self.contact_count, chunk_start],
+            outputs=[h_chunk],
+            device=h_full.device)
 
     def detect_collisions(self, cp_dx, cp_x0, cp_obj_ids, cp_is_static=None):
         r""" Detects collisions between contact points and stores the results in the collision buffers.
@@ -659,7 +1106,7 @@ class Collision:
         """
         # TODO: If we call this function multiple times per timestep, we need to store the
         # cp_dx_at_nm_iteration_0_torch at the start of each timestep, not here.
-        self.cp_dx_at_nm_iteration_0 = wp.clone(cp_dx)
+        self.set_start_of_timestep_dx(cp_dx)
 
         # current position of contact points
         current_cp = wp.from_torch(wp.to_torch(
@@ -674,21 +1121,27 @@ class Collision:
         self.hashgrid.build(current_cp, radius=2.0*self.collision_radius)
 
         # Kernel inputs
-        max_contacts = self.collision_indices_a.shape[0]
+        capacity = self.collision_indices_a.shape[0]
         detection_radius = self.collision_radius * self.collision_detection_ratio
         collision_immune_radius = self.collision_radius * self.ignore_self_collision_ratio
         
         if cp_is_static is None:
             cp_is_static = wp.zeros_like(cp_obj_ids) # none are static
 
-        # Kernel outputs
-        count = wp.zeros(1, dtype=int)
-        
+        # Kernel outputs. Reuse the persistent device buffer rather than allocating a
+        # fresh one per detection: a captured graph records the pointer, so the contact count
+        # must live at a stable address.
+        self.contact_count.zero_()
+        # The memoized host mirror is stale from here on. Dropped before the launch, so
+        # any read after this point re-syncs and sees the new contact set.
+        self._num_contacts_cache = None
+        contact_count = self.contact_count
+
         # Find collisions
         wp.launch(
             kernel=_detect_particle_collisions_wp_kernel,
             dim=current_cp.shape[0],
-            inputs=[max_contacts,
+            inputs=[capacity,
                     self.hashgrid.id,
                     2.0*detection_radius,  # 2x (for both particles)
                     collision_immune_radius,
@@ -697,7 +1150,7 @@ class Collision:
                     pos_delta,
                     cp_obj_ids,
                     cp_is_static, # indices of static objects
-                    count,
+                    contact_count,
                     self.collision_normals,
                     self.collision_kinematic_gaps,
                     self.collision_indices_a,
@@ -705,13 +1158,20 @@ class Collision:
         )
         
 
-        self.num_contacts = int(count.numpy()[0])
+        # Enforce contact_count <= capacity on device. Nothing reads it back here; see
+        # _clamp_contact_count_wp_kernel for why that invariant has to hold anyway.
+        wp.launch(_clamp_contact_count_wp_kernel, dim=1,
+                  inputs=[self.contact_count, capacity], device=self.contact_count.device)
 
-        if self.num_contacts > max_contacts:
-            logging.warning('contact buffer size exceed, some have been ignored')
-            self.num_contacts = max_contacts
-
-        # self.build_jacobian(cp_w, cp_x0, cp_obj_ids)
+        if self.capturable:
+            # object_pairs below costs two blocking D2H (torch.unique with dim= has a
+            # data-dependent output shape, so it sizes its output from the host, then
+            # .cpu()/.numpy() again). Its only consumer is the host Newton path's
+            # _assemble_hessians, which builds a sparse block matrix from the pair list.
+            # The capturable assembly reduces J^T H J full-width and never reads it, so
+            # for a captured scene this is pure dead work plus the last host syncs in the
+            # step. Returning here is what makes the step actually sync-free.
+            return
 
         # If there are any collision contacts detected
         if self.num_contacts > 0:
@@ -743,10 +1203,10 @@ class Collision:
                 )
             )
             # Get unique interaction pairs
-            self.object_pairs = torch.unique(object_pairs, dim=0).numpy() # needed for indexing in the hessian matrix
+            self._object_pairs = torch.unique(object_pairs, dim=0).numpy() # needed for indexing in the hessian matrix
         else:
             # If no collisions, empty list
-            self.object_pairs = []
+            self._object_pairs = []
 
         return
 
@@ -832,15 +1292,22 @@ class Collision:
         if self.num_contacts == 0 and not self.bounds:
             return None
 
+        if self.collision_J_a is None:
+            raise RuntimeError(
+                "get_bounds needs the sparse collision Jacobian, which calculate_jacobian "
+                "builds and a captured scene never calls. Use get_bounds_capturable, which "
+                "reads the same sparsity out of the dense basis, or call calculate_jacobian "
+                "first on a non-captured scene.")
+
         # Inputs: Position increments of the contact points
 
         # Output: vector of size num_column_blocks in J_a. If J_a is csr, then num_blocks=J.shape[1]
-        blockwise_bounds = wp.ones(
+        block_step_bounds = wp.ones(
             (self.collision_J_a.ncol), dtype=float, device=self.collision_J_a.device)
 
         wp.launch(
-            _get_collision_bounds_wp_kernel,
-            dim=self.num_contacts,
+            _collision_bounds_bsr_wp_kernel,
+            dim=self._contact_launch_dim(),
             inputs=[
                 self.collision_radius,
                 self.collision_barrier_ratio,
@@ -856,23 +1323,78 @@ class Collision:
                 self.collision_J_a.columns,  # columns of the jacobian blocks
                 self.collision_J_b.offsets,  # offsets of the jacobian blocks
                 self.collision_J_b.columns,  # columns of the jacobian blocks
-                blockwise_bounds,               # Output: bounds for each handle
+                self.contact_count,          # device-side contact count (slot guard)
+                block_step_bounds,           # Output: bounds for each handle
             ],
         )
 
         # print(
-        #     "blockwise_bounds: left is rbf, right is mlp. If rbf > mlp is true, thats good.")
-        # left = wp.to_torch(blockwise_bounds[0:blockwise_bounds.shape[0]//2])
-        # right = wp.to_torch(blockwise_bounds[blockwise_bounds.shape[0]//2:])
+        #     "block_step_bounds: left is rbf, right is mlp. If rbf > mlp is true, thats good.")
+        # left = wp.to_torch(block_step_bounds[0:block_step_bounds.shape[0]//2])
+        # right = wp.to_torch(block_step_bounds[block_step_bounds.shape[0]//2:])
         # print(left)
         # print(right)
 
         # we have one bound per block column of J.
         # expand to one bound per scalar column, as that is what apply_bounds expect
-        dof_bounds = wp.from_torch(
-            wp.to_torch(blockwise_bounds).unsqueeze(1).repeat(1, self.collision_J_a.block_shape[1]).flatten())
+        dof_step_bounds = wp.from_torch(
+            wp.to_torch(block_step_bounds).unsqueeze(1).repeat(1, self.collision_J_a.block_shape[1]).flatten())
 
-        return dof_bounds
+        return dof_step_bounds
+
+    def get_bounds_capturable(self, cp_delta_dx, cp_dx, b_dense, dof_step_bounds,
+                              block_width=4):
+        r"""Per-DOF step bounds, without touching the sparse Jacobian.
+
+        Capturable counterpart of :func:`get_bounds`: fixed launch dimension, preallocated
+        output, no allocation and no host read. See
+        :func:`_collision_bounds_dense_wp_kernel` for why ``b_dense`` can stand in for
+        the BSR structure.
+
+        Args:
+            cp_delta_dx (wp.array(dtype=wp.vec3)): :math:`B \, dz`, the proposed step at
+                the contact points.
+            cp_dx (wp.array(dtype=wp.vec3)): :math:`B \, z`, current displacements.
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis.
+            dof_step_bounds (wp.array(dtype=float)): Preallocated ``(num_dofs,)`` output. Reset
+                to 1.0 here, so callers need not.
+            block_width (int, optional): DOF block granularity at which bounds are
+                applied, matching ``collision_J_a``'s block shape. Defaults to 4.
+
+        Returns:
+            wp.array(dtype=float): ``dof_step_bounds``.
+        """
+        num_dofs = b_dense.shape[1]
+        if dof_step_bounds.shape[0] != num_dofs:
+            raise ValueError(
+                f"dof_step_bounds has {dof_step_bounds.shape[0]} entries but b_dense has "
+                f"{num_dofs} columns.")
+        if num_dofs % block_width != 0:
+            raise ValueError(
+                f"num_dofs ({num_dofs}) must be a multiple of block_width "
+                f"({block_width}).")
+
+        dof_step_bounds.fill_(1.0)
+        wp.launch(
+            _collision_bounds_dense_wp_kernel,
+            dim=(self._contact_launch_dim(), num_dofs // block_width),
+            inputs=[
+                self.collision_radius,
+                self.collision_barrier_ratio,
+                cp_dx,
+                self.cp_dx_at_nm_iteration_0,
+                self.collision_kinematic_gaps,
+                self.collision_normals,
+                self.collision_indices_a,
+                self.collision_indices_b,
+                cp_delta_dx,
+                b_dense,
+                block_width,
+                self.contact_count,
+            ],
+            outputs=[dof_step_bounds],
+            device=b_dense.device)
+        return dof_step_bounds
 
     def energy(self, dx, x0, coeff, energy=None):
         r"""
@@ -893,7 +1415,7 @@ class Collision:
 
         wp.launch(
             kernel=_collision_energy_wp_kernel,
-            dim=self.num_contacts,
+            dim=self._contact_launch_dim(),
             inputs=[coeff,
                     self.collision_radius,
                     self.collision_barrier_ratio,
@@ -905,14 +1427,15 @@ class Collision:
                     self.collision_kinematic_gaps,
                     self.collision_normals,
                     self.collision_indices_a,
-                    self.collision_indices_b],
+                    self.collision_indices_b,
+                    self.contact_count],
             outputs=[energy],
             adjoint=False
         )
         return energy
         # print("collision energy: ", self.num_contacts, energy.numpy())
 
-    def gradient(self, dx, x0, coeff):
+    def gradient(self, dx, x0, coeff, gradient=None):
         r"""
         Compute the gradient of the collision energy.
 
@@ -920,16 +1443,32 @@ class Collision:
             dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs of size :math:`(\text{num_pts}, 3)`
             x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient for the collision energy.
+            gradient (wp.array(dtype=wp.vec3), optional): Preallocated output, normally of
+                size ``max_contacting_pairs``. Required for cuda-graph capture, which
+                forbids allocation. Zeroed on entry, since the count guard leaves the
+                unused tail unwritten. Defaults to allocating a ``num_contacts``-sized
+                array, which is what the non-capturable path expects.
 
         Returns:
             wp.array(dtype=wp.vec3): Gradient of the collision energy of size :math:`(\text{num_contacts}, 3)`
         """
-        gradient = wp.zeros(
-            self.num_contacts, dtype=wp.vec3, device=dx.device)
+        if gradient is None:
+            gradient = wp.zeros(
+                self.num_contacts, dtype=wp.vec3, device=dx.device)
+        else:
+            # The kernel writes slot c for every c below the device count, which is
+            # independent of this buffer's length -- so an undersized buffer is an
+            # out-of-bounds write, and Warp release builds strip the bounds assert.
+            if gradient.shape[0] < self._contact_launch_dim():
+                raise ValueError(
+                    f"gradient buffer holds {gradient.shape[0]} entries but the launch "
+                    f"covers {self._contact_launch_dim()}; size it to "
+                    f"max_contacting_pairs ({self.max_contacting_pairs}).")
+            gradient.zero_()
 
         wp.launch(
             kernel=_collision_gradient_wp_kernel,
-            dim=self.num_contacts,
+            dim=self._contact_launch_dim(),
             inputs=[coeff,
                     self.collision_radius,
                     self.collision_barrier_ratio,
@@ -941,14 +1480,15 @@ class Collision:
                     self.collision_kinematic_gaps,
                     self.collision_normals,
                     self.collision_indices_a,
-                    self.collision_indices_b],
+                    self.collision_indices_b,
+                    self.contact_count],
             outputs=[gradient],
             adjoint=False
         )
 
         return gradient
 
-    def hessian(self, dx, x0, coeff):
+    def hessian(self, dx, x0, coeff, hessian_blocks=None):
         r"""
         Compute the hessian of the collision energy.
 
@@ -956,17 +1496,32 @@ class Collision:
             dx (wp.array(dtype=wp.vec3)): Current CP displacements with the current dofs of size :math:`(\text{num_pts}, 3)`
             x0 (wp.array(dtype=wp.vec3)): Rest contact point positions of size :math:`(\text{num_pts}, 3)`
             coeff (float): Coefficient for the collision energy.
+            hessian_blocks (wp.array(dtype=wp.mat33), optional): Preallocated output,
+                normally of size ``max_contacting_pairs``. Required for cuda-graph
+                capture, which forbids allocation. Zeroed on entry, since the count guard
+                leaves the unused tail unwritten -- and the padded blocks must be exactly
+                zero so they contribute nothing to :math:`J^T H J`. Defaults to
+                allocating a ``num_contacts``-sized array.
 
         Returns:
             wp.array(dtype=wp.mat33): Hessian of the collision energy of size :math:`(\text{num_contacts}, 3, 3)`
         """
-
-        hessian_blocks = wp.zeros(
-            self.num_contacts, dtype=wp.mat33, device=dx.device)
+        if hessian_blocks is None:
+            hessian_blocks = wp.zeros(
+                self.num_contacts, dtype=wp.mat33, device=dx.device)
+        else:
+            # See gradient(): an undersized buffer is an out-of-bounds write that Warp
+            # release builds will not catch.
+            if hessian_blocks.shape[0] < self._contact_launch_dim():
+                raise ValueError(
+                    f"hessian buffer holds {hessian_blocks.shape[0]} entries but the "
+                    f"launch covers {self._contact_launch_dim()}; size it to "
+                    f"max_contacting_pairs ({self.max_contacting_pairs}).")
+            hessian_blocks.zero_()
 
         wp.launch(
             kernel=_collision_hessian_diag_blocks_wp_kernel,
-            dim=self.num_contacts,
+            dim=self._contact_launch_dim(),
             inputs=[coeff,
                     self.collision_radius,
                     self.collision_barrier_ratio,
@@ -978,8 +1533,224 @@ class Collision:
                     self.collision_kinematic_gaps,
                     self.collision_normals,
                     self.collision_indices_a,
-                    self.collision_indices_b],
+                    self.collision_indices_b,
+                    self.contact_count],
             outputs=[hessian_blocks],
             adjoint=False
         )
         return hessian_blocks
+
+
+class ChunkedCollisionHessian:
+    r"""Reduces the collision Hessian :math:`J^T H J` a chunk of contacts at a time.
+
+    :math:`H` is block diagonal -- one :math:`3 \times 3` block per contact -- so the
+    reduction is separable over contacts:
+
+    .. math::
+        J^T H J = \sum_c J_c^T H_c J_c
+
+    where :math:`J_c` are the rows of :math:`J` belonging to chunk :math:`c`. Each term
+    is a full :math:`(\text{num_dofs}, \text{num_dofs})` matrix that simply accumulates,
+    so the chunks can be visited one at a time and the full
+    :math:`(3 \times \text{max_contacting_pairs}, \text{num_dofs})` Jacobian never has to
+    exist. That is the whole point: peak memory is set by ``chunk_size`` rather than by
+    contact capacity. For ``simplicits_stacking_cubes`` (600 DOFs, 50000 contact capacity)
+    a full dense Jacobian is 343 MiB against 14 MiB for a 2048-contact chunk, and the
+    ``H @ J`` scratch is the same size again in both cases, so the ratio holds overall.
+
+    Every buffer is allocated once, in ``__init__``, and every launch dimension is fixed,
+    so ``reduce`` performs no allocation and no host sync. The trip count is the one
+    remaining host-visible quantity, and :func:`reduce` deliberately walks the full
+    capacity rather than reading the live count; :func:`reduce_capturable` replaces the
+    Python loop with a ``wp.capture_while`` over a device predicate, which both makes it
+    graph-capturable and skips the empty tail.
+
+    Args:
+        collision (Collision): Source of the contact arrays and the device contact count.
+        num_dofs (int): Number of simulation DOFs, i.e. columns of the subspace basis.
+        chunk_size (int, optional): Contacts per chunk. Need not divide
+            ``collision.max_contacting_pairs``; a partial final chunk is safe because the
+            gather kernels zero any lane past the live contact count. Clamped down to the
+            capacity. Defaults to 2048.
+        device (optional): Warp device for the buffers. Defaults to ``collision.contact_count``'s.
+    """
+
+    def __init__(self, collision, num_dofs, chunk_size=2048, device=None):
+        capacity = collision.max_contacting_pairs
+        if chunk_size <= 0:
+            raise ValueError(f"chunk_size must be positive, got {chunk_size}.")
+
+        # chunk_size deliberately need NOT divide the capacity. A final chunk that hangs
+        # off the end is safe because `count <= capacity` is an enforced invariant --
+        # detection drops slots past the capacity (_detect_particle_collisions_wp_kernel)
+        # and _clamp_contact_count_wp_kernel pins the count on device afterwards. So a
+        # lane with `g >= count` also has `g >= capacity`, and all three gather kernels
+        # return early on exactly that test, zeroing their output. Requiring exact
+        # divisibility bought nothing and forced callers into a divisor search that
+        # collapsed to chunk_size=1 for capacities with no convenient factor.
+        chunk_size = min(chunk_size, capacity)
+
+        if device is None:
+            device = collision.contact_count.device
+
+        self.collision = collision
+        self.chunk_size = chunk_size
+        self.num_chunks = -(-capacity // chunk_size)  # ceil
+        self.num_dofs = num_dofs
+        self.device = device
+
+        # Device-resident cursor and loop predicate. Both must be arrays rather than
+        # Python ints: a captured graph bakes in host values, so an int cursor would
+        # replay every step at whatever offset it happened to hold at capture time.
+        self.chunk_start = wp.zeros(1, dtype=int, device=device)
+        self.chunk_while_cond = wp.zeros(1, dtype=int, device=device)
+
+        self.j_chunk = wp.zeros((3 * chunk_size, num_dofs),
+                                dtype=wp.float32, device=device)
+        self.h_chunk = wp.zeros(chunk_size, dtype=wp.mat33, device=device)
+        self.g_chunk = wp.zeros(chunk_size, dtype=wp.vec3, device=device)
+
+        # Torch views onto the same memory -- the reduction is a pair of GEMMs, which
+        # torch does far better than a hand-written kernel. wp.to_torch aliases rather
+        # than copies, so these stay valid for the lifetime of the buffers above.
+        self.j_chunk_th = wp.to_torch(self.j_chunk)
+        self.h_chunk_th = wp.to_torch(self.h_chunk)
+        # (chunk, 3) -> (3*chunk,), a view: this is the vector J_c^T multiplies.
+        self.g_chunk_th = wp.to_torch(self.g_chunk).reshape(3 * chunk_size)
+        # Scratch for the intermediate H @ J. Preallocated because torch.bmm would
+        # otherwise allocate inside the capture region.
+        self.hj_th = torch.zeros(chunk_size, 3, num_dofs,
+                                 dtype=self.j_chunk_th.dtype,
+                                 device=self.j_chunk_th.device)
+
+        # Initialize cuBLAS before CUDA graph capture. Its first matrix multiply creates
+        # a handle, which capture forbids. The handle does not depend on matrix size, so
+        # this 1x1 zero multiply is enough.
+        _warm = torch.zeros((1, 1), dtype=self.j_chunk_th.dtype, device=self.j_chunk_th.device)
+        torch.matmul(_warm, _warm, out=_warm)
+
+    def _advance_and_update_cond(self, chunk_size):
+        r"""Move the cursor, then set whether the captured loop should continue."""
+        wp.launch(kernel=_advance_chunk_start_and_update_cond_wp_kernel, dim=1,
+                  inputs=[self.chunk_start, chunk_size, self.collision.contact_count,
+                          self.chunk_while_cond],
+                  device=self.device)
+
+    def _reduce_one_chunk(self, b_dense, h_full, out):
+        r"""Builds the chunk at the current cursor and accumulates its contribution."""
+        self.collision.gather_jacobian_chunk(b_dense, self.chunk_start, self.j_chunk)
+        self.collision.gather_hessian_chunk(h_full, self.chunk_start, self.h_chunk)
+        hess_reduction(self.j_chunk_th, self.h_chunk_th, out=out, hj_out=self.hj_th,
+                       accumulate=True)
+        self._advance_and_update_cond(self.chunk_size)
+
+    def _reduce_one_gradient_chunk(self, b_dense, g_full, out):
+        r"""Accumulates :math:`J_c^T \, (dE/dx)_c` for the chunk at the current cursor."""
+        self.collision.gather_jacobian_chunk(b_dense, self.chunk_start, self.j_chunk)
+        self.collision.gather_gradient_chunk(g_full, self.chunk_start, self.g_chunk)
+        # addmv_ is the in-place out += A @ v GEMV; no allocation, no extra buffer.
+        out.addmv_(self.j_chunk_th.transpose(0, 1), self.g_chunk_th)
+        self._advance_and_update_cond(self.chunk_size)
+
+    def accumulate_gradient_capturable(self, b_dense, g_full, out):
+        r"""Adds :math:`J^T \, dE/dx` into ``out``, chunked, under ``wp.capture_while``.
+
+        The host path does this with one ``bsr_mv`` against the sparse collision
+        Jacobian, whose topology changes with the contact set and so cannot be captured.
+        This is the same product, accumulated chunk by chunk from gathered rows.
+
+        Unlike the Hessian reduction this deliberately does **not** zero ``out``: the
+        scene gradient already holds the elastic and point-wise terms by the time
+        collisions are added.
+
+        Args:
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis.
+            g_full (wp.array(dtype=wp.vec3)): Per-contact :math:`dE/dx` over capacity.
+            out (torch.Tensor): ``(num_dofs,)`` accumulator, added into.
+
+        Returns:
+            torch.Tensor: ``out``.
+        """
+        if out.numel() != self.num_dofs:
+            raise ValueError(
+                f"out has {out.numel()} entries, expected {self.num_dofs}.")
+        self.chunk_start.zero_()
+        # A zero-size advance initializes the condition without moving the cursor.
+        self._advance_and_update_cond(0)
+
+        def while_body():
+            self._reduce_one_gradient_chunk(b_dense, g_full, out)
+
+        wp.capture_while(self.chunk_while_cond, while_body=while_body)
+        return out
+
+    def reduce(self, b_dense, h_full, out):
+        r"""Accumulates :math:`J^T H J` into ``out`` with a host-side chunk loop.
+
+        Walks the full contact *capacity* rather than the live count, so the trip count
+        is independent of the contact state and nothing is read back to the host. Chunks
+        beyond the count contribute exactly zero -- both gather kernels zero their
+        padding -- so the result is identical to reducing only the live contacts, just at
+        the cost of some empty GEMMs.
+
+        Args:
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis.
+            h_full (wp.array(dtype=wp.mat33)): Per-contact Hessian blocks over capacity.
+            out (torch.Tensor): Preallocated ``(num_dofs, num_dofs)`` output, overwritten.
+
+        Returns:
+            torch.Tensor: ``out``.
+        """
+        self._validate(b_dense, h_full, out)
+        out.zero_()
+        self.chunk_start.zero_()
+        for _ in range(self.num_chunks):
+            self._reduce_one_chunk(b_dense, h_full, out)
+        return out
+
+    def reduce_capturable(self, b_dense, h_full, out, accumulate=False):
+        r"""Same reduction, but with the chunk loop as a ``wp.capture_while``.
+
+        Two things change versus :func:`reduce`. The loop becomes a device-side
+        conditional graph node, so the whole reduction can live inside a captured graph;
+        and the predicate tests the live contact count, so replay stops after
+        ``ceil(count / chunk_size)`` chunks instead of always walking the capacity.
+
+        Args:
+            b_dense (wp.array2d(dtype=wp.float32)): Dense subspace basis.
+            h_full (wp.array(dtype=wp.mat33)): Per-contact Hessian blocks over capacity.
+            out (torch.Tensor): Preallocated ``(num_dofs, num_dofs)`` output.
+            accumulate (bool, optional): Add into ``out`` rather than overwriting it.
+                Lets the scene Hessian be accumulated in place, avoiding a second
+                ``(num_dofs, num_dofs)`` scratch -- 56 MiB at 3840 DOF. Defaults to False.
+
+        Returns:
+            torch.Tensor: ``out``.
+        """
+        self._validate(b_dense, h_full, out)
+        if not accumulate:
+            out.zero_()
+        self.chunk_start.zero_()
+        # A zero-size advance initializes the condition without moving the cursor.
+        self._advance_and_update_cond(0)
+
+        def while_body():
+            self._reduce_one_chunk(b_dense, h_full, out)
+
+        wp.capture_while(self.chunk_while_cond, while_body=while_body)
+        return out
+
+    def _validate(self, b_dense, h_full, out):
+        if b_dense.shape[1] != self.num_dofs:
+            raise ValueError(
+                f"b_dense has {b_dense.shape[1]} columns but this reducer was built for "
+                f"{self.num_dofs} DOFs.")
+        if h_full.shape[0] < self.collision.max_contacting_pairs:
+            raise ValueError(
+                f"h_full holds {h_full.shape[0]} blocks but capacity is "
+                f"{self.collision.max_contacting_pairs}.")
+        if tuple(out.shape) != (self.num_dofs, self.num_dofs):
+            raise ValueError(
+                f"out has shape {tuple(out.shape)}, expected "
+                f"({self.num_dofs}, {self.num_dofs}).")
