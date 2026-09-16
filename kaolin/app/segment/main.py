@@ -131,7 +131,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # ViewerBuilder: helps us build the interactive viewer (on the webpage)
     # ------------------------------------------------------------------------------------------------------------------
-    viewer_builder = ViewerBuilder(camera=camera, viewport_resize_mode='fixed')
+    viewer_builder = ViewerBuilder(camera=camera, viewport_resize_mode='adaptive')
     # Note: Masha is still handling last bugs in adaptive viewport
 
     # WebSocket Connections ----------
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     title = html.Span([html.Span("Gaussian Splat Segmentation"), html.I(className="p-2 bi bi-scissors me-2")])
-    layout_helper = StandardLayoutHelper(title, max_width='lg')
+    layout_helper = StandardLayoutHelper(title, max_width='fluid')
 
     # Menus ---------------------------
     layout_helper.add_navbar_dropdown('File')

@@ -54,12 +54,16 @@ class AppLayoutHelper(Protocol):
 
 
 
-BsBreakpoints = Literal['sm', 'md', 'lg', 'xl', 'xxl', 'flex']
+BsBreakpoints = Literal['sm', 'md', 'lg', 'xl', 'xxl']
 
-def _max_width_to_bs_container_class(max_width: BsBreakpoints | None) -> str:
+#: Suffixes of Bootstrap's ``.container-*`` classes: a breakpoint, past which the
+#: container stops growing, or ``'fluid'`` for one that is always full-width.
+BsContainerType = Literal[BsBreakpoints, 'fluid']
+
+def _max_width_to_bs_container_class(max_width: BsContainerType | None) -> str:
     if max_width is None or len(max_width) == 0:
         return ''
-    allowable_values = get_args(BsBreakpoints)
+    allowable_values = get_args(BsContainerType)
     if max_width not in allowable_values:
         raise ValueError(f"max_width must be one of {allowable_values}")
     return f'container-{max_width}'
@@ -72,7 +76,7 @@ def _width_to_class(width: int):
 class StandardLayoutHelper(AppLayoutHelper):
     def __init__(self,
                  title='Kaolin App',
-                 max_width: BsBreakpoints | None ='lg'):
+                 max_width: BsContainerType | None = 'lg'):
         self.navbar_items = {}
         self.navbar_content, self.navbar = StandardLayoutHelper.make_navbar(title)
         self.main_container_class = _max_width_to_bs_container_class(max_width)

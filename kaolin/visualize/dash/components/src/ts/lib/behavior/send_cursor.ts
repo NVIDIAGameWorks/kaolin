@@ -158,6 +158,13 @@ export const SendCursorBehaviorComponent = forwardRef<
         // ElementBoundBehavior
         elementType: () => elementType,
         setActiveElement: (element: HTMLElement) => { elementRef.current = element; },
+        // Nothing to reconcile: every outgoing CursorValue is measured against
+        // the live element at event time, so no cached pixel state can go
+        // stale. The element-relative pixel fields (`x` / `y`) do change
+        // meaning across a resize, but only in the sense that they are always
+        // relative to the current size; whether the server should be told that
+        // size is a wire-format question, not something to fix here.
+        setDimensions: (_width: number, _height: number) => {},
         // Pointer/click handlers — duck-checked by isPointerEventHandler / isClickEventHandler
         onClick: maybeSend,
         onDoubleClick: maybeSend,

@@ -108,6 +108,14 @@ export class SvgAnnotationBehavior extends InteractiveBehavior {
 
     override setActiveElement(elem) {
         super.setActiveElement(elem);
+        // Markers are stamped at `viewBox` coordinates derived from a fraction
+        // of the *element* box, so the two only agree if the user space maps
+        // onto the whole element. Under the default `preserveAspectRatio` a
+        // square `viewBox` is letterboxed inside a non-square element and a
+        // marker stops landing under the click; 'none' stretches it to fill
+        // instead, which keeps every existing marker at its own fraction at the
+        // cost of scaling glyphs non-uniformly.
+        (elem as SVGElement).setAttribute('preserveAspectRatio', 'none');
         this.svgDisplay = new SvgDisplay(elem as SVGElement);
 
         this.assets = {};
@@ -115,6 +123,16 @@ export class SvgAnnotationBehavior extends InteractiveBehavior {
             this.assets[name] = this.svgDisplay.createSvgGroup(assetSpec);
         }
     }
+
+    /**
+     * Nothing to reconcile. Everything here lives in the `viewBox` user space
+     * that {@link SvgDisplay} read once, which the element's pixel size does
+     * not touch, and the `preserveAspectRatio='none'` set in
+     * `setActiveElement` keeps that space mapped onto the whole element at any
+     * aspect. So SVG rescales the markers for free and their fractions stay
+     * put.
+     */
+    override setDimensions(_width: number, _height: number): void {}
 
     onClick(event: React.MouseEvent) {
         if (!this.element || !this.svgDisplay) {

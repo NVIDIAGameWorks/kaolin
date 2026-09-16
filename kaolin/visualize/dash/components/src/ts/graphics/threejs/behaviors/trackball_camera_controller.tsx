@@ -71,8 +71,7 @@ export class TrackballCameraController extends CameraControllerBase {
         return threeCameraToKaolin(this.camera, this.width, this.height);
     }
 
-    setDimensions(width: number, height: number) {
-        super.setDimensions(width, height);
+    protected override onViewportSizeChanged(width: number, height: number): void {
         if (this.camera instanceof THREE.PerspectiveCamera && height > 0) {
             this.camera.aspect = width / height;
             this.camera.updateProjectionMatrix();

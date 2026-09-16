@@ -107,6 +107,23 @@ export class KonvaSelectionBehavior extends KonvaDrawingBehavior {
     }
 
     /**
+     * Resizes the Konva stage through the base class (which also drops any
+     * in-progress draft), and nothing else.
+     *
+     * The canonical state here is the pixel content of the *composite* canvas,
+     * which is a separate layer this behavior only references by id. The viewer
+     * resizes it like any other layer, carrying the accumulated mask across
+     * when the aspect is unchanged and clearing it when it is not — the right
+     * policy either way, since a stretched mask would misregister against the
+     * render it was drawn over, and the server consumes it as fractions of the
+     * frame so a uniform scale stays registered. Nothing here is expressed in
+     * composite pixels, so there is no state left to reconcile.
+     */
+    override setDimensions(width: number, height: number): void {
+        super.setDimensions(width, height);
+    }
+
+    /**
      * Resolve the composite canvas from options.compositeCanvasId.
      *
      * The element is accepted by duck-typing (presence of `getContext`) rather

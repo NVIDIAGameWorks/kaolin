@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 
+import { resizeCanvasKeepContent, setCanvasBufferSize } from '../util/canvas';
+import { logger } from '../util/logging';
 import { createGlobalRegistry } from '../util/registry';
+import { adjustByDevicePixelRatio, isFixedAspect } from './viewport';
 
 
 // TODO: should be whatever, not fixed properties
@@ -103,4 +106,83 @@ const LayerComponent = ({
     return layerConstructor(elementRef, layerProps);
 };
 
-export { LayerRegister, LayerConstructor, LayerComponent };
+/**
+ * Resize a layer element, keeping its content where that is both meaningful and
+ * possible. What a resize costs depends on the layer type:
+ *
+ * - `canvas`: the size *is* the drawing buffer, and any write to it clears the
+ *   buffer. The painted content is therefore carried across only when the new
+ *   size has the same aspect ratio (see
+ *   {@link core.viewport.isFixedAspect | isFixedAspect}), because the only way
+ *   to carry it is to stretch it and an aspect change would distort it. On an
+ *   aspect change the buffer is resized and left blank for whatever owns it to
+ *   repaint.
+ * - `svg`: nothing can be lost, since the content is vector and is placed by
+ *   the `viewBox`, so only the `width`/`height` attributes are brought in line.
+ *   Under the viewer's CSS (`.sub-canvas` stretches every layer to fill the
+ *   container) those attributes do not drive layout, so this only keeps the
+ *   element self-describing. Whether the `viewBox` should be rewritten to the
+ *   new aspect is a question about the drawing space rather than the element,
+ *   and belongs to the behavior that owns it, so it is left alone here.
+ * - anything else (`div`, custom layers): nothing to do. With no drawing buffer
+ *   of its own, the element is already sized by CSS.
+ *
+ * Sizes are in CSS pixels. A canvas' drawing buffer is the one thing that is
+ * not: it is scaled by `window.devicePixelRatio` (see
+ * {@link core.viewport.adjustByDevicePixelRatio | adjustByDevicePixelRatio}),
+ * since a CSS-sized buffer is upscaled by the browser to fill the element and
+ * renders visibly soft on a HiDPI display. This is the only place that applies
+ * the ratio to a layer, so a behavior reading `canvas.width` gets device pixels
+ * while its `setDimensions` argument is CSS pixels.
+ *
+ * Not for a canvas driven by a renderer (three.js, PlayCanvas): resizing one
+ * behind the renderer's back leaves its viewport stale, and the content-keeping
+ * path asks for a 2D context, which would permanently prevent a WebGL one on a
+ * canvas that has not yet created it. Size those through their behavior.
+ *
+ * @param inputLayer - Layer element; null and undefined are tolerated.
+ * @param newWidth - Target width in pixels; floored, must be >= 1.
+ * @param newHeight - Target height in pixels; floored, must be >= 1.
+ * @returns `true` if the layer now has the requested size, `false` if the layer
+ *     type carries no explicit size of its own or the resize failed.
+ */
+function resizeLayer(inputLayer: Element | null | undefined, newWidth: number, newHeight: number): boolean {
+    if (!inputLayer) {
+        return false;
+    }
+
+    const width = Math.floor(newWidth);
+    const height = Math.floor(newHeight);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+        logger.error(`resizeLayer: invalid target size ${newWidth}x${newHeight}`);
+        return false;
+    }
+
+    if (inputLayer instanceof HTMLCanvasElement) {
+        const buffer = adjustByDevicePixelRatio({ width, height });
+        // Already the requested size: writing it again would clear the buffer
+        // for no gain.
+        if (inputLayer.width === buffer.width && inputLayer.height === buffer.height) {
+            return true;
+        }
+        if (isFixedAspect({ width: inputLayer.width, height: inputLayer.height }, buffer)) {
+            return resizeCanvasKeepContent(inputLayer, buffer.width, buffer.height);
+        }
+        setCanvasBufferSize(inputLayer, buffer.width, buffer.height);
+        return true;
+    }
+
+    if (inputLayer instanceof SVGSVGElement) {
+        if (inputLayer.getAttribute('width') !== String(width)) {
+            inputLayer.setAttribute('width', String(width));
+        }
+        if (inputLayer.getAttribute('height') !== String(height)) {
+            inputLayer.setAttribute('height', String(height));
+        }
+        return true;
+    }
+
+    return false;
+}
+
+export { LayerRegister, LayerConstructor, LayerComponent, resizeLayer };

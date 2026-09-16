@@ -80,13 +80,57 @@ class ViewerBuilder:
                  width: int | None = None,
                  height: int | None = None,
                  viewport_resize_mode: str='fixed'):
+        """
+        ViewerBuilder helps construct and configure the client-side fully-featured Kaolin Viewer. 
+        # TODO: document construction, camera ownership and how width/height
+        #       interact with the camera's own resolution
+
+        Args:
+            camera:
+            width:
+            height:
+            viewport_resize_mode: one of ``'fixed'``, ``'adaptive'``,
+                ``'fixed_aspect'``; see :ref:`rubric viewport resize modes` below.
+
+        Raises:
+            ValueError: if ``viewport_resize_mode`` is not a supported value.
+
+        .. _rubric viewport resize modes:
+
+        .. rubric:: Viewport Resize Modes
+
+        Controls how the viewport and camera are resized with the viewport container size changes. The behavior
+        of the viewport container itself is **not** controlled by this configuration, but by the overall
+        app layout. What this setting controls is how viewport and camera respond to the available space.
+
+        Note: When using
+        server-side rendering, care must be taken to configure `AnyRendererMessageHandler` to properly
+        adjust actual rendering resolution, to avoid extreme latency on larger screens.
+
+        ``'fixed'`` (default)
+        Original aspect ratio comes from the configured Camera.
+        The canvas display box scales to fit within the available space while keeping its aspect ratio fixed.
+        The canvas pixel size remains fixed to Camera dimensions.
+        The Camera dimensions remain fixed.
+
+        ``'fixed_aspect'``
+        Original aspect ratio comes from the configured Camera.
+        The canvas display box scales to fit within the available space while keeping its aspect ratio fixed.
+        The canvas pixel size is adjusted to its display box size.
+        The camera dimensions are adjusted accordingly.
+
+        ``'adaptive'``
+        The canvas display box scales to fit within the available space.
+        The canvas pixel size is adjusted to its display box size.
+        The camera dimensions are adjusted accordingly.
+        """
         self._camera = copy.deepcopy(camera)
         if width is not None:
             self._camera.width = width
         if height is not None:
             self._camera.height = height
         # How the viewport canvas resizes within its container; one of
-        # 'fixed', 'adaptive', 'fix_aspect' (see ViewportResizeMode clientside).
+        # 'fixed', 'adaptive', 'fixed_aspect' (see ViewportResizeMode clientside).
         # Validated against the values compiled into the generated component,
         # unless that annotation could not be read (see _read_valid_resize_modes).
         if _VALID_RESIZE_MODES is not None and viewport_resize_mode not in _VALID_RESIZE_MODES:

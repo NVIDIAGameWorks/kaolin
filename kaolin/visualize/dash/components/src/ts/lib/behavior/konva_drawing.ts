@@ -179,7 +179,6 @@ export class KonvaDrawingBehavior extends InteractiveBehavior {
 
     protected stage: Konva.Stage | null = null;
     protected drawLayer: Konva.Layer | null = null;
-    private resizeObserver: ResizeObserver | null = null;
     private draft: DraftState | null = null;
     private isActive: boolean = true;
 
@@ -212,22 +211,21 @@ export class KonvaDrawingBehavior extends InteractiveBehavior {
 
         this.registerKonvaHandlers();
 
-        if (typeof ResizeObserver !== 'undefined') {
-            this.resizeObserver = new ResizeObserver(() => this.handleResize());
-            this.resizeObserver.observe(element);
-        }
-
         if (!this.isActive) {
             this.drawLayer.hide();
         }
     }
 
     /**
-     * Resize the Konva stage to match the viewer-supplied dimensions.
-     * Also calls super (sets CSS `style.width`/`style.height` on the div) so
-     * the container and stage stay in sync — Konva itself already writes those
-     * properties on the div, so this is idempotent. Mirrors the guard used by
-     * the internal `handleResize` to avoid spurious redraws.
+     * Resize the Konva stage to the viewer-supplied size. The stage and its
+     * layer canvases live *inside* the bound div and were created here, so
+     * unlike the div itself they are this behavior's to resize — the viewer
+     * knows nothing about them. CSS pixels is what Konva wants: it multiplies
+     * by its own pixel ratio when sizing the layer canvases.
+     *
+     * Guarded against an unchanged size, since writing it would clear and
+     * redraw every layer canvas for nothing, and discards any in-progress
+     * draft (see below).
      */
     setDimensions(width: number, height: number): void {
         if (!this.stage) return;
@@ -236,6 +234,12 @@ export class KonvaDrawingBehavior extends InteractiveBehavior {
         if (this.stage.width() === w && this.stage.height() === h) return;
         this.stage.width(w);
         this.stage.height(h);
+        // An in-progress draft cannot survive this. Its points are in stage
+        // coordinates, which Konva does not rescale when the stage resizes, so
+        // the shape would stay where it was while the content under it moved --
+        // true of a uniform resize as much as an aspect change. Dropping it is
+        // the same thing a mode switch does.
+        this.discardDraft();
         this.drawLayer?.batchDraw();
     }
 
@@ -754,22 +758,8 @@ export class KonvaDrawingBehavior extends InteractiveBehavior {
         this.drawLayer?.batchDraw();
     }
 
-    private handleResize(): void {
-        if (!this.stage || !this.element) return;
-        const w = Math.max(1, this.element.clientWidth);
-        const h = Math.max(1, this.element.clientHeight);
-        if (this.stage.width() === w && this.stage.height() === h) return;
-        this.stage.width(w);
-        this.stage.height(h);
-        this.drawLayer?.batchDraw();
-    }
-
     private disposeStage(): void {
         this.discardDraft();
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
-        }
         if (this.stage) {
             this.stage.off('.kaolin');
             this.stage.destroy();

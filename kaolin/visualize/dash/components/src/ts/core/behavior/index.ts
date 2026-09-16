@@ -62,10 +62,18 @@
  * setOption(name: string, value: any): void;
  * reset(options?: any): void;
  * ```
- * {@link ElementBoundBehavior} — bind to a DOM element:
+ * {@link SizeableBehavior} — be told the viewport size in CSS pixels (never
+ * device pixels), to reconcile internal state against it; the viewer sizes the
+ * layer elements themselves, so an implementation never resizes its own layer:
+ * ```typescript
+ * setDimensions(width: number, height: number): void;
+ * ```
+ * {@link ElementBoundBehavior} — bind to a DOM element (also a
+ * {@link SizeableBehavior}):
  * ```typescript
  * elementType(): string;
  * setActiveElement(element: HTMLElement): void;
+ * setDimensions(width: number, height: number): void;
  * ```
  * {@link ClickEventHandler} / {@link PointerEventHandler} — receive click / pointer events:
  * ```typescript
@@ -79,7 +87,8 @@
  * onConnectionOpen(): void;
  * onMessage(messageTag: string, messageContent: any | null): void;
  * ```
- * {@link CameraControllerInterface} — own and drive a camera:
+ * {@link CameraControllerInterface} — own and drive a camera (also a
+ * {@link SizeableBehavior}):
  * ```typescript
  * setDimensions(width: number, height: number): void;
  * setCameraParams(params: CameraParameters): void;

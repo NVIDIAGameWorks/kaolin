@@ -77,12 +77,35 @@ class SessionRegistry:
 
     @classmethod
     def get_or_create(cls, tab_uuid: Optional[str], initial_session_data: Dict) -> Dict:
+        """Returns the session entry for a browser tab, creating it if absent.
+
+        Args:
+            tab_uuid (Optional[str]): per-browser-tab uuid to look up.
+            initial_session_data (Dict): values deep-copied into a newly created entry.
+
+        Return:
+            (Dict) session entry for ``tab_uuid``.
+
+        TODO: complete docstring.
+        """
         with cls._lock:
             return cls._get_or_create(tab_uuid, initial_session_data)
 
     @classmethod
     def get_or_create_and_update(cls, tab_uuid: Optional[str], initial_session_data: Dict,
-                         update_func=None):
+                                 update_func: Optional[Callable[[Dict], None]] = None) -> Dict:
+        """Returns the session entry for a browser tab, mutating it under the registry lock.
+
+        Args:
+            tab_uuid (Optional[str]): per-browser-tab uuid to look up.
+            initial_session_data (Dict): values deep-copied into a newly created entry.
+            update_func (Optional[Callable]): called with the session entry while the lock is held.
+
+        Return:
+            (Dict) session entry for ``tab_uuid``, after ``update_func`` has run.
+
+        TODO: complete docstring.
+        """
         with cls._lock:
             session = cls._get_or_create(tab_uuid, initial_session_data)
             if update_func is not None:
@@ -91,17 +114,41 @@ class SessionRegistry:
 
     @classmethod
     def get(cls, tab_uuid: Optional[str]) -> Optional[Dict]:
+        """Returns the session entry for a browser tab, or None if not registered.
+
+        Args:
+            tab_uuid (Optional[str]): per-browser-tab uuid to look up.
+
+        Return:
+            (Optional[Dict]) session entry for ``tab_uuid``, or ``None``.
+
+        TODO: complete docstring.
+        """
         with cls._lock:
             return cls._entries.get(tab_uuid)
 
     @classmethod
     def remove(cls, tab_uuid: Optional[str]) -> None:
-        """Drop an entry. Idempotent. Intended for future GC; unused for now."""
+        """Drop an entry. Idempotent. Intended for future GC; unused for now.
+
+        Args:
+            tab_uuid (Optional[str]): per-browser-tab uuid to drop.
+
+        TODO: complete docstring.
+        """
         with cls._lock:
             cls._entries.pop(tab_uuid, None)
 
 @dataclass
 class ImportmapItem:
+    """A single browser importmap entry, optionally also exposed on ``window``.
+
+    Args:
+        url (str): url the package name resolves to.
+        import_as_global (Optional[str]): if set, name to bind the module to on ``window``.
+
+    TODO: complete docstring.
+    """
     url: str
     import_as_global: str | None = None
 
@@ -119,20 +166,32 @@ class WebappBuilder:
     instances (e.g. read it as ``State(WebappBuilder.TAB_UUID_STORE_ID, 'data')``)."""
 
     class _UserSettingInfo:
-        def __init__(self, instance, name, field_specs, store):
+        def __init__(self, instance: Any, name: str,
+                     field_specs: list[auto_ui.FieldSpec], store: dcc.Store):
             self.instance = instance
             self.name = name
             self.field_specs = field_specs
             self.store = store
 
-    def __init__(self, debug,
-                 default_theme=dbc.themes.LUX,
-                 set_favicon=True,
+    def __init__(self, debug: bool,
+                 default_theme: str = dbc.themes.LUX,
+                 set_favicon: bool = True,
                  log_dir: str = 'logs',
                  log_prefix: str = 'kaolin',
                  log_download_button: bool = False):
-        """ Initializes web app builder with basic settings. Used setter functions to
-        further configure it before building the app.
+        """ This class provides utilities for configuring various common aspects of
+        web prototypes built with the Kaolin Web Framework.
+
+        Typical usage:
+
+        app_builder = WebappBuilder()
+
+        # add resources and settings
+        # TODO: examples for add_extra_Stylesheets, etc
+
+        # build and run
+        app_builder.build()
+        app_builder.run(
 
         Note: 🌱 this class is just a shortcut. Use custom Dash / tornado app setup
         if it does not fit your use cases.
@@ -189,38 +248,86 @@ class WebappBuilder:
             self.unsafe_enable_log_download(auto_add_download_button=log_download_button)
             self.unsafe_write_websocket_errors()
 
-    def stylesheets(self):
-        """
+    def stylesheets(self) -> list[str]:
+        """Returns all stylesheet urls the built app should load.
 
-        Returns:
-            (list) of strings
+        Return:
+            (list) of str urls, theme first, then extra and layout stylesheets.
 
+        TODO: complete docstring.
         """
         layout_stylesheets = []
         if self.layout_helper is not None:
             layout_stylesheets = self.layout_helper.stylesheets()
         return [self.default_theme] + self.extra_stylesheets + layout_stylesheets
 
-    def external_scripts(self):
+    def external_scripts(self) -> list[str]:
+        """Returns all external script urls the built app should load.
+
+        Return:
+            (list) of str urls.
+
+        TODO: complete docstring.
+        """
         return self.extra_scripts
 
-    def add_extra_stylesheets(self, extra_stylesheets: Iterable):
+    def add_extra_stylesheets(self, extra_stylesheets: Iterable[str]) -> None:
+        """Adds stylesheet urls to load in addition to the theme.
+
+        Args:
+            extra_stylesheets (Iterable[str]): stylesheet urls.
+
+        TODO: complete docstring.
+        """
         self.extra_stylesheets.extend(extra_stylesheets)
 
-    def add_raw_body_html(self, custom_html):
+    def add_raw_body_html(self, custom_html: str) -> None:
+        """Adds raw html to inject at the start of the app's ``<body>``.
+
+        Args:
+            custom_html (str): html snippet to insert verbatim.
+
+        TODO: complete docstring.
+        """
         self.extra_raw_html.append(custom_html)
 
-    def add_importmap_item(self, package_name: str, url: str, import_as_global: str | None = None):
+    def add_importmap_item(self, package_name: str, url: str,
+                           import_as_global: str | None = None) -> None:
+        """Maps a bare module name to a url in the page's importmap.
+
+        Args:
+            package_name (str): bare module specifier, e.g. ``"playcanvas"``.
+            url (str): url the specifier resolves to.
+            import_as_global (Optional[str]): if set, also bind the module to
+                ``window.<import_as_global>``.
+
+        TODO: complete docstring.
+        """
         self.importmap[package_name] = ImportmapItem(url, import_as_global)
 
-    def add_extra_scripts(self, extra_scripts: Iterable):
+    def add_extra_scripts(self, extra_scripts: Iterable[str]) -> None:
+        """Adds external script urls to load in the app.
+
+        Args:
+            extra_scripts (Iterable[str]): script urls.
+
+        TODO: complete docstring.
+        """
         self.extra_scripts.extend(extra_scripts)
 
-    def set_layout_helper(self, layout_helper):
+    def set_layout_helper(self, layout_helper: AppLayoutHelper) -> None:
+        """Sets the helper providing the app layout, stylesheets and callbacks.
+
+        Args:
+            layout_helper (AppLayoutHelper): layout provider used at build time.
+
+        TODO: complete docstring.
+        """
         self.layout_helper = layout_helper
 
     @staticmethod
-    def __add_unique_url_mapping_or_die(mappings, url_path, local_path):
+    def __add_unique_url_mapping_or_die(mappings: Dict[str, str], url_path: str,
+                                        local_path: str) -> str:
         # TODO: deal with slash already provided by user
         url_path = WebappBuilder.CUSTOM_FILES_PATH + '/' + url_path
 
@@ -232,16 +339,20 @@ class WebappBuilder:
         mappings[url_path] = real_dir_path
         return url_path
 
-    def add_static_dir(self, dir_path, url_path=None):
+    def add_static_dir(self, dir_path: str, url_path: Optional[str] = None) -> str:
         """ Adds all files in a directory as static files to be served. New files will be retrieved automatically
         even if the server is already running.
 
         Args:
-            dir_path: local directory where files should be served from, e.g. "/home/me/my_files". All files will be served.
-            url_path: path to the files in dir, e.g. "my_files" (default: "kaolin_custom/(basename dir_path)")
+            dir_path (str): local directory where files should be served from, e.g. "/home/me/my_files".
+                All files will be served.
+            url_path (Optional[str]): path to the files in dir, e.g. "my_files"
+                (default: "kaolin_custom/(basename dir_path)")
 
-        Returns:
-            (str) url_path
+        Return:
+            (str) url path the directory is served under.
+
+        TODO: complete docstring.
         """
         assert os.path.isdir(dir_path), f'Not a directory: {dir_path}'
 
@@ -252,15 +363,18 @@ class WebappBuilder:
 
         return WebappBuilder.__add_unique_url_mapping_or_die(self.served_dirs, url_path, dir_path)
 
-    def add_static_file(self, file_path, url_path=None):
-        """
+    def add_static_file(self, file_path: str, url_path: Optional[str] = None) -> str:
+        """Adds a single local file to be served as a static file.
 
         Args:
-            file_path:
-            url_path:
+            file_path (str): local path of the file to serve, e.g. "/home/me/my_file.ply".
+            url_path (Optional[str]): path to the file, e.g. "my_file.ply"
+                (default: "kaolin_custom/(basename file_path)")
 
-        Returns:
+        Return:
+            (str) url path the file is served under.
 
+        TODO: complete docstring.
         """
         assert os.path.isfile(file_path), f'Not a file: {file_path}'
 
@@ -271,7 +385,8 @@ class WebappBuilder:
 
 
     @staticmethod
-    def _insert_importmap(index_html_str, importmap: Mapping[str, ImportmapItem], add_globals: bool = True):
+    def _insert_importmap(index_html_str: str, importmap: Mapping[str, ImportmapItem],
+                          add_globals: bool = True) -> str:
         """Insert an importmap script tag before </head> in the HTML string.
 
         Args:
@@ -317,11 +432,18 @@ class WebappBuilder:
         return index_html_str.replace('</head>', f'{importmap_script}{globals_script}</head>')
 
     @staticmethod
-    def _insert_at_body_start(index_html_str, custom_html):
+    def _insert_at_body_start(index_html_str: str, custom_html: str) -> str:
         return index_html_str.replace('<body>', f'<body>{custom_html}')
 
     @staticmethod
-    def log_debug_info(app):
+    def log_debug_info(app: Dash) -> None:
+        """Logs static paths, component registry and config of a Dash app.
+
+        Args:
+            app (Dash): app to introspect.
+
+        TODO: complete docstring.
+        """
         logger.debug(f'Static folder: {app.server.static_folder}')
         logger.debug(f'Static URL path: {app.server.static_url_path}')
         logger.debug(f'Component registry: {len(ComponentRegistry.registry)} ' +
@@ -447,7 +569,21 @@ class WebappBuilder:
                 SessionRegistry.get_or_create_and_update(tab_uuid, self.default_user_session, _session_update)
                 return current
 
-    def add_user_settings(self, setting_instance, name, storage_type='session'):
+    def add_user_settings(self, setting_instance: Any, name: str,
+                          storage_type: str = 'session') -> list[Component]:
+        """Builds per-session UI controls for a settings dataclass and binds them to the server.
+
+        Args:
+            setting_instance (Any): dataclass instance holding default setting values.
+            name (str): unique name for this group of settings.
+            storage_type (str): ``dcc.Store`` storage type backing the settings
+                (default: 'session').
+
+        Return:
+            (list) of dash Components: the generated controls plus their backing store.
+
+        TODO: complete docstring.
+        """
         if name in self.user_setting_infos:
             raise ValueError(f'Cannot add multiple settings with identical name {name}; use unique name')
 
@@ -460,7 +596,18 @@ class WebappBuilder:
         self._bind_controls_to_store_serverside(name, field_specs, store.id)
         return controls + [store]
 
-    def get_user_settings_func(self, name):
+    def get_user_settings_func(self, name: str) -> TuidCallable:
+        """Returns an accessor resolving registered settings for a browser tab.
+
+        Args:
+            name (str): name the settings were registered under with :func:`add_user_settings`.
+
+        Return:
+            (TuidCallable) callable mapping a tab uuid to that tab's settings instance,
+            suitable to pass as a websocket handler argument.
+
+        TODO: complete docstring.
+        """
         if name not in self.user_setting_infos:
             raise ValueError(f'User settings with name {name} have not been registered; call add_user_settings to register')
 
@@ -694,7 +841,19 @@ class WebappBuilder:
 
         return True
 
-    def build(self, ws_handlers, **dash_kwargs):
+    def build(self, ws_handlers: list[tuple], **dash_kwargs) -> tuple[Dash, Application]:
+        """Creates the configured Dash app and the tornado application serving it; call once.
+
+        Args:
+            ws_handlers (list[tuple]): websocket handler specs, as accepted by
+                :meth:`kaolin.visualize.web.sockets.WebSocketHandlerManager.initialize`.
+            **dash_kwargs: extra keyword arguments forwarded to the ``Dash`` constructor.
+
+        Return:
+            (tuple) of (Dash app, tornado Application).
+
+        TODO: complete docstring.
+        """
         # <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
         assert self.app is None, f'Can only call build once'
@@ -822,7 +981,14 @@ class WebappBuilder:
         self.server = server
         return app, server
 
-    def start(self, port):
+    def start(self, port: int) -> None:
+        """Serves the built app on a port and blocks running the tornado IO loop.
+
+        Args:
+            port (int): port to listen on, bound on all interfaces.
+
+        TODO: complete docstring.
+        """
         assert self.server is not None, f'Must call build() first'
         logger.info(f'-----> Now starting Dash App and Websocket Handler on port {port}')
         self.server.listen(port, address='0.0.0.0')
