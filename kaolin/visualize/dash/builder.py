@@ -18,7 +18,9 @@ from collections import defaultdict
 import os.path
 from pathlib import Path
 from dataclasses import dataclass
-from dash import Dash, html, dcc, Input, Output, callback, State, clientside_callback, no_update
+import functools
+from dash import Dash, html, dcc, Input, Output, callback, State, no_update
+from dash.exceptions import PreventUpdate
 from dash.development.base_component import Component, ComponentRegistry
 import dash_bootstrap_components as dbc
 from flask import send_from_directory, abort
@@ -125,7 +127,10 @@ class WebappBuilder:
 
     def __init__(self, debug,
                  default_theme=dbc.themes.LUX,
-                 set_favicon=True):
+                 set_favicon=True,
+                 log_dir: str = 'logs',
+                 log_prefix: str = 'kaolin',
+                 log_download_button: bool = False):
         """ Initializes web app builder with basic settings. Used setter functions to
         further configure it before building the app.
 
@@ -134,8 +139,22 @@ class WebappBuilder:
 
         Args:
             debug: if True, will enable hot reloading of code and some other features.
+                When ``True``, :meth:`unsafe_enable_log_download` and
+                :meth:`unsafe_write_websocket_errors` are called automatically.
             default_theme: theme to use (default: dbc.themes.LUX)
             set_favicon: if True, will set default kaolin favicon (default: True)
+            log_dir (str): Directory in which the log file is created immediately on
+                construction. All Python log records are written to it in addition to the
+                usual stdout handler. Defaults to ``'logs'`` relative to the current
+                working directory (created if absent).
+                See :func:`kaolin.utils.log.setup_log_file`.
+            log_prefix (str): Filename prefix for the log file (default: ``'kaolin'``).
+                Ignored when *log_dir* is ``None``.
+            log_download_button (bool): Forwarded as ``auto_add_download_button`` to
+                :meth:`unsafe_enable_log_download` when ``debug=True``. If ``True``,
+                a *Download Logs* button is automatically injected into the navbar at
+                :meth:`build` time (requires :meth:`set_layout_helper` to be called
+                first). Defaults to ``False``.
         """
         self.debug = debug
         self.default_theme = default_theme
@@ -155,6 +174,20 @@ class WebappBuilder:
         self.app = None
         self.server = None
         self.default_user_session = None
+
+        # Logging
+        self.log_file_path: Optional[str] = None
+        if log_dir is not None:
+            from kaolin.utils.log import setup_log_file
+            self.log_file_path = setup_log_file(os.path.abspath(os.path.expanduser(log_dir)), prefix=log_prefix)
+            logger.info(f'WebappBuilder: server log file: {self.log_file_path}')
+
+        # Unsafe debug features — auto-enabled in debug mode; override via unsafe_* methods.
+        self._log_download_config: Optional[tuple] = None   # (url, auto_add_download_button)
+        self._write_errors_to_client: bool = False
+        if debug:
+            self.unsafe_enable_log_download(auto_add_download_button=log_download_button)
+            self.unsafe_write_websocket_errors()
 
     def stylesheets(self):
         """
@@ -289,13 +322,13 @@ class WebappBuilder:
 
     @staticmethod
     def log_debug_info(app):
-        print(f'Static folder: {app.server.static_folder}')
-        print(f'Static URL path: {app.server.static_url_path}')
-        print(f'Component registry: {len(ComponentRegistry.registry)} ' +
-              f'{[x for x in ComponentRegistry.registry]}')
-        print(f'Config: {app.config}')
-        print(f'Registered paths: {app.registered_paths}')
-        # TODO: print the rest of the info, like served files and dirs, external scripts, etc.
+        logger.debug(f'Static folder: {app.server.static_folder}')
+        logger.debug(f'Static URL path: {app.server.static_url_path}')
+        logger.debug(f'Component registry: {len(ComponentRegistry.registry)} ' +
+                     f'{[x for x in ComponentRegistry.registry]}')
+        logger.debug(f'Config: {app.config}')
+        logger.debug(f'Registered paths: {app.registered_paths}')
+        # TODO: log the rest of the info, like served files and dirs, external scripts, etc.
 
     def _setup_user_setting_sessions(self, app: Dash) -> None:
         """Append a hidden ``dcc.Store(id=TAB_UUID_STORE_ID)`` to ``app.layout`` and
@@ -401,7 +434,7 @@ class WebappBuilder:
                 prevent_initial_call=True,
             )
             def _update(value, tab_uuid, current, _name=spec.name):
-                print(f'Updating session {tab_uuid} settings "{name}"[{_name}] to {value}')
+                logger.debug(f'Updating session {tab_uuid} settings "{name}"[{_name}] to {value}')
                 if current is None:
                     current = {}
                 current[_name] = value
@@ -436,6 +469,231 @@ class WebappBuilder:
             return session.get(name)  # get setting instance by name
         return TuidCallable(_get_settings)
 
+    def unsafe_enable_log_download(self, url: str = '/_kaolin_logs',
+                                   auto_add_download_button: bool = False):
+        """Register a Flask endpoint to serve the server log file for download.
+
+        .. warning::
+            This exposes the server log file over HTTP to any client that can reach
+            the app.  Use only in trusted environments (e.g. a local development
+            machine or a private network).  Requires ``debug=True`` on the builder.
+
+        Must be called **before** :meth:`build`. The endpoint is registered at
+        construction of the Tornado/Flask server inside :meth:`build`.
+
+        Args:
+            url (str): URL path for the log-download endpoint
+                (default: ``'/_kaolin_logs'``).
+            auto_add_download_button (bool): If ``True``, a *Download Logs*
+                button is automatically injected into the navbar by
+                :class:`AppLayoutHelper` at :meth:`build` time.  Requires
+                :meth:`set_layout_helper` to be called before :meth:`build`.
+                Defaults to ``False`` — add your own UI element pointing to
+                ``url`` if you want a visible button.
+
+        Raises:
+            RuntimeError: if the builder was not initialized with ``debug=True``.
+        """
+        if not self.debug:
+            raise RuntimeError(
+                'unsafe_enable_log_download() requires debug=True on the builder.')
+        self._log_download_config = (url, auto_add_download_button)
+
+    def unsafe_write_websocket_errors(self):
+        """Forward exception details (type + message) to the client over WebSocket.
+
+        Without this call the client always receives a generic *"an error occurred"*
+        notification that includes the log-file basename (if configured) but never
+        the actual exception message or traceback.  With this call the full
+        ``error_type`` and ``message`` are forwarded, which is useful for
+        debugging but may leak sensitive information if the app is reachable by
+        untrusted clients.
+
+        Must be called **before** :meth:`build`. Applies to both WebSocket handler
+        errors (:meth:`~kaolin.visualize.web.sockets.WebSocketHandlerManager._send_error_to_client`)
+        and Dash callback errors (:meth:`callback`).
+
+        Raises:
+            RuntimeError: if the builder was not initialized with ``debug=True``.
+        """
+        if not self.debug:
+            raise RuntimeError(
+                'unsafe_write_websocket_errors() requires debug=True on the builder.')
+        self._write_errors_to_client = True
+
+    def callback(self, *dash_args, **dash_kwargs):
+        """Decorator equivalent to Dash's ``@callback`` that routes unhandled
+        exceptions to the client error overlay via WebSocket.
+
+        Usage is identical to ``@callback`` — just replace it::
+
+            @app_builder.callback(
+                Output('my-div', 'children'),
+                Input('my-btn', 'n_clicks'),
+            )
+            def my_callback(n_clicks):
+                ...
+
+        On an unhandled exception:
+
+        - The full traceback is logged at ERROR level.
+        - A ``kaolin_error`` WS message is sent to the originating tab so the
+          ``KaolinErrorOverlay`` appears (non-debug) or the Dash debug pane shows
+          it (debug).
+        - In non-debug mode ``PreventUpdate`` is raised to suppress Dash's own
+          error handling and leave all outputs unchanged.
+        - In debug mode the original exception is re-raised so Dash's debug pane
+          displays the full traceback.
+        """
+        def decorator(func):
+            # Appends tab_uuid as the final State so the originating browser tab
+            # can be identified and the error targeted to it specifically.
+            @callback(*dash_args, State(WebappBuilder.TAB_UUID_STORE_ID, 'data'), **dash_kwargs)
+            @functools.wraps(func)
+            def wrapper(*call_args):
+                *inner_args, tab_uuid = call_args
+                try:
+                    return func(*inner_args)
+                except Exception as exc:
+                    logger.exception(
+                        'Unhandled exception in Dash callback %r', func.__name__)
+                    if self.debug:
+                        raise  # Dash debug pane handles it; skip WS relay to avoid duplicate
+                    if tab_uuid:
+                        from kaolin.visualize.web.sockets import GlobalWebSocketConnectionManager
+                        GlobalWebSocketConnectionManager.instance().send_error_to_tab(
+                            tab_uuid, exc,
+                            write_errors_to_client=self._write_errors_to_client)
+                    raise PreventUpdate
+            return wrapper
+        return decorator
+
+    # ID of the app-level KaolinErrorOverlay component added to the layout by _setup_error_overlay.
+    ERROR_OVERLAY_ID = '_kaolin-error-overlay'
+
+    # ID of the hidden Store used to relay kaolin_error WS messages into Dash's
+    # debug pane in debug mode. KaolinErrorOverlay calls set_props on this store;
+    # the Python callback below re-raises so the debug pane catches it.
+    WS_ERROR_RELAY_STORE_ID = '_kaolin-ws-error-relay'
+
+    @staticmethod
+    def _append_to_layout(app: Dash, component) -> None:
+        """Append *component* to the Dash app layout regardless of its current shape.
+
+        Handles all legal ``app.layout`` / ``app.layout.children`` shapes:
+        - ``app.layout`` is a list → extend the list in-place.
+        - ``app.layout.children`` is ``None`` → initialize to ``[component]``.
+        - ``app.layout.children`` is a scalar component → wrap + append.
+        - ``app.layout.children`` is a list or tuple → convert to list + append.
+        - ``app.layout`` is ``None`` → set to ``[component]``.
+        """
+        if isinstance(app.layout, list):
+            app.layout = list(app.layout) + [component]
+        elif app.layout is not None:
+            children = app.layout.children
+            if children is None:
+                app.layout.children = [component]
+            elif isinstance(children, (list, tuple)):
+                app.layout.children = list(children) + [component]
+            else:
+                # scalar component — wrap into a list
+                app.layout.children = [children, component]
+        else:
+            app.layout = [component]
+
+    def _setup_ws_error_debug_relay(self, app: Dash) -> None:
+        """Add the relay Store + callback that surfaces WS handler errors in the
+        Dash debug pane (installed only when ``debug=True``).
+
+        Flow: WS error arrives at ``KaolinErrorOverlay`` → JS calls
+        ``dash_clientside.set_props`` on this Store → Dash triggers the callback
+        → callback re-raises → debug pane shows the exception.
+        """
+        relay_store = dcc.Store(id=WebappBuilder.WS_ERROR_RELAY_STORE_ID,
+                                data=None, storage_type='memory')
+        WebappBuilder._append_to_layout(app, relay_store)
+
+        dummy_id = UniqueIdGenerator.get_unique_id('ws-error-relay-dummy')
+        dummy_div = html.Div(id=dummy_id, style={'display': 'none'})
+        WebappBuilder._append_to_layout(app, dummy_div)
+
+        @callback(
+            Output(dummy_id, 'children'),
+            Input(WebappBuilder.WS_ERROR_RELAY_STORE_ID, 'data'),
+            prevent_initial_call=True,
+        )
+        def _relay_ws_error_to_debug_pane(data):
+            if not data:
+                raise PreventUpdate
+            error_type = data.get('error_type', 'Error')
+            message = data.get('message', '')
+            tb = data.get('traceback', '')
+            detail = f'{error_type}: {message}'
+            if tb:
+                detail += f'\n\nServer traceback:\n{tb}'
+            raise RuntimeError(f'[WS handler] {detail}')
+
+    def _setup_error_overlay(self, app: Dash, websocket_addresses=None) -> None:
+        """Add a ``KaolinErrorOverlay`` component to the layout.
+
+        The component opens its own WebSocket subscriptions (sharing the
+        physical sockets already opened by the viewer) and shows a dismissible
+        modal whenever a ``kaolin_error`` message arrives — entirely in React,
+        with no viewer code involved.
+
+        Args:
+            app: The Dash application instance.
+            websocket_addresses: WebSocket address specs to listen on, in the
+                same format as ``KaolinViewerInternal.websocket_addresses``
+                (list of ``str`` or ``[str, str]`` tuples).  Defaults to
+                ``['/websocket/']``, which is the standard kaolin WS path.
+        """
+        from kaolin.visualize.dash.components.autogen.KaolinErrorOverlay import KaolinErrorOverlay
+
+        if websocket_addresses is None:
+            # Match the standard kaolin WS address format so WebSocketConnectionsManager
+            # shares the viewer's existing physical connection rather than opening a second one.
+            websocket_addresses = ['ws://WINDOW_LOCATION/websocket/']
+
+        overlay = KaolinErrorOverlay(
+            id=WebappBuilder.ERROR_OVERLAY_ID,
+            websocket_addresses=websocket_addresses,
+            debug=self.debug,
+        )
+
+        WebappBuilder._append_to_layout(app, overlay)
+
+    def _setup_log_download(self, app: Dash) -> bool:
+        """Register the log-file download Flask route if configured.
+
+        Returns ``True`` if the endpoint was registered, ``False`` otherwise.
+        Called from :meth:`build`.
+        """
+        if not self.debug or self._log_download_config is None or self.log_file_path is None:
+            return False
+
+        log_url, auto_add_download_button = self._log_download_config
+        log_file_path = self.log_file_path  # capture for closure
+
+        @app.server.route(log_url)
+        def serve_log_file():
+            if not os.path.exists(log_file_path):
+                abort(404)
+            return send_from_directory(
+                os.path.dirname(log_file_path),
+                os.path.basename(log_file_path),
+                as_attachment=True,
+            )
+
+        if auto_add_download_button:
+            if self.layout_helper is None:
+                raise RuntimeError(
+                    'unsafe_enable_log_download(auto_add_download_button=True) requires a '
+                    'layout_helper; call set_layout_helper() before build().')
+            self.layout_helper.add_auto_add_download_button(log_url)
+
+        return True
+
     def build(self, ws_handlers, **dash_kwargs):
         # <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
@@ -468,9 +726,14 @@ class WebappBuilder:
             app.layout = self.layout_helper.layout()
             self.layout_helper.configure_app(app)
 
-        # TODO: condition on something --> e.g. maybe we add these settings to builder
-        if len(self.user_setting_infos) > 0:
-            self._setup_user_setting_sessions(app)
+        # Always set up the TAB_UUID store — callback() injects it as a State
+        # regardless of whether any user settings are registered.
+        self._setup_user_setting_sessions(app)
+
+        if self.debug:
+            self._setup_ws_error_debug_relay(app)
+
+        self._setup_error_overlay(app)
 
         if len(self.served_files) > 0:
             @app.server.route(f'/{WebappBuilder.CUSTOM_FILES_PATH}/<file_url>')
@@ -485,6 +748,8 @@ class WebappBuilder:
                     os.path.dirname(actual_path),
                     os.path.basename(actual_path)
                 )
+
+        log_download_enabled = self._setup_log_download(app)
 
         WebappBuilder.log_debug_info(app)
 
@@ -511,7 +776,10 @@ class WebappBuilder:
 
         # WebSocket handlers
         if len(ws_handlers) > 0:
-            handlers.append((r'/websocket/', WebSocketHandlerManager, dict(handler_specs=ws_handlers)))
+            handlers.append((r'/websocket/', WebSocketHandlerManager, dict(
+                handler_specs=ws_handlers,
+                write_errors_to_client=self._write_errors_to_client,
+            )))
 
         # Custom static file directories
         for dir_url, dir_path in self.served_dirs.items():

@@ -389,16 +389,16 @@ class InteractiveCloudSelector(AsyncMessageHandlerProtocol):
                 mask = TF.resize(mask.unsqueeze(0), [height, width],
                                  interpolation=InterpolationMode.NEAREST).squeeze(0)
             self.tracker.add_ground_truth_mask(image, mask, ref_camera)
-            print(f'[AGGREGATE] add_mask: tracker now has {self.tracker.num_reference_masks} mask(s)')
+            logger.debug(f'[AGGREGATE] add_mask: tracker now has {self.tracker.num_reference_masks} mask(s)')
             if action == AggregateAction.ADD_MASK_AND_AGGREGATE:
                 action = AggregateAction.AGGREGATE  # fall through to aggregation below
             else:
                 return
         if action == AggregateAction.AGGREGATE:
             if not self.tracker.can_track():
-                print('[AGGREGATE] no reference masks; use Add Mask first')
+                logger.warning('[AGGREGATE] no reference masks; use Add Mask first')
                 return
-            print(f'[AGGREGATE] running tracking with {self.tracker.num_reference_masks} reference(s)')
+            logger.debug(f'[AGGREGATE] running tracking with {self.tracker.num_reference_masks} reference(s)')
             segmenter = GaussianSplatSegmenter(self.cloud.gsmodel)
             training_cameras = self.shared_state.cameras
             if training_cameras:
@@ -411,15 +411,15 @@ class InteractiveCloudSelector(AsyncMessageHandlerProtocol):
                     resized.width = w
                     resized.height = h
                     tracking_cameras.append(resized)
-                print(f'[AGGREGATE] using {len(tracking_cameras)} training cameras')
+                logger.debug(f'[AGGREGATE] using {len(tracking_cameras)} training cameras')
             else:
                 tracking_cameras = views.turnaround_cameras_from_camera_and_2dmask(
                     self.tracker.ref_mask, self.tracker.ref_cam, 24, segmenter)
-                print(f'[AGGREGATE] no training cameras, using {len(tracking_cameras)} turnaround cameras')
+                logger.debug(f'[AGGREGATE] no training cameras, using {len(tracking_cameras)} turnaround cameras')
             session = TrackingSession.from_tracker_state(self.tracker, device=str(self.device))
             result = session.track_and_segment(segmenter, tracking_cameras)
             mask_3d = result['3d_mask']
-            print(f'[AGGREGATE] done: {mask_3d.sum().item()} / {len(mask_3d)} points selected')
+            logger.debug(f'[AGGREGATE] done: {mask_3d.sum().item()} / {len(mask_3d)} points selected')
             self._apply_new_selection(CloudSelection.from_point_mask(mask_3d), SelectAction.NEW)
             self.render_handler.render_and_send(write_message_fn)
             debug_payload = _encode_debug_images(result['outputs'], result['masks_2d'])
@@ -428,14 +428,14 @@ class InteractiveCloudSelector(AsyncMessageHandlerProtocol):
             write_message_fn(encoded_debug, True)
         elif action == AggregateAction.CLEAR_MASKS:
             self.tracker.reset_ground_truth_masks()
-            print('[AGGREGATE] clear_masks: tracker reset')
+            logger.debug('[AGGREGATE] clear_masks: tracker reset')
         elif action == AggregateAction.CLEAR_SELECTION:
             self.reset_selection()
             self._update_displayed_cloud()
             self.render_handler.render_and_send(write_message_fn)
-            print('[AGGREGATE] clear_selection: 3D selection emptied')
+            logger.debug('[AGGREGATE] clear_selection: 3D selection emptied')
         else:
-            print(f'[AGGREGATE] unhandled action={action}')
+            logger.warning(f'[AGGREGATE] unhandled action={action}')
 
     def _execute_mask_project_task(self, selection_action, mask, write_message_fn):
         self.project_2d_mask(SelectAction(selection_action), mask)

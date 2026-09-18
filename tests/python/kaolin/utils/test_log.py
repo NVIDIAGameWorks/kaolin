@@ -15,10 +15,12 @@
 
 import argparse
 import logging
+import os
+import re
 import sys
 import pytest
 import torch
-from kaolin.utils.log import default_log_setup
+from kaolin.utils.log import default_log_setup, setup_log_file
 
 from kaolin.utils import log
 
@@ -107,6 +109,103 @@ class TestLogTensor:
         assert caplog.records[0].levelno == logging.DEBUG
         assert 'my_tensor' in caplog.records[0].message
         assert 'torch.Size' in caplog.records[0].message or '2' in caplog.records[0].message
+
+
+class TestSetupLogFile:
+    """Tests for :func:`kaolin.utils.log.setup_log_file`."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_root_handlers(self):
+        """Close and remove any FileHandlers added during the test."""
+        root = logging.getLogger()
+        handlers_before = set(root.handlers)
+        level_before = root.level
+        yield
+        for h in root.handlers[:]:
+            if h not in handlers_before:
+                h.close()
+                root.removeHandler(h)
+        root.setLevel(level_before)
+
+    def test_returns_absolute_path_inside_log_dir(self, tmp_path):
+        path = setup_log_file(str(tmp_path), prefix='test')
+        assert os.path.isabs(path)
+        assert os.path.dirname(path) == str(tmp_path)
+
+    def test_filename_matches_prefix_and_timestamp_pattern(self, tmp_path):
+        path = setup_log_file(str(tmp_path), prefix='myapp')
+        filename = os.path.basename(path)
+        assert re.match(r'^myapp_\d{4}-\d{2}-\d{2}_\d{6}\.log$', filename), \
+            f'Unexpected filename: {filename}'
+
+    def test_default_prefix_is_kaolin(self, tmp_path):
+        path = setup_log_file(str(tmp_path))
+        assert os.path.basename(path).startswith('kaolin_')
+
+    def test_log_file_is_created(self, tmp_path):
+        path = setup_log_file(str(tmp_path), prefix='test')
+        assert os.path.isfile(path)
+
+    def test_creates_log_dir_if_absent(self, tmp_path):
+        new_dir = tmp_path / 'nested' / 'logs'
+        assert not new_dir.exists()
+        setup_log_file(str(new_dir), prefix='test')
+        assert new_dir.is_dir()
+
+    def test_attaches_file_handler_to_root_logger(self, tmp_path):
+        root = logging.getLogger()
+        file_handlers_before = [h for h in root.handlers if isinstance(h, logging.FileHandler)]
+        setup_log_file(str(tmp_path), prefix='test')
+        file_handlers_after = [h for h in root.handlers if isinstance(h, logging.FileHandler)]
+        assert len(file_handlers_after) == len(file_handlers_before) + 1
+
+    def test_messages_written_to_file(self, tmp_path):
+        path = setup_log_file(str(tmp_path), prefix='test')
+        root = logging.getLogger()
+        root.setLevel(logging.INFO)
+        logging.getLogger('test_messages').info('hello from setup_log_file test')
+        for h in root.handlers:
+            h.flush()
+        assert 'hello from setup_log_file test' in open(path).read()
+
+    def test_file_format_matches_standard_kaolin_format(self, tmp_path):
+        path = setup_log_file(str(tmp_path), prefix='test')
+        root = logging.getLogger()
+        root.setLevel(logging.INFO)
+        logging.getLogger('test_fmt').info('format check')
+        for h in root.handlers:
+            h.flush()
+        content = open(path).read()
+        # Expected: 2026-08-13 12:00:00,000|    INFO|       test_fmt| format check
+        assert re.search(r'\d{4}-\d{2}-\d{2}.*\|\s*INFO\|.*\| format check', content)
+
+    def test_no_duplicate_handler_for_same_path(self, tmp_path):
+        """Calling setup_log_file twice with a path that is already registered
+        as a FileHandler on the root logger must not add a second handler."""
+        import unittest.mock as mock
+
+        known_path = str(tmp_path / 'fixed.log')
+        # Pre-register a FileHandler for that exact path.
+        existing = logging.FileHandler(known_path)
+        logging.getLogger().addHandler(existing)
+        try:
+            # Patch the internals so setup_log_file resolves to the same known_path.
+            with mock.patch('datetime.datetime') as mock_dt, \
+                 mock.patch('os.makedirs'), \
+                 mock.patch('os.path.abspath', return_value=known_path):
+                mock_dt.now.return_value.strftime.return_value = 'fixed'
+                result = setup_log_file(str(tmp_path), prefix='fixed')
+
+            assert result == known_path
+            count = sum(
+                1 for h in logging.getLogger().handlers
+                if isinstance(h, logging.FileHandler)
+                and os.path.abspath(h.baseFilename) == known_path
+            )
+            assert count == 1, f'Expected 1 FileHandler for {known_path}, got {count}'
+        finally:
+            existing.close()
+            logging.getLogger().removeHandler(existing)
 
 
 class TestPrintTensor:

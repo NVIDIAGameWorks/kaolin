@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import torch
 
@@ -8,9 +9,10 @@ except ImportError:
     _sam2_available = False
     Sam2Processor = None
     Sam2Model = None
-    print('Failed to import Sam2Processor/Sam2Model from transformers. '
-          'SAM2 functionality will not be available. '
-          'Ensure transformers>=4.47.0 is installed.')
+    logging.getLogger(__name__).warning(
+        'Failed to import Sam2Processor/Sam2Model from transformers. '
+        'SAM2 functionality will not be available. '
+        'Ensure transformers>=4.47.0 is installed.')
 
 
 class GlobalSegmentAnything:

@@ -40,7 +40,7 @@ if _os.path.exists(_os.path.join(__current_path, __dash_js_dir, 'kaolin.js')):
                 'dynamic': True
             },
             {
-                'dev_package_path': _os.path.join(__dash_js_dir, 'prototypes.js'),
+                'dev_package_path': _os.path.join(__dash_js_dir, 'proptypes.js'),
                 'namespace': 'kaolin',
                 'dev_only': True,
             }

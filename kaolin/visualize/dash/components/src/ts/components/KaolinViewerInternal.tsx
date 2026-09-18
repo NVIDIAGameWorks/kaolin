@@ -955,6 +955,7 @@ const KaolinViewerInternal = (props: Props) => {
                 ))}
                 {props.behaviors?.map(([identifier, name, _layerIdentifier, options]) => (
                     <BehaviorRunner
+                        key={identifier}
                         behaviorName={name}
                         behaviorOptions={options}
                         behaviorIdentifier={identifier}

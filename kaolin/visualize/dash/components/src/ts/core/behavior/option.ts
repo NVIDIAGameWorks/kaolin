@@ -298,6 +298,7 @@ const zodToOptionsSchema = (schema: z.ZodObject<any>): Record<string, OptionSpec
     const json = z.toJSONSchema(schema) as { properties?: Record<string, any> };
     const out: Record<string, OptionSpec> = {};
     for (const [k, p] of Object.entries(json.properties ?? {})) {
+        if (p?.uiBound === false) continue;  // non-UI options need no OptionSpec
         const data = jsonPropToOptionSpec(p);
         if (data) {
             out[k] = new OptionSpec({ ...data, name: k });

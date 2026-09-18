@@ -185,7 +185,7 @@ def make_aggregate_ui(mask_canvas_id):
         f"""
         function(n_clicks) {{
             send_aggregate_request("{mask_canvas_id}", "add_mask_and_aggregate");
-            kaolin.interact.events.requestMode('view');
+            kaolin.interact?.events?.requestMode('view');
             return window.dash_clientside.no_update;
         }}
         """,

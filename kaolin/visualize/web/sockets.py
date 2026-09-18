@@ -15,6 +15,7 @@ import time
 import warnings
 import io
 
+import traceback as traceback_module
 import torch
 import threading
 import flask
@@ -643,6 +644,31 @@ class GlobalWebSocketConnectionManager:
         logger.error(f'Broadcast of segmentation to other clients not implemented')
         pass
 
+    def send_error_to_tab(self, tab_uuid: str, exc: Exception,
+                          write_errors_to_client: bool = False) -> None:
+        """Send a ``kaolin_error`` WebSocket message to every open connection for *tab_uuid*.
+
+        Intended for use from Dash HTTP callbacks that cannot call
+        :meth:`WebSocketHandlerManager._send_error_to_client` directly because they
+        have no reference to a specific handler instance.  Uses
+        :meth:`get_handlers_by_tab` to fan out to all open sockets for the tab.
+
+        The client always shows the ``KaolinErrorOverlay`` on receiving this message.
+        Exception details (``error_type`` and ``message``) are included in the
+        payload only when *write_errors_to_client* is ``True``; otherwise only a
+        generic notification is sent to avoid leaking server internals.
+
+        Args:
+            tab_uuid: Per-browser-tab uuid (from ``State(WebappBuilder.TAB_UUID_STORE_ID, 'data')``).
+            exc: The exception to forward.
+            write_errors_to_client (bool): If ``True``, include ``error_type`` and
+                ``message`` in the WS payload. Defaults to ``False``.
+        """
+        for handler in self.get_handlers_by_tab(tab_uuid):
+            if handler._connection_id is not None:
+                handler._send_error_to_client(
+                    exc, write_errors_to_client=write_errors_to_client)
+
     def connection_ids(self) -> list[str]:
         """Snapshot list of all currently-active connection ids."""
         with self._lock:
@@ -678,7 +704,8 @@ class WebSocketHandlerManager(tornado.websocket.WebSocketHandler):
     socket so other server-side code can enumerate or broadcast to clients.
     """
 
-    def initialize(self, handler_specs: list[tuple]):
+    def initialize(self, handler_specs: list[tuple],
+                   write_errors_to_client: bool = False):
         """Construct per-connection message handlers from specs.
 
         Args:
@@ -687,6 +714,10 @@ class WebSocketHandlerManager(tornado.websocket.WebSocketHandler):
                 tuple/list of positional arguments and ``kwargs`` is a dict of
                 keyword arguments to pass to the handler constructor. A fresh
                 handler instance is built for each WebSocket connection.
+            write_errors_to_client (bool): If ``True``, exception type and
+                message are forwarded to the client in ``kaolin_error`` messages.
+                When ``False`` (default), only a generic error notification is
+                sent (no exception details).
         """
         logger.info("Initializing per-connection WebSocket handlers")
         self.handlers = defaultdict(list)
@@ -694,9 +725,11 @@ class WebSocketHandlerManager(tornado.websocket.WebSocketHandler):
         self._connection_id: Optional[str] = None
         self.tab_uuid: Optional[str] = None
         self.handler_specs = handler_specs
+        self._pending_tasks: set[asyncio.Task] = set()
         """Per-browser-tab uuid, parsed from the ``tab`` query argument on
         :meth:`open`. Use this to correlate the WS handler instance with a
         :class:`dash.dcc.Store` value or a :class:`SessionRegistry` entry."""
+        self.write_errors_to_client: bool = write_errors_to_client
 
     def _handlers_lazy_initialize(self):
         logger.debug(f'Initializing custom handlers using {len(self.handler_specs)} specs tab {self.tab_uuid}')
@@ -798,14 +831,71 @@ class WebSocketHandlerManager(tornado.websocket.WebSocketHandler):
             logger.warning(f'No handler assigned for message with tag {tag}; message {kaolin.utils.testing.tensor_info(message)}')
             return
 
-        print(f'WebSocketHandlerManager.Applying Handlers ({message["tag"]}) {self.tab_uuid}')
+        logger.debug(f'Applying handlers for tag "{tag}" (tab {self.tab_uuid})')
         for h in handlers:
             if asyncio.iscoroutinefunction(h.on_message):
-                asyncio.create_task(h.on_message(tag, content, self.write_message_safe))
+                task = asyncio.create_task(h.on_message(tag, content, self.write_message_safe))
+                self._pending_tasks.add(task)
+                task.add_done_callback(self._pending_tasks.discard)
+                task.add_done_callback(
+                    functools.partial(self._on_handler_task_done, tag=tag))
             else:
-                h.on_message(tag, content, self.write_message_safe)
+                try:
+                    h.on_message(tag, content, self.write_message_safe)
+                except Exception as exc:
+                    self._send_error_to_client(exc, tag)
+
+    def _send_error_to_client(self, exc: Exception, tag: Optional[str] = None,
+                              write_errors_to_client: Optional[bool] = None):
+        """Send a ``kaolin_error`` WebSocket message to the connected client.
+
+        Always sends a notification so the browser can show a generic error
+        banner. Exception details (type + message) are included only when
+        *write_errors_to_client* is truthy, to avoid leaking sensitive
+        information by default.
+
+        Logs the exception at ERROR level (with traceback) regardless of what
+        is sent to the client.
+
+        Args:
+            exc: The exception that was raised.
+            tag: The WS message tag that was being handled when the error
+                occurred (included in the log; not sent to the client).
+            write_errors_to_client (bool | None): Override the per-connection
+                flag set in :meth:`initialize`. When ``None`` (default), uses
+                ``self.write_errors_to_client``.
+        """
+        logger.exception(
+            'Unhandled exception in WebSocket handler%s',
+            f' for tag "{tag}"' if tag else '',
+            exc_info=exc,
+        )
+        if self._connection_id is None:
+            return  # connection already closed; nothing to notify
+        should_write = self.write_errors_to_client if write_errors_to_client is None \
+            else write_errors_to_client
+        content = {}
+        if should_write:
+            content['error_type'] = type(exc).__name__
+            content['message'] = str(exc)
+            content['traceback'] = ''.join(traceback_module.format_exception(type(exc), exc, exc.__traceback__))
+        error_msg = kaolin.visualize.web.io.encode_message('kaolin_error', content, binary=False)
+        self.write_message_safe(error_msg, binary=False)
+
+    def _on_handler_task_done(self, task: asyncio.Task, *, tag: Optional[str] = None):
+        """``done_callback`` for async handler tasks — surfaces unhandled exceptions."""
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            self._send_error_to_client(exc, tag)
 
     def on_close(self):
+        # Cancel any in-flight async handler tasks so they can't call
+        # write_message_safe on an already-closed socket.
+        for task in list(self._pending_tasks):
+            task.cancel()
+        self._pending_tasks.clear()
         if self._connection_id is not None:
             GlobalWebSocketConnectionManager.instance().unregister(self._connection_id)
             logger.info(f"Socket closed (connection {self._connection_id}).")
