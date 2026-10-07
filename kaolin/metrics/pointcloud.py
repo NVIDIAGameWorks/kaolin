@@ -177,8 +177,9 @@ def f_score(gt_points, pred_points, radius=0.01, eps=1e-8):
     fp = torch.sum(gt_distances > radius, dim=1).type(data_type)
     tp = (gt_distances.shape[1] - fp).type(data_type)
 
+    # tp counts predicted points; recall is taken over ground truth points.
     precision = tp / (tp + fp)
-    recall = tp / (tp + fn)
+    recall = (pred_distances.shape[1] - fn) / pred_distances.shape[1]
 
     f_score = 2 * (precision * recall) / (precision + recall + eps)
     return f_score

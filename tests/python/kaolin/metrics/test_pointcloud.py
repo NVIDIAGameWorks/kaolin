@@ -344,3 +344,38 @@ class TestFScore:
         assert torch.allclose(output1, expected1, atol=atol, rtol=rtol)
         assert torch.allclose(output2, expected2, atol=atol, rtol=rtol)
 
+    def test_FScore_recall_over_gt(self, device, dtype, get_tol):
+        gt_points = torch.tensor([[[0., 0., 0.],
+                                   [10., 0., 0.],
+                                   [0., 10., 0.]],
+                                  [[0., 0., 0.],
+                                   [10., 0., 0.],
+                                   [0., 10., 0.]]], dtype=dtype, device=device)
+
+        # First batch: every prediction is next to the first ground truth
+        # point, so precision is 1 and recall is 1/3.
+        # Second batch: two predictions match two ground truth points and
+        # one is far from all of them, so precision and recall are both 2/3.
+        pred_points = torch.tensor([[[0.05, 0., 0.],
+                                     [0., 0.05, 0.],
+                                     [0., 0., 0.05]],
+                                    [[10.05, 0., 0.],
+                                     [0., 10.05, 0.],
+                                     [5., 5., 5.]]], dtype=dtype, device=device)
+        output1 = pc.f_score(gt_points, pred_points, radius=0.1)
+
+        # One prediction is close to two ground truth points and the third
+        # ground truth point is far away, so precision is 1 and recall is 2/3.
+        gt_points = torch.tensor([[[0., 0., 0.],
+                                   [0.05, 0., 0.],
+                                   [50., 0., 0.]]], dtype=dtype, device=device)
+        pred_points = torch.tensor([[[0.025, 0., 0.]]], dtype=dtype, device=device)
+        output2 = pc.f_score(gt_points, pred_points, radius=0.1)
+
+        expected1 = torch.tensor([0.5, 2. / 3.], device=device, dtype=dtype)
+        expected2 = torch.tensor([0.8], device=device, dtype=dtype)
+
+        atol, rtol = get_tol
+        assert torch.allclose(output1, expected1, atol=atol, rtol=rtol)
+        assert torch.allclose(output2, expected2, atol=atol, rtol=rtol)
+
