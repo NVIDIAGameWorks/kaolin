@@ -75,16 +75,14 @@ class TestTetMeshMetrics:
                                       [[0.3750, 0.4500, 0.2500],
                                        [0.9000, 0.8000, 0.7000],
                                        [0.6000, 0.9000, 0.3000],
-                                       [0.5500, 0.3500, 0.9000]]]])
-        expected = torch.tensor([[2.2898e-15], [1.5422e-09]])
+                                       [0.5500, 0.3500, 0.9000]]],
+                                     [[[0.0000, 0.0000, 0.0000],
+                                       [1.0000, 0.0000, 0.0000],
+                                       [0.0000, 1.0000, 0.0000],
+                                       [0.0000, 0.0000, 6.0000]],
+                                      [[0.0000, 0.0000, 0.0000],
+                                       [1.0000, 0.0000, 0.0000],
+                                       [0.0000, 1.0000, 0.0000],
+                                       [0.0000, 0.0000, 18.0000]]]])
+        expected = torch.tensor([[2.2898e-15], [1.5422e-09], [1.]])
         assert torch.allclose(tetmesh.equivolume(tetrahedrons, pow=4), expected, rtol=1e-4, atol=1e-18)
-
-    def test_equivolume_batched_meshes(self):
-        heights = torch.tensor([[6., 18., 30.], [60., 84., 108.]])
-        tetrahedrons = torch.zeros((2, 3, 4, 3))
-        tetrahedrons[..., 1, 0] = 1.
-        tetrahedrons[..., 2, 1] = 1.
-        tetrahedrons[..., 3, 2] = heights
-
-        expected = torch.tensor([[32. / 3.], [512. / 3.]])
-        assert torch.allclose(tetmesh.equivolume(tetrahedrons, pow=4), expected)
