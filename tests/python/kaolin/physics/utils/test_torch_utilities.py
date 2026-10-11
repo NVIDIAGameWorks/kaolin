@@ -90,7 +90,113 @@ def test_create_projection_matrix(device, dtype):
     num_dofs = 4
     kin_dofs = torch.arange(num_dofs, device=device)
     P = create_projection_matrix(num_dofs, kin_dofs)
-    
+
     expected = torch.empty((0, num_dofs), device=device)
     check_allclose(P, expected)
 
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+@pytest.mark.parametrize('block_size', [3, 9])
+def test_hess_reduction(device, dtype, block_size):
+    r"""hess_reduction computes Ja^T H Jb for block-diagonal H."""
+    torch.manual_seed(0)
+    n_blocks, n_dofs = 5, 8
+    Ja = torch.randn(n_blocks * block_size, n_dofs, device=device, dtype=dtype)
+    H = torch.randn(n_blocks, block_size, block_size, device=device, dtype=dtype)
+
+    out = hess_reduction(Ja, H)
+    assert out.shape == (n_dofs, n_dofs)
+
+    # Compare against an explicit dense block-diagonal assembly.
+    H_dense = torch.zeros(n_blocks * block_size, n_blocks * block_size,
+                          device=device, dtype=dtype)
+    for i in range(n_blocks):
+        s = i * block_size
+        H_dense[s:s + block_size, s:s + block_size] = H[i]
+    check_allclose(out, Ja.T @ H_dense @ Ja, atol=1e-4, rtol=1e-4)
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+def test_hess_reduction_two_sided(device, dtype):
+    r"""Passing dense_Jb gives Ja^T H Jb rather than Ja^T H Ja."""
+    torch.manual_seed(0)
+    n_blocks, block_size, n_dofs = 4, 3, 6
+    Ja = torch.randn(n_blocks * block_size, n_dofs, device=device, dtype=dtype)
+    Jb = torch.randn(n_blocks * block_size, n_dofs, device=device, dtype=dtype)
+    H = torch.randn(n_blocks, block_size, block_size, device=device, dtype=dtype)
+
+    H_dense = torch.zeros(n_blocks * block_size, n_blocks * block_size,
+                          device=device, dtype=dtype)
+    for i in range(n_blocks):
+        s = i * block_size
+        H_dense[s:s + block_size, s:s + block_size] = H[i]
+
+    check_allclose(hess_reduction(Ja, H, Jb), Ja.T @ H_dense @ Jb,
+                   atol=1e-4, rtol=1e-4)
+
+
+@pytest.mark.parametrize('device', ['cuda', 'cpu'])
+@pytest.mark.parametrize('dtype', [torch.float32, torch.float64])
+def test_hess_reduction_preallocated_matches(device, dtype):
+    r"""The out=/hj_out= path must match the allocating path exactly.
+
+    These kwargs exist so Hessian assembly is allocation-free under CUDA graph
+    capture, where allocating inside a conditional graph node body is illegal.
+    """
+    torch.manual_seed(0)
+    n_blocks, block_size, n_dofs = 5, 3, 8
+    Ja = torch.randn(n_blocks * block_size, n_dofs, device=device, dtype=dtype)
+    H = torch.randn(n_blocks, block_size, block_size, device=device, dtype=dtype)
+
+    expected = hess_reduction(Ja, H)
+
+    out = torch.zeros(n_dofs, n_dofs, device=device, dtype=dtype)
+    hj_out = torch.zeros(n_blocks, block_size, n_dofs, device=device, dtype=dtype)
+    returned = hess_reduction(Ja, H, out=out, hj_out=hj_out)
+
+    check_allclose(out, expected)
+    # Must return the same object it was handed, not a copy.
+    assert returned is out
+
+    # Reusing the buffers overwrites rather than accumulates -- the capturable path
+    # relies on this across Newton iterations.
+    hess_reduction(Ja, H, out=out, hj_out=hj_out)
+    check_allclose(out, expected)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(),
+                    reason="torch.cuda.memory_stats is the only sound instrument here")
+def test_hess_reduction_out_is_allocation_free():
+    r"""No allocation may occur when out= and hj_out= are supplied.
+
+    Allocation inside a CUDA graph conditional-node body is illegal, so this property
+    is what lets Hessian assembly be captured.
+
+    Instrument choice matters. ``TorchDispatchMode`` pops the mode while running the op,
+    so it never observes the ``at::empty`` an out-of-place kernel performs in C++ below
+    the Python dispatch key -- it scores an implementation that ignores ``out=``/``hj_out=``
+    and ends in ``out.copy_(...)`` as 0 allocations, i.e. it cannot fail. It is fine for
+    dispatcher-visible allocations (it did correctly catch ``solve_ex``'s two
+    ``new_empty`` calls) but blind to exactly the class that matters here.
+    ``memory_stats`` counts every request through torch's allocator; verified to report
+    0 for the correct implementation and 2 for that mutation.
+    """
+    torch.manual_seed(0)
+    n_blocks, block_size, n_dofs = 4, 3, 6
+    Ja = torch.randn(n_blocks * block_size, n_dofs, device='cuda')
+    H = torch.randn(n_blocks, block_size, block_size, device='cuda')
+    out = torch.zeros(n_dofs, n_dofs, device='cuda')
+    hj_out = torch.zeros(n_blocks, block_size, n_dofs, device='cuda')
+
+    hess_reduction(Ja, H, out=out, hj_out=hj_out)  # warm up any lazy init
+    torch.cuda.synchronize()
+
+    before = torch.cuda.memory_stats()['allocation.all.allocated']
+    hess_reduction(Ja, H, out=out, hj_out=hj_out)
+    torch.cuda.synchronize()
+    n_alloc = torch.cuda.memory_stats()['allocation.all.allocated'] - before
+
+    assert n_alloc == 0, \
+        f"hess_reduction made {n_alloc} allocation(s) despite out=/hj_out="

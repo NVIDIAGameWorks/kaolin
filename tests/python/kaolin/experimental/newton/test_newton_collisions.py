@@ -139,7 +139,7 @@ def test_object_contacting_rigid_shape(simplicits_object):
     assert not (contacts.soft_contact_shape.numpy()[:contacts.soft_contact_count.numpy()[0]] == 0).any(), \
         "Found contact(s) with ground plane (shape index 0) in contacts."
 
-    for i in range(10):
+    for i in range(20):
         contacts = model.collide(state0)
         solver.step(state0, state1, None, contacts, dt)
         state0, state1 = state1, state0
@@ -204,38 +204,38 @@ def test_contact_energy(simplicits_object):
     energy_value = energy.numpy()[0]
     assert energy_value > 0.0, "Contact energy should be positive when contacts exist"
 
-@pytest.mark.parametrize("velocity_penalty_scale", [0.0, 0.1, 0.2])
-def test_contact_gradient(simplicits_object, velocity_penalty_scale):
-    r"""Test that object is not contacting the floor."""
-    AXIS = 1
+def test_contact_gradient(simplicits_object):
+    r"""Test the contact gradient against finite differences of the contact energy.
+
+    Four quadrature points are placed well inside a static plane, making the reference
+    energy independent of contact activation. Evaluating at rest leaves velocity friction
+    inactive, and mu=0 disables it for the finite-difference perturbations. The velocity
+    penalty is covered by test_contact_vel_gradient, which evaluates it away from the
+    kink at neg_vn = 0.
+    """
     FLOOR_HEIGHT = 0
-    OBJECT_HEIGHT = 1.0
-    dt = 0.05
+    OBJECT_HEIGHT = -2.0
     builder = SimplicitsModelBuilder(up_axis="y")
-    builder.add_simplicits_object(simplicits_object, num_qp=100,
-                    init_transform=torch.tensor([[1.0, 0.0, 0.0, 0.0],
-                                                [0.0, 1.0, 0.0, OBJECT_HEIGHT],
-                                                [0.0, 0.0, 1.0, 0.0],
-                                                [0.0, 0.0, 0.0, 1.0]], dtype=torch.float32, device='cuda'))
-    # Add ground plane
+    builder.add_simplicits_object(
+        simplicits_object,
+        num_qp=4,
+        init_transform=torch.tensor(
+            [[1.0, 0.0, 0.0, 0.0],
+             [0.0, 1.0, 0.0, OBJECT_HEIGHT],
+             [0.0, 0.0, 1.0, 0.0],
+             [0.0, 0.0, 0.0, 1.0]], dtype=torch.float32, device='cuda'))
     builder.add_shape_plane(
         plane=(*builder.up_vector, FLOOR_HEIGHT),
         width=0.0,
         length=0.0,
         cfg=SimplicitsModelBuilder.ShapeConfig(
-            ke=1e4, mu=0.5, kd=100.0, kf=1.0
+            ke=1e4, mu=0.0, kd=100.0, kf=1.0
         ),
         label="ground_plane",
     )
 
-    # Add a rigid cube of size 0.5x0.5x0.5
-    xform = wp.transform(wp.vec3(0.4, 0.5, 0.0), wp.quat_identity())
-    body = builder.add_body(xform=xform)
-    builder.add_shape_box(body=body, hx=0.5, hy=0.5, hz=0.5)
-
     model = builder.finalize()
     state0 = model.state()
-    state1 = model.state()
 
     contacts = model.collide(state0)
     assert contacts is not None
@@ -243,10 +243,10 @@ def test_contact_gradient(simplicits_object, velocity_penalty_scale):
 
     # Get the collision handler
     collision_handler = model.simplicits_scene.force_dict["pt_wise"]["newton_soft_collisions"]["object"]
-    collision_handler.velocity_penalty_kv = velocity_penalty_scale * float(model.soft_contact_ke)
+    collision_handler.velocity_penalty_kv = 0.0
     assert collision_handler is not None
 
-    # Set state and contacts on the collision handler
+    # Use state0 as both prev and current: relative_translation=0 → velocity term inactive
     collision_handler._set_state(state0)
     collision_handler._set_contacts(contacts)
 
@@ -264,7 +264,6 @@ def test_contact_gradient(simplicits_object, velocity_penalty_scale):
     t_dx = wp.to_torch(dx)
 
     # Finite difference for collision gradients
-    # loop through t_x pairs of points and calculate the distance between them
     dEdx_fd = torch.zeros_like(t_x0)
     eps = 1e-4
     for i in range(dEdx_fd.shape[0]):
@@ -278,6 +277,90 @@ def test_contact_gradient(simplicits_object, velocity_penalty_scale):
 
     assert torch.allclose(gradient, dEdx_fd, atol=1e-2,rtol=1e-1), \
         "Collision energy doesn't match analytical calculation"
+
+
+@pytest.mark.parametrize("velocity_penalty_scale", [0.1, 0.2])
+def test_contact_vel_gradient(simplicits_object, velocity_penalty_scale):
+    r"""Test the velocity-penalty term of the contact gradient in isolation.
+
+    Isolates the vel term by zeroing ke/mu: no collision energy, and no friction, whose
+    non-lagged normal-force magnitude ke*|penetration| is differentiated by energy() but
+    held fixed by gradient(). Advances one step so neg_vn > 0, putting the penalty in the
+    smooth region away from the kink at neg_vn = 0, where central differences of the
+    one-sided quadratic return 0.25 * kv * (1 + e)^2 * eps / dt^2 instead of 0.
+    """
+    FLOOR_HEIGHT = 0
+    OBJECT_HEIGHT = 0.0
+    dt = 0.05
+    builder = SimplicitsModelBuilder(up_axis="y")
+    builder.add_simplicits_object(simplicits_object, num_qp=50,
+                                  init_transform=torch.tensor(
+                                      [[1.0, 0.0, 0.0, 0.0],
+                                       [0.0, 1.0, 0.0, OBJECT_HEIGHT],
+                                       [0.0, 0.0, 1.0, 0.0],
+                                       [0.0, 0.0, 0.0, 1.0]], dtype=torch.float32, device='cuda'))
+    builder.add_shape_plane(
+        plane=(*builder.up_vector, FLOOR_HEIGHT),
+        width=0.0,
+        length=0.0,
+        cfg=SimplicitsModelBuilder.ShapeConfig(ke=0.0, mu=0.0, kd=100.0, kf=1.0),
+        label="ground_plane",
+    )
+
+    model = builder.finalize()
+    # Zero out model-level ke/mu so collision+friction energy is exactly 0
+    model.soft_contact_ke = 0.0
+    model.soft_contact_mu = 0.0
+
+    state0 = model.state()
+    state1 = model.state()
+
+    contacts_init = model.collide(state0)
+    assert contacts_init is not None
+    assert contacts_init.soft_contact_count.numpy()[0] > 0, \
+        "Expected initial contacts; OBJECT_HEIGHT=0.0 should place QPs below floor"
+
+    # Advance one step so particles have downward velocity (neg_vn > 0),
+    # moving the vel penalty away from the kink at neg_vn = 0.
+    solver = SimplicitsSolver(model)
+    solver.step(state0, state1, None, contacts_init, dt)
+
+    contacts = model.collide(state1)
+    assert contacts is not None
+    assert contacts.soft_contact_count.numpy()[0] > 0
+
+    collision_handler = model.simplicits_scene.force_dict["pt_wise"]["newton_soft_collisions"]["object"]
+    # Use a fixed reference scale (1e3) since model.soft_contact_ke is 0
+    collision_handler.velocity_penalty_kv = velocity_penalty_scale * 1e3
+    assert collision_handler is not None
+
+    # state0 = prev_pos so relative_translation != 0 → neg_vn > 0
+    collision_handler._set_state(state0)
+    collision_handler._set_contacts(contacts)
+
+    x0 = state1.particle_q
+    dx = wp.zeros_like(x0)
+    coeff = model.simplicits_scene.force_dict["pt_wise"]["newton_soft_collisions"]["coeff"]
+
+    gradient = wp.to_torch(collision_handler.gradient(dx, x0, coeff=coeff, gradients=None)).clone()
+    assert gradient.abs().max() > 0.0, "Expected a non-zero velocity-penalty gradient"
+
+    t_dx = wp.to_torch(dx)
+
+    dEdx_fd = torch.zeros_like(gradient)
+    eps = 1e-4
+    for i in range(dEdx_fd.shape[0]):
+        for j in range(dEdx_fd.shape[1]):
+            t_dx[i, j] += eps
+            E1 = wp.to_torch(collision_handler.energy(wp.from_torch(t_dx, dtype=wp.vec3), x0, coeff=coeff))
+            t_dx[i, j] -= 2.0 * eps
+            E2 = wp.to_torch(collision_handler.energy(wp.from_torch(t_dx, dtype=wp.vec3), x0, coeff=coeff))
+            t_dx[i, j] += eps
+            dEdx_fd[i, j] = (E1 - E2) / (2.0 * eps)
+
+    assert torch.allclose(gradient, dEdx_fd, atol=1e-2, rtol=1e-1), \
+        "Velocity-penalty gradient doesn't match finite difference of energy"
+
 
 @pytest.mark.parametrize("velocity_penalty_scale", [0.1, 0.2])
 def test_contact_vel_hessian(simplicits_object, velocity_penalty_scale):
@@ -461,6 +544,12 @@ def test_contact_friction_hessian(simplicits_object):
     norm is populated and constant during FD sweeps — matching the analytical hessian
     assumption. With eps=1e-5 and eps_u=5e-4 the IPC smoothing yields ~1% friction
     hessian error, well within rtol=10%.
+
+    The comparison is resolution-aware: differencing the gradient in float32 cannot
+    resolve curvature below ULP(G_c) / (2 * eps) for the column it differences, and the
+    tangent/normal cross terms sit under that floor because their column carries the
+    large normal force. Those entries come back as exactly zero, so the floor is folded
+    into the per-entry tolerance instead of asserting identical sparsity.
     """
     FLOOR_HEIGHT = 0
     OBJECT_HEIGHT = 0.0
@@ -507,6 +596,9 @@ def test_contact_friction_hessian(simplicits_object):
         0, 3, 3, device=wp.device_to_torch(wp_hessian_blocks.device))
     hessian = torch.block_diag(*hessian_blocks).to(hessian_blocks.device)
 
+    # Unperturbed gradient, used below to size the FD resolution floor per column.
+    gradient = wp.to_torch(collision_handler.gradient(dx, x0, coeff=coeff, gradients=None)).flatten().clone()
+
     t_x0 = wp.to_torch(x0)
     t_dx = wp.to_torch(dx)
 
@@ -525,14 +617,25 @@ def test_contact_friction_hessian(simplicits_object):
             hessian_fd[3 * i + k] = (G1 - G2) / (2.0 * eps)
 
     zero_threshold = 1e-2
-    analytical_nonzeros = (hessian.abs() > zero_threshold)
-    fd_nonzeros = (hessian_fd.abs() > zero_threshold)
 
-    sparsity_match = torch.all(analytical_nonzeros == fd_nonzeros)
-    assert sparsity_match, \
-        f"Friction hessian sparsity mismatch: analytical {analytical_nonzeros.sum().item()} non-zeros, FD {fd_nonzeros.sum().item()}"
-    assert torch.allclose(hessian[fd_nonzeros], hessian_fd[fd_nonzeros], atol=1e-1, rtol=1e-1), \
-        "Friction hessian values don't match finite difference approximation"
+    # The tangential diagonal entries come solely from the friction term; requiring them
+    # on both sides keeps the comparison below from passing vacuously. Up axis is y, so
+    # the tangential components are x and z.
+    tangential = torch.zeros(hessian.shape[0], dtype=torch.bool, device=hessian.device)
+    tangential[0::3] = True
+    tangential[2::3] = True
+    assert (torch.diagonal(hessian)[tangential].abs() > zero_threshold).any(), \
+        "No friction contribution in the analytical hessian"
+    assert (torch.diagonal(hessian_fd)[tangential].abs() > zero_threshold).any(), \
+        "Finite differences resolved no friction contribution"
+
+    # Entry (r, c) differences gradient component c, so float32 cancellation limits it to
+    # curvature above ULP(G_c) / (2 * eps); below that the quotient rounds to zero.
+    fd_floor = (torch.finfo(torch.float32).eps * gradient.abs() / (2.0 * eps)).unsqueeze(0).expand_as(hessian_fd)
+    tol = 1e-1 + 1e-1 * hessian.abs() + 4.0 * fd_floor
+    excess = ((hessian - hessian_fd).abs() - tol).max().item()
+    assert excess <= 0.0, \
+        f"Friction hessian differs from finite differences beyond FD resolution (worst excess {excess:.4g})"
 
 
 def test_contact_energy_with_velocity_penalty(simplicits_object):
@@ -600,3 +703,75 @@ def test_contact_energy_with_velocity_penalty(simplicits_object):
         f"energy without ({energy_no_kv:.6f}); "
         "check that particles are approaching the contact surface"
     )
+
+
+def test_coeff_reaches_the_output_buffers(simplicits_object):
+    """coeff must scale what lands in the caller's buffer, not just the return value.
+
+    This is the one thing no other test here can see. Every other coeff in this file is
+    literally 1.0, and all four assembler call sites in SimplicitsScene discard the
+    return and read the buffer they passed in. So the previous shape -- kernels with no
+    coeff parameter and `return buffer * coeff` at the end -- looked correct from the
+    return value while contributing an unscaled term to the scene, and reverting to it
+    would pass the rest of this file unchanged.
+
+    Scaling is checked between two coeffs rather than against an absolute value, so the
+    test says nothing about what the contact model should compute.
+    """
+    FLOOR_HEIGHT, OBJECT_HEIGHT = 0, 1.5
+    builder = SimplicitsModelBuilder(up_axis="y")
+    builder.add_simplicits_object(
+        simplicits_object, num_qp=100,
+        init_transform=torch.tensor([[1.0, 0.0, 0.0, 0.0],
+                                     [0.0, 1.0, 0.0, OBJECT_HEIGHT],
+                                     [0.0, 0.0, 1.0, 0.0],
+                                     [0.0, 0.0, 0.0, 1.0]], dtype=torch.float32, device='cuda'))
+    builder.add_shape_plane(
+        plane=(*builder.up_vector, FLOOR_HEIGHT), width=0.0, length=0.0,
+        cfg=SimplicitsModelBuilder.ShapeConfig(ke=1e4, mu=0.5, kd=100.0, kf=1.0),
+        label="ground_plane")
+    xform = wp.transform(wp.vec3(0.4, 0.5, 0.0), wp.quat_identity())
+    builder.add_shape_box(body=builder.add_body(xform=xform), hx=0.5, hy=0.5, hz=0.5)
+
+    model = builder.finalize()
+    state0 = model.state()
+    contacts = model.collide(state0)
+    assert contacts.soft_contact_count.numpy()[0] > 0, "test is vacuous without contacts"
+
+    handler = model.simplicits_scene.force_dict["pt_wise"]["newton_soft_collisions"]["object"]
+    handler._set_state(state0)
+    handler._set_contacts(contacts)
+
+    x0 = state0.particle_q
+    dx = wp.zeros_like(x0)
+    n = x0.shape[0]
+    small, large = 0.25, 1.0
+    ratio = large / small
+
+    def energy_at(coeff):
+        out = wp.zeros(1, dtype=wp.float32, device=x0.device)
+        handler.energy(dx=dx, x0=x0, coeff=coeff, energy=out)
+        return float(out.numpy()[0])
+
+    def gradient_at(coeff):
+        out = wp.zeros(n, dtype=wp.vec3, device=x0.device)
+        handler.gradient(dx, x0, coeff, out)
+        return wp.to_torch(out).clone()
+
+    def hessian_at(coeff):
+        return wp.to_torch(handler.hessian(dx, x0, coeff)).clone()
+
+    e_small, e_large = energy_at(small), energy_at(large)
+    assert e_small != 0.0, "test is vacuous if the contact energy is zero"
+    assert e_large == pytest.approx(ratio * e_small, rel=1e-4), (
+        "coeff did not reach the energy buffer the assembler reads")
+
+    g_small, g_large = gradient_at(small), gradient_at(large)
+    assert g_small.abs().max() > 0.0, "test is vacuous if the contact gradient is zero"
+    assert torch.allclose(g_large, ratio * g_small, rtol=1e-4), (
+        "coeff did not reach the gradient buffer the assembler reads")
+
+    h_small, h_large = hessian_at(small), hessian_at(large)
+    assert h_small.abs().max() > 0.0, "test is vacuous if the contact hessian is zero"
+    assert torch.allclose(h_large, ratio * h_small, rtol=1e-4), (
+        "coeff did not scale the hessian")

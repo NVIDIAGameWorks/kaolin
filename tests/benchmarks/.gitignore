@@ -2,3 +2,9 @@
 *.nsys-rep
 *.ini
 *.sqlite
+
+# The graph-capture benchmark and its README are kept out of the tree: the benchmark
+# imports examples/tutorial/physics/simplicits_stacking_cubes.py, which is untracked, so
+# a tracked copy would not run on a fresh checkout.
+physics_graph_capture.py
+README.md

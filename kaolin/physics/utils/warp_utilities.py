@@ -24,14 +24,114 @@ from warp.fem.linalg import inverse_qr
 
 import kaolin.physics.utils.torch_utilities as torch_utilities
 
-__all__ = ["_wp_bsr_to_torch_bsr",
-           "_bsr_to_torch",
-           "_displacement_delta_kernel",
+__all__ = ["array_inner_capturable",
+           "capture_graph_with_torch",
+           "replay_or_capture",
            "vec12",
            "mat1212",
            "mat312",
            "vec9",
            "mat99"]
+
+
+def capture_graph_with_torch(func, device=None, pool=None):
+    r"""Capture mixed Warp and PyTorch work in one CUDA graph.
+
+    Warp captures the GPU work issued by ``func`` while PyTorch directs any
+    allocations on the active stream into ``pool``.  This ensures that PyTorch
+    tensors allocated during capture are owned by a graph-safe allocation pool
+    and can be reused when the graph is replayed. Reuse ``pool`` when
+    recapturing the same work to avoid growing the CUDA memory footprint.
+
+    Args:
+        func (callable): Zero-argument function issuing the work to capture.
+        device (optional): Warp device for the capture. Defaults to the
+            current Warp device.
+        pool (optional): Allocation pool to reuse when recording again.
+
+    Returns:
+        tuple: The Warp graph and its PyTorch allocation pool.
+    """
+    # Map the Warp capture device to its PyTorch CUDA device index.
+    torch_index = torch.device(wp.device_to_torch(wp.get_device(device))).index or 0
+    # Create a graph-private allocation pool unless the caller supplied one.
+    if pool is None:
+        # Let PyTorch create a pool handle shared by this capture and future recaptures.
+        pool = torch.cuda.graph_pool_handle()
+
+    # Issue all PyTorch work on the same CUDA stream that Warp will capture.
+    with torch.cuda.stream(wp.stream_to_torch(device)):
+        # Route PyTorch allocations on this stream into the graph-private pool.
+        torch._C._cuda_beginAllocateCurrentStreamToPool(torch_index, pool)
+        try:
+            # Begin Warp's CUDA-graph capture on the selected device.
+            with wp.ScopedCapture(device=device) as capture:
+                # Record the caller's Warp and PyTorch GPU operations.
+                func()
+        finally:
+            # Always restore PyTorch's normal allocation behavior, even if func() fails.
+            torch._C._cuda_endAllocateToPool(torch_index, pool)
+    # Return the completed CUDA graph together with the pool needed for recapture.
+    return capture.graph, pool
+
+
+def replay_or_capture(func, graph=None, device=None, pool=None):
+    r"""Run ``graph``, recording ``func`` first when no graph exists.
+
+    Args:
+        func (callable): Zero-argument function issuing the work.
+        graph (wp.Graph, optional): Previously recorded graph. Defaults to None.
+        device (optional): Warp device. Defaults to the current device.
+        pool (optional): Allocation pool to reuse when recording again.
+
+    Returns:
+        tuple: Recorded graph and allocation pool.
+    """
+    device = wp.get_device(device)
+
+    if graph is None:
+        graph, pool = capture_graph_with_torch(func, device=device, pool=pool)
+    wp.capture_launch(graph)
+    return graph, pool
+
+
+@wp.kernel
+def _debug_assert_zero_kernel(a: wp.array(dtype=wp.int32)):  # pragma: no cover
+    assert a[0] == 0
+
+
+def _debug_assert_zero(a):
+    r"""Assert that ``a[0]`` is zero when Warp runs in debug mode."""
+    wp.launch(_debug_assert_zero_kernel, dim=1, inputs=[a])
+
+
+@wp.kernel
+def _array_inner_capturable_kernel(a: wp.array(dtype=wp.float32),
+                                   b: wp.array(dtype=wp.float32),
+                                   out: wp.array(dtype=wp.float32)):  # pragma: no cover
+    i = wp.tid()
+    wp.atomic_add(out, 0, a[i] * b[i])
+
+
+@wp.kernel
+def _array_abs_in_place_kernel(x: wp.array(dtype=wp.float32)):  # pragma: no cover
+    i = wp.tid()
+    x[i] = wp.abs(x[i])
+
+
+def array_inner_capturable(a, b, out, take_abs=False):
+    r"""Write an inner product into ``out`` without allocating workspace.
+
+    Unlike :func:`wp.utils.array_inner`, this is safe to call while recording a graph.
+    """
+    # Use zero_() instead of `out *= 0.0`: multiplying inf or NaN by zero leaves NaN.
+    # A stuck NaN makes the solver predicates false and needlessly runs every
+    # remaining iteration.
+    out.zero_()
+    wp.launch(_array_inner_capturable_kernel, dim=a.shape, inputs=[a, b], outputs=[out])
+    if take_abs:
+        wp.launch(_array_abs_in_place_kernel, dim=out.shape, inputs=[out])
+
 
 vec12 = wp.types.vector(12, dtype=wp.float32)
 mat1212 = wp.types.matrix(shape=(12, 12), dtype=wp.float32)

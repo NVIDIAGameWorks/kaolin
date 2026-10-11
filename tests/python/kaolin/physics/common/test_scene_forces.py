@@ -301,3 +301,169 @@ def test_boundary_hessian(object_points):
     
     assert torch.allclose(wp.to_torch(hessian), expected_hessian,
                           rtol=1e-5), "Boundary hessian does not match analytical calculation"
+
+
+# ---------------------------------------------------------------------------
+# Behaviour a standalone caller has to know about. See the "Using these inside
+# a CUDA graph" section of kaolin/physics/common/scene_forces.py.
+# ---------------------------------------------------------------------------
+
+cuda_only = pytest.mark.skipif(not torch.cuda.is_available(),
+                               reason="graph capture requires CUDA")
+
+
+def _points(n=20, device=None):
+    """Point cloud on Warp's current device, as a standalone caller would build one.
+
+    Deliberately not ``wp.from_torch`` of CPU tensors: that leaves the arrays on the CPU
+    while Warp launches on its default device, and a read taken straight afterwards can
+    land before the kernel has written anything. That reads as zeros, which makes an
+    accumulation check pass for the wrong reason.
+    """
+    torch.manual_seed(0)
+    device = wp.get_device(device)
+    td = wp.device_to_torch(device)
+    return {
+        'x0': wp.from_torch(torch.rand(n, 3, device=td), dtype=wp.vec3),
+        'dx': wp.from_torch(torch.full((n, 3), 0.1, device=td), dtype=wp.vec3),
+        'density': wp.from_torch(torch.ones(n, device=td)),
+        'volume': wp.from_torch(torch.ones(n, device=td) / n),
+    }
+
+
+def _read(arr):
+    """Reads a Warp array to torch, after making sure the launch that filled it is done."""
+    wp.synchronize()
+    return wp.to_torch(arr).clone()
+
+
+@pytest.mark.parametrize("make", [
+    lambda p: Gravity(wp.vec3(0.0, -9.8, 0.0), p['density'], p['volume']),
+    lambda p: Floor(0.5, 1, 0, p['volume']),
+])
+def test_energy_and_gradient_accumulate_rather_than_overwrite(make):
+    """Several forces sum into one buffer, so zeroing is the caller's job."""
+    p = _points()
+    force = make(p)
+
+    e = wp.zeros(1, dtype=wp.float32, device=p['volume'].device)
+    force.energy(p['dx'], p['x0'], 1.0, e)
+    once = float(_read(e)[0])
+    force.energy(p['dx'], p['x0'], 1.0, e)
+    twice = float(_read(e)[0])
+    assert once != 0.0, "test is vacuous if the first call contributes nothing"
+    assert twice == pytest.approx(2.0 * once, rel=1e-5), \
+        "energy() must accumulate into its output, not overwrite it"
+
+    g = wp.zeros(p['dx'].shape[0], dtype=wp.vec3, device=p['volume'].device)
+    force.gradient(p['dx'], p['x0'], 1.0, g)
+    g_once = _read(g)
+    force.gradient(p['dx'], p['x0'], 1.0, g)
+    assert g_once.abs().max() > 0.0, "test is vacuous if the first call contributes nothing"
+    assert torch.allclose(_read(g), 2.0 * g_once, rtol=1e-5), \
+        "gradient() must accumulate into its output, not overwrite it"
+
+
+@pytest.mark.parametrize("make", [
+    lambda p: Gravity(wp.vec3(0.0, -9.8, 0.0), p['density'], p['volume']),
+    lambda p: Floor(0.5, 1, 0, p['volume']),
+])
+def test_hessian_returns_a_force_owned_buffer(make):
+    """The next call overwrites the previous result, so consume it immediately."""
+    p = _points()
+    force = make(p)
+    first = force.hessian(p['dx'], p['x0'], 1.0)
+    second = force.hessian(p['dx'], p['x0'], 1.0)
+    assert first.ptr == second.ptr, \
+        "hessian() is documented as returning a buffer owned by the force"
+
+
+def test_gravity_hessian_ignores_its_arguments():
+    """Sized once from integration_pt_volume; a shorter dx does not resize or raise."""
+    p = _points(n=20)
+    gravity = Gravity(wp.vec3(0.0, -9.8, 0.0), p['density'], p['volume'])
+    short = wp.from_torch(torch.zeros(5, 3), dtype=wp.vec3)
+    assert gravity.hessian(short, short, 1.0).shape[0] == 20
+
+
+@cuda_only
+def test_settings_are_frozen_when_the_graph_is_recorded():
+    """floor_height and coeff are read on the host, so a replay ignores changes."""
+    p = _points(device='cuda')
+    floor = Floor(0.5, 1, 0, p['volume'])
+    e = wp.zeros(1, dtype=wp.float32, device='cuda')
+
+    def eval_energy():
+        e.zero_()
+        floor.energy(p['dx'], p['x0'], 1.0, e)
+
+    with wp.ScopedCapture() as capture:
+        eval_energy()
+    graph = capture.graph
+
+    wp.capture_launch(graph)
+    recorded = float(e.numpy()[0])
+
+    floor.floor_height = -100.0   # every point now far above the floor
+    wp.capture_launch(graph)
+    assert float(e.numpy()[0]) == pytest.approx(recorded), \
+        "changing floor_height after recording must not affect the replay"
+
+    # And the change does take effect once it is evaluated outside the graph.
+    eval_energy()
+    assert float(e.numpy()[0]) != pytest.approx(recorded)
+
+
+@pytest.mark.parametrize("flip", [0, 1])
+def test_floor_derivatives_match_finite_differences(flip):
+    """Energy -> gradient -> Hessian must agree, for a floor and for a ceiling.
+
+    Nothing else in this file sets flip_floor=1, which is how the flipped branch came to
+    carry a sign its energy did not. Both derivatives are differenced here rather than
+    compared against hand-written expressions, so the two branches cannot drift apart
+    again without this failing.
+
+    A negated Hessian is the dangerous half: lu_factor_ex succeeds on an indefinite
+    matrix, so the solve reports no error and the Newton step simply points uphill.
+    """
+    axis, height, eps = 1, 0.5, 1e-3
+    # Put the point on the penalised side of the plane so the branch is live: below for
+    # a floor, above for a ceiling.
+    p = height - 1.0 if flip == 0 else height + 1.0
+
+    device = wp.get_device()
+    td = wp.device_to_torch(device)
+    x0 = wp.from_torch(torch.tensor([[0.0, p, 0.0]], device=td), dtype=wp.vec3)
+    vol = wp.from_torch(torch.ones(1, device=td))
+    floor = Floor(height, axis, flip, vol)
+
+    def at(offset):
+        return wp.from_torch(torch.tensor([[0.0, offset, 0.0]], device=td), dtype=wp.vec3)
+
+    def energy(offset):
+        out = wp.zeros(1, dtype=wp.float32, device=device)
+        floor.energy(at(offset), x0, 1.0, out)
+        return float(_read(out)[0])
+
+    def gradient(offset):
+        out = wp.zeros(1, dtype=wp.vec3, device=device)
+        floor.gradient(at(offset), x0, 1.0, out)
+        return float(_read(out)[0, axis])
+
+    def hessian(offset):
+        return float(_read(floor.hessian(at(offset), x0, 1.0))[0, axis, axis])
+
+    assert energy(0.0) > 0.0, "test is vacuous unless the penalty is active"
+
+    g_fd = (energy(eps) - energy(-eps)) / (2.0 * eps)
+    assert gradient(0.0) == pytest.approx(g_fd, rel=1e-2), (
+        f"flip_floor={flip}: gradient {gradient(0.0):.4f} does not match the derivative "
+        f"of its own energy ({g_fd:.4f})")
+
+    h_fd = (gradient(eps) - gradient(-eps)) / (2.0 * eps)
+    assert hessian(0.0) == pytest.approx(h_fd, rel=1e-2), (
+        f"flip_floor={flip}: Hessian {hessian(0.0):.4f} does not match the derivative "
+        f"of its own gradient ({h_fd:.4f})")
+
+    # A penalty must curve upward on both sides, or the Newton step walks into the wall.
+    assert hessian(0.0) > 0.0, f"flip_floor={flip}: Hessian block is not positive"

@@ -82,18 +82,29 @@ def _get_collision_jacobian_triplets_wp_kernel(
     t, k, i = wp.tid() # valid point index, handle index, row index
 
     p = indices[t] # point index from global sim_weights
-    
+
+    # A negative index is the "partner is static geometry" sentinel from the collision
+    # detector (NULL_ELEMENT_INDEX). Such a side has no DOFs and so contributes no rows.
+    # Tested before p is used anywhere: Warp folds a negative subscript to the end of the
+    # array, so pt_is_static[-1] silently reads the last point's flag and the gathers
+    # below would attribute this contact to whichever object owns that point.
+    if p < 0:
+        return
+
     # Skip the static objects
     if pt_is_static[p] == 1:
         return
-    
-    wp.atomic_add(count, 0, 1)
-    
+
+    # The write slot is the compacted counter, not a dense function of (t, k, i). The
+    # caller keeps only rows[:count], so a dense index leaves that prefix holding slots
+    # belonging to skipped static threads -- never written, hence garbage from wp.empty --
+    # while valid entries past it are dropped. With two of twelve points static that
+    # measured as six populated rows where twelve were expected. bsr_from_triplets does
+    # not care about triplet order, so compacting here is free.
+    idx = wp.atomic_add(count, 0, 1)
+
     weight = sim_weights[p, k]
     point = sim_pts[p]
-    
-    # Index of the triplet
-    idx = (t * sim_weights.shape[1] + k) * 3 + i
 
     # For each point, we need to fill 3 rows (x,y,z, 1 coordinates)
     # in shape (3, 12)

@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+r"""Gravity, floor, and pinning forces for ``wp.array`` point positions.
+
+They can be used with or without a Simplicits scene. See
+:mod:`kaolin.physics.common` for CUDA-graph rules.
+"""
+
 import torch
 import warp as wp
 import warp.sparse as wps
@@ -168,7 +174,7 @@ def floor_gradient_wp_func(floor_height: wp.float32,
             pass
     else:
         if p > floor_height:
-            return -1.0*force
+            return 1.0*force
         else:
             pass
 
@@ -208,7 +214,7 @@ def floor_hessian_wp_func(floor_height: wp.float32,
             pass
     else:
         if p > floor_height:
-            return -1.0*local_hess
+            return 1.0*local_hess
         else:
             pass
     return wp.mat33(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -379,7 +385,9 @@ def boundary_hessian_wp_kernel(
 
 
 class Gravity:
-    r""" Gravity class acts as a wrapper for the gravity energy, gradient, and hessian kernels.
+    r"""Gravity force for a point cloud.
+
+    Re-record a CUDA graph after changing ``g`` or ``coeff``.
     """
 
     def __init__(self, g, integration_pt_density, integration_pt_volume):
@@ -475,7 +483,9 @@ class Gravity:
 
 
 class Floor:
-    r""" Floor class acts as a wrapper for the floor energy, gradient, and hessian kernels.
+    r"""One-sided floor force for a point cloud.
+
+    Re-record a CUDA graph after changing the floor settings.
     """
 
     def __init__(self,
@@ -593,7 +603,9 @@ class Floor:
 
 
 class Boundary:
-    r""" Boundary class acts as a wrapper for the boundary energy, gradient, and hessian kernels for all sample points in the scene.
+    r"""Pins selected points to target positions.
+
+    Call :func:`set_pinned` first. Re-record a CUDA graph after changing the pinned set.
     """
 
     def __init__(self, integration_pt_volume):

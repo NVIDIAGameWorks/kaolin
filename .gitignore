@@ -53,8 +53,9 @@ kaolin/physics/sparsified/
 output/
 assets/fiscus.ply
 
-# Claude Code — local & branch-agnostic, never committed/merged
+# AI coding-agent context — local & branch-agnostic, never committed/merged
 CLAUDE.md
 CLAUDE.local.md
 **/CLAUDE.md
 .claude/
+/AGENTS.md

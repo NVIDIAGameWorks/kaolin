@@ -65,34 +65,60 @@ def create_projection_matrix(num_dofs, list_of_kin_dofs):
     return P
 
 
-def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None):
+def hess_reduction(dense_Ja, block_wise_H, dense_Jb=None, out=None, hj_out=None,
+                   accumulate=False):
     r""" This does :math:`\text{Ja}^T \times \text{H} \times \text{Jb}` for a block-wise diagonal :math:`\text{H}` matrix.
-    
+
     Args:
         dense_Ja (torch.Tensor): The left Jacobian matrix
         block_wise_H (torch.Tensor): 3D tensor of block-wise Hessian matrices
         dense_Jb (torch.Tensor): The right Jacobian matrix. If not provided, will use :math:`\text{Ja}`
-    
+        out (torch.Tensor, optional): Preallocated output of shape
+            :math:`(\text{Ja.shape[1]}, \text{Jb.shape[1]})`. Required for CUDA graph
+            capture, which forbids allocation. When ``None`` a new tensor is allocated.
+        hj_out (torch.Tensor, optional): Preallocated scratch for the intermediate
+            :math:`\text{H} \times \text{Jb}` of shape ``(batch, block, Jb.shape[1])``.
+            Also required for capture. When ``None`` a new tensor is allocated.
+        accumulate (bool, optional): When ``True``, add into ``out`` instead of
+            overwriting it. This is what lets a reduction be split across chunks of rows:
+            :math:`J^T H J = \sum_c J_c^T H_c J_c` when :math:`H` is block diagonal, so
+            each chunk contributes additively and the full :math:`J` never has to exist.
+            Requires ``out``. Defaults to False.
+
     Returns:
-        torch.Tensor: The reduced Hessian matrix
+        torch.Tensor: The reduced Hessian matrix. Same object as ``out`` when given.
     """
+
+    if accumulate and out is None:
+        raise ValueError("accumulate=True requires a preallocated `out` to add into.")
 
     if dense_Jb is None:
         dense_Jb = dense_Ja
 
     # This does J.T @ H @ J
-    batch_size = block_wise_H.shape[0]
     block_size = block_wise_H.shape[1]
 
     # Reshape J to match dimensions for batch matrix multiply
     Jb_reshaped = dense_Jb.reshape(-1, block_size, dense_Jb.shape[1])
 
     # Batch matrix multiply H and J_reshaped
-    HJ = torch.bmm(block_wise_H, Jb_reshaped)
+    if hj_out is None:
+        hj_out = torch.bmm(block_wise_H, Jb_reshaped)
+    else:
+        torch.bmm(block_wise_H, Jb_reshaped, out=hj_out)
 
     # Reshape result to 2D and multiply with J.T
     # Final: (num_handles*12, num_handles*12)
-    return torch.matmul(dense_Ja.transpose(0, 1), HJ.reshape(-1, dense_Jb.shape[1]))
+    HJ_2d = hj_out.reshape(-1, dense_Jb.shape[1])
+    if out is None:
+        return torch.matmul(dense_Ja.transpose(0, 1), HJ_2d)
+    if accumulate:
+        # addmm_ is the in-place C = C + A @ B GEMM, so accumulating costs no extra
+        # buffer and no extra pass -- relevant because this runs once per chunk.
+        out.addmm_(dense_Ja.transpose(0, 1), HJ_2d)
+        return out
+    torch.matmul(dense_Ja.transpose(0, 1), HJ_2d, out=out)
+    return out
 
 
 def torch_bsr_to_torch_triplets(mat):
