@@ -61,7 +61,7 @@ def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
         tetrahedrons_mean (torch.Tensor):
             Mean volume of all tetrahedrons in a grid,
             of shape :math:`(\text{batch_size})` or :math:`(1,)` (broadcasting).
-            Default: Compute ``torch.mean(tet_vertices, dim=-1)``.
+            Default: Compute the mean tetrahedron volume for each mesh.
         pow (int):
             Power for the equivolume loss.
             Increasing power puts more emphasis on the larger tetrahedron deformation.
@@ -69,7 +69,7 @@ def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
 
     Returns:
         (torch.Tensor):
-            EquiVolume loss for each mesh, of shape :math:`(\text{batch_size})`.
+            EquiVolume loss for each mesh, of shape :math:`(\text{batch_size}, 1)`.
 
     Example:
         >>> tet_vertices = torch.tensor([[[[0.5000, 0.5000, 0.7500],
@@ -89,8 +89,8 @@ def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
         ...                                [0.6000, 0.9000, 0.3000],
         ...                                [0.5500, 0.3500, 0.9000]]]])
         >>> equivolume(tet_vertices, pow=4)
-        tensor([[2.2961e-10],
-                [7.7704e-10]])
+        tensor([[2.2898e-15],
+                [1.5422e-09]])
     """
     _validate_tet_vertices(tet_vertices)
 
@@ -100,7 +100,7 @@ def equivolume(tet_vertices, tetrahedrons_mean=None, pow=4):
     if tetrahedrons_mean is None:
         # finding the mean volume of all tetrahedrons in the tetrahedron grid
         tetrahedrons_mean = torch.mean(volumes, dim=-1)
-    tetrahedrons_mean = tetrahedrons_mean.reshape(1, -1)
+    tetrahedrons_mean = tetrahedrons_mean.reshape(-1, 1)
     # compute EquiVolume loss
     equivolume_loss = torch.mean(torch.pow(
         torch.abs(volumes - tetrahedrons_mean), exponent=pow),
