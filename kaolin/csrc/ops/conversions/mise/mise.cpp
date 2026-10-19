@@ -104,8 +104,8 @@ at::Tensor MISE::query() {
       n_unknown += 1;
   }
 
-  at::Tensor points = at::zeros({n_unknown, 3}, std::nullopt, at::kLong,
-                                std::nullopt, at::kCPU, std::nullopt);
+  at::Tensor points = at::zeros({n_unknown, 3}, at::kLong, std::nullopt,
+                                at::Device(at::kCPU), std::nullopt);
   auto points_ptr = points.data_ptr<int64_t>();
   int32_t idx = 0;
   for (auto p : grid_points) {

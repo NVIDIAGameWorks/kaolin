@@ -28,7 +28,6 @@ import torch
 from torch.multiprocessing import Pool
 from torch.utils.data import Dataset
 
-import kaolin.utils.testing as testing
 
 def _parallel_save_task(args):
     torch.set_num_threads(1)
@@ -111,8 +110,9 @@ def _get_saving_actions(dataset, cache_dir, save_on_disk=False,
                     path:Path = cache_dir / '0' / f'{k}.pt'
                     # note: reporting error directory with POSIX path to ease regex matching without raising encoding errors due to Windows backslashes
                     path_str = path.resolve().as_posix()
-                    if path.exists(): # There is already a file for a given key 
+                    if path.exists(): # There is already a file for a given key
                         # Is the value stored the same than the one from the data?
+                        import kaolin.utils.testing as testing
                         assert ignore_diff_error or testing.contained_torch_equal(v, torch.load(path)), \
                             f"file '{path_str}' is different than " \
                             "its matching field from the input dataset, set 'force_overwriting' " \
@@ -197,8 +197,12 @@ class CachedDataset(Dataset):
             # Run the preprocessing + saving
             try:
                if num_workers > 0:
-                   # With multiprocessing
-                   p = Pool(num_workers)
+                   # Prefer 'fork' so user-defined dataset classes (e.g. defined in test
+                   # files or notebooks) don't need to be importable in workers. Fall back
+                   # to 'spawn' on platforms that don't support fork (e.g. Windows).
+                   import multiprocessing as _mp
+                   _ctx = 'fork' if 'fork' in _mp.get_all_start_methods() else 'spawn'
+                   p = _mp.get_context(_ctx).Pool(num_workers)
                    try:
                        iterator = p.imap(
                            _parallel_save_task, [(
@@ -207,9 +211,12 @@ class CachedDataset(Dataset):
                            ) for idx in range(len(self))])
                        for _ in tqdm(range(len(self)), desc=progress_message):
                            self.data.append(next(iterator))
-                   finally:
                        p.close()
                        p.join()
+                   except BaseException:
+                       p.terminate()
+                       p.join()
+                       raise
                else:
                    for idx in tqdm(range(len(self)), desc=progress_message):
                        self.data.append(_save_task(
@@ -494,7 +501,9 @@ class ProcessedDataset(KaolinDataset):
                             data = self._get_base_data(idx)
                             self.cache_convert(key, data)
                 else:
-                    p = Pool(num_workers)
+                    import multiprocessing as _mp
+                    _ctx = 'fork' if 'fork' in _mp.get_all_start_methods() else 'spawn'
+                    p = _mp.get_context(_ctx).Pool(num_workers)
                     try:
                         iterator = p.imap_unordered(
                             _preprocess_task,
@@ -504,9 +513,12 @@ class ProcessedDataset(KaolinDataset):
                         for i in tqdm(range(len(uncached)), desc=desc,
                                       disable=no_progress):
                             next(iterator)
-                    finally:
                         p.close()
                         p.join()
+                    except BaseException:
+                        p.terminate()
+                        p.join()
+                        raise
         else:
             self.cache_convert = None
 

@@ -538,6 +538,8 @@ class TestNamedValueIO:
             assert len(value) > 0
         elif value_type == BinaryIoDataType.DICT:
             value = generate_random_dict(5)
+        elif value_type == BinaryIoDataType.LIST:
+            value = generate_random_value(value_type)
         else:
             value = generate_random_torch_array(value_type)
 
@@ -609,13 +611,14 @@ class TestDictIO:
         """Test dictionary encoding to binary."""
         print(kaolin.utils.testing.tensor_info(dict_compatible))
         in_dict = dict_compatible
-        encoded = to_binary(in_dict)
+        # Random uint8 tensors may be image-shaped; 'raw' keeps the roundtrip shape-preserving.
+        encoded = to_binary(in_dict, image_format='raw')
         decoded = from_binary(encoded)
         self.assert_dicts_equal(in_dict, decoded)
 
     def test_to_from_binary_np(self, dict_np):
         in_dict = dict_np
-        encoded = to_binary(in_dict)
+        encoded = to_binary(in_dict, image_format='raw')
         decoded = from_binary(encoded)
 
         assert set(in_dict.keys()) == set(decoded.keys())
@@ -632,7 +635,7 @@ class TestDictIO:
 
     def test_to_from_binary_primitive(self, dict_primitive):
         in_dict = dict_primitive
-        encoded = to_binary(in_dict)
+        encoded = to_binary(in_dict, image_format='raw')
         decoded = from_binary(encoded)
 
         assert set(in_dict.keys()) == set(decoded.keys())

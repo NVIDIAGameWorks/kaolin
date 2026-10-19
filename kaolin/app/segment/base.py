@@ -89,7 +89,7 @@ class SceneSegmenter(ABC):
 
     @abstractmethod
     def subscene_from_3d_mask(self, mask_3d: torch.Tensor) -> "SceneSegmenter":
-        """Return a NEW segmenter scoped to the masked subset (with a ``parent_mask`` attr)."""
+        """Return a NEW segmenter scoped to the masked subset."""
 
     # ---------------- default (representation-agnostic) implementation ----------------
 

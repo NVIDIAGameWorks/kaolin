@@ -3,6 +3,8 @@
 docker_registry_server = ImageTag.split(':')[0..1].join(':')
 currentBuild.displayName = ImageTag.split(':')[2] + "-${arch}"
 currentBuild.description = sourceBranch + ": " + commitHash
+// Explicitly set GIT_COMMIT so gitlabCommitStatus works on Jenkins Replay (no GitLab trigger context).
+env.GIT_COMMIT = commitHash
 
 // to manage image secrets:
 // 1) log into docker

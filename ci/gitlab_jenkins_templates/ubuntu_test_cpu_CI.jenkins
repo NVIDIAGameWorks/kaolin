@@ -112,6 +112,21 @@ spec:
           echo e.toString()
         }
         
+        boolean triggeredByUpstream = currentBuild.getBuildCauses().any { it._class?.contains('UpstreamCause') }
+        if (!triggeredByUpstream) {
+          try {
+            withCredentials([usernamePassword(
+                credentialsId: 'kaolin-gitlab-access-token-as-password',
+                usernameVariable: 'GL_USER', passwordVariable: 'GL_TOKEN')]) {
+              def glState = build_passed ? 'success' : 'failed'
+              def glProject = repoUrl.minus('https://gitlab-master.nvidia.com/').minus('.git').replace('/', '%2F')
+              sh """curl -s -X POST "https://gitlab-master.nvidia.com/api/v4/projects/${glProject}/statuses/${commitHash}" \
+                --header "PRIVATE-TOKEN: \${GL_TOKEN}" \
+                -d "state=${glState}&name=test-${configName}" \
+                --data-urlencode "target_url=${env.BUILD_URL}" """
+            }
+          } catch (Throwable ignored) {}
+        }
         if (build_passed) {
           currentBuild.result = "SUCCESS"
         } else {
