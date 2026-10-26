@@ -239,7 +239,8 @@ if __name__ == '__main__':
     viewer_builder.set_active_mode('view')
     viewer_builder.on_resize(
         clear_layers=[baked_selection_layer_id],
-        reset_behaviors=[sam_behavior_id, konva_behavior_id])
+        reset_behaviors=[sam_behavior_id, konva_behavior_id],
+        switch_mode='view')
 
     # Building ----------------------
     # Now we construct actual viewer (eventually we'll support multiple viewports).

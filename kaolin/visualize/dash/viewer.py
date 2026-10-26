@@ -572,20 +572,22 @@ class ViewerBuilder:
         return name
 
     def on_resize(self, clear_layers: list | None = None,
-                  reset_behaviors: list | None = None) -> None:
-        """Configure cleanup after a committed viewport size change.
+                  reset_behaviors: list | None = None,
+                  switch_mode: str = "") -> None:
+        """Configure cleanup and an optional mode switch after a viewport resize.
 
         Runs after layers and behaviors receive the new size, before the
         camera update. Initial sizing and unchanged sizes do not trigger it.
-        Register the referenced layers and behaviors before calling.
+        Register the referenced layers, behaviors and mode before calling.
         Calling again replaces the previous resize hook.
 
         Args:
             clear_layers: canvas layer ids to clear, or None to clear none.
             reset_behaviors: behavior ids whose reset() method is called.
+            switch_mode: mode to activate after cleanup; "" keeps the mode.
 
         Raises:
-            ValueError: for unknown ids or a non-canvas clear target.
+            ValueError: for unknown ids/modes or a non-canvas clear target.
         """
         layer_ids = self._layers.get_unique_ids_or_raise(clear_layers or [])
         behavior_ids = self._behaviors.get_unique_ids_or_raise(reset_behaviors or [])
@@ -593,8 +595,11 @@ class ViewerBuilder:
             if self._layers[layer_id][1] != 'canvas':
                 raise ValueError('on_resize clear_layers supports only canvas layers; '
                                  'use reset_behaviors for other layer types.')
+        if switch_mode and not any(mode[0] == switch_mode for mode in self._modes):
+            raise ValueError(f'Unknown resize switch_mode {switch_mode!r}.')
         self._resize_hooks = dict(clear_layers=layer_ids,
-                                  reset_behaviors=behavior_ids)
+                                  reset_behaviors=behavior_ids,
+                                  switch_mode=switch_mode)
 
     def set_active_mode(self, name: str) -> None:
         """Set the initial active mode for the viewer.

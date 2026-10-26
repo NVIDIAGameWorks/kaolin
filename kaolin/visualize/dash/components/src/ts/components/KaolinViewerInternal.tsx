@@ -95,10 +95,11 @@ type Props = {
     /** How the viewport canvas resizes within its container. */
     resize_mode?: ViewportResizeMode;
 
-    /** Cleanup after a committed size change; skipped for initial sizing. */
+    /** Cleanup and optional mode switch after a size change; skipped for initial sizing. */
     resize_hooks?: {
         clear_layers?: string[];
         reset_behaviors?: string[];
+        switch_mode?: string;
     };
 
     /**
@@ -961,13 +962,16 @@ const KaolinViewerInternal = (props: Props) => {
                     logger.error(`Error resetting behavior '${behaviorId}' after resize:`, error);
                 }
             });
+            if (props.resize_hooks?.switch_mode) {
+                applyMode(props.resize_hooks.switch_mode);
+            }
         }
 
         // Sizing the viewport changed the active controller's projection (its
         // aspect ratio, and the pixel dimensions its intrinsics are expressed
         // in), so listeners — a remote renderer above all — have to be told.
         maybeSendCameraUpdateRef.current();
-    }, [cameraSize, resizeMode, id, props.resize_hooks]);
+    }, [cameraSize, resizeMode, id, props.resize_hooks, applyMode]);
 
     // Late-registered layers and behaviors: re-apply the current size whenever
     // either set changes. Declared after the element-binding effect above so
