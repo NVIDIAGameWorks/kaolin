@@ -237,6 +237,9 @@ if __name__ == '__main__':
         ui_icon=mode_info['sam'][0], description='mode for interactive 2D selection',
         clear_layers=[baked_selection_layer_id], reset_behaviors=[konva_behavior_id])
     viewer_builder.set_active_mode('view')
+    viewer_builder.on_resize(
+        clear_layers=[baked_selection_layer_id],
+        reset_behaviors=[sam_behavior_id, konva_behavior_id])
 
     # Building ----------------------
     # Now we construct actual viewer (eventually we'll support multiple viewports).

@@ -158,6 +158,7 @@ class ViewerBuilder:
         # side auto-assigns digit shortcuts 1..9 in registration order.
         self._modes: list[tuple[str, list[str], str | None, str | None]] = []
         self._mode_hooks : dict[str, _ModeHooksInfo] = {}
+        self._resize_hooks: dict[str, Any] | None = None
         # behavior_id -> _BehaviorOptionInfo, populated by add_user_behavior_options.
         self._behavior_option_infos: dict[str, _BehaviorOptionInfo] = {}
         # WebSocket message tag whose arrivals count as "frames" for the
@@ -570,6 +571,31 @@ class ViewerBuilder:
             self._mode_hooks[name] = _ModeHooksInfo(name, clear_layers, reset_behaviors)
         return name
 
+    def on_resize(self, clear_layers: list | None = None,
+                  reset_behaviors: list | None = None) -> None:
+        """Configure cleanup after a committed viewport size change.
+
+        Runs after layers and behaviors receive the new size, before the
+        camera update. Initial sizing and unchanged sizes do not trigger it.
+        Register the referenced layers and behaviors before calling.
+        Calling again replaces the previous resize hook.
+
+        Args:
+            clear_layers: canvas layer ids to clear, or None to clear none.
+            reset_behaviors: behavior ids whose reset() method is called.
+
+        Raises:
+            ValueError: for unknown ids or a non-canvas clear target.
+        """
+        layer_ids = self._layers.get_unique_ids_or_raise(clear_layers or [])
+        behavior_ids = self._behaviors.get_unique_ids_or_raise(reset_behaviors or [])
+        for layer_id in layer_ids:
+            if self._layers[layer_id][1] != 'canvas':
+                raise ValueError('on_resize clear_layers supports only canvas layers; '
+                                 'use reset_behaviors for other layer types.')
+        self._resize_hooks = dict(clear_layers=layer_ids,
+                                  reset_behaviors=behavior_ids)
+
     def set_active_mode(self, name: str) -> None:
         """Set the initial active mode for the viewer.
 
@@ -694,6 +720,8 @@ class ViewerBuilder:
             camera_controllers=self._camera_controllers,
             resize_mode=self._viewport_resize_mode,
             modes=self._modes)
+        if self._resize_hooks is not None:
+            kwargs['resize_hooks'] = self._resize_hooks
         if self._remote_fps_source is not None:
             kwargs['remote_fps_source'] = self._remote_fps_source
         if self._remote_fps_label is not None:

@@ -130,6 +130,37 @@ describe('visualize/dash/components/src/lib/behavior/test_svg_annotations.ts', (
             assert.equal(svg.childNodes.length, 0, 'reset detaches the markers from the svg');
         });
 
+        it('preserves marker centers and asset scale across wide and tall viewports', () => {
+            const svg = makeBoundSvg('svg-resize');
+            let width = 200;
+            let height = 100;
+            svg.getBoundingClientRect = () => ({ left: 0, top: 0, width, height } as DOMRect);
+            const behavior = new SvgAnnotationBehavior({
+                assets: { circle: { elements: [{ name: 'circle' }], scale: 2 } },
+            });
+            behavior.setActiveElement(svg);
+            behavior.onClick({ clientX: 50, clientY: 50 } as any);
+            const marker = behavior.svgMarkers[0];
+            // Center is still (25%, 50%); the root scales X by 2 and Y by 1,
+            // so the local Y compensation makes both glyph axes scale equally.
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2) scale(1, 2)');
+
+            width = 100;
+            height = 200;
+            behavior.setDimensions(width, height);
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2) scale(1, 0.5)');
+            behavior.setDimensions(width, height);
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2) scale(1, 0.5)',
+                'repeated sizes do not accumulate correction');
+
+            behavior.setDimensions(0, 0);
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2) scale(1, 0.5)',
+                'a temporarily hidden viewport leaves the marker intact');
+            behavior.setDimensions(100, 100);
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2)',
+                'returning to square restores the original asset transform');
+        });
+
         it('logs an error and adds nothing when the active asset is missing', () => {
             setLogLevel(LogLevel.DEBUG);  // so logger.error is not suppressed
             const behavior = new SvgAnnotationBehavior({ activeAsset: 'nonexistent' });

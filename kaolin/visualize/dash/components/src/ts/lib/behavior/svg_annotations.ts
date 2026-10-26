@@ -92,6 +92,9 @@ export class SvgAnnotationBehavior extends InteractiveBehavior {
     assets: Record<string, SVGElement>;
     /** Markers added to the SVG by this behavior, tracked for {@link reset}. */
     svgMarkers: SVGElement[];
+    // Preserve original transforms so resize compensation never accumulates.
+    private markerTransforms = new WeakMap<SVGElement, string>();
+    private markerScaleY = 1;
     override options: SvgAnnotationOptions;
 
     constructor(options: Partial<SvgAnnotationOptions> = {}) {
@@ -113,8 +116,8 @@ export class SvgAnnotationBehavior extends InteractiveBehavior {
         // onto the whole element. Under the default `preserveAspectRatio` a
         // square `viewBox` is letterboxed inside a non-square element and a
         // marker stops landing under the click; 'none' stretches it to fill
-        // instead, which keeps every existing marker at its own fraction at the
-        // cost of scaling glyphs non-uniformly.
+        // instead. setDimensions compensates glyph scaling independently of
+        // those fractional positions, so circles remain circular.
         (elem as SVGElement).setAttribute('preserveAspectRatio', 'none');
         this.svgDisplay = new SvgDisplay(elem as SVGElement);
 
@@ -122,17 +125,28 @@ export class SvgAnnotationBehavior extends InteractiveBehavior {
         for (const [name, assetSpec] of Object.entries(this.options.assets)) {
             this.assets[name] = this.svgDisplay.createSvgGroup(assetSpec);
         }
+        const rect = elem.getBoundingClientRect();
+        this.setDimensions(rect.width, rect.height);
     }
 
-    /**
-     * Nothing to reconcile. Everything here lives in the `viewBox` user space
-     * that {@link SvgDisplay} read once, which the element's pixel size does
-     * not touch, and the `preserveAspectRatio='none'` set in
-     * `setActiveElement` keeps that space mapped onto the whole element at any
-     * aspect. So SVG rescales the markers for free and their fractions stay
-     * put.
-     */
-    override setDimensions(_width: number, _height: number): void {}
+    /** Keep glyphs uniformly scaled while their centers follow the viewport. */
+    override setDimensions(width: number, height: number): void {
+        if (!this.svgDisplay || !Number.isFinite(width) || !Number.isFinite(height)
+            || width <= 0 || height <= 0) return;
+        const scaleY = (width / this.svgDisplay.width) / (height / this.svgDisplay.height);
+        if (scaleY === this.markerScaleY) return;
+        this.markerScaleY = scaleY;
+        this.svgMarkers.forEach(marker => this.updateMarkerScale(marker));
+    }
+
+    private updateMarkerScale(marker: SVGElement): void {
+        // Append after the original translate/asset scale: only the glyph is
+        // compensated, never its center. Always start from the original so
+        // repeated resizes cannot accumulate scaling.
+        const transform = this.markerTransforms.get(marker) ?? '';
+        marker.setAttribute('transform', transform +
+            (this.markerScaleY === 1 ? '' : ` scale(1, ${this.markerScaleY})`));
+    }
 
     onClick(event: React.MouseEvent) {
         if (!this.element || !this.svgDisplay) {
@@ -157,6 +171,8 @@ export class SvgAnnotationBehavior extends InteractiveBehavior {
         }
         const { fracX, fracY } = getRelativeCoordinates(event, this.element);
         const marker = this.svgDisplay.addElement(fracX, fracY, asset);
+        this.markerTransforms.set(marker, marker.getAttribute('transform') ?? '');
+        this.updateMarkerScale(marker);
         this.svgMarkers.push(marker);
         this.onMarkerAdded(marker, this.svgMarkers.length - 1, event);
     }

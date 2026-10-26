@@ -2,7 +2,7 @@ import '../../css/viewer.css';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { getCanvasCoordinates } from '../util/canvas';
+import { clearCanvas, getCanvasCoordinates } from '../util/canvas';
 import { BehaviorRunner, CameraControllerInterface, isCameraController, InteractiveBehavior, isElementBoundBehavior, isSizeableBehavior, isClickEventHandler, isPointerEventHandler, ClickEventHandler, PointerEventHandler, MessageHandler, isMessageHandler } from '../core/behavior';
 import * as kaolin_events from '../core/event';
 import * as io from '../core/io';
@@ -94,6 +94,12 @@ type Props = {
 
     /** How the viewport canvas resizes within its container. */
     resize_mode?: ViewportResizeMode;
+
+    /** Cleanup after a committed size change; skipped for initial sizing. */
+    resize_hooks?: {
+        clear_layers?: string[];
+        reset_behaviors?: string[];
+    };
 
     /**
      * Named modes as a list of [modeName, [behaviorIds...], uiIcon, description]
@@ -938,11 +944,30 @@ const KaolinViewerInternal = (props: Props) => {
             behavior.setDimensions(width, height);
         });
 
+        if (previous && (width !== previous.width || height !== previous.height)) {
+            props.resize_hooks?.clear_layers?.forEach(layerId => {
+                const element = layersRef.current.get(layerId)?.current;
+                if (element instanceof HTMLCanvasElement) clearCanvas(element);
+            });
+            props.resize_hooks?.reset_behaviors?.forEach(behaviorId => {
+                const behavior = behaviorsRef.current.get(behaviorId);
+                if (!behavior) {
+                    logger.error('Behavior not found: ' + behaviorId);
+                    return;
+                }
+                try {
+                    behavior.reset();
+                } catch (error) {
+                    logger.error(`Error resetting behavior '${behaviorId}' after resize:`, error);
+                }
+            });
+        }
+
         // Sizing the viewport changed the active controller's projection (its
         // aspect ratio, and the pixel dimensions its intrinsics are expressed
         // in), so listeners — a remote renderer above all — have to be told.
         maybeSendCameraUpdateRef.current();
-    }, [cameraSize, resizeMode, id]);
+    }, [cameraSize, resizeMode, id, props.resize_hooks]);
 
     // Late-registered layers and behaviors: re-apply the current size whenever
     // either set changes. Declared after the element-binding effect above so
