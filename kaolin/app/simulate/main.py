@@ -54,7 +54,7 @@ def build_app(args):
     # Viewer
     # ------------------------------------------------------------------
     app_builder = WebappBuilder(debug=False)
-    viewer_builder = ViewerBuilder(camera=_default_camera(), viewport_resize_mode='fixed')
+    viewer_builder = ViewerBuilder(camera=_default_camera())
     viewer_builder.add_websocket_connection('ws://WINDOW_LOCATION/websocket/', 'main-ws')
 
     render_layer_id = viewer_builder.add_layer()

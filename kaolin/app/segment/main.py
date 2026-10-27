@@ -131,7 +131,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # ViewerBuilder: helps us build the interactive viewer (on the webpage)
     # ------------------------------------------------------------------------------------------------------------------
-    viewer_builder = ViewerBuilder(camera=camera, viewport_resize_mode='adaptive')
+    viewer_builder = ViewerBuilder(camera=camera)
     # Note: Masha is still handling last bugs in adaptive viewport
 
     # WebSocket Connections ----------
@@ -237,7 +237,8 @@ if __name__ == '__main__':
         ui_icon=mode_info['sam'][0], description='mode for interactive 2D selection',
         clear_layers=[baked_selection_layer_id], reset_behaviors=[konva_behavior_id])
     viewer_builder.set_active_mode('view')
-    viewer_builder.on_resize(
+    viewer_builder.set_resize_mode(
+        'adaptive',
         clear_layers=[baked_selection_layer_id],
         reset_behaviors=[sam_behavior_id, konva_behavior_id],
         switch_mode='view')

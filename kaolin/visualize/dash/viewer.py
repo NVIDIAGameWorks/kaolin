@@ -78,67 +78,23 @@ class ViewerBuilder:
 
     def __init__(self, camera: Camera = kaolin.render.easy_render.default_camera(500),
                  width: int | None = None,
-                 height: int | None = None,
-                 viewport_resize_mode: str='fixed'):
-        """
-        ViewerBuilder helps construct and configure the client-side fully-featured Kaolin Viewer. 
-        # TODO: document construction, camera ownership and how width/height
-        #       interact with the camera's own resolution
+                 height: int | None = None):
+        """Construct and configure the client-side Kaolin Viewer.
+
+        Viewport resizing defaults to ``'fixed'``. Use :meth:`set_resize_mode`
+        to configure the resize mode and any associated cleanup together.
 
         Args:
-            camera:
-            width:
-            height:
-            viewport_resize_mode: one of ``'fixed'``, ``'adaptive'``,
-                ``'fixed_aspect'``; see :ref:`rubric viewport resize modes` below.
-
-        Raises:
-            ValueError: if ``viewport_resize_mode`` is not a supported value.
-
-        .. _rubric viewport resize modes:
-
-        .. rubric:: Viewport Resize Modes
-
-        Controls how the viewport and camera are resized with the viewport container size changes. The behavior
-        of the viewport container itself is **not** controlled by this configuration, but by the overall
-        app layout. What this setting controls is how viewport and camera respond to the available space.
-
-        Note: When using
-        server-side rendering, care must be taken to configure `AnyRendererMessageHandler` to properly
-        adjust actual rendering resolution, to avoid extreme latency on larger screens.
-
-        ``'fixed'`` (default)
-        Original aspect ratio comes from the configured Camera.
-        The canvas display box scales to fit within the available space while keeping its aspect ratio fixed.
-        The canvas buffer and camera pixel dimensions are the configured Camera dimensions
-        multiplied by the browser device pixel ratio (DPR), rounded down to integers.
-        These DPR-adjusted dimensions remain fixed as the container resizes.
-
-        ``'fixed_aspect'``
-        Original aspect ratio comes from the configured Camera.
-        The canvas display box scales to fit within the available space while keeping its aspect ratio fixed.
-        The canvas pixel size is adjusted to its display box size.
-        The camera dimensions are adjusted accordingly.
-
-        ``'adaptive'``
-        The canvas display box scales to fit within the available space.
-        The canvas pixel size is adjusted to its display box size.
-        The camera dimensions are adjusted accordingly.
+            camera: Initial camera; the builder stores a copy.
+            width: Optional override for the camera width.
+            height: Optional override for the camera height.
         """
         self._camera = copy.deepcopy(camera)
         if width is not None:
             self._camera.width = width
         if height is not None:
             self._camera.height = height
-        # How the viewport canvas resizes within its container; one of
-        # 'fixed', 'adaptive', 'fixed_aspect' (see ViewportResizeMode clientside).
-        # Validated against the values compiled into the generated component,
-        # unless that annotation could not be read (see _read_valid_resize_modes).
-        if _VALID_RESIZE_MODES is not None and viewport_resize_mode not in _VALID_RESIZE_MODES:
-            raise ValueError(
-                f'Unsupported viewport_resize_mode {viewport_resize_mode!r}; '
-                f'expected one of {_VALID_RESIZE_MODES}.')
-        self._viewport_resize_mode = viewport_resize_mode
+        self._viewport_resize_mode = 'fixed'
 
         # The input ID might not be unique globally, so we ensure that class user
         # can use either their ID or unique-ified ID to refer to layers/behaviors
@@ -572,32 +528,73 @@ class ViewerBuilder:
             self._mode_hooks[name] = _ModeHooksInfo(name, clear_layers, reset_behaviors)
         return name
 
-    def on_resize(self, clear_layers: list | None = None,
-                  reset_behaviors: list | None = None,
-                  switch_mode: str = "") -> None:
-        """Configure cleanup and an optional mode switch after a viewport resize.
+    def set_resize_mode(self, viewport_resize_mode: str,
+                        clear_layers: list | None = None,
+                        reset_behaviors: list | None = None,
+                        switch_mode: str = "") -> None:
+        """Configure viewport resizing and optional cleanup after size changes.
 
-        Runs after layers and behaviors receive the new size, before the
-        camera update. Initial sizing and unchanged sizes do not trigger it.
-        Register the referenced layers, behaviors and mode before calling.
-        Calling again replaces the previous resize hook.
+        Cleanup runs after layers and behaviors receive the new size, before
+        the camera update. Initial sizing and unchanged sizes do not trigger
+        cleanup. Register referenced layers, behaviors and modes before calling.
+        Calling again replaces both the resize mode and its cleanup hooks.
 
         Args:
-            clear_layers: canvas layer ids to clear, or None to clear none.
-            reset_behaviors: behavior ids whose reset() method is called.
-            switch_mode: mode to activate after cleanup; "" keeps the mode.
+            viewport_resize_mode: One of ``'fixed'``, ``'adaptive'``, or
+                ``'fixed_aspect'``; see :ref:`rubric viewport resize modes`.
+            clear_layers: Canvas layer ids to clear, or None to clear none.
+            reset_behaviors: Behavior ids whose reset() method is called.
+            switch_mode: Mode to activate after cleanup; "" keeps the mode.
 
         Raises:
-            ValueError: for unknown ids/modes or a non-canvas clear target.
+            ValueError: For an unsupported resize mode, unknown layer/behavior
+                ids, an unknown switch mode, or a non-canvas clear target.
+
+        .. _rubric viewport resize modes:
+
+        .. rubric:: Viewport Resize Modes
+
+        Controls how the viewport and camera are resized with the viewport container size changes. The behavior
+        of the viewport container itself is **not** controlled by this configuration, but by the overall
+        app layout. What this setting controls is how viewport and camera respond to the available space.
+
+        Note: When using
+        server-side rendering, care must be taken to configure `AnyRendererMessageHandler` to properly
+        adjust actual rendering resolution, to avoid extreme latency on larger screens.
+
+        ``'fixed'`` (default)
+        Original aspect ratio comes from the configured Camera.
+        The canvas display box scales to fit within the available space while keeping its aspect ratio fixed.
+        The canvas buffer and camera pixel dimensions are the configured Camera dimensions
+        multiplied by the browser device pixel ratio (DPR), rounded down to integers.
+        These DPR-adjusted dimensions remain fixed as the container resizes.
+
+        ``'fixed_aspect'``
+        Original aspect ratio comes from the configured Camera.
+        The canvas display box scales to fit within the available space while keeping its aspect ratio fixed.
+        The canvas pixel size is adjusted to its display box size.
+        The camera dimensions are adjusted accordingly.
+
+        ``'adaptive'``
+        The canvas display box scales to fit within the available space.
+        The canvas pixel size is adjusted to its display box size.
+        The camera dimensions are adjusted accordingly.
         """
+        # Validate against the generated component unless its annotation could
+        # not be read (see _read_valid_resize_modes).
+        if _VALID_RESIZE_MODES is not None and viewport_resize_mode not in _VALID_RESIZE_MODES:
+            raise ValueError(
+                f'Unsupported viewport_resize_mode {viewport_resize_mode!r}; '
+                f'expected one of {_VALID_RESIZE_MODES}.')
         layer_ids = self._layers.get_unique_ids_or_raise(clear_layers or [])
         behavior_ids = self._behaviors.get_unique_ids_or_raise(reset_behaviors or [])
         for layer_id in layer_ids:
             if self._layers[layer_id][1] != 'canvas':
-                raise ValueError('on_resize clear_layers supports only canvas layers; '
+                raise ValueError('set_resize_mode clear_layers supports only canvas layers; '
                                  'use reset_behaviors for other layer types.')
         if switch_mode and not any(mode[0] == switch_mode for mode in self._modes):
             raise ValueError(f'Unknown resize switch_mode {switch_mode!r}.')
+        self._viewport_resize_mode = viewport_resize_mode
         self._resize_hooks = dict(clear_layers=layer_ids,
                                   reset_behaviors=behavior_ids,
                                   switch_mode=switch_mode)

@@ -56,7 +56,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # Viewer: stacked 2D layers + one behavior per interaction style + a shared recorder.
     # ------------------------------------------------------------------------------------------------------------------
-    viewer_builder = ViewerBuilder(width=args.size, height=args.size, viewport_resize_mode='fixed')
+    viewer_builder = ViewerBuilder(width=args.size, height=args.size)
 
     # Layers (stacked bottom -> top). Pointer input is always captured by the
     # viewer's top "event canvas" and dispatched to every active behavior, so
