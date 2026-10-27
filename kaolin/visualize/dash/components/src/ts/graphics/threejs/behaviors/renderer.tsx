@@ -49,7 +49,7 @@ export const ThreeRendererBehaviorComponent: React.FC<ThreeRendererProps> = forw
         const canvasRef = useRef<HTMLCanvasElement>(null);
         // Size last applied, so a repeated `setDimensions` (every commit in
         // `fixed` mode, or any late registration) does not re-render for nothing.
-        const lastSizeRef = useRef<{ width: number, height: number } | null>(null);
+        const lastSizeRef = useRef<{ width: number, height: number, pixelRatio: number } | null>(null);
         const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
         const sceneRef = useRef<THREE.Scene | null>(new THREE.Scene());
         const groupRef = useRef<THREE.Group | null>(new THREE.Group());
@@ -67,7 +67,6 @@ export const ThreeRendererBehaviorComponent: React.FC<ThreeRendererProps> = forw
             }
 
             rendererRef.current = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias: true });
-            //rendererRef.current.setSize(500, 500);
             rendererRef.current.setClearColor(clearColor, clearAlpha);
         }, []);
 
@@ -93,29 +92,32 @@ export const ThreeRendererBehaviorComponent: React.FC<ThreeRendererProps> = forw
         }, [scheduleRender]);
 
         const setDimensions = useCallback((width: number, height: number) => {
-            const last = lastSizeRef.current;
-            if (last && last.width === width && last.height === height) {
-                return;
-            }
-            lastSizeRef.current = { width, height };
-
+            const renderer = rendererRef.current;
             const canvas = canvasRef.current;
-            if (rendererRef.current && canvas) {
-                // The canvas is a viewer layer, so the viewer owns its drawing
-                // buffer and has already resized it; setSize would write it
-                // again (clearing it) and could disagree with what the viewer
-                // wrote. Only the GL viewport has to follow, and it is taken
-                // from the buffer rather than from the CSS size passed in, so
-                // it stays right whether or not devicePixelRatio was folded in.
-                // Safe because the renderer's own pixelRatio is left at 1.
-                rendererRef.current.setViewport(0, 0, canvas.width, canvas.height);
+            // Do not cache an unapplied size; registration retries after binding.
+            if (!renderer || !canvas) return;
+            const pixelRatio = window.devicePixelRatio || 1;
+            const bufferWidth = Math.floor(width * pixelRatio);
+            const bufferHeight = Math.floor(height * pixelRatio);
+            const gl = renderer.getContext();
+            const last = lastSizeRef.current;
+            if (last && last.width === width && last.height === height && last.pixelRatio === pixelRatio
+                && gl.drawingBufferWidth === bufferWidth && gl.drawingBufferHeight === bufferHeight) return;
+
+            // The layer is already sized; synchronize Three.js' cached size,
+            // pixel ratio and viewport. Its public API rewrites the same buffer
+            // dimensions but leaves the viewer's CSS sizing alone.
+            renderer.setDrawingBufferSize(width, height, pixelRatio);
+            if (gl.drawingBufferWidth !== bufferWidth || gl.drawingBufferHeight !== bufferHeight) {
+                throw new Error(`Three.js could not resize its drawing buffer to ${bufferWidth}x${bufferHeight}`);
             }
+            lastSizeRef.current = { width, height, pixelRatio };
             const cam = cameraRef.current;
             if (cam instanceof THREE.PerspectiveCamera && height > 0) {
                 cam.aspect = width / height;
                 cam.updateProjectionMatrix();
             }
-            // The viewer's resize cleared the drawing buffer, so without this
+            // Resizing the renderer cleared the drawing buffer, so without this
             // the layer stays blank until the next drag or camera change.
             scheduleRender();
         }, [scheduleRender]);

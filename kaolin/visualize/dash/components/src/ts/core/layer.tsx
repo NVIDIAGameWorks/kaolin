@@ -111,12 +111,12 @@ const LayerComponent = ({
  * possible. What a resize costs depends on the layer type:
  *
  * - `canvas`: the size *is* the drawing buffer, and any write to it clears the
- *   buffer. The painted content is therefore carried across only when the new
- *   size has the same aspect ratio (see
+ *   buffer. 2D content is carried across only when the new size has the same
+ *   aspect ratio (see
  *   {@link core.viewport.isFixedAspect | isFixedAspect}), because the only way
  *   to carry it is to stretch it and an aspect change would distort it. On an
  *   aspect change the buffer is resized and left blank for whatever owns it to
- *   repaint.
+ *   repaint. An existing non-2D context falls back to a plain buffer resize.
  * - `svg`: nothing can be lost, since the content is vector and is placed by
  *   the `viewBox`, so only the `width`/`height` attributes are brought in line.
  *   Under the viewer's CSS (`.sub-canvas` stretches every layer to fill the
@@ -131,14 +131,12 @@ const LayerComponent = ({
  * not: it is scaled by `window.devicePixelRatio` (see
  * {@link core.viewport.adjustByDevicePixelRatio | adjustByDevicePixelRatio}),
  * since a CSS-sized buffer is upscaled by the browser to fill the element and
- * renders visibly soft on a HiDPI display. This is the only place that applies
- * the ratio to a layer, so a behavior reading `canvas.width` gets device pixels
- * while its `setDimensions` argument is CSS pixels.
+ * renders visibly soft on a HiDPI display. This helper applies the ratio,
+ * so `canvas.width` is in device pixels while a behavior's
+ * `setDimensions` argument is in CSS pixels.
  *
- * Not for a canvas driven by a renderer (three.js, PlayCanvas): resizing one
- * behind the renderer's back leaves its viewport stale, and the content-keeping
- * path asks for a 2D context, which would permanently prevent a WebGL one on a
- * canvas that has not yet created it. Size those through their behavior.
+ * After all layers are sized, the viewer calls every behavior's
+ * `setDimensions` to synchronize renderer state and redraw cleared buffers.
  *
  * @param inputLayer - Layer element; null and undefined are tolerated.
  * @param newWidth - Target width in pixels; floored, must be >= 1.
@@ -165,11 +163,14 @@ function resizeLayer(inputLayer: Element | null | undefined, newWidth: number, n
         if (inputLayer.width === buffer.width && inputLayer.height === buffer.height) {
             return true;
         }
-        if (isFixedAspect({ width: inputLayer.width, height: inputLayer.height }, buffer)) {
+        // Existing WebGL contexts return null here; their behaviors redraw
+        // after the buffer resize.
+        if (isFixedAspect({ width: inputLayer.width, height: inputLayer.height }, buffer)
+            && inputLayer.getContext('2d')) {
             return resizeCanvasKeepContent(inputLayer, buffer.width, buffer.height);
         }
         setCanvasBufferSize(inputLayer, buffer.width, buffer.height);
-        return true;
+        return inputLayer.width === buffer.width && inputLayer.height === buffer.height;
     }
 
     if (inputLayer instanceof SVGSVGElement) {

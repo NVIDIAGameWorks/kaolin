@@ -5,6 +5,30 @@ import { BehaviorRegister, CameraControllerInterface, InteractiveBehavior } from
 import { CameraOrthoIntrinsics, CameraParameters, CameraPinholeIntrinsics, defaultCameraParameters } from '../../camera';
 import { updatePlaycanvasCameraWithKaolinParams } from '../camera';
 import { resolvePlaycanvas } from '../resolve';
+import { adjustByDevicePixelRatio } from '../../../core/viewport';
+
+// Cache per device so behaviors sharing an app do not repeat resize events.
+const deviceSizes = new WeakMap<pc.GraphicsDevice, { width: number, height: number }>();
+
+/** Synchronize the graphics device after the viewer has sized its layer. */
+function resizePlaycanvas(app: pc.Application | null, width: number, height: number): void {
+    if (!app) return;
+    const device = app.graphicsDevice;
+    device.maxPixelRatio = window.devicePixelRatio || 1;
+    const buffer = adjustByDevicePixelRatio({ width, height });
+    const alreadySized = device.canvas.width === buffer.width && device.canvas.height === buffer.height;
+    device.resizeCanvas(width, height);
+    if (device.width !== buffer.width || device.height !== buffer.height) {
+        throw new Error(`PlayCanvas could not resize its drawing buffer to ${buffer.width}x${buffer.height}`);
+    }
+    const last = deviceSizes.get(device);
+    // resizeCanvas skips its notification when the layer pass already sized the
+    // buffer. Notify dependent render targets once, without clearing it again.
+    if (alreadySized && (!last || last.width !== buffer.width || last.height !== buffer.height)) {
+        device.fire('resizecanvas', buffer.width, buffer.height);
+    }
+    deviceSizes.set(device, buffer);
+}
 
 export class PlaycanvasBehavior extends InteractiveBehavior {
     static override schema = z.object({});
@@ -27,20 +51,9 @@ export class PlaycanvasBehavior extends InteractiveBehavior {
         this.setup();
     }
 
-    /**
-     * Tells the graphics device the new resolution. In CSS pixels, since
-     * `resizeCanvas` applies its own pixel ratio (matched to the viewer's in
-     * `setup`), and never through `app.resizeCanvas`, which would write the
-     * layer's inline CSS size. The viewer has already given the canvas this
-     * buffer size, so the device's write is a no-op and nothing is cleared; the
-     * call is what keeps PlayCanvas' own resolution and viewport in step.
-     *
-     * `resizeCanvas` is itself guarded against an unchanged size, and the app
-     * may not exist on the first call (the element is bound by `setActiveElement`),
-     * in which case `setup` picks the size up off the canvas.
-     */
+    /** Synchronize PlayCanvas with the layer; unchanged sizes are a no-op. */
     setDimensions(width: number, height: number) {
-        this.app?.graphicsDevice.resizeCanvas(width, height);
+        resizePlaycanvas(this.app, width, height);
     }
 
     setup() {
@@ -53,16 +66,9 @@ export class PlaycanvasBehavior extends InteractiveBehavior {
         }
 
         this.app = new pc.Application(canvas);
-        // The viewer sizes layer buffers in device pixels; PlayCanvas caps its
-        // own ratio at 1 by default, so `resizeCanvas` would scale a CSS size to
-        // a *smaller* buffer than the viewer wrote and undo it. Matching the
-        // ratio makes the two agree exactly.
         this.app.graphicsDevice.maxPixelRatio = window.devicePixelRatio || 1;
-        // FIXED, not AUTO: the viewer owns this canvas' buffer size, and AUTO
-        // has PlayCanvas re-derive it from the element's client box every frame
-        // (AppBase.updateCanvasSize), overwriting what the viewer wrote. CSS
-        // pixels, like `resizeCanvas` (which this calls through to) — the
-        // element fills the layer, so its client box is the viewer's size.
+        // FIXED keeps PlayCanvas from resizing every frame; the viewer supplies
+        // committed CSS sizes to this behavior instead.
         this.app.setCanvasResolution(pc.RESOLUTION_FIXED, canvas.clientWidth, canvas.clientHeight);
         this.app.setCanvasFillMode(pc.FILLMODE_NONE);
         this.app.start();
@@ -128,25 +134,13 @@ export class PlaycanvasSplatBehavior extends InteractiveBehavior implements Came
         this.setup();
     }
 
-    /**
-     * Records the size for the camera converter and tells the graphics device
-     * the new resolution. CSS pixels (`resizeCanvas` applies its own pixel
-     * ratio, matched to the viewer's in `setup`), and never `app.resizeCanvas`,
-     * which would write the layer's inline CSS size. The viewer has already
-     * given the canvas this buffer size, so the device's write is a no-op that
-     * clears nothing; it only brings PlayCanvas' own resolution and viewport in
-     * step.
-     *
-     * Returns on an unchanged size, and `setup` is async, so the app may not
-     * exist yet on the first call; it re-applies the recorded size once it does.
-     */
+    /** Record pending CSS dimensions and resize through the graphics device. */
     setDimensions(width: number, height: number) {
-        if (this.width === width && this.height === height) {
-            return;
-        }
         this.width = width;
         this.height = height;
-        this.app?.graphicsDevice.resizeCanvas(width, height);
+        // The device checks the actual buffer, so failed or pre-setup requests
+        // can be retried even when the requested CSS size is unchanged.
+        resizePlaycanvas(this.app, width, height);
     }
 
     setCameraParams(cameraParams: CameraParameters) {
@@ -180,22 +174,15 @@ export class PlaycanvasSplatBehavior extends InteractiveBehavior implements Came
             }
         });
         app.setCanvasFillMode(pc.FILLMODE_NONE);
-        // The viewer sizes layer buffers in device pixels; PlayCanvas caps its
-        // own ratio at 1 by default, so `resizeCanvas` would scale a CSS size to
-        // a *smaller* buffer than the viewer wrote and undo it. Matching the
-        // ratio makes the two agree exactly.
         app.graphicsDevice.maxPixelRatio = window.devicePixelRatio || 1;
-        // FIXED, not AUTO: the viewer owns this canvas' buffer size, and AUTO
-        // has PlayCanvas re-derive it from the element's client box every frame
-        // (AppBase.updateCanvasSize), overwriting what the viewer wrote. In CSS
-        // pixels, like `resizeCanvas` this calls through to: the viewer's size,
-        // recorded by setDimensions before this async setup finished, or the
-        // element's client box (it fills the layer) until that arrives.
-        // No window resize listener either, for the same reason: resizing is
-        // driven by the viewer, which observes its own container.
+        // Resize only on viewer commits, using any size received before setup.
+        // AUTO would override this from the CSS box on every frame.
         app.setCanvasResolution(pc.RESOLUTION_FIXED,
                                 this.width || canvas.clientWidth, this.height || canvas.clientHeight);
         app.start();
+        // Accept resizes while assets load, rather than leaving the buffer at
+        // the size captured before the await below.
+        this.app = app;
 
         // Load assets
         const assets = [
@@ -229,9 +216,6 @@ export class PlaycanvasSplatBehavior extends InteractiveBehavior implements Came
             });
         });
         //await new Promise(resolve => loader.load(resolve));
-
-        // Store app reference
-        this.app = app;
 
         // Create camera entity
         this.camera = new pc.Entity('Camera');

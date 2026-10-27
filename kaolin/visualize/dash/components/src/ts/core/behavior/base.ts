@@ -125,8 +125,8 @@ export class Behavior implements BehaviorInterface {
 }
 
 /**
- * Behaviors that need to be told the viewport size. The viewer sizes the layer
- * elements itself and then notifies these behaviors so they can bring their
+ * Behaviors that need to be told the viewport size. The viewer sizes all
+ * layer elements and then notifies these behaviors so they can bring their
  * internal state in line — {@link ElementBoundBehavior} for behaviors bound to
  * a layer, and {@link CameraControllerInterface} for the controllers that own a
  * camera whose projection depends on it.
@@ -141,16 +141,14 @@ export interface SizeableBehavior {
      * size, so handing them device pixels applies it twice. A behavior that
      * needs device pixels scales them itself.
      *
-     * A canvas layer is the one place device pixels appear: the viewer scales
-     * its drawing buffer by the ratio, so a behavior comparing its argument
-     * against `canvas.width` is comparing two different units.
+     * Canvas drawing buffers use device pixels, so a behavior comparing its
+     * CSS-size argument against `canvas.width` is comparing different units.
      *
-     * An implementation does not resize the element it is bound to — the viewer
-     * owns every layer's size and has already applied it by the time this runs.
-     * It reconciles its own state instead: coordinates held in pixel space, a
-     * native renderer's viewport, and any element it created itself (a library
-     * stage inside its div, say, which the viewer knows nothing about). No-op
-     * if the behavior is size-independent.
+     * The viewer has already sized every bound layer. Behaviors reconcile
+     * their coordinates, native renderer state, or elements they created inside
+     * a layer (such as a library stage). A renderer's resize API may also write
+     * the same buffer dimensions while updating its internal state.
+     * No-op if size-independent.
      *
      * Called on every resize commit and on every layer or behavior
      * registration, so the same size arrives repeatedly; an implementation that

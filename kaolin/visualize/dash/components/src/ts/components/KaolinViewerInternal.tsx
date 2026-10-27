@@ -920,11 +920,10 @@ const KaolinViewerInternal = (props: Props) => {
         // when it already has this size, which is what keeps a re-run — every
         // commit in `fixed` mode, or any late registration — from clearing
         // content for nothing.
-        // This loop is the only writer of a layer's size: behaviors bound to one
-        // no longer touch their element's buffer, they follow it (the three.js
-        // renderer moves its GL viewport, PlayCanvas re-reads its resolution).
-        // The size is in CSS pixels throughout; `resizeLayer` is what folds
-        // devicePixelRatio into a canvas' drawing buffer.
+        // Size every layer first, then let every behavior reconcile its state.
+        // resizeLayer preserves 2D content where possible;
+        // renderers synchronize their native state in the behavior pass below.
+        // Sizes are CSS pixels; canvas buffers include devicePixelRatio.
         //
         // The event canvas is rendered by the viewer rather than registered, so
         // it is not in `layersRef`, but for sizing it is a layer like any other.
