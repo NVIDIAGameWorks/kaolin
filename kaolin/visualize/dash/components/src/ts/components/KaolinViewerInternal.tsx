@@ -8,9 +8,6 @@ import * as kaolin_events from '../core/event';
 import * as io from '../core/io';
 import { LayerComponent, resizeLayer } from '../core/layer';
 import { WebSocketConnectionsManager } from '../core/sockets';
-// The older code-driven resizing is disabled (see the commented-out block above
-// the render function) and its element-sizing helpers are unused for now.
-// import { computeContainedDisplaySize, computeContainedFixedAspectSize, defaultSetElementDimensions } from '../core/viewport';
 import { computeContainedDisplaySize, ViewportResizeMode } from '../core/viewport';
 import { FpsReadout, InteractiveFps, InteractiveFpsProvider } from '../util/fps';
 import { logger } from '../util/logging';
@@ -1027,110 +1024,6 @@ const KaolinViewerInternal = (props: Props) => {
         };
     }, [resizeMode, id, applyCurrentSize]);
 
-
-    // DISABLED: all code-driven viewport resizing. The viewport is now sized by
-    // CSS off the `resize-mode-*` class and `--kaolin-viewer-aspect` set on the
-    // root element (see viewer.css), and layer buffers keep the attribute sizes
-    // set at construction time. Restoring this block also requires restoring the
-    // `../core/viewport` helper imports at the top of the file.
-    //
-    // const computeViewportSize = useCallback(() => {
-    //     const container = document.getElementById(id);
-    //     if (!container) return;
-    //
-    //     const containerSize = { width: container.clientWidth, height: container.clientHeight };
-    //     if (containerSize.width === 0 || containerSize.height === 0) return null;  // TODO
-    //
-    //     // Let us consider initial size as the effective pixel resolution, i.e. after device pixel ratio adjustment.
-    //     const intrinsics = props.camera_parameters?.intrinsics as { width?: number, height?: number } | { width: 500, height: 500 };
-    //     const dprInverse = 1.0 / (window.devicePixelRatio || 1);
-    //     const initialSize = resizeMode == ViewportResizeMode.FIXED ? { width: intrinsics.width, height: intrinsics.height } :
-    //         { width: Math.ceil(intrinsics.width * dprInverse), height: Math.ceil(intrinsics.height * dprInverse) };
-    //
-    //     const frameSize = (resizeMode == ViewportResizeMode.ADAPTIVE ? containerSize : computeContainedFixedAspectSize(initialSize, containerSize));
-    //     const displaySize = computeContainedDisplaySize(initialSize, resizeMode, containerSize);
-    //
-    //     logger.debug(`[KaolinViewer ${id}] computed target viewport size: ${displaySize.width}x${displaySize.height} ` +
-    //         `frame size: ${frameSize.width}x${frameSize.height} ` +
-    //         `(container ${containerSize.width}x${containerSize.height}, initial ${initialSize.width}x${initialSize.height}, mode ${resizeMode})`);
-    //     return { frame: frameSize, display: displaySize, useDPR: resizeMode != ViewportResizeMode.FIXED };
-    // }, [resizeMode, props.camera_parameters]);
-    //
-    // // Compute the contained canvas size for the current container, resize every
-    // // canvas layer's drawing buffer to it, push the size to all camera
-    // // controllers, and request a fresh frame. Reads latest layers/behaviors via
-    // // refs so it can stay stable (the resize observer captures it once).
-    // const applyViewportSize = useCallback(() => {
-    //     const sizes = computeViewportSize();
-    //     if (!sizes) return;  // container not ready
-    //
-    //     // Let's modify default layers
-    //     // Inner CSS container sizing:
-    //     //  - Adaptive --> 100%, 100%
-    //     //  - Fixed/Fixed aspect --> px sizes, not accounting for devicePixelRatio
-    //     defaultSetElementDimensions(viewerFrameRef.current, sizes.frame.width, sizes.frame.height);
-    //
-    //     if (resizeMode === ViewportResizeMode.FIXED) return;
-    //
-    //     defaultSetElementDimensions(eventCanvasRef.current, sizes.display.width, sizes.display.height, sizes.useDPR);
-    //
-    //     // Let's modify all layers
-    //     layersRef.current.forEach((layerRef, _layerId) => {
-    //         if (layerRef.current) {
-    //             defaultSetElementDimensions(layerRef.current, sizes.display.width, sizes.display.height, sizes.useDPR);
-    //         }
-    //     });
-    //
-    //     // Also inform all behaviors that have a corresponding method
-    //     behaviors.forEach((behavior, identifier) => {
-    //         if ((behavior as any)['setDimensions']) {
-    //             (behavior as any)['setDimensions'](sizes.display.width, sizes.display.height);
-    //         }
-    //     });
-    //
-    //     lastCanvasSizeRef.current = sizes.display;
-    //
-    //     // TODO: this is too slow
-    //     // Immediate camera update so listeners stay in sync during a resize drag.
-    //     maybeSendCameraUpdate();
-    // }, [computeViewportSize, cameraControllerIds, maybeSendCameraUpdate, resizeMode]);
-    //
-    // // Fire on viewer container size change (also fires once on observe, i.e. on
-    // // mount) to resize canvas layers and update camera controllers.
-    // // The rAF wrapper coalesces multiple ResizeObserver firings within one frame
-    // // (common during smooth resize drags) into a single applyViewportSize call,
-    // // capping work to the display refresh rate without adding perceptible lag.
-    // // The deferred maybeSendCameraUpdate fires only after resizing has been idle
-    // // for 300 ms (i.e. drag stopped), resetting on every new ResizeObserver entry.
-    // useEffect(() => {
-    //     // FIXED mode keeps a constant canvas size regardless of the container, so
-    //     // there's nothing to react to — skip installing the ResizeObserver entirely.
-    //     const container = document.getElementById(id);
-    //     if (!container) return;
-    //     let pendingRaf: number | null = null;
-    //     let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
-    //     const resizeObserver = new ResizeObserver(() => {
-    //         if (pendingRaf !== null) cancelAnimationFrame(pendingRaf);
-    //         if (pendingTimeout !== null) clearTimeout(pendingTimeout);
-    //         pendingRaf = requestAnimationFrame(() => {
-    //             pendingRaf = null;
-    //             applyViewportSize();
-    //             pendingTimeout = setTimeout(maybeSendCameraUpdate, 300);
-    //         });
-    //     });
-    //     resizeObserver.observe(container);
-    //     return () => {
-    //         if (pendingRaf !== null) cancelAnimationFrame(pendingRaf);
-    //         if (pendingTimeout !== null) clearTimeout(pendingTimeout);
-    //         resizeObserver.disconnect();
-    //     };
-    // }, [id, applyViewportSize, maybeSendCameraUpdate, resizeMode]);
-    //
-    // // Re-apply when layers or behaviors change so newly mounted canvas layers
-    // // get the current size even if the container itself did not resize.
-    // useEffect(() => {
-    //     applyViewportSize();
-    // }, [layers, behaviors, applyViewportSize]);
 
     // Requirements on the size...
     // v0: div fills the available space, including changing aspect ratio, can change server camera

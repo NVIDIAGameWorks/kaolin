@@ -155,6 +155,8 @@ export class PlaycanvasSplatBehavior extends InteractiveBehavior implements Came
     }
 
     getCameraParams(): CameraParameters {
+        // TODO: Derive intrinsics from the native camera and DPR-adjusted buffer;
+        // echoed parameters can retain stale pixel dimensions after resizing.
         return this.lastParams ?? defaultCameraParameters;
     }
 

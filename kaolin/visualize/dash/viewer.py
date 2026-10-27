@@ -110,8 +110,9 @@ class ViewerBuilder:
         ``'fixed'`` (default)
         Original aspect ratio comes from the configured Camera.
         The canvas display box scales to fit within the available space while keeping its aspect ratio fixed.
-        The canvas pixel size remains fixed to Camera dimensions.
-        The Camera dimensions remain fixed.
+        The canvas buffer and camera pixel dimensions are the configured Camera dimensions
+        multiplied by the browser device pixel ratio (DPR), rounded down to integers.
+        These DPR-adjusted dimensions remain fixed as the container resizes.
 
         ``'fixed_aspect'``
         Original aspect ratio comes from the configured Camera.

@@ -186,7 +186,7 @@ export class KonvaSelectionBehavior extends KonvaDrawingBehavior {
         // drawImage below to stretch the stage's raster to the composite
         // canvas's intrinsic pixel grid, so aspect ratios need not match.
         const stageCanvas = this.stage.toCanvas({
-            pixelRatio: 1,
+            pixelRatio: window.devicePixelRatio || 1,
             imageSmoothingEnabled: false,
         });
 

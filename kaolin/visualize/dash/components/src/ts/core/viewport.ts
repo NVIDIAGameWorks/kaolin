@@ -1,5 +1,3 @@
-import { setCanvasBufferSize } from '../util/canvas';
-
 export enum ViewportResizeMode {
     FIXED = 'fixed',
     ADAPTIVE = 'adaptive',
@@ -107,7 +105,8 @@ function greatestCommonDivisor(a: number, b: number): number {
 /**
  * Compute the viewport pixel size for a given resize mode within a container.
  *
- * - FIXED: keeps its initial pixel size regardless of the container.
+ * - FIXED: keeps its initial logical size regardless of the container;
+ *   drawing buffers and camera pixel dimensions still include DPR.
  * - ADAPTIVE: fills the container; aspect ratio follows the container.
  * - FIXED_ASPECT: largest size preserving the initial aspect ratio exactly that
  *   still fits inside the container (letterboxed; never overflows).
@@ -148,41 +147,4 @@ export function adjustByDevicePixelRatio(size: { width: number, height: number }
     // which is also what a browser reports for a non-HiDPI display.
     const dpr = (typeof window === 'undefined' ? 1 : window.devicePixelRatio) || 1;
     return { width: Math.floor(size.width * dpr), height: Math.floor(size.height * dpr) };
-}
-
-
-export function defaultSetElementDimensions(
-    el: HTMLElement | null,
-    width: number,
-    height: number,
-    incorporateDevicePixelRatio: boolean = false,
-) {
-    if (!el) {
-        return;
-    }
-    
-    switch (el.tagName.toLocaleLowerCase()) {
-        case 'canvas': {
-            const dpr = incorporateDevicePixelRatio ? (window.devicePixelRatio || 1) : 1;
-            setCanvasBufferSize(el, Math.floor(width * dpr), Math.floor(height * dpr));
-            break;
-        }
-        case 'svg': {
-            const svg = el as unknown as SVGSVGElement;
-            if (svg.width.baseVal.value !== width) svg.setAttribute('width', String(width));
-            if (svg.height.baseVal.value !== height) svg.setAttribute('height', String(height));
-            break;
-        }
-        case 'div': {
-            const wPx = `${width}px`;
-            const hPx = `${height}px`;
-            if (el.style.width !== wPx) el.style.width = wPx;
-            if (el.style.height !== hPx) el.style.height = hPx;
-            break;
-        }
-        default:
-            el.style.width = `${width}px`;
-            el.style.height = `${height}px`;
-            break;
-    }
 }
