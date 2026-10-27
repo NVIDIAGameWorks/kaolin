@@ -2,6 +2,7 @@ from __future__ import annotations
 import copy
 import inspect
 import logging
+import math
 from enum import unique
 import re
 from typing import Any, Callable, Dict, Iterable, Protocol, Union, runtime_checkable, get_args
@@ -24,6 +25,24 @@ __all__ = [
     'ViewerBuilder',
     'KaolinViewer',
 ]
+
+
+def _warn_fixed_aspect_size(width: int, height: int) -> None:
+    """Warn when camera dimensions make exact-aspect resizing impractical."""
+    if width <= 0 or height <= 0:
+        logger.warning(
+            'fixed_aspect: camera %dx%d must have positive width and height.',
+            width, height)
+        return
+    divisor = math.gcd(width, height)
+    min_width = width // divisor
+    min_height = height // divisor
+    if min_width > 50 or min_height > 50:
+        logger.warning(
+            'fixed_aspect: camera %dx%d has a smallest exact-aspect '
+            'size of %dx%d pixels; resizing may be coarse or exceed '
+            'small containers.',
+            width, height, min_width, min_height)
 
 
 def _read_valid_resize_modes() -> tuple[str, ...] | None:
@@ -594,6 +613,8 @@ class ViewerBuilder:
                                  'use reset_behaviors for other layer types.')
         if switch_mode and not any(mode[0] == switch_mode for mode in self._modes):
             raise ValueError(f'Unknown resize switch_mode {switch_mode!r}.')
+        if viewport_resize_mode == 'fixed_aspect':
+            _warn_fixed_aspect_size(self.width, self.height)
         self._viewport_resize_mode = viewport_resize_mode
         self._resize_hooks = dict(clear_layers=layer_ids,
                                   reset_behaviors=behavior_ids,
