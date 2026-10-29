@@ -93,6 +93,7 @@ class _ModeHooksInfo:
 
 
 class ViewerBuilder:
+    """Configure layers, behaviors, camera controls and connections for a viewer."""
     _VIEWER_ID_PLACEHOLDER = '<VIEWER_ID>'
 
     def __init__(self, camera: Camera = kaolin.render.easy_render.default_camera(500),
@@ -147,10 +148,12 @@ class ViewerBuilder:
 
     @property
     def width(self):
+        """Configured camera width before browser DPR adjustment."""
         return self._camera.width
 
     @property
     def height(self):
+        """Configured camera height before browser DPR adjustment."""
         return self._camera.height
 
     def add_remote_rendering(self, active_layer_id, connection_id, cam_update_period = 100,
@@ -162,6 +165,11 @@ class ViewerBuilder:
         server pushes back (tagged ``render{tag_suffix}``).
 
         Args:
+            active_layer_id: Canvas layer identifier receiving rendered images.
+            connection_id: Connection registered with :meth:`add_websocket_connection`.
+            cam_update_period: Minimum interval between camera updates, in milliseconds.
+            render_update_period: Minimum interval between render requests, in
+                milliseconds; must be positive.
             tag_suffix: Suffix appended to the ``set_camera``/``render`` message
                 tags. Leave empty for a single rendered viewer. Use a distinct
                 suffix (e.g. ``'_result'``) when a page has more than one
@@ -169,6 +177,9 @@ class ViewerBuilder:
                 viewer's camera/render stream is routed to its own
                 :class:`~kaolin.visualize.web.sockets.AnyRendererMessageHandler`
                 (constructed with the matching ``tag_suffix``).
+
+        Returns:
+            Tuple of behavior ids for image drawing, camera updates and render requests.
         """
         remote_draw_behavior = self.add_behavior(
             'draw_remote_image', active_layer_id=active_layer_id,
@@ -199,7 +210,11 @@ class ViewerBuilder:
         render burst, so the displayed rate reflects interactive responsiveness
         rather than being dragged toward zero when nothing is happening.
 
-        Calling this more than once simply overwrites the tag.
+        Calling this more than once replaces the tag and label.
+
+        Args:
+            message_tag: Incoming message tag to count as rendered frames.
+            label: Optional text displayed alongside the frame rate.
         """
         self._remote_fps_source = message_tag
         self._remote_fps_label = label
@@ -207,31 +222,31 @@ class ViewerBuilder:
     def add_layer(self, tag='canvas', identifier=None, options=None):
         """ Adds a visible layer to the viewer. All layers are stacked over each other
         and take advantage of opacity. Viewer takes care of sizing and styling the layers,
-        but extra options can be passed in, currently limited to:
+        but extra options can be passed in, for example:
         { 'extraClasses': 'custom-css-class' }
 
         🔔 Returns **builder-level** layer identifier, which can only be used with
         the `ViewerBuilder` API, not for DOM manipulation -- as unique DOM layer ID will
         be created for every _built_ layer after calling `build`. To get the actual
-        DOM element ID for a specific viewer:
+        DOM element ID for a specific viewer (when no explicit `id` is supplied):
         ```
         builder_layer_id = builder.add_layer()
         viewer = builder.build()
         dom_layer_id = viewer.resolve_id(builder_layer_id)
         ```
 
-        # TODO: document what options can be passed in
-        # TODO: register documentation or warn, like for behaviors
-
         ☝
 
         Args:
-            tag:
-            identifier:
-            options:
+            tag: Registered layer type, such as ``'canvas'``, ``'svg'`` or ``'div'``.
+            identifier: Optional name unique within this builder.
+            options: Layer properties. Built-in layers accept ``extraClasses``
+                (additional CSS classes) and ``id`` (an explicit DOM id);
+                canvas and SVG layers also accept initial ``width`` and ``height``.
+                Prefer generated ids when building multiple viewers.
 
         Returns:
-
+            A builder-level layer identifier.
         """
         is_builtin_layer(tag, warn=True)
         unique_id = self._layers.add(identifier, None, name_hint=tag)
@@ -246,6 +261,16 @@ class ViewerBuilder:
 
     @staticmethod
     def check_behavior_semantics(name, options=None):
+        """Check a behavior name and its option names against registered metadata.
+
+        Args:
+            name: Registered behavior name.
+            options: Optional mapping of option names to values.
+
+        Returns:
+            False, with a logged warning, for an unknown behavior or option name
+            absent from a nonempty schema; True otherwise. Values are not validated.
+        """
         meta = BehaviorLibrary.meta(name)
         if meta is None:
             logger.warning(f'Python BehaviorLibrary does not know about behavior {name}; could be missing from clientside code')
@@ -305,6 +330,20 @@ class ViewerBuilder:
     def user_behavior_options_spec(
             self, behavior_id,
             options: Iterable[str | OptionSpec] | None = None) -> list[OptionSpec]:
+        """Return option specifications for a registered behavior.
+
+        Args:
+            behavior_id: Original or unique id of a behavior added to this builder.
+            options: Option names or explicit :class:`OptionSpec` instances, in
+                display order. None selects the registered UI-bound options.
+                Unknown names receive an unconstrained specification.
+
+        Returns:
+            Option specifications with defaults from the behavior's initial options.
+
+        Raises:
+            KeyError: If the behavior id is unknown.
+        """
         _, name, _, initial_options, _ = self._behaviors[behavior_id]
         return self._behavior_control_options(name, initial_options, options)
 
@@ -314,21 +353,19 @@ class ViewerBuilder:
             options: Iterable[str | OptionSpec] | None = None):
         """Generate auto-UI controls for a behavior's options and persist them.
 
-            Returns a list of Dash components (controls plus a hidden
-            :class:`dash.dcc.Store(storage_type='session')`) that the caller is
-            responsible for inserting into the app layout. The Store backs the
-            per-tab persistence of the user's edits:
+        Returns a list of Dash components (controls plus hidden callback targets)
+        that the caller is responsible for inserting into the app layout. The
+        controls use per-tab session persistence for the user's edits:
 
-            - On every control change, a clientside callback merges the new value
-              into the Store *and* calls
-              ``kaolin.core.event.requestBehaviorSetOption(behavior_id, name, value, viewer_id)``,
-              so the JS behavior updates without a server roundtrip.
-            - On tab reload, the Store hydrates from sessionStorage; a one-shot
-              hydration callback restores the matching UI controls via
-              ``window.dash_clientside.set_props`` and replays each cached option
-              to the JS behavior via ``requestBehaviorSetOption``.
+        - On every control change, a clientside callback calls
+          ``kaolin.core.event.requestBehaviorSetOption(behavior_id, name, value, viewer_id)``,
+          so the JS behavior updates without a server roundtrip.
+        - On tab reload, Dash restores the controls from sessionStorage; the
+          initial clientside callbacks replay the restored values to the JS
+          behavior via ``requestBehaviorSetOption``.
 
-              # TODO: finish doc and fix its formatting
+        Call :meth:`build` to bind the controls to the viewer. Initial behavior
+        options supply the control defaults.
 
         Args:
             behavior_id: id returned by :meth:`add_behavior`.
@@ -338,6 +375,13 @@ class ViewerBuilder:
                 (keyed by its own ``name``, to override a manifest option or define
                 one for a *user* behavior with no manifest). ``None`` exposes all
                 ``uiBound`` manifest options.
+
+        Returns:
+            Dash components to insert together into the layout, or an empty list
+            when no options are selected.
+
+        Raises:
+            KeyError: If the behavior id is unknown.
         """
         name = self._behaviors[behavior_id][1]
         specs = self.user_behavior_options_spec(behavior_id, options)
@@ -360,6 +404,23 @@ class ViewerBuilder:
         return [*controls, *triggers]
 
     def add_behavior(self, name, identifier=None, active_layer_id=None, options=None, is_active=True):
+        """Add a registered client-side behavior to the viewer.
+
+        Args:
+            name: Behavior name registered by the library or application.
+            identifier: Optional name unique within this builder.
+            active_layer_id: Layer identifier to bind, ``'EVENT_CANVAS'`` for the
+                viewer's input surface, or None for an unbound behavior.
+            options: Initial behavior options. Unknown names produce a warning.
+            is_active: Whether the behavior starts active.
+
+        Returns:
+            The unique behavior identifier.
+
+        Raises:
+            ValueError: If the layer identifier is unknown.
+            RuntimeError: If the behavior identifier is already used.
+        """
         self.check_behavior_semantics(name, options)
         unique_id = self._behaviors.add(identifier, None, name_hint=name)
 
@@ -376,6 +437,12 @@ class ViewerBuilder:
         return unique_id
 
     def add_websocket_connection(self, address, connection_id):
+        """Add a WebSocket connection available to viewer behaviors.
+
+        Args:
+            address: WebSocket URL or server-relative endpoint path.
+            connection_id: Identifier used by behaviors to select this connection.
+        """
         self._ws_addresses.append((address, connection_id))
 
     def add_camera_controller(self, controller_behavior_name='threejs_camera_orbit', options=None,
@@ -390,8 +457,8 @@ class ViewerBuilder:
         Args:
             controller_behavior_name: registered controller behavior name.
             options: optional dict of behavior options for the controller, passed
-                through to :meth:`add_behavior` (and validated against the
-                behavior's registered option schema). For the default
+                through to :meth:`add_behavior` (unknown option names are warned
+                about when a schema is available). For the default
                 ``threejs_camera_orbit`` this exposes the three.js
                 ``OrbitControls`` parameters (e.g. ``enableDamping``,
                 ``rotateSpeed``, ``screenSpacePanning``) as well as the world
@@ -408,15 +475,16 @@ class ViewerBuilder:
 
 
     def add_camera_listener(self, behavior_id, setter='setCamera', use_raw_object=False):
-        """
+        """Send active-camera updates to an active behavior.
 
         Args:
-            behavior_id:
-            setter:
-            use_raw_object:
+            behavior_id: Original or unique id of a registered behavior.
+            setter: Behavior method receiving the camera on each update.
+            use_raw_object: If True, pass the controller's native camera object;
+                otherwise pass serialized Kaolin camera parameters.
 
-        Returns:
-
+        Raises:
+            ValueError: If the behavior id is unknown.
         """
         unique_behavior_id = self._behaviors.get_unique_id_or_raise(behavior_id)
         self._camera_listeners.append((unique_behavior_id, setter, use_raw_object))
@@ -503,11 +571,8 @@ class ViewerBuilder:
 
         Apps switch between registered modes at runtime by dispatching
         ``kaolin.core.event.requestMode(name)`` from clientside callbacks.
-        Behaviors not listed in the active mode are deactivated; behaviors not
-        registered with any mode are still only affected by the explicit mode
-        switch (i.e. any registered behavior outside the target mode becomes
-        inactive) — manage them with :meth:`add_behavior` ``is_active=False`` if
-        they should not be touched by mode changes.
+        Every registered behavior outside the active mode is deactivated,
+        including behaviors that are not assigned to any mode.
 
         Args:
             name: unique mode name (raises ``ValueError`` on duplicate).
@@ -521,9 +586,8 @@ class ViewerBuilder:
                 appended to the tooltip automatically.
             clear_layers: optional iterable of layer ids whose contents should be
                 cleared every time this mode becomes active. Currently only
-                canvas layers are supported (cleared via
-                ``kaolin.util.canvas.clearCanvas``); other layer types
-                are skipped with a warning at build time.
+                canvas layers are supported; other layer types are skipped
+                with a logged message.
             reset_behaviors: optional iterable of behavior ids whose ``reset()``
                 method should be invoked every time this mode becomes active.
                 Equivalent to ``kaolin.core.event.requestBehaviorReset(id)``.
@@ -590,14 +654,17 @@ class ViewerBuilder:
 
         ``'fixed_aspect'``
         Original aspect ratio comes from the configured Camera.
+        Sizes use whole multiples of its reduced integer ratio. A minimum of one
+        multiple may exceed small containers. A warning is logged if either
+        reduced dimension exceeds 50 pixels or a camera dimension is nonpositive.
         The canvas display box scales to fit within the available space while keeping its aspect ratio fixed.
-        The canvas pixel size is adjusted to its display box size.
-        The camera dimensions are adjusted accordingly.
+        The canvas buffer and camera dimensions follow the display box size,
+        adjusted by DPR and rounded down to integers.
 
         ``'adaptive'``
         The canvas display box scales to fit within the available space.
-        The canvas pixel size is adjusted to its display box size.
-        The camera dimensions are adjusted accordingly.
+        The canvas buffer and camera dimensions follow the display box size,
+        adjusted by DPR and rounded down to integers.
         """
         # Validate against the generated component unless its annotation could
         # not be read (see _read_valid_resize_modes).
@@ -632,6 +699,9 @@ class ViewerBuilder:
 
         Args:
             name: a mode name previously registered via :meth:`add_mode`.
+
+        Raises:
+            ValueError: If the mode is unknown.
         """
         target = None
         for entry in self._modes:
@@ -648,6 +718,16 @@ class ViewerBuilder:
 
     @staticmethod
     def resolve_id_for_viewer(builder_level_value, viewer_id):
+       """Resolve a builder-level layer reference for a particular viewer.
+
+       Args:
+           builder_level_value: Layer reference or other value to resolve.
+           viewer_id: Id of the built viewer.
+
+       Returns:
+           The viewer-specific reference, or the original value if no resolution
+           is needed. Explicit custom DOM ids are returned unchanged.
+       """
        if type(builder_level_value) is str and ViewerBuilder._VIEWER_ID_PLACEHOLDER in builder_level_value:
            return re.sub(ViewerBuilder._VIEWER_ID_PLACEHOLDER, viewer_id, builder_level_value)
        else:
@@ -707,6 +787,14 @@ class ViewerBuilder:
         return unique_id, name, unique_layer_id, options, is_active
 
     def build(self) -> KaolinViewer:
+        """Create a viewer with the configured layers, behaviors and connections.
+
+        Each call creates a new viewer id. Add the returned component and any
+        components from :meth:`add_user_behavior_options` to the app layout.
+
+        Returns:
+            A :class:`KaolinViewer` Dash component.
+        """
         my_id = UniqueIdGenerator.get_unique_id('viewer', prefix='kaolin')
 
         # # Bind any present options to behavior instances of each built viewer
@@ -756,149 +844,33 @@ class ViewerBuilder:
 
 
 class KaolinViewer(KaolinViewerInternal):
+    """Dash viewer component with layer-id resolution.
+
+    Use :class:`ViewerBuilder` to configure layers and behaviors. Direct
+    construction accepts the underlying Dash component properties and requires
+    an ``id`` unique within the app layout.
+    """
     def __init__(self, *args, **kwargs):
+        """Create a viewer from Dash component properties.
+
+        Args:
+            *args: Positional component properties.
+            **kwargs: Component properties, including a required unique ``id``.
+        """
         super().__init__(*args, **kwargs)
         self.id = kwargs.get('id', None)
         assert self.id is not None, f'ID cannot be None'
 
     def resolve_id(self, layer_identifier):
+        """Return the DOM id for a builder-level layer identifier.
+
+        Args:
+            layer_identifier: Identifier returned by :meth:`ViewerBuilder.add_layer`.
+
+        Returns:
+            The layer's id for this viewer. If the layer has an explicit ``id``
+            option, use that custom id directly instead.
+        """
         return ViewerBuilder.resolve_id_for_viewer(layer_identifier, self.id)
-
-
-
-
-
-# class KaolinViewer:
-#     r"""
-#     This 3D Viewer class can be used with Plotly Dash <https://dash.plotly.com/> to create
-#     complex interactive 3D or 2D Web applications with complicated client-server communication.
-#     This class is extensively configurable and can handle any custom client-server
-#     communication through WebSockets or (TODO) other protocols. The primary logic of this
-#     component resides on the client side as a React component, but it can be configred in
-#     many different ways using this python API.
-#
-#     .. _rubric overview:
-#
-#     .. rubric:: Overview
-#
-#     The primary purpose of `KaolinViewer` is to provide an interactive 2D or 3D space.
-#     The viewer UI is composed of several aligned and stacked **layers**, which can include
-#     HTML canvas elements, SVGs, or others. This space accepts any touch or mouse
-#     events, key events, and modifier keys. Separately, the viewer is configured with
-#     **behaviors**, which map user interactions or events to actions, such as layer manipulations.
-#     All layers and behaviors _run on the client side_, however, the behaviors can
-#     facilitate _complex custom client-server communication_. See examples below.
-#
-#     .. _rubric:: Programming Client Side Behavior:
-#
-#     We support defining custom behaviors and client-side callbacks. When launching a dash
-#     app using `KaolinViewer`, the kaolin _client-side_ utility functions in Javascript will be
-#     exposed under `kaolin` namespace inside the browser. Review the Kaolin Library
-#     javascript documentation to see a variety of useful functions. Notably, we can encode
-#     decode, and compress custom binary messages, and support various canvas and svg
-#     manipulations.
-#
-#     .. _rubric examples:
-#
-#     .. rubric:: Examples
-#
-#     Example 1: Server-side rendering with a custom camera control behavior.
-#
-#     .. code-block:: python
-#
-#         from kaolin.visualize.dash import KaolinViewer
-#         viewer = KaolinViewer(id='my-viewer', socket_handlers=[], components=[], camera=camera)
-#         viewer.show()
-#
-#
-#     """
-#     def __init__(self, id, socket_handlers, components, camera):
-#         self.id = id
-#         self.socket_handlers = [x for x in socket_handlers]
-#         self.components = [x for x in components]
-#         self.camera = camera
-#
-#     @staticmethod
-#     def convenience_init_v0(camera: Camera = None, ws_address=None):
-#         my_id ="kaolin-viewer"
-#         if camera is None:
-#             camera = kaolin.render.easy_render.default_camera()
-#
-#         component = KaolinViewerInternal(
-#             websocket_addresses=[(ws_address, 'main-ws')],
-#             id=my_id,
-#             camera_parameters=camera.as_dict(),
-#             layers=[
-#                 ('gsplats-board', 'canvas', {"width": "500px", "height": "500px"}),
-#                 #('gsplats-board2', 'canvas', {"width": "500px", "height": "500px"}),
-#                 ('draw-board1', 'canvas', {"width": "500px", "height": "500px"}),
-#                 ('draw-board2', 'canvas', {"width": "500px", "height": "500px"}),
-#                 ('svg-board', 'svg', {'width': '1000', 'height': '1000'}),
-#                 #('play-board', 'canvas', {"width": "500px", "height": "500px"})
-#                 ],
-#             behaviors=[
-#                 ('draw-1', 'drawing', 'draw-board1', {"color": "#ffcc00"}),
-#                 ('draw-2', 'drawing', 'draw-board2', {"thickness": 4}),
-#                 ('svg', 'svg_annotation', 'svg-board', {}),
-#                 ('gsplat-render', 'draw_remote_image', 'gsplats-board', {}),
-#                 ('send-cam', 'send_camera', None, {'connectionId': 'main-ws', 'minUpdateMs': 100})
-#                 #('image-draw-component', 'draw_canvas_image_react', 'gsplat-board2', {})
-#                 #('play', 'playcanvas_splat_js', 'play-board', {})
-#                 ]
-#         )
-#         return KaolinViewer(my_id, [], [component], camera=camera)
-#
-#     @staticmethod
-#     def convenience_init(camera: Camera = None, ws_address=None):
-#         my_id = "kaolin-viewer"
-#         if camera is None:
-#             camera = kaolin.render.easy_render.default_camera()
-#
-#         component = KaolinViewerInternal(
-#             websocket_addresses=[ws_address],
-#             id=my_id,
-#             camera_parameters=camera.as_dict(),
-#             layers=[
-#                 ('gsplats-board', 'canvas', {"width": "500px", "height": "500px"}),
-#                 # ('gsplats-board2', 'canvas', {"width": "500px", "height": "500px"}),
-#                 ('mesh-board', 'canvas', {"width": "500px", "height": "500px"}),
-#                 ('draw-board1', 'canvas', {"width": "500px", "height": "500px"}),
-#                 ('draw-board2', 'canvas', {"width": "500px", "height": "500px"}),
-#                 ('svg-board', 'svg', {'width': '1000', 'height': '1000'}),
-#                 ('play-board', 'canvas', {"width": "500px", "height": "500px"})
-#             ],
-#             behaviors=[
-#                 ('draw-1', 'drawing', 'draw-board1', {"color": "#ffcc00"}),
-#                 ('draw-2', 'drawing', 'draw-board2', {"thickness": 4}),
-#                 ('svg', 'svg_annotation', 'svg-board', {}),
-#                 ('gsplat-render', 'draw_remote_image', 'gsplats-board', {}),
-#                 ('three-render', 'three_render',  'mesh-board', {}),
-#                 ('receive-mesh', 'receive_message', None,
-#                     {"tag": "set_mesh",
-#                      "msgProcessFunctionName": "kaolin.graphics.threejs.meshFromMessage",
-#                      "alertBehaviors": [("three-render", "setMesh")]}),
-#                 # ('image-draw-component', 'draw_canvas_image_react', 'gsplat-board2', {})
-#                 ('play', 'playcanvas_splat', 'play-board', {})
-#             ]
-#         )
-#         return KaolinViewer(my_id, [], [component], camera=camera)
-#
-#
-#     def make_server_renderer(self):
-#         pass
-    
-    # def __call__(self, *args, **kwargs):
-    #     """Make the wrapper callable like the original component."""
-    #     return self.component(*args, **kwargs)
-    
-    # def __getattr__(self, name):
-    #     """Delegate attribute access to the underlying component."""
-    #     return getattr(self.component, name)
-    
-    # def __repr__(self):
-    #     """String representation of the wrapper."""
-    #     return f"KaolinViewer(websocket_address={getattr(self.component, 'websocket_address', None)})"
-
-
 
 

@@ -356,9 +356,16 @@ class AnyRendererMessageHandler(AsyncMessageHandlerProtocol):
     Handles 'set_camera' and 'render' messages (with optional tag_suffix).
     Runs rendering in a separate thread to avoid blocking the event loop.
 
-    Bookkeeping: tracks the rate of incoming render requests (``request_fps``)
-    and the throughput implied by render+encode time (``rendering_fps``); see
-    :meth:`stats`. These are recorded but not yet used to adapt quality.
+    With ``low_rendering_options``, interactive requests adapt quality using
+    request rate and render+encode time (network/display time is not measured).
+    Each interaction starts at the default options. At most once per second,
+    the interpolation weight toward the low options increases by 0.25 when
+    rendering cannot keep up, or decreases by 0.1 when rendering is more than
+    25% faster than requests. Otherwise it stays unchanged. See :meth:`stats`
+    for the current weight and measured rates. Option changes are logged.
+
+    Initial, direct :meth:`render_and_send`, and final high-quality renders
+    keep their configured options and do not inform interactive adaptation.
 
     When ``high_rendering_options`` is configured, a final high-resolution
     frame is sent once render requests stop (a gap longer than
@@ -371,9 +378,11 @@ class AnyRendererMessageHandler(AsyncMessageHandlerProtocol):
         tag_suffix: Optional suffix for message tags (e.g., '_secondary').
         rendering_options: Default :class:`RemoteRenderingOptions` used for
             requests. Defaults to a fresh :class:`RemoteRenderingOptions`.
-        low_rendering_options: If configured, can interpolate from
-            ``rendering_options`` toward these faster options to keep up
-            response speed (not yet used).
+        low_rendering_options: If configured, enables interactive adaptation
+            between ``rendering_options`` and these faster options using
+            :meth:`RemoteRenderingOptions.interpolate`. Numeric fields blend;
+            encoding format, kwargs, and uncapped resolution switch at the
+            midpoint. If ``None``, requests always use ``rendering_options``.
         high_rendering_options: If configured, the final frame after a gap in
             requests is rendered with these options.
     """
@@ -399,6 +408,9 @@ class AnyRendererMessageHandler(AsyncMessageHandlerProtocol):
         # Response-time bookkeeping.
         self._request_fps = SlidingWindowFps()
         self._rendering_fps = RenderTimeFps()
+        self._interactive_rendering_fps = RenderTimeFps()
+        self._low_quality_weight = 0.0
+        self._last_quality_update_s = 0.0
 
         # Gap detection for the high-res follow-up render. Each render request
         # bumps ``_request_seq``; a scheduled check fires after the idle gap and
@@ -420,13 +432,18 @@ class AnyRendererMessageHandler(AsyncMessageHandlerProtocol):
 
         Returns a dict with ``request_fps`` (rate of incoming render requests),
         ``rendering_fps`` (throughput implied by render+encode time) and
-        ``last_render_s`` (most recent render+encode duration). Values may be
-        ``None`` before enough samples are collected.
+        ``last_render_s`` (most recent render+encode duration).
+        ``interactive_rendering_fps`` excludes initial, direct, and final
+        high-quality frames. ``low_quality_weight`` is the last interactive
+        selection: 0 means default options, 1 means low options. Rates and
+        durations may be ``None`` before enough samples are collected.
         """
         return {
             'request_fps': self._request_fps.fps(),
             'rendering_fps': self._rendering_fps.fps(),
             'last_render_s': self._rendering_fps.last_duration(),
+            'interactive_rendering_fps': self._interactive_rendering_fps.fps(),
+            'low_quality_weight': self._low_quality_weight,
         }
 
     def _sanity_check(self):
@@ -448,8 +465,41 @@ class AnyRendererMessageHandler(AsyncMessageHandlerProtocol):
         elif message_tag == f'render{self.tag_suffix}':
             if self.camera is not None:
                 self._note_render_request()
-                await self._maybe_render_and_send(write_message_fn, self.rendering_options)
+                options = self._interactive_rendering_options()
+                await self._maybe_render_and_send(write_message_fn, options, interactive=True)
                 self._schedule_high_res_check(write_message_fn)
+
+    def _interactive_rendering_options(self) -> RemoteRenderingOptions:
+        """Select options on the event loop, leaving worker threads to render."""
+        if self.low_rendering_options is None:
+            return self.rendering_options
+
+        now = time.monotonic()
+        request_fps = self._request_fps.fps()
+        rendering_fps = self._interactive_rendering_fps.fps()
+        previous_weight = self._low_quality_weight
+        if request_fps is None:
+            # A new interaction starts at normal quality with fresh timings.
+            self._low_quality_weight = 0.0
+            self._interactive_rendering_fps.reset()
+            self._last_quality_update_s = now
+        elif (rendering_fps is not None and
+              now - self._last_quality_update_s >= _DEFAULT_FPS_WINDOW_S):
+            # Let a full timing window reflect each change before adjusting again.
+            self._last_quality_update_s = now
+            if rendering_fps < request_fps:
+                self._low_quality_weight = min(1.0, self._low_quality_weight + 0.25)
+            elif rendering_fps > request_fps * 1.25:
+                self._low_quality_weight = max(0.0, self._low_quality_weight - 0.1)
+
+        if self._low_quality_weight != previous_weight:
+            logger.info('Interactive render low-quality weight %.2f '
+                        '(request_fps=%s, rendering_fps=%s)',
+                        self._low_quality_weight, request_fps, rendering_fps)
+        if self._low_quality_weight == 0.0:
+            return self.rendering_options
+        return RemoteRenderingOptions.interpolate(
+            self.rendering_options, self.low_rendering_options, self._low_quality_weight)
 
     def _note_render_request(self) -> None:
         """Record a render-request arrival (request-rate bookkeeping + gap seq)."""
@@ -474,29 +524,35 @@ class AnyRendererMessageHandler(AsyncMessageHandlerProtocol):
         self._high_res_sent_seq = seq
         await self._maybe_render_and_send(write_message_fn, self.high_rendering_options)
 
-    async def _maybe_render_and_send(self, write_message_fn, options: RemoteRenderingOptions):
+    async def _maybe_render_and_send(self, write_message_fn, options: RemoteRenderingOptions,
+                                     *, interactive: bool = False):
         try:
-            # The queue carries the desired rendering options for this frame.
-            self._queue.put(options, block=False)
+            # Keep the timing category with its options when workers take queued frames.
+            self._queue.put((options, interactive), block=False)
             await asyncio.to_thread(self._execute_rendering_task, write_message_fn)
         except queue.Full:
             pass
 
     def _execute_rendering_task(self, write_message_fn):
         try:
-            options = self._queue.get(block=False)
+            options, interactive = self._queue.get(block=False)
         except queue.Empty:
             return
         try:
             with self._cam_lock:
                 camera = copy.deepcopy(self.camera)
-            self.render_and_send(write_message_fn, camera, options)
+            self.render_and_send(write_message_fn, camera, options, interactive=interactive)
         finally:
             self._queue.task_done()
 
     def render_and_send(self, write_message_fn, cam=None,
-                        options: Optional[RemoteRenderingOptions] = None):
-        """Render with given camera/options, recording render+encode time, and send."""
+                        options: Optional[RemoteRenderingOptions] = None,
+                        *, interactive: bool = False):
+        """Render with given camera/options, recording render+encode time, and send.
+
+        ``interactive`` also records this duration for quality adaptation;
+        option selection is performed by the incoming render-request handler.
+        """
         if options is None:
             options = self.rendering_options
         if cam is None:
@@ -504,13 +560,17 @@ class AnyRendererMessageHandler(AsyncMessageHandlerProtocol):
         start = time.monotonic()
         res = self._invoke_render(cam, options)
         encoded = self.encode_rendering(res, options)
-        self._rendering_fps.record(time.monotonic() - start)
+        duration_s = time.monotonic() - start
+        self._rendering_fps.record(duration_s)
+        if interactive:
+            self._interactive_rendering_fps.record(duration_s)
         write_message_fn(encoded, True)
 
     def _invoke_render(self, cam, options: RemoteRenderingOptions):
         """Scale the camera per ``max_resolution`` and call the render function."""
-        logger.info(f'Rendering ({cam.width}x{cam.height}) with {options.jpeg_quality} quality')
         cam = self._scale_camera(cam, options)
+        logger.info('Rendering (%sx%s) as %s with JPEG quality %s',
+                    cam.width, cam.height, options.encode_format, options.jpeg_quality)
         if options.kwargs:
             return self.render_func(cam, **options.kwargs)
         return self.render_func(cam)

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import pytest
 import numpy as np
@@ -141,7 +142,7 @@ def generate_random_value(value_type: BinaryIoDataType, included_types=_types_us
     else:
         value = generate_random_torch_array(value_type)
     return value
-    
+
 
 
 def generate_random_dict(num_entries=None,
@@ -331,7 +332,6 @@ class TestTypeMapping:
 
     def test_convert_value_to_supported_format(self):
         """Test value conversion to supported formats."""
-        # TODO: Test conversion of ints, floats, torch tensors, numpy arrays
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         def _check_convert_numeric_type(expected_io_type: BinaryIoDataType,
@@ -376,13 +376,13 @@ class TestTypeMapping:
             torch.zeros((6, 3), dtype=torch.int32, device=device),
             np.int32,
             42)  # Test with primitive int
-        
+
         _check_convert_numeric_type(
             BinaryIoDataType.INT32,
             torch.zeros((6, 3), dtype=torch.int32, device=device),
             np.int32,
             [42, 5, 7])  # Test with int list
-        
+
         _check_convert_numeric_type(
             BinaryIoDataType.UINT32,
             torch.zeros((6, 3), dtype=torch.uint32, device=device),
@@ -403,7 +403,7 @@ class TestTypeMapping:
             torch.zeros((3, 4), dtype=torch.float32, device=device),
             np.float32,
             3.14)  # Test with primitive float
-        
+
         _check_convert_numeric_type(
             BinaryIoDataType.FLOAT32,
             torch.zeros((3, 4), dtype=torch.float32, device=device),
@@ -555,8 +555,8 @@ class TestDictIO:
             in_dict, decoded, approximate=True, ignore_device=True, print_error_context='')
 
         # in case something is wrong with contained_torch_equal
-        encoded = to_binary(in_dict)
-        encoded2 = to_binary(decoded)
+        encoded = to_binary(in_dict, image_format='raw')
+        encoded2 = to_binary(decoded, image_format='raw')
         assert encoded == encoded2
 
     @pytest.fixture
@@ -585,7 +585,7 @@ class TestDictIO:
         dict0 = {'sima': 'cat', 'tanya': 'kitty'}
         baseline = to_binary(dict0)
         encoded = to_binary(dict0, image_format=image_format)
-        # No image-shaped values: bytes match the raw default exactly.
+        # No image-shaped values: the codec choice does not change bytes.
         assert encoded == baseline, \
             f"image_format='{image_format}' altered bytes for non-image dict"
         decoded = from_binary(encoded)
@@ -665,14 +665,14 @@ class TestDictIO:
         """Test that encoding dictionaries with unsupported types throws ValueError."""
         test_dict = generate_random_dict()
         test_dict['unsupported'] = {'a', 'b', 'c'}  # Set is unsupported type
-        
+
         with pytest.raises(ValueError): #, match=r"Cannot encode value of type.*set.*to binary"):
             to_binary(test_dict)
 
     def test_nested_dicts(self):
         camera = kaolin.render.easy_render.default_camera()
         in_dict = camera.as_dict()
-        encoded = to_binary(in_dict)
+        encoded = to_binary(in_dict, image_format='raw')
         decoded = from_binary(encoded)
         out_camera = kaolin.render.camera.Camera.from_dict(decoded)
         self.assert_dicts_equal(in_dict, out_camera.as_dict())
@@ -688,16 +688,16 @@ class TestListIO:
             in_list, decoded, approximate=True, ignore_device=True, print_error_context='')
 
         # in case something is wrong with contained_torch_equal
-        encoded = to_binary(in_list)
-        encoded2 = to_binary(decoded)
+        encoded = to_binary(in_list, image_format='raw')
+        encoded2 = to_binary(decoded, image_format='raw')
         assert encoded == encoded2
 
     def test_primitive_int(self):
         """Test list with integers."""
         in_list = [1, 2, 3, 4, 5]
-        encoded = to_binary(in_list)
+        encoded = to_binary(in_list, image_format='raw')
         decoded = from_binary(encoded)
-        
+
         # Homogeneous int list should be converted to torch tensor
         kaolin.utils.testing.check_tensor(decoded, shape=(5,), dtype=torch.int32, throw=True)
         assert torch.allclose(decoded.float(), torch.tensor(in_list, dtype=torch.float32))
@@ -705,9 +705,9 @@ class TestListIO:
     def test_primitive_float(self):
         """Test list with floats."""
         in_list = [1.5, 2.5, 3.14, 4.2, 5.7]
-        encoded = to_binary(in_list)
+        encoded = to_binary(in_list, image_format='raw')
         decoded = from_binary(encoded)
-        
+
         # Homogeneous float list should be converted to torch tensor
         kaolin.utils.testing.check_tensor(decoded, shape=(5,), dtype=torch.float32, throw=True)
         assert torch.allclose(decoded, torch.tensor(in_list, dtype=torch.float32))
@@ -715,13 +715,13 @@ class TestListIO:
     def test_mixed(self):
         """Test list with mixed types."""
         in_list = [42, "hello world", 3.14, [1, 2, 3]]
-        encoded = to_binary(in_list)
+        encoded = to_binary(in_list, image_format='raw')
         decoded = from_binary(encoded)
-        
+
         # Mixed-type list should remain as list
         assert isinstance(decoded, list)
         assert len(decoded) == len(in_list)
-        
+
         # Check each element
         assert decoded[0] == in_list[0]  # int
         assert decoded[1] == in_list[1]  # string
@@ -799,6 +799,38 @@ def _make_checkerboard_image(side=8, channels=3, dtype=np.uint8):
             if (x + y) % 2 == 0:
                 img[y, x, :] = 255
     return img
+
+
+class TestMessageIO:
+    def test_json_message(self):
+        content = {'label': 'café', 'enabled': True, 'points': [1, 2], 'extra': None}
+        encoded = encode_message('options', content, binary=False)
+        assert isinstance(encoded, str)
+        assert json.loads(encoded) == {'tag': 'options', 'msg': content}
+
+    @pytest.mark.parametrize('shape', [(5, 7), (3, 5, 7)])
+    def test_raw_preserves_image_shaped_arrays(self, shape):
+        value = np.arange(np.prod(shape), dtype=np.uint8).reshape(shape)
+        decoded = from_binary(encode_message('array', value, image_format='raw'))
+        assert decoded['tag'] == 'array'
+        assert torch.equal(decoded['msg'], torch.from_numpy(value))
+
+    @pytest.mark.parametrize('length', [0, 4, 8, 13])
+    def test_truncated_array(self, length):
+        encoded = to_binary(np.array([10, 20], dtype=np.int32), image_format='raw')
+        with pytest.raises(ValueError):
+            from_binary(encoded[:length])
+
+    def test_unknown_type(self):
+        # Unknown type codes currently decode as None without consuming a payload.
+        encoded = np.array([0, 999], dtype=np.int32).tobytes()
+        assert from_binary(encoded) is None
+        assert np_type_from_type_id(999) == (None, 0)
+
+    def test_trailing_bytes_warn(self, caplog):
+        encoded = to_binary(42) + b'extra'
+        assert from_binary(encoded) == 42
+        assert 'not full message length' in caplog.text
 
 
 class TestImageIO:
@@ -994,6 +1026,19 @@ class TestImageIO:
         # The encode helper re-raises with a torchvision-flavoured ImportError.
         with pytest.raises(ImportError, match='simulated missing torchvision'):
             to_binary(img, image_format=ImageFormat.PNG)
+
+    @pytest.mark.parametrize('image_format', ['png', 'jpeg'])
+    def test_decoder_unavailable(self, monkeypatch, image_format):
+        import torchvision.io as tvio
+
+        encoded = to_binary(_make_checkerboard_image(), image_format=image_format)
+
+        def unavailable(*args, **kwargs):
+            raise ImportError('simulated unavailable image decoder')
+
+        monkeypatch.setattr(tvio, 'decode_image', unavailable)
+        with pytest.raises(ImportError, match='unavailable image decoder'):
+            from_binary(encoded)
 
     def test_golden_fixture_python_side(self):
         path = _golden_fixture_bin_path()
