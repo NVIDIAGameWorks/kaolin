@@ -78,6 +78,9 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', default=False,
                         help='Enable debug mode: hot reloading, and unsafe dev features '
                              '(log download endpoint, error details forwarded to client).')
+    parser.add_argument('--resize_mode', type=str, default='fixed',
+                        choices=['fixed', 'adaptive', 'fixed_aspect'],
+                        help='The viewer resize mode within the window.')
     parser.add_arguments(ServerSideUserSettings, dest="settings")
     add_log_level_flag(parser)
     args = parser.parse_args()
@@ -237,11 +240,12 @@ if __name__ == '__main__':
         ui_icon=mode_info['sam'][0], description='mode for interactive 2D selection',
         clear_layers=[baked_selection_layer_id], reset_behaviors=[konva_behavior_id])
     viewer_builder.set_active_mode('view')
-    viewer_builder.set_resize_mode(
-        'adaptive',
-        clear_layers=[baked_selection_layer_id],
-        reset_behaviors=[sam_behavior_id, konva_behavior_id],
-        switch_mode='view')
+    if args.resize_mode != 'fixed':
+        viewer_builder.set_resize_mode(
+            args.resize_mode,
+            clear_layers=[baked_selection_layer_id],
+            reset_behaviors=[sam_behavior_id, konva_behavior_id],
+            switch_mode='view')
 
     # Building ----------------------
     # Now we construct actual viewer (eventually we'll support multiple viewports).
