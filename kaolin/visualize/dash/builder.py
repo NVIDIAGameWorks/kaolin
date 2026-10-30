@@ -359,7 +359,7 @@ class WebappBuilder:
         if url_path is None:
             url_path =  Path(dir_path).name
 
-        assert url_path in WebappBuilder.RESERVED_PATHS, f'Cannot assign reserved path {url_path} to custom static files dir'
+        assert url_path not in WebappBuilder.RESERVED_PATHS, f'Cannot assign reserved path {url_path} to custom static files dir'
 
         return WebappBuilder.__add_unique_url_mapping_or_die(self.served_dirs, url_path, dir_path)
 
@@ -518,7 +518,7 @@ class WebappBuilder:
         for name, info in self.user_setting_infos.items():
             session_instance = copy.deepcopy(info.instance)
             # We will also use store to save session-level settings for a tab
-            auto_ui.apply_store_to_dataclass(info.store, session_instance, info.field_specs)
+            auto_ui.apply_store_to_dataclass(info.store.data, session_instance, info.field_specs)
             self.default_user_session[name] = session_instance
 
         @app.callback(
@@ -555,7 +555,7 @@ class WebappBuilder:
                 State(store_id, 'data'),
                 prevent_initial_call=True,
             )
-            def _update(value, tab_uuid, current, _name=spec.name):
+            def _update(value, tab_uuid, current, _name=spec.name, _spec=spec):
                 logger.debug(f'Updating session {tab_uuid} settings "{name}"[{_name}] to {value}')
                 if current is None:
                     current = {}
@@ -564,7 +564,7 @@ class WebappBuilder:
                 def _session_update(session):
                     session_settings = session.get(name)  # get setting instance by name
                     if session_settings is not None:
-                        auto_ui.apply_store_value_to_dataclass(current, session_settings, spec)
+                        auto_ui.apply_store_value_to_dataclass(current, session_settings, _spec)
 
                 SessionRegistry.get_or_create_and_update(tab_uuid, self.default_user_session, _session_update)
                 return current
@@ -895,10 +895,10 @@ class WebappBuilder:
         self._setup_error_overlay(app)
 
         if len(self.served_files) > 0:
-            @app.server.route(f'/{WebappBuilder.CUSTOM_FILES_PATH}/<file_url>')
+            @app.server.route(f'/{WebappBuilder.CUSTOM_FILES_PATH}/<path:file_url>')
             def serve_dynamic_file(file_url):
                 # Look up the actual absolute path based on the URL parameter
-                actual_path = self.served_files.get(file_url)
+                actual_path = self.served_files.get(f'{WebappBuilder.CUSTOM_FILES_PATH}/{file_url}')
 
                 if actual_path is None or not os.path.exists(actual_path):
                     abort(404)  # Return 404 if the file isn't in the registry
@@ -942,7 +942,7 @@ class WebappBuilder:
 
         # Custom static file directories
         for dir_url, dir_path in self.served_dirs.items():
-            handlers.append((f'/{WebappBuilder.CUSTOM_FILES_PATH}/{dir_url}/(.*)', StaticFileHandler, {'path': dir_path}))
+            handlers.append((f'/{dir_url}/(.*)', StaticFileHandler, {'path': dir_path}))
 
         # Default dash app as the last handler
         container = WSGIContainer(app.server)
@@ -968,9 +968,9 @@ class WebappBuilder:
                         }
                     }
                     document.addEventListener('DOMContentLoaded', function() {
-                    updateFavicon('/_kaolin_assets/favicon.ico'); 
+                    updateFavicon('/_kaolin_assets/favicon.ico');
                     });
-                    updateFavicon('/_kaolin_assets/favicon.ico'); 
+                    updateFavicon('/_kaolin_assets/favicon.ico');
                     return dash_clientside.no_update;
                 }
                 """,

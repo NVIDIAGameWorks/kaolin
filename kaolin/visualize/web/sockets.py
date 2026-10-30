@@ -818,8 +818,11 @@ class WebSocketHandlerManager(tornado.websocket.WebSocketHandler):
 
     def set_camera(self, camera: kaolin.render.camera.Camera):
         """Programmatically set camera (triggers handlers)."""
-        message = kaolin.visualize.web.io.encode_message('set_camera', camera.as_dict(), binary=False)
-        self._apply_handlers(message)
+        message = {
+            kaolin.visualize.web.io.MESSAGE_TAG_KEY: 'set_camera',
+            kaolin.visualize.web.io.MESSAGE_CONTENT_KEY: camera.as_dict(),
+        }
+        self._io_loop.add_callback(self._apply_handlers, message)
 
     def register_message_handler(self, handler: SyncMessageHandlerProtocol | AsyncMessageHandlerProtocol):
         """Register a handler for its accepted message tags."""
@@ -849,9 +852,9 @@ class WebSocketHandlerManager(tornado.websocket.WebSocketHandler):
         message = {"status": f"ok"}
         self.write_message(message, binary=False)
 
-        for k, handler_list in self.handlers.items():
-            for h in handler_list:
-                h.on_connection_open(self.write_message_safe)
+        handlers = {id(h): h for group in self.handlers.values() for h in group}
+        for handler in handlers.values():
+            handler.on_connection_open(self.write_message_safe)
 
     def send_sample_json_message(self):
         message = {"type": "test",

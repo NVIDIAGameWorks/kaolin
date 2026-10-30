@@ -63,7 +63,7 @@ BsContainerType = Literal[BsBreakpoints, 'fluid']
 def _max_width_to_bs_container_class(max_width: BsContainerType | None) -> str:
     if max_width is None or len(max_width) == 0:
         return ''
-    allowable_values = get_args(BsContainerType)
+    allowable_values = (*get_args(BsBreakpoints), 'fluid')
     if max_width not in allowable_values:
         raise ValueError(f"max_width must be one of {allowable_values}")
     return f'container-{max_width}'

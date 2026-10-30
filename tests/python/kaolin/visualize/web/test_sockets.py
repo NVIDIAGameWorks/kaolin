@@ -15,15 +15,23 @@
 
 """Tests for kaolin.visualize.web.sockets."""
 
+import asyncio
 import copy
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 
+import numpy as np
 import pytest
 import torch
 
-from kaolin.visualize.web import sockets
+from tornado.httputil import HTTPServerRequest
+from tornado.web import Application
+
+from kaolin.render.camera import Camera
+from kaolin.render.materials import PBRMaterial
+from kaolin.rep import SurfaceMesh
+from kaolin.visualize.web import io, sockets
 from kaolin.visualize.web.sockets import (
     AnyRendererMessageHandler, RemoteRenderingOptions, RenderTimeFps,
     SlidingWindowFps,
@@ -237,39 +245,273 @@ class TestRenderTimeFps:
         assert tracker.fps() is None and tracker.last_duration() is None
 
 
+def make_camera(width=80, height=40):
+    return Camera.from_args(view_matrix=torch.eye(4), width=width, height=height,
+                            fov=1.0, device='cpu')
+
+
+def make_manager(specs=(), tab='first'):
+    request = HTTPServerRequest(uri=f'/?tab={tab}', connection=Mock())
+    manager = sockets.WebSocketHandlerManager(Application(), request,
+                                              handler_specs=list(specs))
+    manager.write_message = Mock()
+    return manager
+
+
 class TestGlobalWebSocketConnectionManager:
     def test_connection_lifecycle(self):
-        # TODO: use fake connections to check register/get/unregister and snapshots.
-        pytest.skip('TODO: implement connection registry checks')
+        registry = sockets.GlobalWebSocketConnectionManager()
+        handler = Mock(tab_uuid=None)
+        key = registry.register(handler)
+        assert key in registry and len(registry) == 1
+        assert registry.get(key) is handler
+        assert registry.connection_ids() == [key]
+        assert registry.items() == [(key, handler)]
+        snapshot = registry.connections()
+        snapshot.clear()
+        assert registry.connections() == [handler]
+        registry.unregister(key)
+        registry.unregister(key)
+        assert registry.get(key) is None and key not in registry
+        assert registry.items() == [] and len(registry) == 0
 
     def test_tab_isolation(self):
-        # TODO: register connections for two tabs and check tab-specific lookup.
-        pytest.skip('TODO: implement tab isolation checks')
+        registry = sockets.GlobalWebSocketConnectionManager()
+        first, second, other = [Mock(tab_uuid=tab) for tab in ('a', 'a', 'b')]
+        keys = [registry.register(handler) for handler in (first, second, other)]
+        assert set(registry.get_handlers_by_tab('a')) == {first, second}
+        assert registry.get_handlers_by_tab('b') == [other]
+        snapshot = registry.get_handlers_by_tab('a')
+        registry.unregister(keys[0])
+        assert set(snapshot) == {first, second}
+        assert registry.get_handlers_by_tab('a') == [second]
+        registry.unregister(keys[1])
+        assert registry.get_handlers_by_tab('a') == []
+        assert registry.get_handlers_by_tab('missing') == []
 
 
-class TestWebSocketHandlerManager:
-    def test_handler_factories(self):
-        # TODO: use fake factories and TuidCallable arguments to check per-tab instances.
-        pytest.skip('TODO: implement handler factory checks')
+class TestWebSocketHandlerManager(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.registry = sockets.GlobalWebSocketConnectionManager()
+        patcher = patch.object(sockets.GlobalWebSocketConnectionManager,
+                               '_singleton', self.registry)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
-    def test_message_dispatch(self):
-        # TODO: test sync/async handlers with decoded JSON/binary, unknown tags and bad input.
-        pytest.skip('TODO: implement message dispatch checks')
+    async def test_handler_factories(self):
+        factory = Mock(side_effect=lambda *args, **kwargs: Mock(
+            accepted_message_tags=lambda: ['first', 'second']))
+        spec = (factory, (sockets.TuidCallable(lambda tab: f'arg-{tab}'),),
+                {'value': sockets.TuidCallable(lambda tab: f'kw-{tab}')})
+        first, second = make_manager([spec], 'a'), make_manager([spec], 'b')
+        first.open()
+        second.open()
+        assert factory.call_args_list == [
+            call('arg-a', value='kw-a'),
+            call('arg-b', value='kw-b')]
+        assert first.handlers['first'][0] is not second.handlers['first'][0]
+        assert first.handlers['first'][0] is first.handlers['second'][0]
+        first.handlers['first'][0].on_connection_open.assert_called_once()
+        assert self.registry.get_handlers_by_tab('a') == [first]
+        first.on_close()
+        second.on_close()
+        assert len(self.registry) == 0
 
-    def test_connection_callbacks(self):
-        # TODO: check open/close once per handler, safe writes and programmatic set_camera.
-        pytest.skip('TODO: implement connection callback checks')
+        manager = make_manager([(factory, ())])
+        manager.open()
+        factory.assert_called_with()
+        manager.on_close()
+        with self.assertRaisesRegex(ValueError, 'Handler spec'):
+            make_manager([(factory,)])._handlers_lazy_initialize()
+
+    async def test_message_dispatch(self):
+        manager = make_manager()
+        sync_handler = Mock(accepted_message_tags=lambda: ['example'])
+        received = asyncio.Event()
+
+        async def receive(*args):
+            received.set()
+
+        async_handler = Mock(accepted_message_tags=lambda: ['example'],
+                             on_message=AsyncMock(side_effect=receive))
+        manager.register_message_handler(sync_handler)
+        manager.register_message_handler(async_handler)
+        for binary in (False, True):
+            received.clear()
+            await manager.on_message(io.encode_message('example', {'value': 3}, binary=binary))
+            await asyncio.wait_for(received.wait(), 1)
+            sync_handler.on_message.assert_called_with('example', {'value': 3}, manager.write_message_safe)
+            async_handler.on_message.assert_awaited_with('example', {'value': 3}, manager.write_message_safe)
+        with self.assertLogs(sockets.logger, level='WARNING'):
+            await manager.on_message(io.encode_message('unknown', {}))
+        for malformed in ('not JSON', b''):
+            with self.assertLogs(sockets.logger, level='ERROR'):
+                await manager.on_message(malformed)
+        with self.assertRaisesRegex(ValueError, 'does not contain'):
+            await manager.on_message('{}')
+        assert sync_handler.on_message.call_count == 2
+
+    async def test_connection_callbacks(self):
+        manager = make_manager()
+        handler = Mock(accepted_message_tags=lambda: ['set_camera', 'render'])
+        manager.register_message_handler(handler)
+        manager.open()
+        handler.on_connection_open.assert_called_once_with(manager.write_message_safe)
+        assert self.registry.get(manager.connection_id) is manager
+        manager.write_message.assert_called_once_with({'status': 'ok'}, binary=False)
+
+        received = asyncio.Event()
+        handler.on_message.side_effect = lambda *args: received.set()
+        camera = make_camera()
+        manager.set_camera(camera)
+        await asyncio.wait_for(received.wait(), 1)
+        tag, content, write = handler.on_message.call_args.args
+        assert tag == 'set_camera' and write == manager.write_message_safe
+        restored = Camera.from_dict(content)
+        torch.testing.assert_close(restored.extrinsics.view_matrix(), camera.extrinsics.view_matrix())
+        assert (restored.width, restored.height) == (80, 40)
+
+        manager._io_loop = Mock()
+        manager.write_message.reset_mock()
+        manager.write_message_safe(b'frame', True)
+        manager.write_message.assert_not_called()
+        manager._io_loop.add_callback.call_args.args[0]()
+        manager.write_message.assert_called_once_with(b'frame', True)
+        manager.on_close()
+        manager.on_close()
+        assert manager.connection_id is None and len(self.registry) == 0
 
 
 class TestMeshGeometryStreamer:
+    @staticmethod
+    def mesh():
+        texture = torch.zeros((8, 8, 3))
+        texture[..., 0] = 1
+        return SurfaceMesh(
+            vertices=torch.tensor([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]]),
+            faces=torch.tensor([[0, 1, 2]]),
+            face_normals=torch.tensor([[[0., 0., 1.]] * 3]),
+            face_uvs=torch.tensor([[[0., 0.], [1., 0.], [0., 1.]]]),
+            material_assignments=torch.tensor([0]),
+            materials=[PBRMaterial(diffuse_color=(1., 0., 0.), diffuse_texture=texture)])
+
     def test_mesh_payload(self):
-        # TODO: decode a small CPU mesh with normals, UVs and a material/texture.
-        pytest.skip('TODO: implement mesh payload checks')
+        mesh = self.mesh()
+        decoded = io.from_binary(sockets.MeshGeometryStreamer(mesh).encode_mesh())
+        assert decoded['tag'] == 'set_mesh'
+        content = decoded[io.MESSAGE_CONTENT_KEY]
+        for name in ('face_vertices', 'face_normals', 'face_uvs', 'material_assignments'):
+            np.testing.assert_array_equal(content[name], getattr(mesh, name).numpy())
+        material = content['materials'][0]
+        np.testing.assert_array_equal(material['diffuse_color'], [1., 0., 0.])
+        assert material['diffuse_texture'].shape == (8, 8, 4)
+        np.testing.assert_array_equal(material['diffuse_texture'][0, 0], [255, 0, 0, 255])
 
     def test_initial_and_requested_mesh(self):
-        # TODO: capture initial/get_mesh writes and ensure unrelated tags are ignored.
-        pytest.skip('TODO: implement mesh request checks')
+        handler = sockets.MeshGeometryStreamer(self.mesh())
+        write = Mock()
+        assert handler.accepted_message_tags() == ['get_mesh']
+        handler.on_connection_open(write)
+        handler.on_message('unknown', {}, write)
+        assert write.call_count == 1
+        handler.on_message('get_mesh', {}, write)
+        assert write.call_count == 2
+        for call in write.call_args_list:
+            assert call.args[1] is True
+            assert io.from_binary(call.args[0])['tag'] == 'set_mesh'
 
 
-# TODO: extend AnyRendererMessageHandler tests with actual idle-task cancellation,
-# real Camera resolution caps, encoding metadata and worker exception handling.
+class TestRendererOutput:
+    @pytest.mark.parametrize('width,height,cap,expected', [
+        (80, 40, 20, (20, 10)), (40, 80, 20, (10, 20)),
+        (8, 4, 20, (8, 4)), (80, 40, None, (80, 40)),
+    ])
+    def test_camera_resolution_cap(self, width, height, cap, expected):
+        camera = make_camera(width, height)
+        original = copy.deepcopy(camera)
+        handler = AnyRendererMessageHandler(Mock(), device='cpu')
+        resized = handler._scale_camera(camera, RemoteRenderingOptions(max_resolution=cap))
+        assert (resized.width, resized.height) == expected
+        assert (camera.width, camera.height) == (width, height)
+        torch.testing.assert_close(camera.intrinsics.params, original.intrinsics.params)
+        torch.testing.assert_close(resized.extrinsics.view_matrix(), original.extrinsics.view_matrix())
+
+    @pytest.mark.parametrize('image_format', ['raw', 'png', 'jpeg'])
+    def test_encoded_frame_and_metadata(self, image_format):
+        handler = AnyRendererMessageHandler(Mock(), tag_suffix='_test', device='cpu')
+        frame = torch.full((8, 12, 3), 128, dtype=torch.uint8)
+        options = RemoteRenderingOptions(encode_format=image_format)
+        write = Mock()
+        handler.send_render_message({'img': frame, 'frame_id': 7}, write, options)
+        encoded, binary = write.call_args.args
+        assert binary is True
+        decoded = io.from_binary(encoded)
+        assert decoded['tag'] == 'render_test' and decoded[io.MESSAGE_CONTENT_KEY]['frame_id'] == 7
+        image = decoded[io.MESSAGE_CONTENT_KEY]['img']
+        assert image.shape[:2] == (8, 12)
+        np.testing.assert_allclose(image[..., :3], frame.numpy(), atol=2)
+
+
+class TestRendererScheduling(unittest.IsolatedAsyncioTestCase):
+    async def test_new_request_suppresses_old_idle_frame(self):
+        handler = AnyRendererMessageHandler(Mock(), device='cpu',
+            high_rendering_options=RemoteRenderingOptions(max_resolution=200))
+        handler.camera = make_camera()
+        handler._maybe_render_and_send = AsyncMock()
+        entered = asyncio.Queue()
+        release = asyncio.Event()
+
+        async def wait_gap(delay):
+            assert delay == handler._high_res_gap_s
+            entered.put_nowait(None)
+            await release.wait()
+
+        tasks = []
+        create_task = asyncio.create_task
+
+        def schedule(coroutine):
+            task = create_task(coroutine)
+            tasks.append(task)
+            return task
+
+        with patch.object(sockets.asyncio, 'sleep', side_effect=wait_gap), patch.object(
+                sockets.asyncio, 'create_task', side_effect=schedule):
+            await handler.on_message('render', {}, Mock())
+            await asyncio.wait_for(entered.get(), 1)
+            await handler.on_message('render', {}, Mock())
+            await asyncio.wait_for(entered.get(), 1)
+            assert len(tasks) == 2
+            release.set()
+            await asyncio.wait_for(asyncio.gather(*tasks), 1)
+        calls = handler._maybe_render_and_send.call_args_list
+        assert len(calls) == 3  # Two interactive frames, one final frame.
+        assert calls[-1].args[1] is handler.high_rendering_options
+
+        handler.high_rendering_options = None
+        with patch.object(sockets.asyncio, 'create_task') as create_task:
+            await handler.on_message('render', {}, Mock())
+            create_task.assert_not_called()
+
+    async def test_worker_failure_releases_queue_and_next_frame_succeeds(self):
+        render = Mock(side_effect=[RuntimeError('render failed'), torch.zeros((8, 8, 4))])
+        handler = AnyRendererMessageHandler(render, device='cpu',
+            rendering_options=RemoteRenderingOptions(encode_format='raw'))
+        handler.camera = make_camera()
+        write = Mock()
+        with self.assertRaisesRegex(RuntimeError, 'render failed'):
+            await handler._maybe_render_and_send(write, handler.rendering_options)
+        assert handler._queue.empty() and handler._queue.unfinished_tasks == 0
+        write.assert_not_called()
+        await handler._maybe_render_and_send(write, handler.rendering_options)
+        assert handler._queue.empty() and handler._queue.unfinished_tasks == 0
+        assert io.from_binary(write.call_args.args[0])['tag'] == 'render'
+        handler._execute_rendering_task(write)  # Empty queue is a no-op.
+        write.assert_called_once()
+        for _ in range(2):
+            handler._queue.put((handler.rendering_options, False))
+        await handler._maybe_render_and_send(write, handler.rendering_options)
+        assert handler._queue.qsize() == 2
+        assert render.call_count == 2
+        for _ in range(2):
+            handler._queue.get_nowait()
+            handler._queue.task_done()

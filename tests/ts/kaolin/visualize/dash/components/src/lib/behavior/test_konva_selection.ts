@@ -16,6 +16,7 @@
 import * as fs from 'fs';
 
 import { assert } from 'chai';
+import { spy } from 'sinon';
 
 import { isElementBoundBehavior } from '@kaolin/core/behavior';
 import { KonvaSelectionOptionsSchema, KonvaSelectionBehavior } from '@kaolin/lib/behavior/konva_selection';
@@ -97,4 +98,46 @@ describe('visualize/dash/components/src/lib/behavior/test_konva_selection.ts', (
         });
     });
 
+});
+
+
+describe('KonvaSelectionBehavior resized masks', () => {
+    let harness: KonvaHarness;
+    beforeEach(() => { harness = setupKonvaHarness(100); });
+    afterEach(async () => { await harness.teardown(); });
+
+    for (const dpr of [1.25, 2]) {
+        for (const action of ['add', 'subtract', 'intersect'] as const) {
+            it(`${action} aligns the resized mask at DPR ${dpr}`, () => {
+                Object.defineProperty(window, 'devicePixelRatio', { value: dpr, configurable: true });
+                const composite = harness.compositeCanvas('mask', 80 * dpr, 80 * dpr);
+                const behavior = new KonvaSelectionBehavior({ compositeCanvasId: 'mask', mode: 'box', action });
+                harness.attach(behavior, harness.container('selection'));
+                behavior.setActive(true);
+                behavior.setDimensions(80, 80);
+                // The viewer resizes the composite layer before resizing the behavior.
+                composite.width = composite.height = 100 * dpr;
+                behavior.setDimensions(100, 100);
+                const rasterize = spy((behavior as any).stage, 'toCanvas');
+                const ctx = composite.getContext('2d')!;
+                ctx.fillStyle = 'white';
+                ctx.fillRect(10 * dpr, 10 * dpr, 40 * dpr, 40 * dpr);
+                const event = (x: number, y: number) => ({ nativeEvent: { clientX: x, clientY: y, pointerId: 1 } } as any);
+                behavior.onPointerDown(event(30, 30));
+                behavior.onPointerMove(event(70, 70));
+                behavior.onPointerUp(event(70, 70));
+
+                const raster = rasterize.returnValues[0];
+                assert.equal(raster.width, composite.width, 'raster is exported at device resolution');
+                assert.equal(raster.height, composite.height);
+                const alpha = (x: number, y: number) => ctx.getImageData(Math.floor(x * dpr), Math.floor(y * dpr), 1, 1).data[3];
+                assert.equal(alpha(20, 20), action === 'intersect' ? 0 : 255, 'old mask only');
+                assert.equal(alpha(40, 40), action === 'subtract' ? 0 : 255, 'overlap');
+                assert.equal(alpha(60, 60), action === 'add' ? 255 : 0, 'new mask only');
+                assert.equal(alpha(85, 85), 0, 'outside both masks');
+                assert.equal(ctx.globalCompositeOperation, 'source-over');
+                behavior.setActiveElement(null as any);
+            });
+        }
+    }
 });

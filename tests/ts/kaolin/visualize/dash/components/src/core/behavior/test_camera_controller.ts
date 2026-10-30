@@ -14,6 +14,7 @@
 // limitations under the License.
 
 import { assert } from 'chai';
+import { registerDom, unregisterDom } from '@test/helpers/dom';
 import { CameraControllerBase, isCameraController } from '@kaolin/core/behavior/camera_controller';
 import { isSizeableBehavior } from '@kaolin/core/behavior/base';
 
@@ -59,4 +60,24 @@ describe('visualize/dash/components/src/core/behavior/test_camera_controller.ts'
         });
     });
 
+});
+
+
+describe('CameraControllerBase DPR sizing', () => {
+    before(registerDom);
+    after(unregisterDom);
+
+    for (const [dpr, width, height] of [[1.25, 126, 63], [1.5, 151, 76], [2, 202, 102]]) {
+        it(`reports CSS dimensions once per buffer change at DPR ${dpr}`, () => {
+            Object.defineProperty(window, 'devicePixelRatio', { value: dpr, configurable: true });
+            const controller = new StubController();
+            controller.setDimensions(101, 51);
+            assert.deepEqual(controller.getCameraParams(), { width, height });
+            controller.setDimensions(101, 51);
+            controller.setDimensions(101.1, 51.1);
+            assert.deepEqual(controller.changes, [{ width: 101, height: 51 }]);
+            controller.setDimensions(103, 53);
+            assert.deepEqual(controller.changes, [{ width: 101, height: 51 }, { width: 103, height: 53 }]);
+        });
+    }
 });

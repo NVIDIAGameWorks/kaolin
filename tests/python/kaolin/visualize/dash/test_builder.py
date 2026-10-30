@@ -105,6 +105,55 @@ class TestWebappBuilder:
             builder.get_user_settings_func('missing')
 
 
-# TODO: regression-test build(), static HTTP routes, importmap execution and
-# settings synchronization in a running app. Check add_static_dir's reserved-path
-# condition and route prefixes before asserting the intended directory behavior.
+    def test_static_directory_mapping(self, tmp_path):
+        builder = WebappBuilder(debug=False)
+        url = builder.add_static_dir(str(tmp_path), 'data')
+        assert url == 'kaolin_custom/data'
+        assert builder.served_dirs[url] == str(tmp_path.resolve())
+        assert builder.add_static_dir(str(tmp_path), 'data') == url
+        for reserved in builder.RESERVED_PATHS:
+            with pytest.raises(AssertionError, match='reserved path'):
+                builder.add_static_dir(str(tmp_path), reserved)
+        other = tmp_path / 'other'
+        other.mkdir()
+        with pytest.raises(ValueError, match='already mapped'):
+            builder.add_static_dir(str(other), 'data')
+        with pytest.raises(AssertionError, match='Not a directory'):
+            builder.add_static_dir(str(tmp_path / 'missing'))
+
+    def test_importmap_without_global_exports(self):
+        mapping = {'example': builder_module.ImportmapItem('/example.js', 'example')}
+        page = '<html><head></head><body></body></html>'
+        assert WebappBuilder._insert_importmap(page, {}) == page
+        result = WebappBuilder._insert_importmap(page, mapping, add_globals=False)
+        assert '"example": "/example.js"' in result
+        assert 'type="module"' not in result
+
+    def test_each_setting_callback_updates_its_own_field(self, monkeypatch):
+        callbacks = []
+
+        def register(*args, **kwargs):
+            def capture(function):
+                callbacks.append(function)
+                return function
+            return capture
+
+        monkeypatch.setattr(builder_module, 'callback', register)
+
+        @dataclass
+        class Settings:
+            size: int = 3
+            opacity: float = 0.5
+
+        builder = WebappBuilder(debug=False)
+        builder.add_user_settings(Settings(), 'brush')
+        builder.default_user_session = {'brush': Settings()}
+        restore_size, update_size, restore_opacity, update_opacity = callbacks
+        data = update_size(7, 'first', {'size': 3, 'opacity': 0.5})
+        assert builder.get_user_settings_func('brush')('first') == Settings(7, 0.5)
+        data = update_opacity(0.8, 'first', data)
+        assert builder.get_user_settings_func('brush')('first') == Settings(7, 0.8)
+        assert builder.get_user_settings_func('brush')('second') == Settings()
+        assert restore_size(data, 3) == 7
+        assert restore_opacity(data, 0.5) == 0.8
+        assert restore_size(data, 7) is builder_module.no_update
