@@ -128,6 +128,27 @@ def test_load_round_trip(tmp_path):
     assert sorted(bg_indices) == list(range(5, 10))
 
 
+@pytest.mark.parametrize('names', [
+    ('left-arm', 'left_arm', 'left_arm_1'),
+    ('left arm', 'left/arm', 'left_arm'),
+    ('1', '_', '__1'),
+])
+def test_load_round_trip_segment_labels(tmp_path, names):
+    path = str(tmp_path / 'labels.usda')
+    segmentation = DisjointSegmentation(10, 'cpu')
+    for i, name in enumerate(names):
+        mask = torch.zeros(10, dtype=torch.bool)
+        mask[i] = True
+        segmentation.add_segment(name, mask)
+
+    export_scene_as_usd(_toy_cloud(), segmentation, path)
+    _, loaded = load_scene_from_usd(path, 'cpu')
+
+    assert set(loaded.segments) == set(segmentation.segments)
+    for name, segment in segmentation.segments.items():
+        assert torch.equal(loaded.segments[name].mask, segment.mask)
+
+
 def test_load_multi_prim_no_subsets(tmp_path):
     """Two prims, no subsets → two segments named by prim leaf component."""
     path, n_a, n_b = _make_usd_two_prims(tmp_path)

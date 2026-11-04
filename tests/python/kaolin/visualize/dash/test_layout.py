@@ -73,7 +73,7 @@ class TestStandardLayoutHelper:
         helper.register_help_trigger('extra-help')
         assert helper.sidebar_sections['Tools'].children == [link]
         assert section.children[-1].is_open is False
-        assert helper.sidebar.style['min-width'] == '200px'
+        assert helper.sidebar.style['minWidth'] == '200px'
         assert modal['component'].style == {'display': 'none'}
         assert modal['component'] in helper.layout()[0].children
         assert helper.sidebar in helper.layout()[0].children[1].children
