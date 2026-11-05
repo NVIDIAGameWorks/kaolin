@@ -19,7 +19,7 @@ import shutil
 import math
 import torch
 import pytest
-from pxr import Usd
+from pxr import Sdf, Usd, UsdGeom, UsdVol
 
 from kaolin.io import usd
 from kaolin.utils.bundled_data import SCANNED_TOYS_PATH, SCANNED_TOYS_NAMES, download_scanned_toys_dataset
@@ -481,6 +481,274 @@ class TestGaussianExportImport:
             del stage
             actual = usd.get_gaussiancloud_scene_paths(out_path, scene_path='/World/Foo')
         assert set(str(p) for p in actual) == set(foo_paths)
+
+
+class TestGaussianFeatures:
+    """Extra channels on standard Gaussian prims, without dataset downloads."""
+
+    @pytest.mark.parametrize('extension', ['usda', 'usdc'])
+    @pytest.mark.parametrize('n', [1, 8])
+    @pytest.mark.parametrize('dtype', [torch.float16, torch.float32, torch.float64])
+    def test_features_roundtrip(self, tmp_path, extension, n, dtype):
+        """Features of each float dtype export as float32 vertex primvars and re-import unchanged."""
+        data = make_synthetic_gaussian_cloud(n=n)
+        features = {
+            'my_embedding': torch.arange(n * 64, dtype=dtype).reshape(n, 64)[:, ::2],
+            'confidence': torch.linspace(0, 1, n, dtype=dtype).reshape(n, 1),
+        }
+        expected_features = {k: v.float() for k, v in features.items()}
+        path = str(tmp_path / f'features.{extension}')
+        usd.export_gaussiancloud(path, scene_path='/Gaussians', **data, features=features)
+
+        stage = Usd.Stage.Open(path)
+        prim = stage.GetPrimAtPath('/Gaussians')
+        assert prim.IsA(UsdVol.ParticleField3DGaussianSplat)
+        for name, expected in expected_features.items():
+            pv = UsdGeom.PrimvarsAPI(prim).GetPrimvar('kaolin:features:' + name)
+            assert pv.GetTypeName() == Sdf.ValueTypeNames.FloatArray
+            assert pv.GetInterpolation() == UsdGeom.Tokens.vertex
+            assert pv.GetElementSize() == expected.shape[1]
+            assert not pv.IsIndexed()
+            assert torch.equal(torch.tensor(pv.Get()).reshape(n, -1), expected)
+
+        imported = usd.import_gaussiancloud(path)
+        assert contained_torch_equal(
+            {**data, 'features': expected_features},
+            imported.as_dict(only_tensors=True), approximate=True)
+
+    def test_old_positional_signatures(self, tmp_path):
+        """Positional calls written before the features argument existed still work."""
+        data = make_synthetic_gaussian_cloud()
+        args = [data[k] for k in ('positions', 'orientations', 'scales', 'opacities', 'sh_coeff')]
+        path = str(tmp_path / 'old_api.usdc')
+        usd.export_gaussiancloud(path, '/Gaussians', *args, None, 'Z', None, False)
+        assert usd.import_gaussiancloud(path).features is None
+        stage = Usd.Stage.CreateInMemory()
+        usd.add_gaussiancloud(stage, '/Gaussians', *args, None, None, False)
+        assert usd.import_gaussiancloud(stage).features is None
+
+    @pytest.mark.parametrize('features', [None, {}])
+    def test_missing_features_preserve_existing(self, features):
+        """Overwriting with features=None or {} keeps existing features and foreign primvars."""
+        data = make_synthetic_gaussian_cloud()
+        stage = Usd.Stage.CreateInMemory()
+        original = {'weights': torch.ones(8, 3)}
+        prim = usd.add_gaussiancloud(stage, '/Gaussians', **data, features=original)
+        api = UsdGeom.PrimvarsAPI(prim)
+        api.CreatePrimvar('foreign:data', Sdf.ValueTypeNames.IntArray).Set([42])
+        usd.add_gaussiancloud(stage, '/Gaussians', **data, overwrite=True, features=features)
+        imported = usd.import_gaussiancloud(stage)
+        assert contained_torch_equal(original, imported.features)
+        assert list(api.GetPrimvar('foreign:data').Get()) == [42]
+
+    @pytest.mark.parametrize('features', [None, {'other': torch.ones(6, 1)}])
+    def test_count_change_rejects_retained_features(self, features):
+        """Overwriting with a new Gaussian count raises unless every existing feature is passed again."""
+        stage = Usd.Stage.CreateInMemory()
+        usd.add_gaussiancloud(
+            stage, '/Gaussians', **make_synthetic_gaussian_cloud(n=4), features={'weights': torch.ones(4, 2)})
+        before = stage.GetRootLayer().ExportToString()
+        data = make_synthetic_gaussian_cloud(n=6)
+        with pytest.raises(ValueError, match="Existing feature 'weights'"):
+            usd.add_gaussiancloud(stage, '/Gaussians', **data, overwrite=True, features=features)
+        assert stage.GetRootLayer().ExportToString() == before
+
+        replacement = {'weights': torch.zeros(6, 2)}
+        usd.add_gaussiancloud(stage, '/Gaussians', **data, overwrite=True, features=replacement)
+        imported = usd.import_gaussiancloud(stage)
+        assert imported.positions.shape[0] == 6
+        assert contained_torch_equal(replacement, imported.features)
+
+    def test_time_sample_count_change_rejects_held_features(self):
+        """Writing a new Gaussian count at another time raises unless a feature held from an earlier sample is passed again."""
+        stage = Usd.Stage.CreateInMemory()
+        small = make_synthetic_gaussian_cloud(n=4)
+        large = make_synthetic_gaussian_cloud(n=6)
+        usd.add_gaussiancloud(stage, '/Gaussians', **small, time=1, features={'weights': torch.ones(4, 2)})
+        before = stage.GetRootLayer().ExportToString()
+        with pytest.raises(ValueError, match="Existing feature 'weights'"):
+            usd.add_gaussiancloud(stage, '/Gaussians', **large, time=2, overwrite=True)
+        assert stage.GetRootLayer().ExportToString() == before
+
+        # Same count keeps the held feature; a new count works once the feature is passed again.
+        usd.add_gaussiancloud(stage, '/Gaussians', **small, time=2, overwrite=True)
+        usd.add_gaussiancloud(
+            stage, '/Gaussians', **large, time=3, overwrite=True, features={'weights': torch.zeros(6, 2)})
+        for time, count in ((1, 4), (2, 4), (3, 6)):
+            imported = usd.import_gaussiancloud(stage, time=time)
+            assert imported.positions.shape[0] == count
+            assert imported.features['weights'].shape == (count, 2)
+
+    def test_indexed_import_and_dense_update_in_stronger_layer(self):
+        """Indexed features are resolved on import; a dense update in a stronger layer replaces them."""
+        data = make_synthetic_gaussian_cloud(n=3)
+        base = Usd.Stage.CreateInMemory()
+        prim = usd.add_gaussiancloud(
+            base, '/Gaussians', **data, features={'retained': torch.ones(3, 1)})
+        pv = UsdGeom.PrimvarsAPI(prim).CreatePrimvar(
+            'kaolin:features:weights', Sdf.ValueTypeNames.FloatArray,
+            UsdGeom.Tokens.vertex, 2)
+        pv.Set([1., 2., 3., 4.])
+        pv.SetIndices([1, 0, 1])
+        imported = usd.import_gaussiancloud(base)
+        assert torch.equal(imported.features['weights'], torch.tensor([[3., 4.], [1., 2.], [3., 4.]]))
+
+        stage = Usd.Stage.CreateInMemory()
+        stage.GetRootLayer().subLayerPaths.append(base.GetRootLayer().identifier)
+        replacement = torch.arange(6, dtype=torch.float32).reshape(3, 2)
+        usd.add_gaussiancloud(
+            stage, '/Gaussians', **data, overwrite=True, features={'weights': replacement})
+        imported = usd.import_gaussiancloud(stage)
+        assert torch.equal(imported.features['weights'], replacement)
+        assert torch.equal(imported.features['retained'], torch.ones(3, 1))
+        pv = UsdGeom.PrimvarsAPI(stage.GetPrimAtPath('/Gaussians')).GetPrimvar('kaolin:features:weights')
+        assert not pv.IsIndexed()
+
+    def test_time_samples_and_blocked_features(self):
+        """Features are stored per time sample; a blocked feature is skipped on import."""
+        data = make_synthetic_gaussian_cloud(n=2)
+        stage = Usd.Stage.CreateInMemory()
+        for time in (1, 2):
+            usd.add_gaussiancloud(
+                stage, '/Gaussians', **data, time=time, overwrite=True,
+                features={'weights': torch.full((2, 3), float(time))})
+        for time in (1, 2):
+            imported = usd.import_gaussiancloud(stage, time=time)
+            assert torch.equal(imported.features['weights'], torch.full((2, 3), float(time)))
+        api = UsdGeom.PrimvarsAPI(stage.GetPrimAtPath('/Gaussians'))
+        api.BlockPrimvar('primvars:kaolin:features:weights')
+        assert usd.import_gaussiancloud(stage, time=1).features is None
+
+    @pytest.mark.parametrize('sampled', ['values', 'indices', 'update'])
+    def test_indexed_animation_update_rejected_without_mutation(self, sampled):
+        """Updating an indexed feature that has time samples raises and leaves the stage unchanged."""
+        data = make_synthetic_gaussian_cloud(n=3)
+        stage = Usd.Stage.CreateInMemory()
+        prim = usd.add_gaussiancloud(stage, '/Gaussians', **data)
+        pv = UsdGeom.PrimvarsAPI(prim).CreatePrimvar(
+            'kaolin:features:weights', Sdf.ValueTypeNames.FloatArray,
+            UsdGeom.Tokens.vertex, 2)
+        pv.Set([1., 2., 3., 4.], 1 if sampled == 'values' else Usd.TimeCode.Default())
+        pv.SetIndices([1, 0, 1], 1 if sampled == 'indices' else Usd.TimeCode.Default())
+        before = stage.GetRootLayer().ExportToString()
+        with pytest.raises(ValueError, match='indexed feature'):
+            usd.add_gaussiancloud(
+                stage, '/Gaussians', **data, overwrite=True,
+                time=2 if sampled == 'update' else None,
+                features={'weights': torch.ones(3, 2)})
+        assert stage.GetRootLayer().ExportToString() == before
+
+    @pytest.mark.parametrize('features, message', [
+        (torch.ones(8, 2), 'features must be a dict'),
+        ({1: torch.ones(8, 2)}, 'Invalid feature name'),
+        ({'': torch.ones(8, 2)}, 'Invalid feature name'),
+        ({'with space': torch.ones(8, 2)}, 'Invalid feature name'),
+        ({'nested:name': torch.ones(8, 2)}, 'Invalid feature name'),
+        ({'indices': torch.ones(8, 2)}, 'Invalid feature name'),
+        ({'weights': [[1., 2.]]}, 'floating tensor'),
+        ({'weights': torch.ones(8, 2, dtype=torch.int64)}, 'floating tensor'),
+        ({'weights': torch.ones(8, 2, dtype=torch.bool)}, 'floating tensor'),
+        ({'weights': torch.ones(8, 2, dtype=torch.complex64)}, 'floating tensor'),
+        ({'weights': torch.ones(8)}, 'must have shape'),
+        ({'weights': torch.ones(8, 2, 2)}, 'must have shape'),
+        ({'weights': torch.ones(7, 2)}, 'must have shape'),
+        ({'weights': torch.ones(8, 0)}, 'must have shape'),
+    ])
+    def test_invalid_features_do_not_modify_stage_or_file(self, tmp_path, features, message):
+        """Invalid features raise before the stage or the output file is modified."""
+        data = make_synthetic_gaussian_cloud()
+        stage = Usd.Stage.CreateInMemory()
+        usd.add_gaussiancloud(stage, '/Gaussians', **data)
+        before = stage.GetRootLayer().ExportToString()
+        with pytest.raises(ValueError, match=message):
+            usd.add_gaussiancloud(
+                stage, '/Gaussians', **{**data, 'positions': data['positions'] + 1},
+                overwrite=True, features=features)
+        assert stage.GetRootLayer().ExportToString() == before
+
+        path = tmp_path / 'invalid.usdc'
+        with pytest.raises(ValueError, match=message):
+            usd.export_gaussiancloud(str(path), **data, features=features)
+        assert not path.exists()
+        path.write_bytes(b'existing contents')
+        with pytest.raises(ValueError, match=message):
+            usd.export_gaussiancloud(str(path), **data, features=features, overwrite=True)
+        assert path.read_bytes() == b'existing contents'
+
+    @pytest.mark.parametrize('change', ['type', 'interpolation', 'width'])
+    def test_incompatible_declaration_rejected_before_update(self, change):
+        """Updating a feature whose primvar has another type, interpolation or width raises and leaves the stage unchanged."""
+        data = make_synthetic_gaussian_cloud()
+        stage = Usd.Stage.CreateInMemory()
+        prim = usd.add_gaussiancloud(stage, '/Gaussians', **data)
+        UsdGeom.PrimvarsAPI(prim).CreatePrimvar(
+            'kaolin:features:weights',
+            Sdf.ValueTypeNames.IntArray if change == 'type' else Sdf.ValueTypeNames.FloatArray,
+            UsdGeom.Tokens.constant if change == 'interpolation' else UsdGeom.Tokens.vertex,
+            3 if change == 'width' else 2)
+        before = stage.GetRootLayer().ExportToString()
+        with pytest.raises(ValueError):
+            usd.add_gaussiancloud(
+                stage, '/Gaussians', **data, overwrite=True,
+                features={'valid_first': torch.ones(8, 1), 'weights': torch.ones(8, 2)})
+        assert stage.GetRootLayer().ExportToString() == before
+
+    @pytest.mark.parametrize('problem', ['type', 'interpolation', 'width', 'count', 'indices'])
+    def test_invalid_owned_primvar_rejected_on_import(self, problem):
+        """Import raises on a malformed kaolin:features primvar."""
+        data = make_synthetic_gaussian_cloud(n=3)
+        stage = Usd.Stage.CreateInMemory()
+        prim = usd.add_gaussiancloud(stage, '/Gaussians', **data)
+        pv = UsdGeom.PrimvarsAPI(prim).CreatePrimvar(
+            'kaolin:features:weights',
+            Sdf.ValueTypeNames.IntArray if problem == 'type' else Sdf.ValueTypeNames.FloatArray,
+            UsdGeom.Tokens.constant if problem == 'interpolation' else UsdGeom.Tokens.vertex,
+            2)
+        pv.Set([1, 2, 3, 4] if problem == 'count' else [1, 2, 3, 4, 5, 6])
+        if problem == 'width':
+            pv.GetAttr().SetMetadata('elementSize', 0)
+        if problem == 'indices':
+            pv.SetIndices([0, 1, 99])
+        with pytest.raises(ValueError, match='feature'):
+            usd.import_gaussiancloud(stage)
+
+    def test_foreign_primvars_are_not_features(self):
+        """Primvars outside the kaolin:features namespace are not imported as features."""
+        data = make_synthetic_gaussian_cloud()
+        stage = Usd.Stage.CreateInMemory()
+        prim = usd.add_gaussiancloud(stage, '/Gaussians', **data)
+        api = UsdGeom.PrimvarsAPI(prim)
+        api.CreatePrimvar('displayColor', Sdf.ValueTypeNames.Color3fArray).Set([(1, 0, 0)])
+        api.CreatePrimvar('other:embedding', Sdf.ValueTypeNames.FloatArray).Set([1, 2])
+        assert usd.import_gaussiancloud(stage).features is None
+
+    @pytest.mark.parametrize('mismatch', [None, 'missing', 'keys', 'width'])
+    def test_features_merge(self, mismatch):
+        """Merged import concatenates matching features and raises when feature sets differ between prims."""
+        data = make_synthetic_gaussian_cloud(n=2)
+        stage = Usd.Stage.CreateInMemory()
+        features = {'weights': torch.arange(4, dtype=torch.float32).reshape(2, 2)}
+        transform = torch.eye(4)
+        transform[:3, 3] = torch.tensor([1., 2., 3.])
+        usd.add_gaussiancloud(stage, '/A', **data, features=features, local_to_world=transform)
+        other_features = features
+        if mismatch == 'missing':
+            other_features = None
+        elif mismatch == 'keys':
+            other_features = {'other': features['weights']}
+        elif mismatch == 'width':
+            other_features = {'weights': torch.ones(2, 3)}
+        usd.add_gaussiancloud(stage, '/B', **data, features=other_features)
+        clouds = usd.import_gaussianclouds(stage, return_list=False)
+        assert contained_torch_equal(clouds['/A'].features, features)
+        assert contained_torch_equal(clouds['/B'].features, other_features)
+        if mismatch is not None:
+            with pytest.raises(ValueError):
+                usd.import_gaussiancloud(stage)
+        else:
+            merged = usd.import_gaussiancloud(stage)
+            assert torch.equal(merged.features['weights'], features['weights'].repeat(2, 1))
+            assert torch.allclose(merged.positions[:2], data['positions'] + transform[:3, 3])
 
 
 # -----------------------------------------------------------------------------

@@ -23,7 +23,7 @@ import torch
 
 from kaolin.rep import GaussianSplatModel
 
-from pxr import Usd, UsdGeom, UsdVol, Gf
+from pxr import Usd, UsdGeom, UsdVol, Gf, Sdf, Vt
 
 from .utils import _get_stage_from_maybe_file, get_scene_paths, create_stage
 from .transform import set_local_to_world_transform, get_local_to_world_transform
@@ -37,6 +37,125 @@ __all__ = [
     'import_gaussianclouds',
     'import_gaussiancloud',
 ]
+
+_FEATURE_PREFIX = 'kaolin:features:'
+
+
+def _validate_feature_name(name):
+    if (not isinstance(name, str) or not Sdf.Path.IsValidIdentifier(name)
+            or name == 'indices'):
+        raise ValueError(
+            f'Invalid feature name {name!r}: expected a USD identifier '
+            'other than "indices"')
+
+
+def _get_feature_width(primvar):
+    """Validate the storage declaration and return its channel count."""
+    width = primvar.GetElementSize()
+    if (primvar.GetTypeName() != Sdf.ValueTypeNames.FloatArray
+            or primvar.GetInterpolation() != UsdGeom.Tokens.vertex
+            or width <= 0):
+        raise ValueError(
+            f'Invalid feature primvar {primvar.GetAttr().GetPath()}: expected '
+            'float[], vertex interpolation, and positive elementSize')
+    return width
+
+
+def _validate_features(features, num_gaussians, prim=None, time=None):
+    """Validate all features before authoring any stage data.
+
+    Checks that:
+
+    * ``features`` is a dict of valid names to floating ``(N, K)`` tensors.
+    * If ``prim`` exists, a feature being updated keeps its channel count, and
+      is not an indexed feature with time samples.
+    * If ``prim`` exists, every feature kept on it (not passed in ``features``)
+      still has one row per Gaussian at ``time``. This fails when an overwrite
+      changes the Gaussian count, or when a value held from another time sample
+      has a different count.
+    """
+    if features is None:
+        features = {}
+    elif not isinstance(features, dict):
+        raise ValueError('features must be a dict of floating (N, K) tensors')
+    api = UsdGeom.PrimvarsAPI(prim) if prim else None
+    for name, tensor in features.items():
+        _validate_feature_name(name)
+        if not torch.is_tensor(tensor) or not torch.is_floating_point(tensor):
+            raise ValueError(f'features[{name!r}] must be a floating tensor')
+        if (tensor.ndim != 2 or tensor.shape[0] != num_gaussians
+                or tensor.shape[1] <= 0):
+            raise ValueError(
+                f'features[{name!r}] must have shape (N={num_gaussians}, K) '
+                f'with K > 0, got {tuple(tensor.shape)}')
+        if api is not None:
+            primvar = api.GetPrimvar(_FEATURE_PREFIX + name)
+            if primvar and _get_feature_width(primvar) != tensor.shape[1]:
+                raise ValueError(
+                    f'Cannot change channel count of feature {name!r}')
+            if primvar and primvar.IsIndexed():
+                if (not Usd.TimeCode(time).IsDefault()
+                        or primvar.GetAttr().GetNumTimeSamples()
+                        or primvar.GetIndicesAttr().GetNumTimeSamples()):
+                    # Blocking indices affects every sample, not just this time.
+                    raise ValueError(
+                        f'Cannot update indexed feature {name!r} with time '
+                        'samples; flatten the feature across all times first')
+    if api is None:
+        return
+    for primvar in api.GetAuthoredPrimvars():
+        name = str(primvar.GetPrimvarName())
+        if not name.startswith(_FEATURE_PREFIX):
+            continue
+        name = name[len(_FEATURE_PREFIX):]
+        if name in features:
+            continue
+        values = primvar.ComputeFlattened(time) if primvar.IsIndexed() else primvar.Get(time)
+        width = primvar.GetElementSize()
+        if values is None or width <= 0:
+            continue
+        if len(values) != num_gaussians * width:
+            raise ValueError(
+                f'Existing feature {name!r} holds {len(values) // width} entries '
+                f'at this time but {num_gaussians} Gaussians are being written; '
+                'pass it again in features')
+
+
+def _write_features(prim, features, time):
+    """Author validated features as dense, Gaussian-major float32 arrays."""
+    api = UsdGeom.PrimvarsAPI(prim)
+    for name, tensor in (features or {}).items():
+        values = tensor.detach().float().cpu().contiguous().numpy().reshape(-1)
+        primvar = api.CreatePrimvar(
+            _FEATURE_PREFIX + name, Sdf.ValueTypeNames.FloatArray,
+            UsdGeom.Tokens.vertex, tensor.shape[1])
+        # Dense updates must also override indices authored in weaker layers.
+        primvar.BlockIndices()
+        primvar.Set(Vt.FloatArray.FromNumpy(values), time)
+
+
+def _read_features(prim, num_gaussians, time):
+    """Read only Kaolin feature primvars, resolving optional USD indexing."""
+    features = {}
+    for primvar in UsdGeom.PrimvarsAPI(prim).GetAuthoredPrimvars():
+        name = str(primvar.GetPrimvarName())
+        if not name.startswith(_FEATURE_PREFIX):
+            continue
+        raw = primvar.Get(time)
+        if raw is None:
+            continue
+        name = name[len(_FEATURE_PREFIX):]
+        _validate_feature_name(name)
+        width = _get_feature_width(primvar)
+        values = primvar.ComputeFlattened(time) if primvar.IsIndexed() else raw
+        if values is None or len(values) != num_gaussians * width:
+            raise ValueError(
+                f'Invalid values for feature {name!r}: expected '
+                f'{num_gaussians * width} scalars after resolving indices')
+        features[name] = torch.from_numpy(
+            np.array(values, dtype=np.float32, copy=True).reshape(num_gaussians, width))
+    return features or None
+
 
 def _convert_if_half(tensor):
     if tensor.dtype == torch.half:
@@ -78,7 +197,8 @@ def _get_gaussiancloud(prim, time):
         output['sh_coeff'] = torch.tensor(np.asarray(attr)).reshape(-1, num_coeffs, 3)
     else:
         output['sh_coeff'] = torch.tensor(np.asarray(gaussian.GetRadianceSphericalHarmonicsCoefficientshAttr().Get(time=time))).reshape(-1, num_coeffs, 3)
-    return output    
+    output['features'] = _read_features(prim, len(output['positions']), time)
+    return output
 
 def import_gaussianclouds(file_path_or_stage, scene_paths=None, times=None, return_list=True):
     r"""Import gaussians from Usd file.
@@ -101,7 +221,8 @@ def import_gaussianclouds(file_path_or_stage, scene_paths=None, times=None, retu
             the default), or a ``dict[str, GaussianSplatModel]`` keyed by scene path (when
             ``return_list=False``). Each model's ``transform`` is set to the computed
             local-to-world matrix of shape :math:`(4, 4)`, or ``None`` if the prim has an
-            identity transform.
+            identity transform. Kaolin feature primvars are restored as a dictionary
+            of float32 ``(N, K)`` tensors in ``features``, or ``None`` when absent.
     """
     stage = _get_stage_from_maybe_file(file_path_or_stage)
     try:
@@ -138,6 +259,9 @@ def import_gaussiancloud(file_path_or_stage, scene_path=None, time=None):
     orientations, scales, and spherical-harmonics coefficients before merging.
     If clouds have different numbers of SH coefficients the higher-degree coefficients
     are truncated to the minimum present across all clouds.
+    Features are concatenated without spatial transformation. All clouds must have
+    matching feature keys and channel counts, or all have no features. Use
+    :func:`import_gaussianclouds` to retain clouds with heterogeneous features.
 
     Args:
         file_path_or_stage (Usd.Stage or str):
@@ -183,11 +307,10 @@ def get_gaussiancloud_scene_paths(file_path_or_stage, scene_path=None):
     return gaussians_paths
 
 def add_gaussiancloud(stage, scene_path, positions, orientations, scales,
-                      opacities, sh_coeff, local_to_world=None, time=None, overwrite=False):
+                      opacities, sh_coeff, local_to_world=None, time=None, overwrite=False,
+                      *, features=None):
     r"""Add a gaussiancloud as a ParticleField3DGaussianSplat to an existing USD stage.
 
-    Create a pointcloud represented by point instances of a sphere centered
-    at each point coordinate.
     The stage is modified but not saved to disk.
 
     Args:
@@ -212,11 +335,27 @@ def add_gaussiancloud(stage, scene_path, positions, orientations, scales,
         time (convertible to float, optional):
             Positive integer defining the time at which the supplied parameters
             correspond to.
-        overwrite (bool): If True, replace existing prim at scene_path. If False (default),
+        overwrite (bool): If True, update existing prim at scene_path. If False (default),
             raise ValueError when a ParticleField3DGaussianSplat already exists there.
         local_to_world (torch.Tensor):
             Local-to-world transform matrix of shape :math:`(4, 4)`,
             or ``None`` if the prim has an identity transform.
+        features (dict, optional): Named floating tensors of shape ``(N, K)``,
+            with ``K > 0``. Stored as float32 ``primvars:kaolin:features:<name>``
+            arrays with vertex interpolation and ``elementSize=K``. Names must be
+            valid USD identifiers other than ``indices``. Updates preserve omitted
+            features; ``None`` or an empty dict leaves existing features unchanged.
+            Existing feature declarations and channel counts must match. Callers
+            must keep retained features aligned with Gaussian count and order.
+            Indexed features can only be replaced at default time when neither
+            their values nor indices have time samples.
+            Features are stored as given and are never transformed. They can hold
+            geometric data such as surface normals, but those values stay fixed:
+            they are not recomputed when ``local_to_world`` is set or when the
+            cloud is transformed on import.
+
+    Raises:
+        ValueError: If a feature name, tensor, or existing declaration is invalid.
 
     Returns:
         (Usd.Prim): The generated gaussian Prim.
@@ -231,6 +370,7 @@ def add_gaussiancloud(stage, scene_path, positions, orientations, scales,
                 raise ValueError(
                     f"Prim already exists at {scene_path}; use overwrite=True to replace."
                 )
+        _validate_features(features, positions.shape[0], existing, time)
         gaussian = UsdVol.ParticleField3DGaussianSplat.Define(stage, scene_path)
         # positions
         assert torch.is_tensor(positions)
@@ -283,13 +423,15 @@ def add_gaussiancloud(stage, scene_path, positions, orientations, scales,
                 sh_coeff.detach().float().cpu().numpy().reshape(-1, 3), time)
         if local_to_world is not None:
             set_local_to_world_transform(stage, gaussian.GetPrim(), local_to_world, time)
+        _write_features(gaussian.GetPrim(), features, time)
     finally:
         del stage
     return gaussian.GetPrim()
 
 def export_gaussiancloud(file_path, scene_path='/World/Gaussians/gaussian_0',
                          positions=None, orientations=None, scales=None, opacities=None,
-                         sh_coeff=None, local_to_world=None, up_axis='Y', time=None, overwrite=False):
+                         sh_coeff=None, local_to_world=None, up_axis='Y', time=None, overwrite=False,
+                         *, features=None):
     r"""Export a single gaussian cloud to a USD scene.
 
     The gaussian cloud will be added to the USD stage and represented by a
@@ -321,6 +463,12 @@ def export_gaussiancloud(file_path, scene_path='/World/Gaussians/gaussian_0',
             Positive integer defining the time at which the supplied parameters
             correspond to.
         overwrite (bool): If True, overwrite existing .usda. If False (default) raise an error if files already exists.
+        features (dict, optional): Named floating ``(N, K)`` tensors, serialized as
+            float32 per-Gaussian primvars. See :func:`add_gaussiancloud` for naming
+            and shape requirements. Defaults to ``None``.
+
+    Raises:
+        ValueError: If a feature name or tensor is invalid.
 
     """
     assert isinstance(scene_path, str)
@@ -339,10 +487,12 @@ def export_gaussiancloud(file_path, scene_path='/World/Gaussians/gaussian_0',
     if os.path.exists(file_path) and not overwrite:
         raise FileExistsError(f"{file_path} already exists; to overwrite whole file use 'overwrite' argument;" +
                               " to add gaussiancloud to existing usd, use 'add_gaussiancloud' instead.")
+    _validate_features(features, positions.shape[0])
     stage = create_stage(file_path, up_axis)
     try:
         add_gaussiancloud(stage, scene_path, positions, orientations, scales,
-                          opacities, sh_coeff, local_to_world, time, overwrite)
+                          opacities, sh_coeff, local_to_world, time, overwrite,
+                          features=features)
         stage.Save()
     finally:
         del stage
