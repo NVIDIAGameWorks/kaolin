@@ -79,6 +79,7 @@ def run_apidoc(_):
             "kaolin/ops/spc/bf_recon.py",
             "kaolin/physics/common/collisions.py",
             "kaolin/physics/common/optimization.py",
+            "kaolin/physics/common/optimization_capturable.py",
             "kaolin/physics/common/scene_forces.py",
             "kaolin/physics/materials/linear_elastic_material.py",
             "kaolin/physics/materials/material_forces.py",

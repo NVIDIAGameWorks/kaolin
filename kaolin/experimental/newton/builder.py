@@ -211,7 +211,7 @@ class SimplicitsModelBuilder(newton.ModelBuilder):
                                                     model.simplicits_scene.sim_vols),
                                                 dt=model.simplicits_scene.timestep,
                                                 friction_use_lagged_body_contact_force_norm=False),
-                    "coeff": 0.001,
+                    "coeff": 1.0,
                 }
 
         return model
