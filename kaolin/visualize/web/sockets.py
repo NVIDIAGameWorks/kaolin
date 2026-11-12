@@ -250,10 +250,10 @@ class RenderTimeFps:
     """Tracks render+encode durations and reports the implied throughput.
 
     Unlike :class:`SlidingWindowFps` (which measures how often requests
-    *arrive*), this measures how fast frames could be produced back-to-back:
-    ``fps = n / sum(durations)`` over the most recent ``window_s`` (i.e. the
-    reciprocal of the mean per-frame render+encode time). This is the
-    response-time bookkeeping used to decide whether rendering can keep up.
+    *arrive*), this estimates capacity from render+encode intervals ending in
+    the most recent ``window_s``: ``fps = n / busy_time``. Overlapping intervals
+    count once toward busy time; idle gaps are excluded. For serial renders,
+    this is the reciprocal of the mean per-frame render+encode time.
     Thread-safe (durations are recorded from the render worker thread).
     """
 
@@ -265,7 +265,7 @@ class RenderTimeFps:
         self._lock = threading.Lock()
 
     def record(self, duration_s: float, timestamp: Optional[float] = None) -> None:
-        """Record the time taken to render and encode one frame (seconds)."""
+        """Record a frame's render+encode duration and end timestamp (seconds)."""
         t = self._now() if timestamp is None else timestamp
         with self._lock:
             self._samples.append((t, duration_s))
@@ -278,10 +278,15 @@ class RenderTimeFps:
             self._trim(t)
             if not self._samples:
                 return None
-            total = sum(d for _, d in self._samples)
-            if total <= 0:
+            busy_s = 0.0
+            previous_end = float('-inf')
+            for start, end in sorted((end - duration, end)
+                                     for end, duration in self._samples):
+                busy_s += max(0.0, end - max(start, previous_end))
+                previous_end = max(previous_end, end)
+            if busy_s <= 0:
                 return None
-            return len(self._samples) / total
+            return len(self._samples) / busy_s
 
     def last_duration(self) -> Optional[float]:
         """Most recent render+encode duration in seconds, or ``None``."""
@@ -431,7 +436,7 @@ class AnyRendererMessageHandler(AsyncMessageHandlerProtocol):
         """Snapshot of bookkeeping metrics.
 
         Returns a dict with ``request_fps`` (rate of incoming render requests),
-        ``rendering_fps`` (throughput implied by render+encode time) and
+        ``rendering_fps`` (concurrent capacity estimated by :class:`RenderTimeFps`) and
         ``last_render_s`` (most recent render+encode duration).
         ``interactive_rendering_fps`` excludes initial, direct, and final
         high-quality frames. ``low_quality_weight`` is the last interactive
@@ -560,10 +565,11 @@ class AnyRendererMessageHandler(AsyncMessageHandlerProtocol):
         start = time.monotonic()
         res = self._invoke_render(cam, options)
         encoded = self.encode_rendering(res, options)
-        duration_s = time.monotonic() - start
-        self._rendering_fps.record(duration_s)
+        end = time.monotonic()
+        duration_s = end - start
+        self._rendering_fps.record(duration_s, timestamp=end)
         if interactive:
-            self._interactive_rendering_fps.record(duration_s)
+            self._interactive_rendering_fps.record(duration_s, timestamp=end)
         write_message_fn(encoded, True)
 
     def _invoke_render(self, cam, options: RemoteRenderingOptions):

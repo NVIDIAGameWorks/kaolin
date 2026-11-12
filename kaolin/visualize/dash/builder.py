@@ -184,14 +184,28 @@ class WebappBuilder:
 
         Typical usage:
 
-        app_builder = WebappBuilder()
+        from dataclasses import dataclass
+        import dash_bootstrap_components as dbc
+        from kaolin.visualize.dash import StandardLayoutHelper, WebappBuilder
+
+        @dataclass
+        class Settings:
+            scale: float = 1.0
+
+        app_builder = WebappBuilder(debug=False)
 
         # add resources and settings
-        # TODO: examples for add_extra_Stylesheets, etc
+        app_builder.add_extra_stylesheets([dbc.icons.FONT_AWESOME])
+        controls = app_builder.add_user_settings(Settings(), 'display')
 
-        # build and run
-        app_builder.build()
-        app_builder.run(
+        # add the generated controls to the app layout
+        layout_helper = StandardLayoutHelper()
+        layout_helper.add_main_content(controls)
+        app_builder.set_layout_helper(layout_helper)
+
+        # build and run (no websocket handlers in this example)
+        app_builder.build(ws_handlers=[])
+        app_builder.start(port=8050)
 
         Note: 🌱 this class is just a shortcut. Use custom Dash / tornado app setup
         if it does not fit your use cases.

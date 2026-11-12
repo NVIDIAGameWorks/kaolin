@@ -95,7 +95,8 @@ describe('KonvaDrawingBehavior resize during a gesture', () => {
 
     it('keeps a draft at the same size and drops only the draft on resize', () => {
         const behavior = new KonvaDrawingBehavior({ mode: 'box' });
-        harness.attach(behavior, harness.container('drawing'));
+        const container = harness.container('drawing');
+        harness.attach(behavior, container);
         behavior.setActive(true);
         const event = (x: number, y: number) => ({ nativeEvent: { clientX: x, clientY: y, pointerId: 1 } } as any);
         behavior.onPointerDown(event(10, 10));
@@ -111,9 +112,10 @@ describe('KonvaDrawingBehavior resize during a gesture', () => {
         behavior.onPointerMove(event(80, 80));
         assert.lengthOf(layer.getChildren(), 2);
         const draft = layer.getChildren()[1];
-        behavior.setDimensions(100, 100);
-        assert.strictEqual(layer.getChildren()[1], draft, 'unchanged size preserves the gesture');
-        behavior.setDimensions(160, 120);
+        behavior.setDimensions(512, 512);
+        assert.deepEqual(stage.size(), { width: 100, height: 100 }, 'stage follows display, not rendering size');
+        assert.strictEqual(layer.getChildren()[1], draft, 'unchanged display size preserves the gesture');
+        harness.resize(container, 160, 120);
         assert.deepEqual(stage.size(), { width: 160, height: 120 });
         assert.deepEqual(layer.getChildren(), [committed]);
         assert.deepEqual(committed.getClientRect(), originalRect, 'committed geometry remains intact');

@@ -105,6 +105,22 @@ class TestInteractiveQuality(unittest.TestCase):
         self.assertIs(options, self.normal)
         self.assertEqual(self.handler.stats()['low_quality_weight'], 0.0)
 
+    def test_concurrent_renders_keep_quality_and_allow_recovery(self):
+        self.now += 1.1
+        self.handler._interactive_rendering_fps.record(0.2)
+        self.assertIs(self.sample(0.2, advance=0), self.normal)
+        self.assertAlmostEqual(
+            self.handler.stats()['interactive_rendering_fps'], 10.0)
+
+        self.sample(0.2)  # A single slower render lowers quality.
+        self.assertEqual(self.handler.stats()['low_quality_weight'], 0.25)
+        self.now += 1.1
+        self.handler._interactive_rendering_fps.record(0.1)
+        self.sample(0.1, advance=0)
+        self.assertAlmostEqual(
+            self.handler.stats()['interactive_rendering_fps'], 20.0)
+        self.assertAlmostEqual(self.handler.stats()['low_quality_weight'], 0.15)
+
     def test_new_interaction_resets_quality_and_old_timings(self):
         self.sample(0.2)
         self.now += 0.6
@@ -226,6 +242,20 @@ class TestSlidingWindowFps:
 
 
 class TestRenderTimeFps:
+    @pytest.mark.parametrize('intervals, expected_fps', [
+        ([(0, 0.2), (0, 0.2)], 10.0),  # Concurrent frames.
+        ([(0, 0.2), (0.1, 0.3)], 2 / 0.3),  # Partial overlap.
+        ([(0.3, 0.4), (0.2, 0.6)], 5.0),  # Nested intervals.
+        ([(0.1, 0.4), (0, 0.2)], 5.0),  # Recorded out of order.
+        ([(0, 0.2), (0.4, 0.6)], 5.0),  # Idle gap adds no work.
+        ([(-0.5, 1.0)], 1 / 1.5),  # Keep full duration across window boundary.
+    ])
+    def test_capacity_from_render_intervals(self, intervals, expected_fps):
+        tracker = RenderTimeFps(now=lambda: 1.0)
+        for start, end in intervals:
+            tracker.record(end - start, timestamp=end)
+        assert tracker.fps() == pytest.approx(expected_fps)
+
     def test_durations_window_and_reset(self):
         now = [0.0]
         tracker = RenderTimeFps(window_s=1, now=lambda: now[0])

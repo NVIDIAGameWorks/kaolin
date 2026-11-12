@@ -767,12 +767,14 @@ const KaolinViewerInternal = (props: Props) => {
         return () => document.removeEventListener('keydown', handleKey);
     }, [shortcutToMode, applyMode]);
 
-    // Connect behaviors to their active layers when both are registered
+    // Connect behaviors to their active layers when both are registered.
+    // Registration updates refs before React state; use the same current maps as
+    // applyCurrentSize so renderers bind before a resize can claim a 2D context.
     useEffect(() => {
         props.behaviors?.forEach(([behaviorId, behaviorName, activeLayerIdentifier, _options]) => {
             if (!activeLayerIdentifier) return;
 
-            const behavior = behaviors.get(behaviorId);
+            const behavior = behaviorsRef.current.get(behaviorId);
             if (!behavior) return;
 
             // Check for reserved layer names
@@ -780,7 +782,7 @@ const KaolinViewerInternal = (props: Props) => {
             if (activeLayerIdentifier === ViewerReservedNames.eventCanvas) {
                 targetElement = eventCanvasRef.current;
             } else {
-                const layerRef = layers.get(activeLayerIdentifier);
+                const layerRef = layersRef.current.get(activeLayerIdentifier);
                 targetElement = layerRef?.current || null;
             }
 

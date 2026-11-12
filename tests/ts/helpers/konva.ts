@@ -32,11 +32,12 @@
  *     offscreen node-canvas to the content div; those are not happy-dom nodes, so
  *     happy-dom's `appendChild` throws. Attachment is irrelevant to rendering /
  *     capture, so we skip non-happy-dom canvas children.
- *  4. **Layout.** happy-dom has no layout, so element rects / `clientWidth` are
- *     all zero. We stub the container and the stage content to a fixed square
- *     `size`, so Konva maps pointer coordinates 1:1 onto a `size`-px stage and
- *     {@link record_interactions.eventFromSerializable | replayed events} resolve
- *     to the same pixels they were recorded at.
+ *  4. **Layout.** happy-dom has no layout, so element rects / `clientWidth` /
+ *     `clientHeight` are all zero. We stub the container and stage content so
+ *     pointer coordinates map 1:1 onto the stage. They start at `size`x`size`;
+ *     {@link KonvaHarness.resize} accepts independent width and height, delivers
+ *     a ResizeObserver notification, and updates the content's layout box to
+ *     match the resized stage. Replayed events use the current displayed box.
  *  5. **Synchronous rAF.** Freeform drawing coalesces points in
  *     `requestAnimationFrame`; we run callbacks synchronously so each replayed
  *     move paints immediately and in order.
@@ -68,19 +69,19 @@ import 'konva/canvas-backend';
 
 import { registerDom, unregisterDom } from './dom';
 
-/** A fixed on-screen rect of `size`x`size` anchored at the origin. */
-function squareRect(size: number): DOMRect {
+/** A fixed on-screen rect anchored at the origin. */
+function layoutRect(width: number, height: number): DOMRect {
     return {
-        left: 0, top: 0, right: size, bottom: size, width: size, height: size,
+        left: 0, top: 0, right: width, bottom: height, width, height,
         x: 0, y: 0, toJSON: () => ({}),
     } as DOMRect;
 }
 
-/** Pin an element's layout box (`getBoundingClientRect` + `clientWidth/Height`) to `size`. */
-function stubGeometry(el: HTMLElement, size: number): void {
-    el.getBoundingClientRect = () => squareRect(size);
-    Object.defineProperty(el, 'clientWidth', { value: size, configurable: true });
-    Object.defineProperty(el, 'clientHeight', { value: size, configurable: true });
+/** Pin an element's layout box (`getBoundingClientRect` + `clientWidth/Height`). */
+function stubGeometry(el: HTMLElement, width: number, height = width): void {
+    el.getBoundingClientRect = () => layoutRect(width, height);
+    Object.defineProperty(el, 'clientWidth', { value: width, configurable: true });
+    Object.defineProperty(el, 'clientHeight', { value: height, configurable: true });
 }
 
 /** Minimal view of a Konva behavior: bind an element, expose the created stage. */
@@ -89,29 +90,37 @@ interface KonvaBehaviorLike {
 }
 
 /**
- * Active Konva test harness; see {@link setupKonvaHarness}. All stubs target a
- * single square stage of the configured `size`.
+ * Active Konva test harness; see {@link setupKonvaHarness}. Stages start at the
+ * configured `size`x`size`; {@link KonvaHarness.resize} supports rectangular boxes.
  */
 export interface KonvaHarness {
     /**
      * Create a stage-container `div`, tagged with `id`, attached to the document
-     * and sized (layout box pinned to the harness `size`). Pass it to
+     * initially sized to the harness `size`x`size`. Pass it to
      * {@link KonvaHarness.attach}.
      */
     container(id: string): HTMLDivElement;
 
     /**
      * Bind `behavior` to `container` (via `setActiveElement`) and pin the
-     * resulting Konva stage's inner content div to `size`, so pointer coordinates
-     * map 1:1 onto the stage.
+     * resulting Konva stage's inner content div to the initial `size`x`size`,
+     * so pointer coordinates map 1:1 onto the stage. Use `resize` after binding
+     * to change the displayed dimensions.
      */
     attach(behavior: KonvaBehaviorLike, container: HTMLDivElement): void;
+
+    /**
+     * Change the displayed width and height and deliver a ResizeObserver notification.
+     * Height defaults to width. Composite canvas buffers keep their existing size.
+     */
+    resize(container: HTMLDivElement, width: number, height?: number): void;
 
     /**
      * Create a node-canvas-backed composite target resolvable by
      * `document.getElementById(id)` — required by `konva_selection`, whose
      * stage->composite `drawImage` only works when both share Konva's backend.
-     * Sized to the harness `size` unless overridden.
+     * Width and height each default to the harness `size` and can be overridden
+     * independently; display resizing does not change this buffer's dimensions.
      */
     compositeCanvas(id: string, width?: number, height?: number): HTMLCanvasElement;
 
@@ -121,9 +130,10 @@ export interface KonvaHarness {
 
 /**
  * Install the Konva headless harness (see the module overview for the full
- * recipe) for a square stage of `size` pixels.
+ * recipe), with initial stage and container dimensions of `size`x`size`.
+ * Use {@link KonvaHarness.resize} for subsequent rectangular display sizes.
  *
- * @param size - Stage / container / golden edge length in pixels.
+ * @param size - Initial width and height in CSS pixels.
  * @returns The active {@link KonvaHarness}.
  */
 export function setupKonvaHarness(size: number): KonvaHarness {
@@ -140,6 +150,21 @@ export function setupKonvaHarness(size: number): KonvaHarness {
     const prevAppend = win.Node.prototype.appendChild;
     const prevGetById = window.document.getElementById.bind(window.document);
     const composites = new Map<string, HTMLCanvasElement>();
+    const stages = new Map<HTMLDivElement, Konva.Stage>();
+    const resizeCallbacks = new Map<Element, () => void>();
+    const prevResizeObserver = globalThis.ResizeObserver;
+    // happy-dom has no layout-driven ResizeObserver notifications.
+    globalThis.ResizeObserver = class {
+        private target: Element | null = null;
+        constructor(private callback: ResizeObserverCallback) {}
+        observe(target: Element): void {
+            this.target = target;
+            resizeCallbacks.set(target, () => this.callback([], this as any));
+        }
+        disconnect(): void {
+            if (this.target) resizeCallbacks.delete(this.target);
+        }
+    } as any;
 
     Konva.isBrowser = true;
     Konva.dblClickWindow = 0;
@@ -170,7 +195,17 @@ export function setupKonvaHarness(size: number): KonvaHarness {
         attach(behavior: KonvaBehaviorLike, container: HTMLDivElement): void {
             behavior.setActiveElement(container);
             const stage = (behavior as unknown as { stage?: Konva.Stage | null }).stage;
-            if (stage?.content) stubGeometry(stage.content, size);
+            if (stage?.content) {
+                stages.set(container, stage);
+                stubGeometry(stage.content, size);
+            }
+        },
+
+        resize(container: HTMLDivElement, width: number, height = width): void {
+            stubGeometry(container, width, height);
+            resizeCallbacks.get(container)?.();
+            const stage = stages.get(container);
+            if (stage?.content) stubGeometry(stage.content, stage.width(), stage.height());
         },
 
         compositeCanvas(id: string, width = size, height = size): HTMLCanvasElement {
@@ -182,6 +217,9 @@ export function setupKonvaHarness(size: number): KonvaHarness {
         },
 
         async teardown(): Promise<void> {
+            globalThis.ResizeObserver = prevResizeObserver;
+            resizeCallbacks.clear();
+            stages.clear();
             win.document.getElementById = prevGetById;
             win.Node.prototype.appendChild = prevAppend;
             win.setTimeout = prevSetTimeout;
