@@ -36,11 +36,9 @@ It also demonstrates key features of the new Kaolin UI/web toolkit in
 To install this app's dependencies, run:
 
 ```bash
+pip install hatchling
 pip install -e ".[app.segment]" --no-build-isolation
 ```
-
-> ℹ️ **Note:** We probably won't ship apps like this — this is a placeholder solution to
-> easily share development.
 
 ---
 

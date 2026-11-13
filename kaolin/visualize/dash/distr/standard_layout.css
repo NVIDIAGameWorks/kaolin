@@ -199,10 +199,25 @@ body {
 }
 
 @media (min-width: 768px) {
+    /** Fixed-height app shell, so the page itself never scrolls and the sidebar
+        owns its own vertical overflow (see .kaolin-sidebar below). Without a
+        definite height here, a tall sidebar would instead stretch the flex row
+        and scroll the whole page. */
+    #kaolin-app {
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+    }
+
     .kaolin-sidebar {
         box-shadow: 2px 0 5px 0px rgba(0, 0, 0, 0.3);
         flex-grow: 0;
         min-height: unset;
+        /** Fill all vertical space left by the navbar, and scroll internally
+            when the sections don't fit. */
+        height: 100%;
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
 
     .kaolin-sidebar-content {
@@ -217,18 +232,54 @@ body {
     .kaolin-primary-container {
         display: flex;
         flex-direction: row;
+        /** Flex items default to min-height:auto; without this the row would
+            refuse to shrink below its tallest child and overflow the shell. */
+        min-height: 0;
     }
 }
 
 @media (max-width: 767px) {
+    /** Stacked layout: the sidebar sits above the main area, so there is no flex
+        row to stretch this container and its only content (the viewer) is made of
+        absolutely positioned layers with no intrinsic height -- it would collapse
+        to zero. Must be a definite `height`, not `min-height`: the viewer sizes
+        itself with height:100%, which only resolves against a definite parent. */
+    .kaolin-main-container {
+        height: 100vh;
+        height: 100dvh;
+    }
+
     .kaolin-sidebar {
         width: 100%;
         min-height: 100%;
         padding: 20px;
     }
 
+    /** Disappearing sidebar overlays the content (position: absolute), so the main
+        area is the only in-flow child and should take exactly the height the navbar
+        leaves it -- the 100dvh above would make the page one navbar taller than the
+        viewport and scroll. This is the same flex row used at >=768px: the height
+        then comes from flex stretch, which (unlike a flex-grown height) counts as a
+        definite parent for the viewer's own height:100%. */
+    .kaolin-primary-container:has(> .kaolin-sliding-sidebar) {
+        display: flex;
+        flex-direction: row;
+        min-height: 0;
+    }
+
+    .kaolin-sliding-sidebar ~ .kaolin-main-container {
+        flex-grow: 1;
+        height: auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+
     .kaolin-sliding-sidebar {
         min-width: 300px;
+        /** Now bounded by the viewport height, so it has to scroll internally or
+            its lower controls are unreachable (cf. the >=768px rule). */
+        overflow-y: auto;
+        overscroll-behavior: contain;
     }
 }
 

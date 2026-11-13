@@ -100,6 +100,8 @@ assembling a viewer. The most common methods are:
 * :meth:`~kaolin.visualize.dash.viewer.ViewerBuilder.add_remote_rendering` --
   one-call setup for server-side rendering: streams the camera to the server and
   draws the frames it pushes back.
+* :meth:`~kaolin.visualize.dash.viewer.ViewerBuilder.set_resize_mode` --
+  configure viewport resizing mode (defaults to ``'fixed'``).
 * :meth:`~kaolin.visualize.dash.viewer.ViewerBuilder.build` -- produce the
   :class:`~kaolin.visualize.dash.viewer.KaolinViewer` Dash component.
 

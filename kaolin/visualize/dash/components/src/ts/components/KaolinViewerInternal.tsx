@@ -2,13 +2,13 @@ import '../../css/viewer.css';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { getCanvasCoordinates } from '../util/canvas';
-import { BehaviorRunner, CameraControllerInterface, isCameraController, InteractiveBehavior, isElementBoundBehavior, isClickEventHandler, isPointerEventHandler, ClickEventHandler, PointerEventHandler, MessageHandler, isMessageHandler } from '../core/behavior';
+import { clearCanvas, getCanvasCoordinates } from '../util/canvas';
+import { BehaviorRunner, CameraControllerInterface, isCameraController, InteractiveBehavior, isElementBoundBehavior, isSizeableBehavior, isClickEventHandler, isPointerEventHandler, ClickEventHandler, PointerEventHandler, MessageHandler, isMessageHandler } from '../core/behavior';
 import * as kaolin_events from '../core/event';
 import * as io from '../core/io';
-import { LayerComponent } from '../core/layer';
+import { LayerComponent, resizeLayer } from '../core/layer';
 import { WebSocketConnectionsManager } from '../core/sockets';
-import { computeContainedDisplaySize, computeContainedFixedAspectSize, defaultSetElementDimensions, ViewportResizeMode } from '../core/viewport';
+import { computeContainedDisplaySize, ViewportResizeMode } from '../core/viewport';
 import { FpsReadout, InteractiveFps, InteractiveFpsProvider } from '../util/fps';
 import { logger } from '../util/logging';
 import * as graphics from '../graphics';
@@ -19,6 +19,32 @@ export const ViewerReservedNames = {
     eventCanvas: 'EVENT_CANVAS',
     setBehaviorActive: kaolin_events.ACTIVE_BEHAVIOR_SETTER_NAME
 } as const;
+
+/**
+ * How long the stream of resize notifications must be quiet before the viewport
+ * resize is committed. Lower it to make releasing a drag feel snappier; the
+ * ceiling below independently bounds how often a commit can happen.
+ */
+const RESIZE_SETTLE_MS = 500;
+
+/**
+ * Longest a commit may be deferred, measured from the first notification since
+ * the previous commit. This is what keeps a slow, continuous drag progressing
+ * instead of waiting for a pause that never arrives, and it sets the floor on
+ * the interval between commits.
+ */
+const RESIZE_MAX_WAIT_MS = 500;
+
+/**
+ * Smallest change in either dimension, in CSS pixels, that is worth committing
+ * a resize for. Committing clears every layer's drawing buffer, so a change too
+ * small to be worth that — a scrollbar appearing, a layout settling by a pixel —
+ * is left to CSS, which goes on stretching the content it already has. A count
+ * of pixels rather than a fraction of the viewport: what a commit costs does not
+ * scale with the viewport, and the visible error from not committing is the
+ * stretch, which is also absolute.
+ */
+const RESIZE_MIN_CHANGE_PX = 4;
 
 type Props = {
     /**
@@ -65,6 +91,13 @@ type Props = {
 
     /** How the viewport canvas resizes within its container. */
     resize_mode?: ViewportResizeMode;
+
+    /** Cleanup and optional mode switch after a size change; skipped for initial sizing. */
+    resize_hooks?: {
+        clear_layers?: string[];
+        reset_behaviors?: string[];
+        switch_mode?: string;
+    };
 
     /**
      * Named modes as a list of [modeName, [behaviorIds...], uiIcon, description]
@@ -125,6 +158,24 @@ const KaolinViewerInternal = (props: Props) => {
     const { id: id, websocket_addresses: websocketAddresses, remote_fps_source: remoteFpsSource } = props;
     const resizeMode = useMemo(() => props.resize_mode ?? ViewportResizeMode.FIXED, [props.resize_mode]);
 
+
+    // Pixel size of the input camera: the viewport's size in `fixed` mode and
+    // the aspect ratio it is held to in `fixed_aspect`. Memoized on the two
+    // numbers rather than on `camera_parameters` itself, so a fresh prop object
+    // carrying unchanged intrinsics does not invalidate everything downstream.
+    const cameraIntrinsics = props.camera_parameters?.intrinsics as { width?: number, height?: number } | undefined;
+    const cameraWidth = cameraIntrinsics?.width ?? 500;
+    const cameraHeight = cameraIntrinsics?.height ?? 500;
+    const cameraSize = useMemo(
+        () => ({ width: cameraWidth, height: cameraHeight }), [cameraWidth, cameraHeight]);
+
+    // Camera aspect ratio, handed to the stylesheet as a custom property: the
+    // viewport is sized purely in CSS off this value (see viewer.css), with no
+    // resize watchers. A bare number is a valid `aspect-ratio`, and the same
+    // value feeds the calc() that letterboxes the viewer inside its container.
+    const viewerAspect = useMemo(
+        () => String(cameraSize.height > 0 ? cameraSize.width / cameraSize.height : 1), [cameraSize]);
+
     // Sliding-window FPS tracker for render-on-demand. Lives in a ref so it
     // survives re-renders without losing samples. Only created when the
     // Python side opted in via `show_remote_fps`; absent otherwise so the
@@ -135,7 +186,11 @@ const KaolinViewerInternal = (props: Props) => {
     }
 
     const eventCanvasRef = useRef<HTMLCanvasElement>(null);
-    const viewerFrameRef = useRef<HTMLDivElement>(null);
+    // The box CSS has already resolved to the true viewport (letterboxed in
+    // fixed_aspect), and the box every layer sizes itself against. Watched for
+    // resizes; never written to, so a buffer resize cannot feed back into layout.
+    const viewerContainerRef = useRef<HTMLDivElement>(null);
+    //const viewerFrameRef = useRef<HTMLDivElement>(null);
 
     // The viewer no longer owns a camera; it pipes the (optional) input camera
     // parameters to camera controllers and dispatches the active controller's
@@ -144,10 +199,12 @@ const KaolinViewerInternal = (props: Props) => {
     // Controller ids already seeded with the initial camera (one-shot, so the
     // element-binding effect re-runs do not clobber user-driven camera changes).
     const initializedControllers = useRef<Set<string>>(new Set());
-    // Latest computed canvas drawing-buffer size (device pixels). Source of
-    // truth for sizing canvas layers and for seeding camera-controller
-    // dimensions; populated by the resize observer (fires on mount too).
-    const lastCanvasSizeRef = useRef<{ width: number, height: number } | null>(null);
+    // Viewport size last applied, in CSS pixels (the drawing buffers derived
+    // from it are devicePixelRatio times larger). Records what was handed out
+    // rather than gating anything: layers are compared against the element and
+    // behaviors check for themselves, since only they know whether an unchanged
+    // size means there is nothing to do.
+    const lastAppliedSizeRef = useRef<{ width: number, height: number } | null>(null);
 
     const isAnimating = useRef<boolean>(false);  // TODO: I don't think we need this one, why was it added
     // Pending trailing camera-update timer for wheel/zoom. OrbitControls applies
@@ -333,6 +390,17 @@ const KaolinViewerInternal = (props: Props) => {
             }
         });
     }, [activeCameraController, cameraListeners, behaviorActiveStatus, behaviors]);
+
+    // Latest `maybeSendCameraUpdate` in a stable container, for callers that
+    // must not depend on it: `applyCurrentSize` is deliberately dependency-free
+    // so the resize observer that captures it never re-subscribes. Synced from an
+    // effect rather than at a write site because the callback is state-derived;
+    // it is only read from asynchronous work (a settled resize), by which point
+    // the effect has run.
+    const maybeSendCameraUpdateRef = useRef(maybeSendCameraUpdate);
+    useEffect(() => {
+        maybeSendCameraUpdateRef.current = maybeSendCameraUpdate;
+    }, [maybeSendCameraUpdate]);
 
     const handleWebSocketMessage = async (event: MessageEvent) => {
         let decodedMessage = null;
@@ -699,12 +767,14 @@ const KaolinViewerInternal = (props: Props) => {
         return () => document.removeEventListener('keydown', handleKey);
     }, [shortcutToMode, applyMode]);
 
-    // Connect behaviors to their active layers when both are registered
+    // Connect behaviors to their active layers when both are registered.
+    // Registration updates refs before React state; use the same current maps as
+    // applyCurrentSize so renderers bind before a resize can claim a 2D context.
     useEffect(() => {
         props.behaviors?.forEach(([behaviorId, behaviorName, activeLayerIdentifier, _options]) => {
             if (!activeLayerIdentifier) return;
 
-            const behavior = behaviors.get(behaviorId);
+            const behavior = behaviorsRef.current.get(behaviorId);
             if (!behavior) return;
 
             // Check for reserved layer names
@@ -712,7 +782,7 @@ const KaolinViewerInternal = (props: Props) => {
             if (activeLayerIdentifier === ViewerReservedNames.eventCanvas) {
                 targetElement = eventCanvasRef.current;
             } else {
-                const layerRef = layers.get(activeLayerIdentifier);
+                const layerRef = layersRef.current.get(activeLayerIdentifier);
                 targetElement = layerRef?.current || null;
             }
 
@@ -729,21 +799,16 @@ const KaolinViewerInternal = (props: Props) => {
 
             // Camera controllers are element-bound (e.g. OrbitControls need the
             // canvas) AND own the camera. Now that the element is set, seed the
-            // designated controllers with viewport dimensions and the initial
-            // camera. Gated by `cameraControllerIds` (not duck-typing, so plain
-            // camera listeners are not initialized as controllers) and run once
-            // so effect re-runs don't clobber user-driven camera changes.
+            // designated controllers with the initial camera. Gated by
+            // `cameraControllerIds` (not duck-typing, so plain camera listeners
+            // are not initialized as controllers) and run once so effect re-runs
+            // don't clobber user-driven camera changes. Viewport dimensions are
+            // applied separately by `applyCurrentSize` below, since unlike the
+            // camera they have to be re-applied on every change.
             if (cameraControllerIds.includes(behaviorId) &&
                 !initializedControllers.current.has(behaviorId) &&
                 isCameraController(behavior)) {
                 const controller = behavior as unknown as CameraControllerInterface;
-                const canvas = targetElement as HTMLCanvasElement;
-                // TODO: not clear if this is correct here
-                // Prefer the resize observer's computed size; fall back to the
-                // canvas' own buffer size (or 500) before the first resize.
-                const seedSize = lastCanvasSizeRef.current
-                    ?? { width: canvas.width || 500, height: canvas.height || 500 };
-                controller.setDimensions(seedSize.width, seedSize.height);
                 if (props.camera_parameters) {
                     controller.setCameraParams(props.camera_parameters);
                 }
@@ -801,103 +866,166 @@ const KaolinViewerInternal = (props: Props) => {
     }, []); // Empty dependency array = runs only once
 
 
-    const computeViewportSize = useCallback(() => {
-        const container = document.getElementById(id);
-        if (!container) return;
-
-        const containerSize = { width: container.clientWidth, height: container.clientHeight };
-        if (containerSize.width === 0 || containerSize.height === 0) return null;  // TODO   
-
-        // Let us consider initial size as the effective pixel resolution, i.e. after device pixel ratio adjustment.
-        const intrinsics = props.camera_parameters?.intrinsics as { width?: number, height?: number } | { width: 500, height: 500 };
-        const dprInverse = 1.0 / (window.devicePixelRatio || 1);
-        const initialSize = resizeMode == ViewportResizeMode.FIXED ? { width: intrinsics.width, height: intrinsics.height } :
-            { width: Math.ceil(intrinsics.width * dprInverse), height: Math.ceil(intrinsics.height * dprInverse) };
-
-        const frameSize = (resizeMode == ViewportResizeMode.ADAPTIVE ? containerSize : computeContainedFixedAspectSize(initialSize, containerSize));
-        const displaySize = computeContainedDisplaySize(initialSize, resizeMode, containerSize);
-
-        logger.debug(`[KaolinViewer ${id}] computed target viewport size: ${displaySize.width}x${displaySize.height} ` +
-            `frame size: ${frameSize.width}x${frameSize.height} ` +
-            `(container ${containerSize.width}x${containerSize.height}, initial ${initialSize.width}x${initialSize.height}, mode ${resizeMode})`);
-        return { frame: frameSize, display: displaySize, useDPR: resizeMode != ViewportResizeMode.FIXED };
-    }, [resizeMode, props.camera_parameters]);
-
-    // Compute the contained canvas size for the current container, resize every
-    // canvas layer's drawing buffer to it, push the size to all camera
-    // controllers, and request a fresh frame. Reads latest layers/behaviors via
-    // refs so it can stay stable (the resize observer captures it once).
-    const applyViewportSize = useCallback(() => {
-        const sizes = computeViewportSize();
-        if (!sizes) return;  // container not ready
-
-        // Let's modify default layers
-        // Inner CSS container sizing:
-        //  - Adaptive --> 100%, 100%
-        //  - Fixed/Fixed aspect --> px sizes, not accounting for devicePixelRatio
-        defaultSetElementDimensions(viewerFrameRef.current, sizes.frame.width, sizes.frame.height);
-
-        if (resizeMode === ViewportResizeMode.FIXED) return;
-
-        defaultSetElementDimensions(eventCanvasRef.current, sizes.display.width, sizes.display.height, sizes.useDPR);
-
-        // Let's modify all layers
-        layersRef.current.forEach((layerRef, _layerId) => {
-            if (layerRef.current) {
-                defaultSetElementDimensions(layerRef.current, sizes.display.width, sizes.display.height, sizes.useDPR);
-            }
-        });
-
-        // Also inform all behaviors that have a corresponding method
-        behaviors.forEach((behavior, identifier) => {
-            if ((behavior as any)['setDimensions']) {
-                (behavior as any)['setDimensions'](sizes.display.width, sizes.display.height);
-            }
-        });
-
-        lastCanvasSizeRef.current = sizes.display;
-
-        // TODO: this is too slow
-        // Immediate camera update so listeners stay in sync during a resize drag.
-        maybeSendCameraUpdate();
-    }, [computeViewportSize, cameraControllerIds, maybeSendCameraUpdate, resizeMode]);
-
-    // Fire on viewer container size change (also fires once on observe, i.e. on
-    // mount) to resize canvas layers and update camera controllers.
-    // The rAF wrapper coalesces multiple ResizeObserver firings within one frame
-    // (common during smooth resize drags) into a single applyViewportSize call,
-    // capping work to the display refresh rate without adding perceptible lag.
-    // The deferred maybeSendCameraUpdate fires only after resizing has been idle
-    // for 300 ms (i.e. drag stopped), resetting on every new ResizeObserver entry.
-    useEffect(() => {
-        // FIXED mode keeps a constant canvas size regardless of the container, so
-        // there's nothing to react to — skip installing the ResizeObserver entirely.
-        const container = document.getElementById(id);
-        if (!container) return;
-        let pendingRaf: number | null = null;
-        let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
-        const resizeObserver = new ResizeObserver(() => {
-            if (pendingRaf !== null) cancelAnimationFrame(pendingRaf);
-            if (pendingTimeout !== null) clearTimeout(pendingTimeout);
-            pendingRaf = requestAnimationFrame(() => {
-                pendingRaf = null;
-                applyViewportSize();
-                pendingTimeout = setTimeout(maybeSendCameraUpdate, 300);
-            });
-        });
-        resizeObserver.observe(container);
-        return () => {
-            if (pendingRaf !== null) cancelAnimationFrame(pendingRaf);
-            if (pendingTimeout !== null) clearTimeout(pendingTimeout);
-            resizeObserver.disconnect();
+    // Push the viewer's current size into everything that needs to know it.
+    //
+    // Two triggers reach this: a committed viewport resize, and the effect just
+    // below, which re-runs whenever the layer or behavior set changes so
+    // late-registered layers and behaviors are sized too (and which covers the
+    // initial mount). Layers and behaviors are read through refs rather than
+    // declared as dependencies, so this callback stays stable across
+    // registrations and mode switches — otherwise the resize observer that
+    // captures it would re-subscribe, and re-`observe()` schedules a fresh
+    // commit every time.
+    //
+    // `minChangePx` is how the two triggers differ: a resize commit asks to be
+    // skipped unless the viewport really moved, while a registration passes 0,
+    // because the size may be unchanged and the point is to hand it to whatever
+    // just appeared.
+    const applyCurrentSize = useCallback((minChangePx: number = 0) => {
+        // What CSS actually gave the viewer. Measures zero before first layout,
+        // so fall back to the camera size: `fixed` mode installs no resize
+        // observer that would come back and retry.
+        const container = viewerContainerRef.current;
+        const containerSize = {
+            width: container?.clientWidth || cameraSize.width,
+            height: container?.clientHeight || cameraSize.height,
         };
-    }, [id, applyViewportSize, maybeSendCameraUpdate, resizeMode]);
+        // `fixed` ignores the container and stays at the camera size; `adaptive`
+        // takes the container as-is; `fixed_aspect` takes the largest exactly
+        // camera-proportioned size that fits inside it.
+        const { width, height } = computeContainedDisplaySize(cameraSize, resizeMode, containerSize);
 
-    // Re-apply when layers or behaviors change so newly mounted canvas layers
-    // get the current size even if the container itself did not resize.
+        // Read from the element rather than from the ResizeObserverEntry, so
+        // the commit acts on the current size and not on whichever
+        // notification happened to start the clock.
+        const previous = lastAppliedSizeRef.current;
+        if (previous
+            && Math.abs(width - previous.width) < minChangePx
+            && Math.abs(height - previous.height) < minChangePx) {
+            logger.debug(`[KaolinViewer ${id}] resize skipped: ${previous.width}x${previous.height} -> `
+                + `${width}x${height} is under the ${minChangePx}px threshold`);
+            return;
+        }
+
+        lastAppliedSizeRef.current = { width, height };
+        logger.debug(`[KaolinViewer ${id}] resize commit: `
+            + `${previous ? `${previous.width}x${previous.height}` : 'unsized'} -> ${width}x${height} `
+            + `(container ${containerSize.width}x${containerSize.height}, mode ${resizeMode}, `
+            + `dpr ${window.devicePixelRatio || 1})`);
+
+        // Layers before behaviors: sizing a canvas clears its buffer, so the
+        // behaviors are told last and can repaint into a buffer that is already
+        // the right shape. `resizeLayer` measures the element and does nothing
+        // when it already has this size, which is what keeps a re-run — every
+        // commit in `fixed` mode, or any late registration — from clearing
+        // content for nothing.
+        // Size every layer first, then let every behavior reconcile its state.
+        // resizeLayer preserves 2D content where possible;
+        // renderers synchronize their native state in the behavior pass below.
+        // Sizes are CSS pixels; canvas buffers include devicePixelRatio.
+        //
+        // The event canvas is rendered by the viewer rather than registered, so
+        // it is not in `layersRef`, but for sizing it is a layer like any other.
+        resizeLayer(eventCanvasRef.current, width, height);
+        layersRef.current.forEach((layerRef) => {
+            resizeLayer(layerRef.current, width, height);
+        });
+
+        // Every behavior that can take a size gets it, camera controllers
+        // included — their projection depends on it. This runs often (every
+        // commit in `fixed` mode, and on every layer or behavior registration),
+        // but it is not filtered here: only the behavior knows what an unchanged
+        // size means for it, and a behavior that was not ready for the last call
+        // (its element not yet bound, its library still initializing) needs this
+        // one. Each implementation returns early when there is nothing to do.
+        behaviorsRef.current.forEach((behavior) => {
+            if (!isSizeableBehavior(behavior)) return;
+            behavior.setDimensions(width, height);
+        });
+
+        if (previous && (width !== previous.width || height !== previous.height)) {
+            props.resize_hooks?.clear_layers?.forEach(layerId => {
+                const element = layersRef.current.get(layerId)?.current;
+                if (element instanceof HTMLCanvasElement) clearCanvas(element);
+            });
+            props.resize_hooks?.reset_behaviors?.forEach(behaviorId => {
+                const behavior = behaviorsRef.current.get(behaviorId);
+                if (!behavior) {
+                    logger.error('Behavior not found: ' + behaviorId);
+                    return;
+                }
+                try {
+                    behavior.reset();
+                } catch (error) {
+                    logger.error(`Error resetting behavior '${behaviorId}' after resize:`, error);
+                }
+            });
+            if (props.resize_hooks?.switch_mode) {
+                applyMode(props.resize_hooks.switch_mode);
+            }
+        }
+
+        // Sizing the viewport changed the active controller's projection (its
+        // aspect ratio, and the pixel dimensions its intrinsics are expressed
+        // in), so listeners — a remote renderer above all — have to be told.
+        maybeSendCameraUpdateRef.current();
+    }, [cameraSize, resizeMode, id, props.resize_hooks, applyMode]);
+
+    // Late-registered layers and behaviors: re-apply the current size whenever
+    // either set changes. Declared after the element-binding effect above so
+    // elements are always bound before this runs.
     useEffect(() => {
-        applyViewportSize();
-    }, [layers, behaviors, applyViewportSize]);
+        applyCurrentSize();
+    }, [layers, behaviors, applyCurrentSize]);
+
+    // PLACEHOLDER: watcher for the viewport size. Not implemented yet.
+    //
+    // Installed only for the modes whose geometry follows the container. FIXED
+    // sizes the viewport purely from the camera intrinsics, so there is nothing
+    // to react to. The viewer container is the target rather than the sizing
+    // container, whose size in fixed_aspect is the space offered to the viewer
+    // and not the letterboxed box the viewer takes up.
+    useEffect(() => {
+        if (resizeMode !== ViewportResizeMode.ADAPTIVE && resizeMode !== ViewportResizeMode.FIXED_ASPECT) return;
+
+        const target = viewerContainerRef.current;
+        if (!target) return;
+
+        // A resize gesture emits a continuous stream of notifications, but
+        // committing one is destructive — it clears every layer drawing buffer —
+        // so commits are rate limited rather than run per notification. A commit
+        // lands once the stream has been quiet for RESIZE_SETTLE_MS, or
+        // RESIZE_MAX_WAIT_MS after the stream started, whichever comes first,
+        // and then only if the viewport moved by RESIZE_MIN_CHANGE_PX.
+        // There is deliberately no leading-edge commit: the first notification of
+        // a gesture only starts the clock, so a quick drag is never interrupted
+        // mid-flight. Between commits the content just stays CSS-stretched.
+        let commitTimer: ReturnType<typeof setTimeout> | null = null;
+        let burstStartMs: number | null = null;  // first notification since the last commit
+
+        const commitResize = () => {
+            commitTimer = null;
+            burstStartMs = null;
+            applyCurrentSize(RESIZE_MIN_CHANGE_PX);
+        };
+
+        // Also runs once on observe, which is wanted: it seeds the commit from the
+        // viewer's real mounted size.
+        const observer = new ResizeObserver(() => {
+            const now = performance.now();
+            if (burstStartMs === null) burstStartMs = now;
+            const fireAt = Math.min(now + RESIZE_SETTLE_MS, burstStartMs + RESIZE_MAX_WAIT_MS);
+            if (commitTimer !== null) clearTimeout(commitTimer);
+            commitTimer = setTimeout(commitResize, Math.max(0, fireAt - now));
+        });
+        observer.observe(target);
+        return () => {
+            // Pending commit must not fire into an unmounted viewer.
+            if (commitTimer !== null) clearTimeout(commitTimer);
+            observer.disconnect();
+        };
+    }, [resizeMode, id, applyCurrentSize]);
+
 
     // Requirements on the size...
     // v0: div fills the available space, including changing aspect ratio, can change server camera
@@ -909,8 +1037,10 @@ const KaolinViewerInternal = (props: Props) => {
     //$("#palette-canvas").css("height", width);
     //}
     return (
-        <div id={id} className='kaolin-viewport-sizing-container'>
-            <div className='kaolin-viewer-container' ref={viewerFrameRef}
+        <div id={id}
+            className={`kaolin-viewport-sizing-container resize-mode-${resizeMode}`}
+            style={{ '--kaolin-viewer-aspect': viewerAspect } as React.CSSProperties}>
+            <div className='kaolin-viewer-container' ref={viewerContainerRef} //ref={viewerFrameRef}
                 onMouseEnter={() => { isHoveredRef.current = true; }}
                 onMouseLeave={() => { isHoveredRef.current = false; }}
             >
@@ -963,8 +1093,6 @@ const KaolinViewerInternal = (props: Props) => {
                     />
                 ))}
                 <canvas
-                    width={(props.camera_parameters?.intrinsics as { width?: number })?.width ?? 500}
-                    height={(props.camera_parameters?.intrinsics as { height?: number })?.height ?? 500}
                     ref={eventCanvasRef}
                     className='sub-canvas'
                     onClick={handleCanvasClick}

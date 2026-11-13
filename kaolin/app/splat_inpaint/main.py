@@ -105,7 +105,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # ViewerBuilder: helps us build the interactive viewer (on the webpage)
     # ------------------------------------------------------------------------------------------------------------------
-    viewer_builder = ViewerBuilder(camera=camera, viewport_resize_mode='fixed')
+    viewer_builder = ViewerBuilder(camera=camera)
 
     # WebSocket Connections ----------
     # Add a named socket connection (this will be used to connect to all our handlers).

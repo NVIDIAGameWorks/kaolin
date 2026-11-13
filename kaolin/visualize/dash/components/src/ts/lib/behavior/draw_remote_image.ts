@@ -84,6 +84,19 @@ export class DrawRemoteImageBehavior extends CanvasBehavior implements MessageHa
   }
 
   /**
+   * Nothing to reconcile: this behavior keeps no cached frame and no state in
+   * pixel space. The frame on the canvas belongs to the viewer's layer resize,
+   * which rescales it when the aspect is unchanged — truthful, and a usable
+   * placeholder — and clears it when it is not, where a stretched frame would
+   * misrepresent the camera it was rendered for. Either way the next message
+   * overwrites it at the new resolution.
+   *
+   * Requesting a fresh frame here instead of waiting would need a server-side
+   * request tag this behavior does not have; it only receives.
+   */
+  override setDimensions(_width: number, _height: number): void {}
+
+  /**
    * Render an incoming image payload to the active canvas.
    *
    * @param messageTag - Tag of the incoming message.

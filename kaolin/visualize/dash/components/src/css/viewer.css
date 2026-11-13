@@ -14,6 +14,34 @@
     height: 100%;
 }
 
+/* Viewport sizing for the `fixed` and `fixed_aspect` resize modes, done entirely
+   in CSS (no resize observers). The viewer fills the space it is given while
+   keeping the camera's aspect ratio, anchored to the top-left of that space.
+   `--kaolin-viewer-aspect` is set by KaolinViewerInternal from the camera.
+
+   The aspect-ratio here is a fallback, not the sizing mechanism: it is ignored
+   whenever the parent resolves height:100% to a definite value, and supplies a
+   height from the width when the parent is height-less -- which `container-type:
+   size` would otherwise collapse to zero. */
+.kaolin-viewport-sizing-container.resize-mode-fixed,
+.kaolin-viewport-sizing-container.resize-mode-fixed_aspect {
+    aspect-ratio: var(--kaolin-viewer-aspect);
+    container-type: size;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+}
+
+/* Largest box of the right aspect that fits the container. `height: auto` is
+   required to undo the 100% above, which would otherwise win over aspect-ratio
+   and stretch the viewer back to the container's shape. */
+.kaolin-viewport-sizing-container.resize-mode-fixed > .kaolin-viewer-container,
+.kaolin-viewport-sizing-container.resize-mode-fixed_aspect > .kaolin-viewer-container {
+    width: min(100cqw, calc(100cqh * var(--kaolin-viewer-aspect)));
+    height: auto;
+    aspect-ratio: var(--kaolin-viewer-aspect);
+}
+
 .kaolin-viewer-container canvas {
     width: 100%;
 }
@@ -44,13 +72,14 @@
     color: white;
     font-size: x-small;
     z-index: 2;
-    top: 0;
+    bottom: 0;
     right: 0;
     opacity:25%;
     border-radius: 5px;
     padding: 1px 2px;
 }
 
+/* Bottom-left, since the version overlay now owns the bottom-right corner. */
 .kaolin-fps-overlay {
     position: absolute;
     background-color: black;
@@ -58,17 +87,19 @@
     font-size: x-small;
     z-index: 2;
     bottom: 0;
-    right: 0;
+    left: 0;
     opacity: 50%;
     border-radius: 5px;
     padding: 1px 4px;
     font-weight: bold;
 }
 
+/* Right side, not left: the sliding sidebar's show button sits at the top-left
+   of the surrounding layout and would sit on top of these. */
 .kaolin-mode-overlay {
     position: absolute;
     top: 6px;
-    left: 6px;
+    right: 6px;
     z-index: 2;
     display: flex;
     flex-direction: column;

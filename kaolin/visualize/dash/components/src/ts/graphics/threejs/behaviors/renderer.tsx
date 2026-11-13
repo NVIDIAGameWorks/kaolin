@@ -3,7 +3,6 @@ import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef,
 import { z } from 'zod';
 
 import { BehaviorRegister, ElementBoundBehavior } from '../../../core/behavior';
-import { adjustByDevicePixelRatio } from '../../../core/viewport';
 import { logger } from '../../../util/logging';
 import { defaultCamera } from '../camera';
 import { defaultMesh, disposeObject } from '../geometry';
@@ -48,6 +47,9 @@ export const ThreeRendererBehaviorComponent: React.FC<ThreeRendererProps> = forw
         const acitveMeshRef = useRef<THREE.Object3D | null>(null);
         const cameraRef = useRef<THREE.Camera>(defaultCamera());
         const canvasRef = useRef<HTMLCanvasElement>(null);
+        // Size last applied, so a repeated `setDimensions` (every commit in
+        // `fixed` mode, or any late registration) does not re-render for nothing.
+        const lastSizeRef = useRef<{ width: number, height: number, pixelRatio: number } | null>(null);
         const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
         const sceneRef = useRef<THREE.Scene | null>(new THREE.Scene());
         const groupRef = useRef<THREE.Group | null>(new THREE.Group());
@@ -65,7 +67,6 @@ export const ThreeRendererBehaviorComponent: React.FC<ThreeRendererProps> = forw
             }
 
             rendererRef.current = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias: true });
-            //rendererRef.current.setSize(500, 500);
             rendererRef.current.setClearColor(clearColor, clearAlpha);
         }, []);
 
@@ -74,10 +75,10 @@ export const ThreeRendererBehaviorComponent: React.FC<ThreeRendererProps> = forw
             rendererRef.current?.render(sceneRef.current, cameraRef.current);
         }, []);
 
-        const setCamera = useCallback((camera: THREE.Camera) => {
-            cameraRef.current = camera;
-            // Schedule a render so wheel-zoom and any non-drag camera updates
-            // are visible immediately (onAnimate only runs during drag).
+        // Render on the next frame. Needed by everything that changes what the
+        // canvas should show outside a drag, since `onAnimate` only runs while
+        // one is in progress.
+        const scheduleRender = useCallback(() => {
             requestAnimationFrame(() => {
                 if (rendererRef.current && sceneRef.current) {
                     rendererRef.current.render(sceneRef.current, cameraRef.current);
@@ -85,19 +86,41 @@ export const ThreeRendererBehaviorComponent: React.FC<ThreeRendererProps> = forw
             });
         }, []);
 
+        const setCamera = useCallback((camera: THREE.Camera) => {
+            cameraRef.current = camera;
+            scheduleRender();
+        }, [scheduleRender]);
+
         const setDimensions = useCallback((width: number, height: number) => {
-            const displaySize = adjustByDevicePixelRatio({ width, height });
-            if (rendererRef.current) {
-                // false = don't touch CSS size; drawing-buffer sizing is managed externally.
-                // Scale by DPR: input is CSS pixels, WebGL drawing buffer needs device pixels.
-                rendererRef.current.setSize(displaySize.width, displaySize.height, false);
+            const renderer = rendererRef.current;
+            const canvas = canvasRef.current;
+            // Do not cache an unapplied size; registration retries after binding.
+            if (!renderer || !canvas) return;
+            const pixelRatio = window.devicePixelRatio || 1;
+            const bufferWidth = Math.floor(width * pixelRatio);
+            const bufferHeight = Math.floor(height * pixelRatio);
+            const gl = renderer.getContext();
+            const last = lastSizeRef.current;
+            if (last && last.width === width && last.height === height && last.pixelRatio === pixelRatio
+                && gl.drawingBufferWidth === bufferWidth && gl.drawingBufferHeight === bufferHeight) return;
+
+            // The layer is already sized; synchronize Three.js' cached size,
+            // pixel ratio and viewport. Its public API rewrites the same buffer
+            // dimensions but leaves the viewer's CSS sizing alone.
+            renderer.setDrawingBufferSize(width, height, pixelRatio);
+            if (gl.drawingBufferWidth !== bufferWidth || gl.drawingBufferHeight !== bufferHeight) {
+                throw new Error(`Three.js could not resize its drawing buffer to ${bufferWidth}x${bufferHeight}`);
             }
+            lastSizeRef.current = { width, height, pixelRatio };
             const cam = cameraRef.current;
             if (cam instanceof THREE.PerspectiveCamera && height > 0) {
                 cam.aspect = width / height;
                 cam.updateProjectionMatrix();
             }
-        }, []);
+            // Resizing the renderer cleared the drawing buffer, so without this
+            // the layer stays blank until the next drag or camera change.
+            scheduleRender();
+        }, [scheduleRender]);
 
         const cleanUpMesh = useCallback(() => {
             if (acitveMeshRef.current) {

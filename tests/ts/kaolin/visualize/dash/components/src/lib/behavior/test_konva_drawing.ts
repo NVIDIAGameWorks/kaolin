@@ -86,3 +86,41 @@ describe('visualize/dash/components/src/lib/behavior/test_konva_drawing.ts', () 
     });
 
 });
+
+
+describe('KonvaDrawingBehavior resize during a gesture', () => {
+    let harness: KonvaHarness;
+    beforeEach(() => { harness = setupKonvaHarness(100); });
+    afterEach(async () => { await harness.teardown(); });
+
+    it('keeps a draft at the same size and drops only the draft on resize', () => {
+        const behavior = new KonvaDrawingBehavior({ mode: 'box' });
+        const container = harness.container('drawing');
+        harness.attach(behavior, container);
+        behavior.setActive(true);
+        const event = (x: number, y: number) => ({ nativeEvent: { clientX: x, clientY: y, pointerId: 1 } } as any);
+        behavior.onPointerDown(event(10, 10));
+        behavior.onPointerMove(event(30, 30));
+        behavior.onPointerUp(event(30, 30));
+        const stage = (behavior as any).stage;
+        const layer = stage.getLayers()[0];
+        assert.lengthOf(layer.getChildren(), 1);
+        const committed = layer.getChildren()[0];
+        const originalRect = committed.getClientRect();
+
+        behavior.onPointerDown(event(50, 50));
+        behavior.onPointerMove(event(80, 80));
+        assert.lengthOf(layer.getChildren(), 2);
+        const draft = layer.getChildren()[1];
+        behavior.setDimensions(512, 512);
+        assert.deepEqual(stage.size(), { width: 100, height: 100 }, 'stage follows display, not rendering size');
+        assert.strictEqual(layer.getChildren()[1], draft, 'unchanged display size preserves the gesture');
+        harness.resize(container, 160, 120);
+        assert.deepEqual(stage.size(), { width: 160, height: 120 });
+        assert.deepEqual(layer.getChildren(), [committed]);
+        assert.deepEqual(committed.getClientRect(), originalRect, 'committed geometry remains intact');
+        behavior.onPointerUp(event(80, 80));
+        assert.lengthOf(layer.getChildren(), 1, 'a cancelled draft cannot commit later');
+        behavior.setActiveElement(null as any);
+    });
+});

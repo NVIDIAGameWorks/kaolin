@@ -159,8 +159,8 @@ def get_app_extras():
         req_file = os.path.join(app_dir, app_name, 'requirements.txt')
         if os.path.isfile(req_file):
             with open(req_file) as f:
-                reqs = [l.strip() for l in f if l.strip() and not l.startswith('#')
-                    and not l.strip().startswith(('git+', 'hg+', 'svn+', 'bzr+'))]
+                reqs = [line.strip() for line in f
+                        if line.strip() and not line.lstrip().startswith('#')]
             extras[f'app.{app_name}'] = reqs
     return extras
 

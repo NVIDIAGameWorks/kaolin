@@ -26,6 +26,7 @@ import { z } from 'zod';
 import { BehaviorRegister, CanvasBehavior, HandlerReturnInfo } from '../../core/behavior';
 import { zColor } from '../../core/behavior/option';
 import * as kaolin_events from '../../core/event';
+import { isFixedAspect } from '../../core/viewport';
 import { getCanvasCoordinates } from '../../util/canvas';
 
 
@@ -126,6 +127,9 @@ export class DrawingBehavior extends CanvasBehavior {
     override options: DrawingOptions;
     isPainting: Boolean;
     lastPoint: { x: number; y: number } | null;
+    /** Last size seen by `setDimensions`; the buffer itself is already resized
+     *  by the time it runs, so the previous one has to be remembered here. */
+    private lastSize: { width: number, height: number } | null = null;
 
     constructor(options: Partial<DrawingOptions> = {}) {
       super();
@@ -147,6 +151,37 @@ export class DrawingBehavior extends CanvasBehavior {
   // unrelated draws on the same layer, such as `draw_remote_image`.
   override updateForOptions() {}
 
+  /**
+   * Remaps the in-progress stroke onto the resized buffer.
+   *
+   * The painted bitmap is this behavior's other state, and the viewer has
+   * already dealt with it: it carries the strokes across, scaled, when the
+   * aspect is unchanged and clears the buffer when it is not. What is left is
+   * `lastPoint`, which is in buffer pixels (see `getCanvasCoordinates`) and so
+   * no longer points at the same place. A uniform scale can be followed, which
+   * keeps the current segment from kinking; an aspect change cannot, and the
+   * strokes the segment would join up with are gone anyway, so the stroke is
+   * dropped.
+   *
+   * `options.thickness` is deliberately left alone: it is a user-facing brush
+   * width in CSS pixels (scaled to buffer pixels at draw time, see `withBrush`),
+   * so it keeps its meaning on the new buffer rather than tracking the visual
+   * weight of what was drawn before.
+   */
+  override setDimensions(width: number, height: number): void {
+    const previous = this.lastSize;
+    if (previous && previous.width === width && previous.height === height) return;
+    this.lastSize = { width, height };
+    if (!previous || !this.lastPoint) return;
+
+    if (isFixedAspect(previous, { width, height })) {
+      const scale = width / previous.width;
+      this.lastPoint = { x: this.lastPoint.x * scale, y: this.lastPoint.y * scale };
+    } else {
+      this.reset();
+    }
+  }
+
   /** Apply this brush's style to `ctx` for the duration of `draw`, restoring
    *  the context to its prior state afterwards so the shared canvas context is
    *  never left in a non-default state. */
@@ -155,7 +190,14 @@ export class DrawingBehavior extends CanvasBehavior {
     if (!ctx) return;
 
     ctx.save();
-    ctx.lineWidth = this.options.thickness;
+    // `thickness` is in CSS pixels, the buffer is in device pixels (the viewer
+    // sizes it, see core.layer.resizeLayer), so the brush is scaled by the ratio
+    // between them — otherwise it thins out on a HiDPI display. Read off the
+    // element rather than from devicePixelRatio, so it is right even if the two
+    // are briefly out of step.
+    const canvas = ctx.canvas;
+    const bufferPerCssPixel = canvas.clientWidth > 0 ? canvas.width / canvas.clientWidth : 1;
+    ctx.lineWidth = this.options.thickness * bufferPerCssPixel;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     if (this.options.mode === 'draw') {

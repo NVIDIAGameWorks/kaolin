@@ -34,6 +34,7 @@ import {
     drawTypedArrayToCanvas,
     clearCanvas,
     setCanvasBufferSize,
+    resizeCanvasKeepContent,
 } from '@kaolin/util/canvas';
 import { registerDom, unregisterDom, addElement, addCanvasElement, makeCanvasElement } from '@test/helpers/dom';
 import { captureConsole } from '@test/helpers/console';
@@ -434,6 +435,53 @@ describe('visualize/dash/components/src/util/test_canvas.ts', () => {
             setCanvasBufferSize(el, 320, 240);
             assert.equal(el.width, 320);
             assert.equal(el.height, 240);
+        });
+    });
+
+    // NOTE: pixel preservation across a resize cannot be asserted here. Writing
+    // canvas.width on a happy-dom element updates the attribute but does not
+    // resize (or clear) the node-canvas surface behind it, so after a "resize"
+    // the surface still holds the old pixels at the old size and painting over
+    // the new extent touches only the original region. That is the opposite of
+    // the browser, where the write clears the buffer — which is the whole
+    // reason resizeCanvasKeepContent exists. Coverage below is therefore limited
+    // to the observable contract: return values, resulting element size, and
+    // input guards.
+    describe('resizeCanvasKeepContent', () => {
+        itReturnsForNonCanvas(resizeCanvasKeepContent, false);
+
+        it('resizes to the requested size, growing and shrinking', () => {
+            const canvas = addCanvasElement('dst', 8, 4);
+
+            assert.isTrue(resizeCanvasKeepContent('dst', 32, 16), 'upscale succeeds');
+            assert.deepEqual([canvas.width, canvas.height], [32, 16], 'buffer grew to the requested size');
+
+            assert.isTrue(resizeCanvasKeepContent('dst', 5, 11), 'downscale to a new aspect succeeds');
+            assert.deepEqual([canvas.width, canvas.height], [5, 11], 'buffer shrank to the requested size');
+
+            assert.isTrue(resizeCanvasKeepContent('dst', 5, 11), 'a same-size resize reports success');
+            assert.deepEqual([canvas.width, canvas.height], [5, 11], 'a same-size resize leaves the size alone');
+        });
+
+        it('rounds fractional sizes and rejects non-positive ones', () => {
+            const canvas = addCanvasElement('dst', 8, 4);
+            assert.isTrue(resizeCanvasKeepContent('dst', 10.4, 6.6), 'fractional sizes are accepted');
+            assert.deepEqual([canvas.width, canvas.height], [10, 7], 'fractional sizes are rounded');
+
+            const capture = captureConsole();
+            try {
+                assert.isFalse(resizeCanvasKeepContent('dst', 0, 10), 'a zero dimension is rejected');
+                assert.isFalse(resizeCanvasKeepContent('dst', 10, NaN), 'NaN is rejected');
+            } finally {
+                capture.restore();
+            }
+            assert.deepEqual([canvas.width, canvas.height], [10, 7], 'a rejected resize leaves the canvas untouched');
+        });
+
+        it('grows an empty buffer, which has no content to preserve', () => {
+            const canvas = addCanvasElement('dst', 0, 0);
+            assert.isTrue(resizeCanvasKeepContent('dst', 16, 8), 'a zero-sized source is not an error');
+            assert.deepEqual([canvas.width, canvas.height], [16, 8], 'buffer resized');
         });
     });
 

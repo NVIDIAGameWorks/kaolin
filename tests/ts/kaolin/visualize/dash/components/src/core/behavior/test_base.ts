@@ -25,6 +25,7 @@ import {
     InteractiveBehavior,
     CanvasBehavior,
     isElementBoundBehavior,
+    isSizeableBehavior,
     isClickEventHandler,
     isPointerEventHandler,
 } from '@kaolin/core/behavior/base';
@@ -105,12 +106,19 @@ describe('visualize/dash/components/src/core/behavior/test_base.ts', () => {
     });
 
     describe('type guards', () => {
-        it('detect element-bound, click, and pointer capabilities', () => {
+        it('detect sizeable, element-bound, click, and pointer capabilities', () => {
             const interactive = new InteractiveBehavior();
             assert.isTrue(isElementBoundBehavior(interactive), 'InteractiveBehavior is element-bound');
+            assert.isTrue(isSizeableBehavior(interactive), 'an element-bound behavior is also sizeable');
             assert.isTrue(isClickEventHandler(interactive), 'InteractiveBehavior handles click events');
             assert.isTrue(isPointerEventHandler(interactive), 'InteractiveBehavior handles pointer events');
             assert.isFalse(isElementBoundBehavior(new Behavior()), 'plain Behavior is not element-bound');
+            assert.isFalse(isSizeableBehavior(new Behavior()), 'plain Behavior is not sizeable');
+            // The sizeable guard is the narrower one: it must accept a value that
+            // takes dimensions without being bound to an element.
+            const sizeableOnly = { setDimensions: () => {} };
+            assert.isTrue(isSizeableBehavior(sizeableOnly), 'setDimensions alone satisfies the sizeable guard');
+            assert.isFalse(isElementBoundBehavior(sizeableOnly), 'but not the element-bound guard');
             assert.isFalse(isClickEventHandler({}), 'a bare object is not a click handler');
             assert.isFalse(isPointerEventHandler({ onClick: () => {} }), 'a click-only object is not a pointer handler');
         });

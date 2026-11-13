@@ -23,7 +23,7 @@ import pytest
 
 from kaolin.utils.testing import contained_torch_equal
 from kaolin.visualize.dash.option import (
-    OptionKind, OptionSpec, UIBound, specs_from_dataclass, specs_from_function)
+    BehaviorMeta, OptionKind, OptionSpec, UIBound, specs_from_dataclass, specs_from_function)
 
 
 def _check_dict(spec, expected, label):
@@ -264,6 +264,46 @@ class TestOptionSpec:
         grp.add_child(OptionSpec(name='c', kind=OptionKind.INT, default=1))
         assert [c.name for c in grp.merged().children] == ['c'], 'merged copies group children'
 
+    def test_numeric_annotation_metadata(self):
+        annotated_types = pytest.importorskip('annotated_types')
+        for metadata in (
+            (annotated_types.Ge(0), annotated_types.Le(10)),
+            (annotated_types.Gt(0), annotated_types.Lt(10)),
+            (annotated_types.Interval(ge=0, le=10),),
+            (annotated_types.Interval(gt=0, lt=10),),
+        ):
+            spec = OptionSpec.from_annotated_field(
+                'size', Annotated[int, *metadata, annotated_types.MultipleOf(2)], default=4)
+            assert spec.as_dict() == {
+                'name': 'size', 'kind': 'int', 'default': 4, 'min': 0, 'max': 10, 'step': 2}
+
+    def test_metadata_precedence(self):
+        annotated_types = pytest.importorskip('annotated_types')
+        spec = OptionSpec.from_annotated_field('size', Annotated[
+            int, annotated_types.Interval(ge=0, le=10), annotated_types.MultipleOf(2),
+            {'min': 1, 'max': 9, 'step': 1, 'uiBound': False}, UIBound(True)])
+        assert (spec.min, spec.max, spec.step, spec.ui_bound) == (1, 9, 1, True)
+
+    @pytest.mark.parametrize('metadata', [
+        Literal['a', 'b'], {'values': ['a', 'b']}, ['a', 'b'], ('a', 'b')])
+    def test_enum_annotation_metadata(self, metadata):
+        spec = OptionSpec.from_annotated_field('mode', Annotated[str, metadata], default='a')
+        assert spec.kind == OptionKind.ENUM
+        assert spec.values == ['a', 'b'] and spec.default == 'a'
+
+    @pytest.mark.parametrize('metadata', [
+        {'min': 'low'}, {'min': 2, 'max': 1}, {'step': True}, {'values': []}])
+    def test_invalid_annotation_metadata(self, metadata):
+        with pytest.raises(ValueError):
+            OptionSpec.from_annotated_field('size', Annotated[int, metadata])
+
+    def test_unsupported_annotation_preserves_ui_bound(self, caplog):
+        spec = OptionSpec.from_annotated_field(
+            'items', Annotated[list[int], UIBound(False)], default=[1, 2])
+        assert spec.as_dict() == {
+            'name': 'items', 'kind': 'any', 'default': [1, 2], 'uiBound': False}
+        assert 'unsupported annotation' in caplog.text
+
     def test_from_dict_aliases(self):
         assert OptionSpec.from_dict({'name': 'a', 'kind': 'int', 'uiBound': False}).ui_bound is False, \
             "'uiBound' key populates ui_bound"
@@ -425,3 +465,40 @@ class TestFunctionSpecs:
             'names selects a subset and honors its order'
         with pytest.raises(ValueError, match='unknown name'):
             specs_from_function(fn, names=['a', 'nope'])
+
+
+class TestBehaviorMeta:
+    def test_round_trip(self):
+        options = {'size': OptionSpec('size', OptionKind.INT, default=3)}
+        meta = BehaviorMeta('Brush size', options, source_path='brush.ts')
+        options.clear()
+        expected = {
+            'description': 'Brush size', 'sourcePath': 'brush.ts',
+            'options': {'size': {'name': 'size', 'kind': 'int', 'default': 3}}}
+        assert meta.as_dict() == expected
+        assert BehaviorMeta.from_dict(expected).as_dict() == expected
+
+    @pytest.mark.parametrize('source_key', ['sourcePath', 'source_path'])
+    def test_manifest_aliases(self, source_key):
+        meta = BehaviorMeta.from_dict({
+            source_key: 'brush.js', 'options': {'size': {'kind': 'int', 'default': 2}}})
+        assert meta.source_path == 'brush.js'
+        assert meta.options['size'].name == 'size'
+        assert meta.options['size'].default == 2
+
+    def test_empty_metadata(self):
+        expected = {'description': None, 'options': {}}
+        assert BehaviorMeta().as_dict() == expected
+        assert BehaviorMeta.from_dict({'options': None}).as_dict() == expected
+
+    def test_unknown_keys(self):
+        with pytest.raises(ValueError, match='unknown keys'):
+            BehaviorMeta.from_dict({'unexpected': True})
+
+    def test_summary(self):
+        meta = BehaviorMeta('Brush size', {'size': OptionSpec('size', OptionKind.INT)},
+                            source_path='brush.ts')
+        assert 'brush' in meta.as_string('brush')
+        summary = meta.as_string('brush', detailed=True)
+        assert all(value in summary for value in ('Brush size', 'brush.ts', 'size'))
+        assert 'options: (none)' in BehaviorMeta().as_string('empty', detailed=True)

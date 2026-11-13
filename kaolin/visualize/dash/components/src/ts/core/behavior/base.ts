@@ -125,12 +125,64 @@ export class Behavior implements BehaviorInterface {
 }
 
 /**
- * Behaviors that bind to a viewer *layer* (configurable from python) and will
- * automatically receive a reference to the live element once it is mounted.
+ * Behaviors that need to be told the viewport size. The viewer sizes all
+ * layer elements and then notifies these behaviors so they can bring their
+ * internal state in line — {@link ElementBoundBehavior} for behaviors bound to
+ * a layer, and {@link CameraControllerInterface} for the controllers that own a
+ * camera whose projection depends on it.
  *
  * @group Key Behavior Interfaces
  */
-export interface ElementBoundBehavior {
+export interface SizeableBehavior {
+    /**
+     * Called by the viewer when the viewport size changes, in CSS pixels.
+     * `window.devicePixelRatio` is deliberately not folded in: the libraries
+     * behaviors wrap (Konva, PlayCanvas) apply their own pixel ratio to a CSS
+     * size, so handing them device pixels applies it twice. A behavior that
+     * needs device pixels scales them itself.
+     *
+     * Canvas drawing buffers use device pixels, so a behavior comparing its
+     * CSS-size argument against `canvas.width` is comparing different units.
+     *
+     * The viewer has already sized every bound layer. Behaviors reconcile
+     * their coordinates, native renderer state, or elements they created inside
+     * a layer (such as a library stage). A renderer's resize API may also write
+     * the same buffer dimensions while updating its internal state.
+     * No-op if size-independent.
+     *
+     * Called on every resize commit and on every layer or behavior
+     * registration, so the same size arrives repeatedly; an implementation that
+     * does real work (repainting, resetting native controls) tracks the last
+     * size it acted on and returns early. It is not filtered on the viewer's
+     * side, because only the behavior knows whether it was in a position to act
+     * last time — an element may not have been bound yet, or a library may
+     * still have been initializing.
+     */
+    setDimensions(width: number, height: number): void;
+};
+
+/**
+ * Runtime type-guard that reports whether a value implements
+ * {@link SizeableBehavior}. Fails at compile time if the interface changes.
+ *
+ * @param object - Candidate value to test.
+ * @returns `true` if `object` implements every {@link SizeableBehavior} member.
+ *
+ * @group Key Behavior Interfaces
+ */
+export const isSizeableBehavior =
+    makeImplementsInterfaceFunction<SizeableBehavior>({
+        setDimensions: true
+    });
+
+/**
+ * Behaviors that bind to a viewer *layer* (configurable from python) and will
+ * automatically receive a reference to the live element once it is mounted.
+ * Being bound to an element, they are also {@link SizeableBehavior}.
+ *
+ * @group Key Behavior Interfaces
+ */
+export interface ElementBoundBehavior extends SizeableBehavior {
     elementType: () => string;
     setActiveElement: (element: HTMLElement) => void;
 };
@@ -147,7 +199,8 @@ export interface ElementBoundBehavior {
 export const isElementBoundBehavior =
     makeImplementsInterfaceFunction<ElementBoundBehavior>({
         elementType: true,
-        setActiveElement: true
+        setActiveElement: true,
+        setDimensions: true
     });
 
 /**
@@ -243,6 +296,14 @@ export class InteractiveBehavior extends Behavior implements PointerEventHandler
     setActiveElement(element: HTMLElement) {
         this.element = element;
     }
+
+    /**
+     * No-op default, so size-independent subclasses satisfy
+     * {@link ElementBoundBehavior} without boilerplate. Override in subclasses
+     * holding internal state that has to be reconciled with the new size; the
+     * element itself is sized by the viewer.
+     */
+    setDimensions(width: number, height: number): void {}
 
     onClick(event: React.MouseEvent): void | HandlerReturnInfo {}
     onDoubleClick(event: React.MouseEvent): void | HandlerReturnInfo {}

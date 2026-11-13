@@ -130,6 +130,72 @@ describe('visualize/dash/components/src/lib/behavior/test_svg_annotations.ts', (
             assert.equal(svg.childNodes.length, 0, 'reset detaches the markers from the svg');
         });
 
+        it('preserves marker centers and asset scale across wide and tall viewports', () => {
+            const svg = makeBoundSvg('svg-resize');
+            let width = 200;
+            let height = 100;
+            svg.getBoundingClientRect = () => ({ left: 0, top: 0, width, height } as DOMRect);
+            const behavior = new SvgAnnotationBehavior({
+                assets: { circle: { elements: [{ name: 'circle' }], scale: 2 } },
+            });
+            behavior.setActiveElement(svg);
+            behavior.onClick({ clientX: 50, clientY: 50 } as any);
+            const marker = behavior.svgMarkers[0];
+            // Center is still (25%, 50%); the root scales X by 2 and Y by 1,
+            // so the local Y compensation makes both glyph axes scale equally.
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2) scale(1, 2)');
+
+            width = 100;
+            height = 200;
+            behavior.setDimensions(width, height);
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2) scale(1, 0.5)');
+            behavior.setDimensions(width, height);
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2) scale(1, 0.5)',
+                'repeated sizes do not accumulate correction');
+
+            behavior.setDimensions(0, 0);
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2) scale(1, 0.5)',
+                'a temporarily hidden viewport leaves the marker intact');
+            behavior.setDimensions(100, 100);
+            assert.equal(marker.getAttribute('transform'), 'translate(25, 50) scale(2)',
+                'returning to square restores the original asset transform');
+        });
+
+        it('preserves compound transforms and applies compensation to new markers', () => {
+            const svg = makeBoundSvg('compound');
+            const behavior = new SvgAnnotationBehavior();
+            behavior.setActiveElement(svg);
+            behavior.assets[behavior.options.activeAsset].setAttribute('transform', 'rotate(30) scale(2)');
+            behavior.onClick({ clientX: 25, clientY: 50 } as any);
+            const marker = behavior.svgMarkers[0];
+            const original = 'translate(25, 50) rotate(30) scale(2)';
+            assert.equal(marker.getAttribute('transform'), original);
+            behavior.setDimensions(200, 100);
+            assert.equal(marker.getAttribute('transform'), original + ' scale(1, 2)');
+            svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 100 } as DOMRect);
+            behavior.onClick({ clientX: 100, clientY: 50 } as any);
+            assert.equal(behavior.svgMarkers[1].getAttribute('transform'),
+                'translate(50, 50) rotate(30) scale(2) scale(1, 2)');
+            behavior.setDimensions(100, 100);
+            assert.equal(marker.getAttribute('transform'), original);
+        });
+
+        it('uses current marker bounds for hit testing after resize', () => {
+            const behavior = new SvgAnnotationBehavior({ onClickAction: 'add_or_remove' });
+            behavior.setActiveElement(makeBoundSvg('resized-hit'));
+            behavior.onClick({ clientX: 50, clientY: 50 } as any);
+            const marker = behavior.svgMarkers[0];
+            stubMarkerRect(marker, { left: 40, top: 40, width: 20, height: 20 });
+            behavior.setDimensions(200, 100);
+            // happy-dom has no SVG layout; supply the browser's post-resize bounds.
+            stubMarkerRect(marker, { left: 90, top: 40, width: 20, height: 20 });
+            assert.isNull(behavior.markerFromEvent({ clientX: 50, clientY: 50 } as any));
+            assert.strictEqual(behavior.markerFromEvent({ clientX: 100, clientY: 50 } as any), marker);
+            behavior.onClick({ clientX: 100, clientY: 50 } as any);
+            assert.lengthOf(behavior.svgMarkers, 0);
+            assert.isNull(marker.parentNode);
+        });
+
         it('logs an error and adds nothing when the active asset is missing', () => {
             setLogLevel(LogLevel.DEBUG);  // so logger.error is not suppressed
             const behavior = new SvgAnnotationBehavior({ activeAsset: 'nonexistent' });

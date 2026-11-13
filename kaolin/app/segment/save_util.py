@@ -16,6 +16,7 @@ import logging
 import os
 
 import torch
+from pxr import Tf, Usd
 
 from kaolin.io.usd.utils import create_stage
 from kaolin.io.usd.gaussians import add_gaussiancloud, import_gaussianclouds
@@ -60,6 +61,7 @@ def export_scene_as_usd(
 ) -> None:
     """Export the full gaussian cloud and all segment labels to a USD file.
 
+    Segment labels are preserved when reloading the exported file.
     The file is overwritten if it already exists. Raises on any I/O or USD error.
 
     Args:
@@ -84,9 +86,19 @@ def export_scene_as_usd(
             opacities=cloud._orig_opacities,
             sh_coeff=gm.sh_coeff,
         )
+        used_names = set()
         for seg_name, segment in segmentation.segments.items():
+            base_name = Tf.MakeValidIdentifier(seg_name)
+            subset_name = base_name
+            suffix = 1
+            while subset_name in used_names:
+                subset_name = f'{base_name}_{suffix}'
+                suffix += 1
+            used_names.add(subset_name)
             indices = segment.mask.nonzero(as_tuple=False).squeeze(1).long()
-            add_subset(stage, _GAUSSIAN_SCENE_PATH, seg_name, indices, family_name='part')
+            prim = add_subset(stage, _GAUSSIAN_SCENE_PATH, subset_name, indices, family_name='part')
+            # USD identifiers may differ from labels; retain the label for reload.
+            prim.SetCustomDataByKey('kaolin:segmentName', seg_name)
         stage.Save()
     finally:
         del stage
@@ -100,7 +112,8 @@ def load_scene_from_usd(fname: str, device: str):
     instead. Uncovered gaussians within a prim (if subsets don't cover it fully)
     form an additional segment named after the prim leaf.
 
-    Segment names have their longest common USD path prefix stripped.
+    Labels from exported segmentations are restored; otherwise segment names
+    have their longest common USD path prefix stripped.
 
     Args:
         fname: path to the USD file (*.usd or *.usda).
@@ -112,7 +125,8 @@ def load_scene_from_usd(fname: str, device: str):
     Raises:
         ValueError: if no ParticleField3DGaussianSplat prims are found.
     """
-    clouds = import_gaussianclouds(fname, return_list=False)
+    stage = Usd.Stage.Open(fname)
+    clouds = import_gaussianclouds(stage, return_list=False)
     if not clouds:
         raise ValueError(f"No ParticleField3DGaussianSplat prims found in {fname}")
     scene_paths = list(clouds.keys())
@@ -130,7 +144,7 @@ def load_scene_from_usd(fname: str, device: str):
     # Pass 1: collect (raw_name, bool_mask) without knowing the common prefix yet
     segments_data = []  # list of [raw_name, bool_mask]
     for prim_path, offset, prim_size in zip(scene_paths, offsets, prim_sizes):
-        subsets = import_subsets(fname, prim_path, family_name='part')
+        subsets = import_subsets(stage, prim_path, family_name='part')
 
         if subsets:
             prim_covered = torch.zeros(n_total, dtype=torch.bool)
@@ -167,7 +181,9 @@ def load_scene_from_usd(fname: str, device: str):
     # Skip any segment named 'background': DisjointSegmentation manages it automatically
     # as the complement of all named segments.
     segmentation = DisjointSegmentation(n_total, device)
-    for name, (_, mask) in zip(stripped, segments_data):
+    for name, (usd_path, mask) in zip(stripped, segments_data):
+        label = stage.GetPrimAtPath(usd_path).GetCustomDataByKey('kaolin:segmentName')
+        name = label if label is not None else name
         if name == DisjointSegmentation.BACKGROUND_NAME:
             continue
         segmentation.add_segment(name, mask.to(device))

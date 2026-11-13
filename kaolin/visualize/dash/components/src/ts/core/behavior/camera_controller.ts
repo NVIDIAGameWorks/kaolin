@@ -25,7 +25,8 @@ import { z } from 'zod';
 
 import { CameraParameters } from '../../graphics/camera';
 import { makeImplementsInterfaceFunction } from '../../util/types';
-import { InteractiveBehavior } from './base';
+import { adjustByDevicePixelRatio } from '../viewport';
+import { InteractiveBehavior, SizeableBehavior } from './base';
 
 /**
  * Contract for behaviors that own and drive a camera in their own native
@@ -35,11 +36,12 @@ import { InteractiveBehavior } from './base';
  * with its own converter. React-component controllers expose the same members
  * through an imperative handle.
  *
+ * A controller is a {@link SizeableBehavior}: the inherited `setDimensions`
+ * supplies the viewport size that its parameter converter projects against.
+ *
  * @group Key Behavior Interfaces
  */
-export interface CameraControllerInterface {
-    /** Viewport size used by the controller's CameraParameters converter. */
-    setDimensions(width: number, height: number): void;
+export interface CameraControllerInterface extends SizeableBehavior {
     /** Update the owned camera from universal parameters. */
     setCameraParams(params: CameraParameters): void;
     /** Native camera object (THREE.Camera, pc.Entity, ...). */
@@ -74,6 +76,7 @@ export const isCameraController =
 export abstract class CameraControllerBase extends InteractiveBehavior implements CameraControllerInterface {
     static override schema = z.object({});
 
+    /** Viewport size used by the parameter converter, in device pixels. */
     width = 0;
     height = 0;
 
@@ -82,13 +85,42 @@ export abstract class CameraControllerBase extends InteractiveBehavior implement
     /**
      * Records the viewport size used by the controller's parameter converter.
      *
-     * @param width - Viewport width in pixels.
-     * @param height - Viewport height in pixels.
+     * The recorded size is in device pixels, not the CSS pixels handed in:
+     * {@link CameraParameters} are image intrinsics, describing the pixels a
+     * renderer produces, and that is the layer's drawing buffer (sized by
+     * {@link core.layer.resizeLayer | resizeLayer}) rather than its CSS box. A
+     * server asked to render at the CSS size would come back half-resolution on
+     * a HiDPI display.
+     *
+     * Called on every resize commit and on every layer or behavior
+     * registration, so the same size arrives repeatedly. Discarding the repeats
+     * is this method's job, which is why a subclass with work to do on a real
+     * change implements {@link onViewportSizeChanged} instead of overriding
+     * here — there is then no way to forget the check.
+     *
+     * @param width - Viewport width in CSS pixels.
+     * @param height - Viewport height in CSS pixels.
      */
-    setDimensions(width: number, height: number) {
-        this.width = width;
-        this.height = height;
+    setDimensions(width: number, height: number): void {
+        const size = adjustByDevicePixelRatio({ width, height });
+        if (this.width === size.width && this.height === size.height) {
+            return;
+        }
+        this.width = size.width;
+        this.height = size.height;
+        this.onViewportSizeChanged(width, height);
     }
+
+    /**
+     * Reconcile the native camera with a viewport size that really changed:
+     * reproject, reset native controls. No-op by default, for a controller whose
+     * converter just reads the recorded size.
+     *
+     * @param width - Viewport width in CSS pixels, as the aspect ratio is the
+     *     same either way; `this.width` / `this.height` hold it in device pixels.
+     * @param height - Viewport height in CSS pixels.
+     */
+    protected onViewportSizeChanged(_width: number, _height: number): void {}
 
     /**
      * Updates the owned native camera from universal parameters.

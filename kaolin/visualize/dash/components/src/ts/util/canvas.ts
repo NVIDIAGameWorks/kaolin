@@ -304,6 +304,79 @@ export function setCanvasBufferSize(el: HTMLElement | null, width: number, heigh
     }
 }
 
+/**
+ * Resize a canvas' drawing buffer, stretching the existing content into the new
+ * buffer instead of losing it.
+ *
+ * Any write to `canvas.width` or `canvas.height` clears the drawing buffer and
+ * resets the 2D context, even when the assigned value is unchanged, so content
+ * survives a resize only if it is stashed and redrawn. The stash here is a
+ * canvas-to-canvas `drawImage`, which is both the fastest and the most faithful
+ * route: pixels stay in the canvas' own premultiplied-alpha space and never
+ * enter JS memory, so alpha is carried across exactly. Going through
+ * `getImageData`/`putImageData` instead would force a synchronous pixel readback
+ * and round-trip the bytes through unpremultiplied alpha, which is slower and
+ * loses precision in partially transparent pixels; it also cannot rescale.
+ *
+ * Content is stretched to the new size, which matches what CSS does to the
+ * element while a resize is in flight. A change of aspect ratio therefore
+ * distorts the content rather than letterboxing or cropping it — callers that
+ * cannot accept distortion should test the aspect first (see
+ * {@link core.viewport.isFixedAspect | isFixedAspect}) and rebuild instead.
+ * Rescaling uses the browser's image smoothing, so the edges of a hard-edged
+ * mask pick up intermediate alpha values.
+ *
+ * @param canvasOrId - Canvas element or its DOM id.
+ * @param newWidth - Target buffer width in device pixels; rounded, must be >= 1.
+ * @param newHeight - Target buffer height in device pixels; rounded, must be >= 1.
+ * @returns true if the canvas now has the requested size, false on failure, in
+ *     which case the canvas is left untouched.
+ */
+export function resizeCanvasKeepContent(canvasOrId: CanvasOrId, newWidth: number, newHeight: number): boolean {
+    const canvas = resolveCanvas(canvasOrId);
+    if (!canvas) return false;
+    const ctx = resolveContext(canvas);
+    if (!ctx) return false;
+
+    const width = Math.round(newWidth);
+    const height = Math.round(newHeight);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
+        console.error(`resizeCanvasKeepContent: invalid target size ${newWidth}x${newHeight}`);
+        return false;
+    }
+
+    const oldWidth = canvas.width;
+    const oldHeight = canvas.height;
+    // Assigning the same size would still clear the canvas, for no benefit.
+    if (oldWidth === width && oldHeight === height) return true;
+
+    // Nothing to carry over, and drawImage rejects a zero-dimension source.
+    if (oldWidth < 1 || oldHeight < 1) {
+        canvas.width = width;
+        canvas.height = height;
+        return true;
+    }
+
+    const scratch = document.createElement('canvas') as HTMLCanvasElement;
+    scratch.width = oldWidth;
+    scratch.height = oldHeight;
+    const scratchCtx = scratch.getContext('2d');
+    if (!scratchCtx) {
+        // Bail out before mutating, so a failure never costs the caller content.
+        console.error('resizeCanvasKeepContent: could not get 2d context from scratch canvas');
+        return false;
+    }
+    scratchCtx.drawImage(canvas, 0, 0);
+
+    canvas.width = width;
+    canvas.height = height;
+    // The resize reset the context, so smoothing is back on at its default; only
+    // the quality hint is worth restating.
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(scratch, 0, 0, oldWidth, oldHeight, 0, 0, width, height);
+    return true;
+}
+
 
 // ---------------------------------------------------------------------------
 // Helpers
