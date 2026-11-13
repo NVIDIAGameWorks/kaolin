@@ -80,7 +80,9 @@ if __name__ == '__main__':
                              '(log download endpoint, error details forwarded to client).')
     parser.add_argument('--resize_mode', type=str, default='fixed',
                         choices=['fixed', 'adaptive', 'fixed_aspect'],
-                        help='The viewer resize mode within the window.')
+                        help='The resize mode of the rendering, relative to the available window space;'
+                             'in all cases the display area will adjust to fit the available space,'
+                             'but rendering will resize adaptively, retain fixed dimensions or keep its aspect.')
     parser.add_arguments(ServerSideUserSettings, dest="settings")
     add_log_level_flag(parser)
     args = parser.parse_args()

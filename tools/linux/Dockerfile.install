@@ -100,4 +100,6 @@ RUN if [ "$FORCE_CUDA" -eq "1" ]; then \
     export MAX_JOBS=1 && \
     pip install --no-build-isolation --break-system-packages .; fi
 
+# Build backend needed by app dependencies when build isolation is disabled.
+RUN pip install hatchling
 RUN export MAX_JOBS=1 && pip install -e ".[app.splat_inpaint,app.segment]" --no-build-isolation
