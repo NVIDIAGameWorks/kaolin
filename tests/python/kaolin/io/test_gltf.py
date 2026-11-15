@@ -1,4 +1,4 @@
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023,26 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import os
+import base64
+import json
 import pytest
 from PIL import Image
 import numpy as np
@@ -178,3 +180,56 @@ class TestTransmittanceExtensionGLTF:
 
         assert torch.equal(mesh.materials[6].transmittance_value, torch.tensor([0.0]))
         assert mesh.materials[6].transmittance_texture is None
+
+
+class TestUnassignedMaterials:
+    """Primitives without a ``material`` are valid glTF and must stay unassigned (-1)."""
+
+    @staticmethod
+    def _write_gltf(path, primitives, materials=None):
+        # Four vertices and one uint16 index accessor per primitive, stored in a data URI buffer.
+        positions = np.array([[0., 0., 0.], [1., 0., 0.], [0., 1., 0.], [1., 1., 0.]], dtype=np.float32)
+        blob = positions.tobytes()
+        buffer_views = [{'buffer': 0, 'byteOffset': 0, 'byteLength': len(blob)}]
+        accessors = [{'bufferView': 0, 'componentType': 5126, 'count': 4, 'type': 'VEC3',
+                      'min': [0., 0., 0.], 'max': [1., 1., 0.]}]
+        gltf_primitives = []
+        for indices, material in primitives:
+            indices = np.array(indices, dtype=np.uint16).tobytes()
+            buffer_views.append({'buffer': 0, 'byteOffset': len(blob), 'byteLength': len(indices)})
+            accessors.append({'bufferView': len(buffer_views) - 1, 'componentType': 5123,
+                              'count': len(indices) // 2, 'type': 'SCALAR'})
+            blob += indices + b'\0' * (-len(indices) % 4)
+            primitive = {'attributes': {'POSITION': 0}, 'indices': len(accessors) - 1}
+            if material is not None:
+                primitive['material'] = material
+            gltf_primitives.append(primitive)
+        content = {
+            'asset': {'version': '2.0'}, 'scene': 0, 'scenes': [{'nodes': [0]}],
+            'nodes': [{'mesh': 0}], 'meshes': [{'primitives': gltf_primitives}],
+            'buffers': [{'byteLength': len(blob), 'uri': 'data:application/octet-stream;base64,' +
+                         base64.b64encode(blob).decode()}],
+            'bufferViews': buffer_views, 'accessors': accessors
+        }
+        if materials is not None:
+            content['materials'] = [{'name': name, 'pbrMetallicRoughness': {}} for name in materials]
+        with open(path, 'w') as f:
+            json.dump(content, f)
+
+    @pytest.mark.parametrize('materials,primitives,expected_names,expected_assignments', [
+        (None, [([0, 1, 2], None), ([1, 3, 2], None)], [], [-1, -1]),
+        (['red'], [([0, 1, 2], 0), ([1, 3, 2], None)], ['red'], [0, -1]),
+        (['red', 'blue'], [([0, 1, 2], 0), ([1, 3, 2], None)], ['red'], [0, -1]),
+    ])
+    def test_import_meshes(self, tmp_path, materials, primitives, expected_names, expected_assignments):
+        path = str(tmp_path / 'unassigned.gltf')
+        self._write_gltf(path, primitives, materials)
+        meshes = gltf.import_meshes(path)
+        assert len(meshes) == 1
+        assert [m.material_name for m in meshes[0].materials] == expected_names
+        assert meshes[0].material_assignments.tolist() == expected_assignments
+
+        # Must agree with import_mesh, which keeps the global material list
+        mesh = gltf.import_mesh(path)
+        assert mesh.material_assignments.tolist() == [
+            -1 if idx == -1 else materials.index(expected_names[idx]) for idx in expected_assignments]
