@@ -14,10 +14,10 @@ It also demonstrates key features of the new Kaolin UI/web toolkit in
 
 ## 1. Installation (Kaolin Library)
 
-1. Clone [internal gitlab Kaolin](https://gitlab-master.nvidia.com/Toronto_DL_Lab/kaolin) repository **recursively**:
+1. Clone the [Kaolin GitHub](https://github.com/NVIDIAGameWorks/kaolin) repository **recursively**:
 
    ```bash
-   git clone --recursive <copy location from gitlab>
+   git clone --recursive https://github.com/NVIDIAGameWorks/kaolin.git
    ```
 
 2. Check out **this branch**.

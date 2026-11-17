@@ -61,3 +61,6 @@ CLAUDE.md
 CLAUDE.local.md
 **/CLAUDE.md
 .claude/
+
+# downloaded model weights
+kaolin/app/segment/weights/
