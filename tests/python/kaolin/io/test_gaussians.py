@@ -65,6 +65,35 @@ def out_dir():
 class TestSyntheticGaussianImportExport:
     """USD vs PLY vs :func:`kaolin.io.import_gaussiancloud` on the same synthetic cloud."""
 
+    @pytest.mark.parametrize('formats', [('ply', 'usdc', 'ply'), ('usdc', 'ply', 'usdc')])
+    @pytest.mark.parametrize('device', ['cpu', pytest.param('cuda', marks=_CUDA_MARK)])
+    def test_features_cross_format_roundtrip(self, tmp_path, formats, device):
+        """Preserve standard fields and named feature groups through both formats."""
+        data = make_synthetic_gaussian_cloud(n=8)
+        data['features'] = {
+            'material_weights': torch.arange(40, dtype=torch.float32).reshape(8, 5) / 40,
+            'embedding': torch.arange(512, dtype=torch.float32).reshape(8, 64)[:, ::2],
+            'confidence': torch.linspace(0, 1, 8).reshape(8, 1),
+        }
+        current = {
+            key: ({name: tensor.to(device) for name, tensor in value.items()}
+                  if isinstance(value, dict) else value.to(device))
+            for key, value in data.items()
+        }
+        for index, extension in enumerate(formats):
+            path = str(tmp_path / f'roundtrip_{index}.{extension}')
+            writer = ply if extension == 'ply' else usd
+            writer.export_gaussiancloud(path, **current)
+            # Exercise the format dispatcher as well as both concrete readers.
+            model = import_gaussiancloud(path)
+            current = model.as_dict(only_tensors=True)
+            assert contained_torch_equal(
+                data, current, approximate=True, rtol=1e-5, atol=1e-6,
+                print_error_context=f'Roundtrip step {index}: {extension}')
+            assert set(model.features) == set(data['features'])
+            for name, expected in data['features'].items():
+                assert torch.equal(model.features[name], expected)
+
     @pytest.mark.parametrize('device', [
         'cpu',
         pytest.param('cuda', marks=_CUDA_MARK),
