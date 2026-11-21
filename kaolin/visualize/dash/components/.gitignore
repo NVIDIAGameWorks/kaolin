@@ -1,0 +1,5 @@
+# Ignore everything in components/autogen
+autogen/*
+
+# But include specific files
+!autogen/__init__.py

@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "lib": ["DOM", "DOM.Iterable", "ES6", "es2022"],
+    "jsx": "react",
+    "baseUrl": ".",
+    "inlineSources": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "strict": false,
+    "module": "commonjs",
+    "outDir": "./build/ts_out",
+    "declaration": true,
+    "declarationMap": true,
+    "paths": {
+      "@kaolin/*": [
+        "kaolin/visualize/dash/components/src/ts/*"
+      ],
+      "@test/*": [
+        "tests/ts/*"
+      ]
+    }
+  },
+  "include": [
+    "kaolin/visualize/dash/components/src/ts/**/*"
+    //"tests/ts/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build"
+  ]
+}

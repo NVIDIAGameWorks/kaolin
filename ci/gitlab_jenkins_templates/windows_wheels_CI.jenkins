@@ -3,6 +3,8 @@
 docker_registry_server = ImageTag.split(':')[0..1].join(':')
 currentBuild.displayName = ImageTag.split(':')[2]
 currentBuild.description = sourceBranch + ": " + commitHash
+// Explicitly set GIT_COMMIT so gitlabCommitStatus works on Jenkins Replay (no GitLab trigger context).
+env.GIT_COMMIT = commitHash
 
 // to manage image secrets:
 // 1) log into docker
@@ -29,7 +31,7 @@ spec:
   restartPolicy: Never
   initContainers:
     - name: vm-disk
-      image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/colossus-qemu-551.52-desktop-win10-win11-64bit:v1
+      image: urm.nvidia.com/sw-ipp-blossom-sre-docker-local/colossus-win-2022-vm:v1
       imagePullPolicy: IfNotPresent
       args:
         - /bin/busybox
@@ -190,14 +192,14 @@ spec:
                                 '''
                             }
                             if (currentBuild.getCurrentResult() != "FAILURE") {
-                                stage("Push wheels on volume") {
+                                stage("Push wheel to volume") {
                                     powershell '''
                                         $driveLetter = "Z:"
                                         $targetHost = $Env:VM_IP
                                         $shareName = "VirtioShare"
                                         $userName = $Env:VM_USER
                                         $password = $Env:VM_PASSWORD
-                        
+
                                         # Construct UNC path (e.g., \\\\10.0.2.15\\VirtioShare)
                                         $uncPath = "\\\\$targetHost\\$shareName"
 
@@ -213,7 +215,6 @@ spec:
                                             exit 1
                                         }
 
-                                        # Validate mapping
                                         if (-not (Test-Path "$driveLetter\\")) {
                                             Write-Error "ERROR: Drive $driveLetter is not accessible after mapping."
                                             Write-Host "INFO: Debug info - Available drives:"
@@ -225,17 +226,9 @@ spec:
                                         Write-Host "INFO: Drive $driveLetter mapped successfully. Listing contents:"
 
                                         New-Item -Path z://pvc/whl/"$env:folderName"/ -ItemType "directory" -Force
-                                        cp /kaolin/kaolin-*.whl z://pvc/whl/"$env:folderName"/
+                                        Copy-Item /kaolin/kaolin-*.whl z://pvc/whl/"$env:folderName"/ -ErrorAction Stop
                                         Get-ChildItem -Recurse -Depth 2 "z://pvc/whl/"
                                     '''
-                                }
-                                stage("Push wheels on artifacts") {
-                                    // archiveArtifacts only take relative path, and the working directory doesn't work in jenkins
-                                    // So we copy from /kaolin to current dir
-                                    powershell '''
-                                    cp /kaolin/kaolin-*.whl .
-                                    '''
-                                    archiveArtifacts artifacts: "kaolin-*.whl"
                                 }
                             }
 

@@ -76,13 +76,31 @@ spec:
           stage("Push") {
             targetImage.push()
           }
-          stage("Get cuda version") {
+          stage("Get build info") {
             targetImage.inside() {
-                cudaVer = sh (
-                  script: """
-                  python -c "import torch; print(torch.version.cuda)"
-                  """,
-                  returnStdout: true
+                cudaVer = sh(
+                    script: 'python -c "import torch; print(torch.version.cuda)"',
+                    returnStdout: true
+                ).trim()
+                supportedArches = sh(
+                    script: '''
+python3 << 'PYEOF'
+import torch
+# get_arch_list() returns [] when no GPU is present (guarded by is_available()).
+# Fall back to _cuda_getArchFlags() which reads compile-time flags directly.
+arches = torch.cuda.get_arch_list()
+if not arches:
+    result = []
+    for a in torch._C._cuda_getArchFlags().split():
+        sm = a.replace('+PTX', '')
+        result.append(sm)
+        if '+PTX' in a:
+            result.append('compute_' + sm.replace('sm_', ''))
+    arches = result
+print(' '.join(arches))
+PYEOF
+''',
+                    returnStdout: true
                 ).trim()
             }
           }
@@ -116,8 +134,10 @@ def prepareUbuntuTestJob(arch) {
         string(name: 'configName', value: "${configName}"),
         string(name: 'imageTag', value: "${targetImageTag}"),
         string(name: 'cudaVer', value: "${cudaVer}"),
+        string(name: 'supportedArches', value: "${supportedArches}"),
         string(name: 'arch', value: "${arch}"),
-        string(name: 'commitHash', value: "${commitHash}")
+        string(name: 'commitHash', value: "${commitHash}"),
+        string(name: 'repoUrl', value: "${repoUrl}")
       ],
       // This node doesn't need to be held while tests run.
       wait: false,

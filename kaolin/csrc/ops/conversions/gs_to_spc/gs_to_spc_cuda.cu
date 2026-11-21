@@ -17,12 +17,13 @@
 #define CUB_NS_POSTFIX }
 #define CUB_NS_QUALIFIER ::kaolin::cub
 
-#include <ATen/ATen.h>
-
 #define CUB_STDERR
-#include <c10/cuda/CUDAGuard.h>
 #include <cub/device/device_scan.cuh>
 #include <cub/device/device_radix_sort.cuh>
+
+#include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAGuard.h>
 
 #include <math_constants.h>
 
@@ -47,7 +48,7 @@ size_t get_cub_storage_bytes_sort_pairs(
   cudaStream_t stream = 0)
 {
     size_t    temp_storage_bytes = 0;
-    CubDebugExit(
+    AT_CUDA_CHECK(
         cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
                                         d_morton_codes_in, d_morton_codes_out, 
                                         d_values_in, d_values_out, num_items, 0, sizeof(uint64_t) * 8, stream)
@@ -625,7 +626,7 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
       reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()), curr_cnt, stream);
     temp_storage.resize_({static_cast<int64_t>(temp_storage_bytes)});
 
-    CubDebugExit(cub::DeviceScan::InclusiveSum(
+    AT_CUDA_CHECK(cub::DeviceScan::InclusiveSum(
       (void*)temp_storage.data_ptr<uint8_t>(), temp_storage_bytes, 
       reinterpret_cast<uint32_t*>(occupancy.data_ptr<int>()), 
       reinterpret_cast<uint32_t*>(prefix_sum.data_ptr<int>()), curr_cnt, stream));
@@ -682,7 +683,7 @@ std::vector<at::Tensor> gs_to_spc_cuda_impl(
     stream);
   temp_storage.resize_({(int64_t)temp_storage_bytes});
 
-  CubDebugExit(cub::DeviceRadixSort::SortPairs(
+  AT_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
     (void*)temp_storage.data_ptr<uint8_t>(), 
     temp_storage_bytes, 
     reinterpret_cast<uint64_t*>(morton_codes[curr_buf].data_ptr<int64_t>()), 

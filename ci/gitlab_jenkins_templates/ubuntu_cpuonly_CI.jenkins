@@ -105,6 +105,7 @@ spec:
                 """--no-cache --network host -f ./tools/linux/Dockerfile.install_wheel \
                    --build-arg BASE_IMAGE=${targetImageTag}-base \
                    --build-arg WHEEL_NAME=${wheelName} \
+                   --build-arg FORCE_CUDA=0 \
                    .
                 """)
           }
@@ -133,7 +134,8 @@ spec:
           string(name: 'sourceBranch', value: "${sourceBranch}"),
           string(name: 'configName', value: "${configName}"),
           string(name: 'imageTag', value: "${targetImageTag}"),
-          string(name: 'commitHash', value: "${commitHash}")
+          string(name: 'commitHash', value: "${commitHash}"),
+          string(name: 'repoUrl', value: "${repoUrl}")
         ],
         // This node doesn't need to be held while tests run.
         wait: false,

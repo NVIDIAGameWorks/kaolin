@@ -1,0 +1,4 @@
+gsplat>=1.4.0
+diffusers>=0.36.0
+transformers>=5.1.0
+accelerate>=1.12.0

@@ -86,6 +86,7 @@ KNOWN_BAD_DRIVERS = [
     ],
     "12.8": [
         "565.75",
+        "570.06",
         "570.14",
         "570.19",
         "570.86.10",
@@ -136,6 +137,14 @@ KNOWN_BAD_DRIVERS = [
         "595.45.04-open",
         "595.48",
     ],
+]
+
+// One-off host exclusions for nodes the driver_version affinity fails to filter. Keep each
+// entry dated with the reason; remove once the node is fixed/relabeled.
+BLACKLISTED_HOSTS = [
+    // 2026-10-13: driver 580.35 (in KNOWN_BAD_DRIVERS["13.0"]) but still scheduled for cuda=13.2;
+    // node's nvidia.com/driver_version label couldn't be inspected (missing or mismatched?).
+    "ipp2-0722.ipp2a1.colossus",
 ]
 
 required_min_driver = CUDA_MIN_DRIVER[cudaMajorMinor]
@@ -218,7 +227,7 @@ GPU_MIN_CUDA = [
         "NVIDIA_GH200_480GB",
     ],
     "12.8": [   // Blackwell sm_100 (requires CUDA 12.8+)
-        "GB102-P2021",
+        // "GB102-P2021", // this GPU cause some issues with nvdiffrast tests.
         "GB202_B40_TS2_MATHLIBS",
         "GB202-PG145-SKU30-TS2",
         "GB203-400DVT-A1-PG147-SKU45-TS2",
@@ -227,6 +236,62 @@ GPU_MIN_CUDA = [
     ],
     "13.0": [   // Blackwell sm_120 (requires CUDA 13.0+)
     ],
+]
+
+// Maps each GPU board-type string to its CUDA compute capability (sm_XX).
+// Used with supportedArches (passed from the build job) to drop GPUs whose architecture
+// was removed from the installed PyTorch — e.g. PyTorch 2.7+cu128 dropped sm_60/sm_70.
+// Any GPU not listed here passes through the filter unchanged.
+// Sources: https://developer.nvidia.com/cuda-gpus
+GPU_SM = [
+    // Pascal
+    "Tesla_P100_PCIE_12GB":             "sm_60",
+    "Tesla_PG500":                      "sm_60",
+    "Tesla_PG500_216":                  "sm_60",
+    "Tesla_P40":                        "sm_61",
+    "Tesla_P40_perf":                   "sm_61",
+    // Volta
+    "Tesla_V100_FHHL_16GB":             "sm_70",
+    "Tesla_V100_PCIE_16GB":             "sm_70",
+    "Tesla_V100_PCIE_32GB":             "sm_70",
+    "Tesla_V100S_PCIE_32GB":            "sm_70",
+    // Turing
+    "GeForce_RTX_2080_Ti":              "sm_75",
+    // Ampere sm_80
+    "A30":                              "sm_80",
+    "A100_80GB_PCIe":                   "sm_80",
+    "A100_PCIE_40GB":                   "sm_80",
+    "GA100-E4720-DVT":                  "sm_80",
+    "GA100-E4720-HBM2":                 "sm_80",
+    "GA100-E4720-POR":                  "sm_80",
+    // Ampere sm_86
+    "A10":                              "sm_86",
+    "A16":                              "sm_86",
+    "A40":                              "sm_86",
+    "GA104-300-PG142-SKU10-TS3":        "sm_86",
+    "GA107-PG179-SKU200-TS2":           "sm_86",
+    "GeForce_RTX_3060_Ti":              "sm_86",
+    "GeForce_RTX_3070":                 "sm_86",
+    "GeForce_RTX_3070_Ti":              "sm_86",
+    "GeForce_RTX_3080":                 "sm_86",
+    "GeForce_RTX_3080_Ti":              "sm_86",
+    // Ada Lovelace
+    "L40":                              "sm_89",
+    // Hopper
+    "GB100-P2020-SKU200-TS2":           "sm_90",  // TODO: verify min CUDA bucket (currently "12.0")
+    "GH100-882-P1010-SKU200-TS3":       "sm_90",
+    "GH100-882-P1010-SKU200-TS3_A":     "sm_90",
+    "GH100-885-PG520-SKU200-TS6":       "sm_90",
+    "GH100-PG520-SKU201-TS4":           "sm_90",
+    "H100_PCIe":                        "sm_90",
+    "NVIDIA_GH200_480GB":               "sm_90",
+    // Blackwell sm_100
+    "GB102-P2021":                      "sm_100",
+    "GB202_B40_TS2_MATHLIBS":           "sm_100",
+    "GB202-PG145-SKU30-TS2":            "sm_100",
+    "GB203-400DVT-A1-PG147-SKU45-TS2":  "sm_100",
+    "GB205-300-A1-PG146-SKU70-CR":      "sm_100",
+    "NVIDIA_HGX_B300":                  "sm_100",
 ]
 
 // Candidate GPU types for this build.
@@ -257,6 +322,30 @@ if (compatible_gpus.isEmpty()) {
           "All candidate GPUs require a higher CUDA: ${dropped}. " +
           "Use a different arch or update GPU_MIN_CUDA in ubuntu_test_cuda_CI.jenkins.")
 }
+
+// Filter candidate_gpus: drop any GPU whose architecture is absent from the torch build.
+// supportedArches is a space-separated list of sm_XX / compute_XX entries from
+// torch.cuda.get_arch_list(), emitted by the build job. GPUs not in GPU_SM pass through.
+// PTX (compute_XX) covers any sm where smNum >= computeNum (forward-compat only).
+def _archesStr = ''
+try { _archesStr = supportedArches ?: '' } catch (MissingPropertyException ignored) {}
+if (_archesStr) {
+    def arches = _archesStr.split(' ') as List
+    compatible_gpus = compatible_gpus.findAll { gpu ->
+        def sm = GPU_SM[gpu]
+        if (sm == null) return true
+        if (sm in arches) return true
+        def smNum = sm.replace('sm_', '').toInteger()
+        return arches.any { a ->
+            a.startsWith('compute_') && smNum >= a.replace('compute_', '').toInteger()
+        }
+    }
+    if (compatible_gpus.isEmpty()) {
+        error("No GPU types support the torch arch list '${_archesStr}' from arch='${arch}'. " +
+              "All candidates were filtered by GPU_SM. Add new GPUs to GPU_SM in ubuntu_test_cuda_CI.jenkins.")
+    }
+}
+
 gpu_list = "\n" + compatible_gpus.collect { "            - \"${it}\"" }.join("\n") + "\n    "
 
 // Union all KNOWN_BAD_DRIVERS[K] where K <= cudaVer.
@@ -277,8 +366,21 @@ if (!applicable_bad_drivers.isEmpty()) {
 ${values_lines}"""
 }
 
+host_blacklist_clause = ""
+if (!BLACKLISTED_HOSTS.isEmpty()) {
+    def values_lines = BLACKLISTED_HOSTS.collect { "            - \"${it}\"" }.join("\n")
+    host_blacklist_clause = """          - key: "kubernetes.io/hostname"
+            operator: "NotIn"
+            values:
+${values_lines}"""
+}
+
 // Shell-friendly CSV of the bad-driver union, for the runtime check stage.
 known_bad_csv = applicable_bad_drivers.join(",")
+
+// Space-separated "cuda=min_driver" pairs, for the runtime check stage to compute the
+// suggested KNOWN_BAD_DRIVERS bucket. Relies on CUDA_MIN_DRIVER being declared in ascending order.
+cuda_min_driver_pairs = CUDA_MIN_DRIVER.collect { k, v -> "${k}=${v}" }.join(" ")
 
 gitlabCommitStatus(gitlabStatusName) {
 
@@ -326,6 +428,7 @@ spec:
             operator: "In"
             values:${gpu_list}
 ${driver_blacklist_clause}
+${host_blacklist_clause}
 """) {
   node(POD_LABEL) {
     container("docker") {
@@ -344,37 +447,44 @@ MIN="${required_min_driver}"
 CUDA="${cudaMajorMinor}"
 KNOWN_BAD="${known_bad_csv}"
 HOST=\$(hostname)
+NODE="\${K8S_NODE_NAME:-unknown}"
 
-# Branch 1: minimum-version violation (driver too old for this CUDA).
-if [ "\$(printf '%s\\n%s' "\$DRV" "\$MIN" | sort -V | head -n 1)" != "\$MIN" ]; then
-    if [ "\$DRV_MAX_CUDA" = "unknown" ]; then
-        SUGGEST_BUCKET="\$CUDA"
-    else
-        SUGGEST_BUCKET=\$(echo "\$DRV_MAX_CUDA" | awk -F. '{printf "%d.%d", \$1, \$2+1}')
-    fi
-    cat <<EOF
-INFRA_DRIVER_MISMATCH: cuda=\$CUDA required>=\$MIN got=\$DRV (max claimed: \$DRV_MAX_CUDA) host=\$HOST
-  Suggested fix: add "\$DRV" to KNOWN_BAD_DRIVERS["\$SUGGEST_BUCKET"] in
-    ci/gitlab_jenkins_templates/ubuntu_test_cuda_CI.jenkins
-  (If the driver claims to support cuda=\$CUDA but is buggy, use
-   KNOWN_BAD_DRIVERS["\$CUDA"] instead.)
-EOF
-    exit 1
-fi
-
-# Branch 2: known-bad-hit (driver matches an entry already in the union list).
+# Branch 1: known-bad-hit (driver matches an entry already in the union list). Checked first so a
+# driver that is both too old and already listed isn't reported with a no-op "add it" suggestion.
 if [ -n "\$KNOWN_BAD" ]; then
     IFS=',' read -ra BAD_ARR <<< "\$KNOWN_BAD"
     for bad in "\${BAD_ARR[@]}"; do
         if [ "\$DRV" = "\$bad" ]; then
             cat <<EOF
-INFRA_DRIVER_MISMATCH: cuda=\$CUDA got=\$DRV host=\$HOST (already in KNOWN_BAD_DRIVERS)
+INFRA_DRIVER_MISMATCH: cuda=\$CUDA got=\$DRV host=\$HOST node=\$NODE (already in KNOWN_BAD_DRIVERS)
   The affinity should have filtered this driver. Possible causes: stale pod,
   recently-relabeled node, or affinity bug. Escalate to CI on-call.
 EOF
             exit 1
         fi
     done
+fi
+
+# Branch 2: minimum-version violation (driver too old for this CUDA).
+if [ "\$(printf '%s\\n%s' "\$DRV" "\$MIN" | sort -V | head -n 1)" != "\$MIN" ]; then
+    # Smallest CUDA in CUDA_MIN_DRIVER whose minimum this driver fails. Not derived from
+    # nvidia-smi's "CUDA Version", which reports the container's forward-compat libs, not the host driver.
+    SUGGEST_BUCKET="\$CUDA"
+    for pair in ${cuda_min_driver_pairs}; do
+        K_MIN="\${pair#*=}"
+        if [ "\$(printf '%s\\n%s' "\$DRV" "\$K_MIN" | sort -V | head -n 1)" != "\$K_MIN" ]; then
+            SUGGEST_BUCKET="\${pair%%=*}"
+            break
+        fi
+    done
+    cat <<EOF
+INFRA_DRIVER_MISMATCH: cuda=\$CUDA required>=\$MIN got=\$DRV (max claimed: \$DRV_MAX_CUDA) host=\$HOST node=\$NODE
+  Suggested fix: add "\$DRV" to KNOWN_BAD_DRIVERS["\$SUGGEST_BUCKET"] in
+    ci/gitlab_jenkins_templates/ubuntu_test_cuda_CI.jenkins
+  (If the driver claims to support cuda=\$CUDA but is buggy, use
+   KNOWN_BAD_DRIVERS["\$CUDA"] instead.)
+EOF
+    exit 1
 fi
 
 echo "Driver compat OK: cuda=\$CUDA need>=\$MIN have=\$DRV (max claimed: \$DRV_MAX_CUDA)"
@@ -398,6 +508,64 @@ echo "Driver compat OK: cuda=\$CUDA need>=\$MIN have=\$DRV (max claimed: \$DRV_M
             '''
             sh 'lscpu'
             sh 'free -h --si'
+          }
+        } catch(e) {
+          build_passed = false
+          echo e.toString()
+        }
+        try {
+          stage('Check GPU_SM') {
+            // Verify that the GPU on the allocated node has the sm_XX we expect in GPU_SM.
+            // Detects stale or wrong entries in the map before they cause silent misfiltering.
+            // board_type resolution:
+            //   non-MULTI: arch IS the board_type (e.g. "Tesla_P100_PCIE_12GB") — exact match.
+            //   MULTI: query the node's nvidia.com/gpu_type label via kubectl.
+            def gpuSmJson = groovy.json.JsonOutput.toJson(GPU_SM)
+            withEnv(["GPU_SM_JSON=${gpuSmJson}", "GPU_BOARD_TYPE=${arch}"]) {
+              def rc = sh(returnStatus: true, script: '''
+python3 << 'PYEOF'
+import json, os, subprocess, sys, torch
+
+gpu_sm = json.loads(os.environ['GPU_SM_JSON'])
+board_type = os.environ.get('GPU_BOARD_TYPE', '')
+
+if board_type == 'MULTI':
+    node_name = os.environ.get('K8S_NODE_NAME', '')
+    try:
+        result = subprocess.run(
+            ['kubectl', 'get', 'node', node_name,
+             '-o', r'jsonpath={.metadata.labels.nvidia\\.com/gpu_type}'],
+            capture_output=True, text=True, timeout=5
+        )
+        board_type = result.stdout.strip() if result.returncode == 0 else ''
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        board_type = ''
+
+if not board_type:
+    print('WARNING: could not determine board_type for this node — skipping GPU_SM check.')
+    sys.exit(0)
+
+if board_type not in gpu_sm:
+    print(f'WARNING: board_type "{board_type}" not found in GPU_SM — skipping check.')
+    print( '         Consider adding it to GPU_SM in ubuntu_test_cuda_CI.jenkins.')
+    sys.exit(0)
+
+expected_sm = gpu_sm[board_type]
+major, minor = torch.cuda.get_device_capability()
+actual_sm = f'sm_{major}{minor}'
+
+if actual_sm != expected_sm:
+    print(f'ERROR: GPU_SM["{board_type}"] = "{expected_sm}" but actual capability is "{actual_sm}".')
+    print( '       Update GPU_SM in ubuntu_test_cuda_CI.jenkins.')
+    sys.exit(1)
+
+print(f'OK: "{board_type}" -> {actual_sm} matches GPU_SM["{board_type}"].')
+PYEOF
+              ''')
+              if (rc != 0) {
+                error('GPU_SM entry is incorrect — see output above.')
+              }
+            }
           }
         } catch(e) {
           build_passed = false
@@ -523,6 +691,12 @@ echo "Driver compat OK: cuda=\$CUDA need>=\$MIN have=\$DRV (max claimed: \$DRV_M
                   if [[ "$PYTHON_MINOR" -ge "11" && "$PYTHON_MINOR" -lt "14" ]]; then
                       git clone --recursive https://github.com/nv-tlabs/3dgrut -b v1.1.0 /tmp/3dgrut
                       cd /tmp/3dgrut/ && MAX_JOBS=1 pip install -e .[dev,gui]
+                      # 3dgrut's JIT loader hardcodes -std=c++17 for nvcc, but torch>=2.14 headers
+                      # require C++20. Only bump when torch demands it (nvcc 11.x has no C++20).
+                      TORCH_INCLUDE=$(python -c "import torch, os; print(os.path.join(os.path.dirname(torch.__file__), 'include'))")
+                      if grep -q "C++20 or later" "$TORCH_INCLUDE/ATen/ATen.h"; then
+                          sed -i 's/"-std=c++17"/"-std=c++20"/' /tmp/3dgrut/threedgrut/utils/jit.py
+                      fi
                       SLANGC_VERSION="2026.5.2"
                       DOWNLOAD_URL="https://github.com/shader-slang/slang/releases/download/v${SLANGC_VERSION}/slang-${SLANGC_VERSION}-linux-x86_64.tar.gz"
                       wget -O /tmp/$(basename $DOWNLOAD_URL) $DOWNLOAD_URL
@@ -671,6 +845,29 @@ echo "Driver compat OK: cuda=\$CUDA need>=\$MIN have=\$DRV (max claimed: \$DRV_M
         } catch(e) {
           build_passed = false
           echo e.toString()
+        }
+        // On Replay there is no UpstreamCause, so gitlabCommitStatus can't traverse the cause
+        // chain to find GitLabWebHookCause and posts nothing. Fall back to a direct API call.
+        // Skip on normal triggered runs to avoid overwriting the plugin's pipeline-linked status.
+        boolean triggeredByUpstream = currentBuild.getBuildCauses().any { it._class?.contains('UpstreamCause') }
+        if (!triggeredByUpstream) {
+          try {
+            withCredentials([usernamePassword(
+                credentialsId: 'kaolin-gitlab-access-token-as-password',
+                usernameVariable: 'GL_USER', passwordVariable: 'GL_TOKEN')]) {
+              def glState = build_passed ? 'success' : 'failed'
+              def glProject = repoUrl.minus('https://gitlab-master.nvidia.com/').minus('.git').replace('/', '%2F')
+              def rc = sh(returnStatus: true, script: """curl -sS -f -X POST "https://gitlab-master.nvidia.com/api/v4/projects/${glProject}/statuses/${commitHash}" \
+                --header "PRIVATE-TOKEN: \${GL_TOKEN}" \
+                -d "state=${glState}&name=${gitlabStatusName}" \
+                --data-urlencode "target_url=${env.BUILD_URL}" """)
+              if (rc != 0) {
+                echo "WARNING: GitLab status fallback POST failed (curl rc=${rc}); MR status may be stale."
+              }
+            }
+          } catch (Throwable e) {
+            echo "WARNING: GitLab status fallback skipped: ${e}"
+          }
         }
         if (build_passed) {
           currentBuild.result = "SUCCESS"

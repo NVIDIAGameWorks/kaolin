@@ -17,10 +17,10 @@
 #define CUB_NS_POSTFIX }
 #define CUB_NS_QUALIFIER ::kaolin::cub
 
-#include <ATen/ATen.h>
-
 #define CUB_STDERR
 #include <cub/device/device_scan.cuh>
+
+#include <ATen/ATen.h>
 
 #include "../../spc_math.h"
 #include "../../spc_utils.cuh"

@@ -17,11 +17,12 @@
 #define CUB_NS_POSTFIX }
 #define CUB_NS_QUALIFIER ::kaolin::cub
 
-#include <ATen/ATen.h>
-
 #define CUB_STDERR
 #include <cub/device/device_scan.cuh>
 #include <cub/device/device_radix_sort.cuh>
+
+#include <ATen/ATen.h>
+#include <ATen/cuda/CUDAContext.h>
 
 #include "math_constants.h"
 
@@ -48,7 +49,7 @@ size_t get_cub_storage_bytes_sort_pairs(
   uint32_t num_items)
 {
     size_t    temp_storage_bytes = 0;
-    CubDebugExit(
+    AT_CUDA_CHECK(
         cub::DeviceRadixSort::SortPairs(d_temp_storage, temp_storage_bytes,
                                         d_morton_codes_in, d_morton_codes_out, 
                                         d_values_in, d_values_out, num_items)
@@ -348,7 +349,7 @@ std::vector<at::Tensor> mesh_to_spc_cuda_impl(
       reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), curr_cnt+1);
     temp_storage = at::empty({(int64_t)temp_storage_bytes}, face_vertices.options().dtype(at::kByte));
 
-    CubDebugExit(cub::DeviceScan::ExclusiveSum(
+    AT_CUDA_CHECK(cub::DeviceScan::ExclusiveSum(
       (void*)temp_storage.data_ptr<uint8_t>(), temp_storage_bytes, 
       reinterpret_cast<uint*>(occupancy.data_ptr<int>()), 
       reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), curr_cnt+1)); //start sum on second element
@@ -406,7 +407,7 @@ std::vector<at::Tensor> mesh_to_spc_cuda_impl(
     reinterpret_cast<uint64_t*>(triangle_id1.data_ptr<int64_t>()), curr_cnt);
   temp_storage = at::empty({(int64_t)temp_storage_bytes}, face_vertices.options().dtype(at::kByte));
 
-  CubDebugExit(cub::DeviceRadixSort::SortPairs(
+  AT_CUDA_CHECK(cub::DeviceRadixSort::SortPairs(
     (void*)temp_storage.data_ptr<uint8_t>(), 
     temp_storage_bytes, 
     reinterpret_cast<uint64_t*>(morton_codes0.data_ptr<int64_t>()), 
@@ -418,7 +419,7 @@ std::vector<at::Tensor> mesh_to_spc_cuda_impl(
   prefix_sum = at::empty({curr_cnt+1}, face_vertices.options().dtype(at::kInt));
 
   // set first element to zero
-  CubDebugExit(cudaMemcpy(reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), &buffer, sizeof(uint), cudaMemcpyHostToDevice));
+  AT_CUDA_CHECK(cudaMemcpy(reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), &buffer, sizeof(uint), cudaMemcpyHostToDevice));
 
   // Mark boundaries of unique  
   d_MarkDuplicates << <(curr_cnt + 63) / 64, 64 >> > (
@@ -439,7 +440,7 @@ std::vector<at::Tensor> mesh_to_spc_cuda_impl(
     temp_storage_bytes, 
     reinterpret_cast<uint*>(occupancy.data_ptr<int>()), 
     reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()), curr_cnt+1);
-  CubDebugExit(cudaMemcpy(&psize, reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()) + curr_cnt, sizeof(uint), cudaMemcpyDeviceToHost));
+  AT_CUDA_CHECK(cudaMemcpy(&psize, reinterpret_cast<uint*>(prefix_sum.data_ptr<int>()) + curr_cnt, sizeof(uint), cudaMemcpyDeviceToHost));
 
   d_Compactify << <(curr_cnt + 63) / 64, 64 >> > (
     curr_cnt, 

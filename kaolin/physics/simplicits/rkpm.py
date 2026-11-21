@@ -22,6 +22,7 @@ import logging
 
 from kaolin.ops.pointcloud import farthest_point_sampling
 from kaolin.physics.materials.material_utils import to_lame
+from kaolin.utils.compile import maybe_compile
 from scipy.spatial import cKDTree
 
 from .network import SkinningModule
@@ -263,7 +264,7 @@ class SimplicitsRKPM(SkinningModule):
         grad = torch.einsum("nNd,Nc->ncd", grad_phi, self.evecs)  # (n, D, C)
         return grad.to(dtype=out_dtype)
 
-@torch.compile(fullgraph=True)
+@maybe_compile(fullgraph=True)
 def compiled_func_x(x, nodes, radius):
     r"""Uncorrected Gaussian RBF kernel evaluated at input locations.
 
@@ -278,7 +279,7 @@ def compiled_func_x(x, nodes, radius):
     r = torch.cdist(x, nodes)
     return torch.exp(-(r / radius.unsqueeze(0)) ** 2)
 
-@torch.compile(fullgraph=True)
+@maybe_compile(fullgraph=True)
 def compiled_phi_x(Cx, Pn, func_x):
     r"""Assembles RKPM corrected shape functions from polynomial coefficients and the RBF.
 

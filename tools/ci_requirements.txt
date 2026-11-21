@@ -14,3 +14,8 @@ polyscope>=2.2.0
 gsplat>=1.4.0
 k3d
 newton[examples]==1.2.0  ; python_version > "3.10" and python_version < "3.14"
+# newton 1.2.0 reads warp.config.verbose, which warp-lang 1.18.0 removed.
+# warp-lang 1.18.0 PyPI wheels are also built with CUDA 13.4 and need an R580+ driver;
+# on older CI drivers warp silently falls back to CPU.
+warp-lang<1.18
+matplotlib

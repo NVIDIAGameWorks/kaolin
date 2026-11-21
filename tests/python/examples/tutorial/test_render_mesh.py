@@ -43,7 +43,8 @@ def gt_image_float(basename):
 def out_dir():
     # Create temporary output directory
     out_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '_render_mesh_out')
-    os.makedirs(out_dir, exist_ok=True)
+    shutil.rmtree(out_dir, ignore_errors=True)
+    os.makedirs(out_dir)
     yield out_dir
     shutil.rmtree(out_dir)  # Note: comment to keep output directory
 

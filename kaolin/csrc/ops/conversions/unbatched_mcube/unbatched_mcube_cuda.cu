@@ -15,11 +15,11 @@
 #include "tables.h"
 #include "helper_math.h"
 
+#include <cub/cub.cuh>
+
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
-
-#include <cub/cub.cuh>
 
 namespace kaolin {
 

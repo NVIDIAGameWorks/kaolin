@@ -17,6 +17,7 @@
 
 import copy
 import random
+from typing import Union
 import pytest
 import torch
 import math
@@ -78,7 +79,7 @@ class BaseTests:
         result[:3, 3] = translation
         return result, scale_mat, rot_matrix
 
-    def sample_input_kwargs(self, num_pts, optional_attributes=None, with_features: bool | list[str] = False, device="cpu", dtype=torch.float32, **kwargs):
+    def sample_input_kwargs(self, num_pts, optional_attributes=None, with_features: Union[bool, list[str]] = False, device="cpu", dtype=torch.float32, **kwargs):
         raise NotImplementedError('Implement this test for all test subclasses')
 
     def expected_tensor_attributes(self):

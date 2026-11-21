@@ -254,7 +254,7 @@ class TestTimelapseParser:
         if os.path.exists(out_dir):
             shutil.rmtree(out_dir)
         yield out_dir
-        # shutil.rmtree(out_dir)  # Note: comment to keep output directory
+        shutil.rmtree(out_dir)  # Note: comment to keep output directory
 
     def test_parsing(self, timelapse_sample_dir, output_dir2, meshes):
         shutil.copytree(timelapse_sample_dir, output_dir2)
