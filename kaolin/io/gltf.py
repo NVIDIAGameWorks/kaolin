@@ -477,6 +477,11 @@ def import_meshes(path):
     meshes = _get_meshes(gltf)
     for m in meshes:
         global_assignments, local_assignments = torch.unique(m.material_assignments, return_inverse=True)
+        # -1 marks faces without material; torch.unique sorts it first, so drop it
+        # and shift the local indices so those faces stay at -1
+        if global_assignments.numel() > 0 and global_assignments[0] == -1:
+            global_assignments = global_assignments[1:]
+            local_assignments = local_assignments - 1
         m.materials = [materials[idx] for idx in global_assignments]
         m.material_assignments = local_assignments
     return meshes
