@@ -71,23 +71,6 @@ d_MarkDuplicates(
     occupancy[tidx] = mcode[tidx - 1] == mcode[tidx] ? 0 : 1;
 }
 
-__global__ void
-d_Compactify(
-  const uint32_t num, 
-  const morton_code* mIn, 
-  morton_code* mOut, 
-  const uint32_t* occupancy, 
-  const uint32_t* prefix_sum)
-{
-  uint32_t tidx = blockDim.x * blockIdx.x + threadIdx.x;
-  if (tidx >= num) return;
-
-  if (occupancy[tidx]) {
-    uint32_t base_idx = tidx == 0 ? 0 : prefix_sum[tidx-1];
-    mOut[base_idx] = mIn[tidx];
-  }
-}
-
 // This function will subdivide input voxel to out voxels 
 __global__ void
 subdivide_cuda_kernel(

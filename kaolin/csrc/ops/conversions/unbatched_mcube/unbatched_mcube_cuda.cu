@@ -563,10 +563,10 @@ void CubScanWrapper(at::Tensor output, at::Tensor input, int numElements) {
 }
 
 // at::Tensor used to store tables
-void computeIsosurface(int3 gridSize, int3 gridSizeLog2, float isoValue,
+void computeIsosurface(int3 gridSize, int3 /*gridSizeLog2*/, float isoValue,
                        int *activeVoxels, int *totalVerts, int *totalTriangles,
                        int *totalPartialVerts,
-                       int numVoxels, float3 voxelSize, int maxVerts, int maxFaces,
+                       int numVoxels, float3 voxelSize, int maxVerts, int /*maxFaces*/,
                        at::Tensor voxelgrid, at::Tensor d_pos, at::Tensor d_faces,
                        at::Tensor d_voxelPartialVerts,
                        at::Tensor d_voxelTriangles,

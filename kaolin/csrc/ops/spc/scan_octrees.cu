@@ -64,7 +64,9 @@ int scan_octrees_cuda_impl(
   uint* EX0 = prefix_sum_ptr;
   uint8_t* O0 = octrees_ptr;
 
-  int level;
+  // batch_size >= 1 here (the caller takes at::max(lengths)), so the loop below always
+  // sets level; initialize it anyway so the return value is never indeterminate.
+  int level = 0;
 
   for (int batch = 0; batch < batch_size; batch++) {
     uint  osize = lengths[batch].item<int>();
@@ -84,7 +86,7 @@ int scan_octrees_cuda_impl(
     pyramid_acc[batch][1][1] = 1;
 
     level = 1;
-    while (pyramid_acc[batch][1][level] <= osize) {
+    while (static_cast<uint>(pyramid_acc[batch][1][level]) <= osize) {
       cudaMemcpy(&currSum, EX0 + prevSum, sizeof(uint), cudaMemcpyDeviceToHost);
       AT_CUDA_CHECK(cudaGetLastError());
 

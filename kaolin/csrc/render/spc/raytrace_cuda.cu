@@ -505,11 +505,11 @@ cumsum_reverse_cuda_kernel(
 std::vector<at::Tensor> raytrace_cuda_impl(
     at::Tensor octree,
     at::Tensor points,
-    at::Tensor pyramid,
+    at::Tensor /*pyramid*/,
     at::Tensor inclusive_sum,
     at::Tensor ray_o,
     at::Tensor ray_d,
-    uint32_t max_level,
+    uint32_t /*max_level*/,
     uint32_t target_level,
     bool return_depth,
     bool with_exit) {

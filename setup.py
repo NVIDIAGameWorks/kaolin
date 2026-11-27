@@ -5,6 +5,9 @@
 #
 # IGNORE_TORCH_VER
 #   ignore version requirements for PyTorch
+#
+# KAOLIN_WARNINGS_AS_ERRORS
+#   treat compiler warnings in Kaolin's C++/CUDA sources as errors (default: 1, set to 0 to disable)
 
 import os
 from setuptools import setup, find_packages
@@ -21,6 +24,7 @@ import shutil
 TORCH_MIN_VER = '2.5.1'
 TORCH_MAX_VER = '2.14.1'  # Updated to support newer PyTorch versions
 IGNORE_TORCH_VER = os.getenv('IGNORE_TORCH_VER') is not None
+WARNINGS_AS_ERRORS = os.getenv('KAOLIN_WARNINGS_AS_ERRORS', '1') != '0'
 
 # Module required before installation
 # trying to install it ahead turned out to be too unstable
@@ -55,7 +59,7 @@ if numpy_spec is None:
     )
 
 import numpy
-from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDAExtension, CUDA_HOME
+from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDAExtension, CUDA_HOME, include_paths
 
 # Setup logging and working directory
 cwd = os.path.dirname(os.path.abspath(__file__))
@@ -211,6 +215,28 @@ def get_extensions():
         extra_compile_args['cxx'].append('/Zc:preprocessor')
         if is_cuda:
             extra_compile_args['nvcc'] += ['-Xcompiler', '/Zc:preprocessor']
+    else:
+        # Enable warnings for Kaolin's own sources. PyTorch's headers are added with -I by
+        # CppExtension / CUDAExtension; also passing them as -isystem marks them as system
+        # headers (GCC/Clang then ignore the duplicate -I), so warnings in them are not reported.
+        # (include_paths() takes a bool before PyTorch 2.6 and a device string after.)
+        system_includes = []
+        for path in (include_paths('cuda') if is_cuda else include_paths()):
+            system_includes += ['-isystem', path]
+        warning_flags = ['-Wall', '-Wextra']
+        if not is_cuda:
+            # Without WITH_CUDA, the CUDA entry points compile to KAOLIN_NO_CUDA_ERROR stubs
+            # whose parameters are only used in the CUDA branch.
+            warning_flags.append('-Wno-unused-parameter')
+        if WARNINGS_AS_ERRORS:
+            warning_flags.append('-Werror')
+        extra_compile_args['cxx'] += system_includes + warning_flags
+        if is_cuda:
+            extra_compile_args['nvcc'] += system_includes + ['-Xcompiler=' + ','.join(warning_flags)]
+            if WARNINGS_AS_ERRORS:
+                # -Wno-deprecated-gpu-targets: the default TORCH_CUDA_ARCH_LIST above still
+                # includes pre-sm_75 targets, which newer nvcc reports as deprecated.
+                extra_compile_args['nvcc'] += ['-Werror=all-warnings', '-Wno-deprecated-gpu-targets']
 
     extensions = [
         extension(

@@ -385,19 +385,6 @@ static inline __host__ __device__ bool equals(float3 a, float3 b) {
     return a.x == b.x && a.y == b.y && a.z == b.z;
 }
 
-static __inline__ __host__ __device__  double4 crs4(float3 aa, float3 bb, float3 cc) {
-
-  double3 a = make_double3(aa.x, aa.y, aa.z);
-  double3 b = make_double3(bb.x, bb.y, bb.z);
-  double3 c = make_double3(cc.x, cc.y, cc.z);
-  double4 P;
-  P.x = a.z*b.y - a.y*b.z - a.z*c.y + b.z*c.y + a.y*c.z - b.y*c.z;
-  P.y = a.x*b.z + a.z*c.x - b.z*c.x - a.x*c.z + b.x*c.z - a.z*b.x;
-  P.z = a.y*b.x - a.x*b.y - a.y*c.x + b.y*c.x + a.x*c.y - b.x*c.y;
-  P.w = a.y*b.z*c.x + a.z*b.x*c.y - a.x*b.z*c.y - a.y*b.x*c.z + a.x*b.y*c.z -a.z*b.y*c.x;
-  return P;
-}
-
 static __host__ __device__ __forceinline__ float project_edge(
     const float3& vertex, const float3& edge, const float3& point) {
   const float3 point_vec = point - vertex;

@@ -312,9 +312,9 @@ void unbatched_reduced_sg_inner_product_backward_cuda_kernel(
         grad_intensity_prod_z = shm[threadIdx.x][threadIdx.y];
         __syncthreads();
         for (int offset = 8; offset > 0; offset /= 2) {
-          grad_intensity_prod_x += __shfl_down_sync(0xffffffff, grad_intensity_prod_x, offset);
-          grad_intensity_prod_y += __shfl_down_sync(0xffffffff, grad_intensity_prod_y, offset);
-          grad_intensity_prod_z += __shfl_down_sync(0xffffffff, grad_intensity_prod_z, offset);
+          grad_intensity_prod_x = grad_intensity_prod_x + __shfl_down_sync(0xffffffff, grad_intensity_prod_x, offset);
+          grad_intensity_prod_y = grad_intensity_prod_y + __shfl_down_sync(0xffffffff, grad_intensity_prod_y, offset);
+          grad_intensity_prod_z = grad_intensity_prod_z + __shfl_down_sync(0xffffffff, grad_intensity_prod_z, offset);
         }
         __syncthreads();
         if (threadIdx.x == 0) {

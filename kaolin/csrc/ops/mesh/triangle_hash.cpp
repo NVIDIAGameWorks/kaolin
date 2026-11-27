@@ -139,10 +139,10 @@ std::vector<at::Tensor> TriangleHash::query(at::Tensor points) {
   auto points_indices_tensor = at::zeros(points_indices.size(), options.dtype(at::kLong));
   auto tri_indices_tensor = at::zeros(tri_indices.size(), options.dtype(at::kLong));
   
-  for (int k = 0; k < points_indices.size(); k++) {
+  for (size_t k = 0; k < points_indices.size(); k++) {
     points_indices_tensor[k] = points_indices[k];
   }
-  for (int k = 0; k < tri_indices.size(); k++) {
+  for (size_t k = 0; k < tri_indices.size(); k++) {
     tri_indices_tensor[k] = tri_indices[k];
   }
 

@@ -53,20 +53,17 @@ unsigned int prepare_param(
     const unsigned int tensor_idx) {
   unsigned int cur_numel = 1;
   if (use_shape) {
-#pragma unroll
     for (int dim = 0; dim < tensor_ndim; dim++) {
       param.tensor_to_shape[tensor_idx][dim] = \
           shape_per_tensor[(tensor_idx + param.tensor_offset) * tensor_ndim + dim];
     }
   }
-#pragma unroll
   for (int dim = 0; dim < tensor_ndim; dim++) {
     cur_numel *= shape_per_tensor[(tensor_idx + param.tensor_offset) * tensor_ndim + dim];
   }
   if (use_numel) {
     param.tensor_to_numel[tensor_idx] = cur_numel;
   }
-#pragma unroll
   for (int i = 0; i < nb_cpu_data; i++) {
     param.tensor_to_cpu_data[tensor_idx][i] = \
         static_cast<unsigned int>(cpu_data[i][tensor_idx + param.tensor_offset]);
