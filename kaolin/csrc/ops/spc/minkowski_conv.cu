@@ -233,7 +233,7 @@ namespace minkowski {
 		const Dtype *d_kernel,
 		const pInOutMaps<Itype> &in_maps,
 		const pInOutMaps<Itype> &out_maps,
-		int out_nrows, cublasHandle_t cuhandle,
+		int /*out_nrows*/, cublasHandle_t /*cuhandle*/,
 		cudaStream_t stream) {
 
 		AT_CUDA_CHECK(cudaDeviceSynchronize());
@@ -256,7 +256,7 @@ namespace minkowski {
 		dim3 threads(shared_mem_size, shared_mem_size);
 
 		// Iterate through each spatial kernel and get indices for in_map and out_map
-		for (int k = 0; k < in_maps.size(); k++) {
+		for (int k = 0; k < static_cast<int>(in_maps.size()); k++) {
 			n_active_in_volume = in_maps[k].size();
 			if (n_active_in_volume == 0)
 				continue;
@@ -322,7 +322,7 @@ namespace minkowski {
 		Dtype *d_grad_kernel,
 		const pInOutMaps<Itype> &in_maps,
 		const pInOutMaps<Itype> &out_maps,
-		int out_nrows, cublasHandle_t cuhandle,
+		int /*out_nrows*/, cublasHandle_t /*cuhandle*/,
 		cudaStream_t stream) {
 
 		AT_CUDA_CHECK(cudaDeviceSynchronize());
@@ -344,7 +344,7 @@ namespace minkowski {
 
 		dim3 threads(shared_mem_size, shared_mem_size);
 
-		for (int k = 0; k < in_maps.size(); k++) {
+		for (int k = 0; k < static_cast<int>(in_maps.size()); k++) {
 			n_active_in_volume = in_maps[k].size();
 			if (n_active_in_volume == 0)
 				continue;

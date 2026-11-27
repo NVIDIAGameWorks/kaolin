@@ -204,7 +204,7 @@ void ProcessKernelMaps(
   int size = 0;
   int* Ix = InmapX;
   int* Ox = OutmapX;
-  for (int k = 0; k < K; k++) {
+  for (uint k = 0; k < K; k++) {
     cudaMemcpy(&currSum, PSum + (k + 1)*Cnt - 1, sizeof(int),
                cudaMemcpyDeviceToHost);
 
@@ -250,7 +250,7 @@ void Conv3d_forward_cuda(
   int Plevel = Qlevel - Jump;
   uint scale_factor = 0x1 << (Qlevel - Plevel);
 
-  for (uint batch = 0; batch < BatchSize; batch++) {
+  for (uint batch = 0; batch < static_cast<uint>(BatchSize); batch++) {
     uint Psize = GetPyramid(Pyramid, batch, 0, Plevel, Olevel);
     uint Qsize = GetPyramid(Pyramid, batch, 0, Qlevel, Olevel);
     uint offset = GetPyramid(Pyramid, batch, 1, Qlevel, Olevel);
@@ -337,7 +337,7 @@ void Conv3d_backward_cuda(
               "Level + jump must be lower or equal than the depth of the octree.");
   uint scale_factor = 0x1 << (Qlevel - Plevel);
 
-  for (uint batch = 0; batch < BatchSize; batch++) {
+  for (uint batch = 0; batch < static_cast<uint>(BatchSize); batch++) {
     uint Qsize = GetPyramid(Pyramid, batch, 0, Qlevel, Olevel);
     uint Psize = GetPyramid(Pyramid, batch, 0, Plevel, Olevel);
     uint offset = GetPyramid(Pyramid, batch, 1, Plevel, Olevel);
@@ -421,7 +421,7 @@ void ConvTranspose3d_forward_cuda(
 
   uint scale_factor = 0x1 << (Plevel - Qlevel);
 
-  for (uint batch = 0; batch < BatchSize; batch++) {
+  for (uint batch = 0; batch < static_cast<uint>(BatchSize); batch++) {
     uint Qsize = GetPyramid(Pyramid, batch, 0, Qlevel, Olevel);
     uint Psize = GetPyramid(Pyramid, batch, 0, Plevel, Olevel);
     uint offset = GetPyramid(Pyramid, batch, 1, Qlevel, Olevel);
@@ -503,7 +503,7 @@ void ConvTranspose3d_backward_cuda(
 
   uint scale_factor = 0x1 << (Plevel - Qlevel);
 
-  for (uint batch = 0; batch < BatchSize; batch++) {
+  for (uint batch = 0; batch < static_cast<uint>(BatchSize); batch++) {
     uint Qsize = GetPyramid(Pyramid, batch, 0, Qlevel, Olevel);
     uint Psize = GetPyramid(Pyramid, batch, 0, Plevel, Olevel);
     uint offset = GetPyramid(Pyramid, batch, 1, Plevel, Olevel);

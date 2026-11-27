@@ -521,7 +521,7 @@ std::vector<at::Tensor> bq_extract(
 
 
 std::vector<at::Tensor> bq_touch(
-  at::Tensor points,
+  at::Tensor /*points*/,
   uint32_t level,
   at::Tensor octree, 
   at::Tensor empty,

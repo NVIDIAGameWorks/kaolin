@@ -78,7 +78,7 @@ void to_dense_forward_cuda_kernel_launch(
   float* features_ptr = features.data_ptr<float>();
   float* outputs_ptr = outputs.data_ptr<float>();
 
-  for (int bidx = 0; bidx < batch_size; bidx++) {
+  for (int bidx = 0; bidx < static_cast<int>(batch_size); bidx++) {
     uint point_size = GetPyramid(pyramid_ptr, bidx, 0, level, max_level);
 
     // map input->output

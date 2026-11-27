@@ -64,7 +64,7 @@ at::Tensor to_dense_forward(
   int num_features = features.size(0);
   uint psize = pyramid.index({ Slice(None), 0, level }).sum().item<int>();
 
-  TORCH_CHECK(num_features == psize);
+  TORCH_CHECK(static_cast<uint>(num_features) == psize);
 
   at::Tensor outputs = at::zeros({batch_size, feature_size, grid_size, grid_size, grid_size},
                                  points.options().dtype(at::kFloat));

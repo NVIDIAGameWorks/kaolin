@@ -403,7 +403,7 @@ __global__ void rasterize_backward_cuda_kernel(
 
 void rasterize_backward_cuda_impl(
     const at::Tensor grad_interpolated_features,
-    const at::Tensor interpolated_features,
+    const at::Tensor /*interpolated_features*/,
     const at::Tensor selected_face_idx,
     const at::Tensor output_weights,
     const at::Tensor face_vertices_image,

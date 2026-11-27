@@ -136,7 +136,7 @@ at::Tensor coords_to_trilinear_cuda(at::Tensor coords, at::Tensor points) {
 #endif  // WITH_CUDA
 }
 
-at::Tensor coords_to_trilinear_jacobian_cuda(at::Tensor coords) {
+at::Tensor coords_to_trilinear_jacobian_cuda(at::Tensor /*coords*/) {
 #ifdef WITH_CUDA
   // TODO(ttakikawa): To implement when we implement backprop
   AT_ERROR("coords_to_trilinear_jacobian_cuda is not implemented yet");

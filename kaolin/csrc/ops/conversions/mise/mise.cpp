@@ -59,7 +59,7 @@ MISE::MISE(int32_t in_resolution_0, int32_t in_depth, double in_threshold) {
       for (int32_t k = 0; k < resolution_0; k++) {
         loc = Vector3D(i * voxel_size_0, j * voxel_size_0, k * voxel_size_0);
         voxel = Voxel(loc, 0, true);
-        TORCH_CHECK(voxels.size() == i * resolution_0 * resolution_0 + j * resolution_0 + k);
+        TORCH_CHECK(voxels.size() == static_cast<size_t>(i * resolution_0 * resolution_0 + j * resolution_0 + k));
         voxels.push_back(voxel);
       }
     }
@@ -71,7 +71,7 @@ MISE::MISE(int32_t in_resolution_0, int32_t in_depth, double in_threshold) {
     for (int32_t j = 0; j < resolution_1; j++) {
       for (int32_t k = 0; k < resolution_1; k++) {
         loc = Vector3D(i * voxel_size_0, j * voxel_size_0, k * voxel_size_0);
-        TORCH_CHECK(grid_points.size() == i * resolution_1 * resolution_1 + j * resolution_1 + k);
+        TORCH_CHECK(grid_points.size() == static_cast<size_t>(i * resolution_1 * resolution_1 + j * resolution_1 + k));
         add_grid_point(loc);
       }
     }
@@ -190,7 +190,7 @@ void MISE::subdivide_voxels() {
 
   int32_t n_subdivide = 0;
   for (size_t idx = 0; idx < voxels.size(); idx++) {
-    if (!voxels[idx].is_leaf || voxels[idx].level == depth)
+    if (!voxels[idx].is_leaf || voxels[idx].level == static_cast<uint32_t>(depth))
       continue;
     if (next_to_positive[idx] && next_to_negative[idx])
       n_subdivide += 1;
@@ -201,7 +201,7 @@ void MISE::subdivide_voxels() {
   int32_t init_voxel_size = voxels.size();
 
   for (int32_t idx = 0; idx < init_voxel_size; idx++) {
-    if (!voxels[idx].is_leaf || voxels[idx].level == depth)
+    if (!voxels[idx].is_leaf || voxels[idx].level == static_cast<uint32_t>(depth))
       continue;
     if (next_to_positive[idx] && next_to_negative[idx])
       subdivide_voxel(idx);
